@@ -77,11 +77,11 @@ WSGI_APPLICATION = 'nc.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'defaultdb',
-        'USER': 'postgres',
-        'PASSWORD': 'postgres',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': 'zzz_defaultdb',
+        'USER': 'Pawel',
+        'PASSWORD': 'AVNS_A1Vlq8MqVwDcfbX8qL5',
+        'HOST': 'db-postgresql-fra1-18304-do-user-18661095-0.l.db.ondigitalocean.com',
+        'PORT': '25060',
     }
 }
 
