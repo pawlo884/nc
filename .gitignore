@@ -19,3 +19,4 @@ __pycache__/
 .env.prod
 docker-compose.dev.yml
 .vscode/
+nc/settings.dev.py
