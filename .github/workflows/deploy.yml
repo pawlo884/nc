@@ -38,9 +38,13 @@ jobs:
         username: ${{ secrets.DROPLET_USERNAME }}
         key: ${{ secrets.DROPLET_SSH_KEY }}
         port: 22
+        debug: true
+        command_timeout: 20m
         script: |
           echo "Testing connection..."
           whoami
+          pwd
+          ls -la ~/.ssh/
           echo "Deploying application..."
           cd /app
           docker-compose pull
