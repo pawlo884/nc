@@ -73,6 +73,8 @@ jobs:
                 - .env.${ENVIRONMENT:-prod}
               restart: always
           EOL
+          echo "Adding DOCKERHUB_USERNAME to .env.prod..."
+          echo "DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }}" >> /srv/app/.env.prod
           echo "Deploying application..."
           cd /srv/app
           docker-compose pull
