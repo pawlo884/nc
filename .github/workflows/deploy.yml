@@ -59,9 +59,10 @@ jobs:
           echo "Creating /srv/app directory..."
           sudo mkdir -p /srv/app
           sudo chown ${{ secrets.DROPLET_USERNAME }}:${{ secrets.DROPLET_USERNAME }} /srv/app
-          echo "Copying project files..."
+          echo "Cleaning /srv/app directory..."
           cd /srv/app
-          rm -rf * .git
+          rm -rf .* * || true
+          echo "Copying project files..."
           git clone git@github.com:pawlo884/nc.git .
           echo "Copying docker-compose.yml..."
           cat > /srv/app/docker-compose.yml << 'EOL'
