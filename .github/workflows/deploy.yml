@@ -78,6 +78,9 @@ jobs:
               listen 80;
               server_name _;
 
+              access_log /var/log/nginx/access.log;
+              error_log /var/log/nginx/error.log debug;
+
               location / {
                   proxy_pass http://web:8000;
                   proxy_set_header Host $host;
@@ -88,6 +91,8 @@ jobs:
 
               location /static/ {
                   alias /app/staticfiles/;
+                  access_log off;
+                  expires max;
               }
           }
           EOL
@@ -102,4 +107,14 @@ jobs:
           DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose pull
           DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose up -d
           echo "Container logs:"
-          docker-compose logs web 
+          docker-compose logs web
+          echo "Nginx logs:"
+          docker-compose logs nginx
+          echo "Container status:"
+          docker-compose ps
+          echo "Nginx configuration:"
+          cat nginx.conf
+          echo "Environment variables:"
+          env | grep DOCKERHUB_USERNAME
+          echo "Docker compose file:"
+          cat docker-compose.yml 

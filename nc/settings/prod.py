@@ -6,7 +6,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-zlntqh&x6vv%$+87ycj
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['209.38.208.114']  # W produkcji należy ustawić konkretne domeny
+ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '164.92.251.171']
 
 # Database
 DATABASES = {
@@ -21,10 +21,14 @@ DATABASES = {
 }
 
 # Security settings for production
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = 31536000  # 1 rok
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
-SECURE_FRAME_DENY = True 
+SECURE_SSL_REDIRECT = False  # Tymczasowo wyłączone, ponieważ nie mamy jeszcze HTTPS
+SESSION_COOKIE_SECURE = False  # Tymczasowo wyłączone
+CSRF_COOKIE_SECURE = False  # Tymczasowo wyłączone
+SECURE_HSTS_SECONDS = None  # Tymczasowo wyłączone
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+SECURE_FRAME_DENY = False
+
+# Dodatkowe ustawienia dla proxy
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = None 
