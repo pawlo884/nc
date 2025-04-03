@@ -11,6 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Skopiuj pliki projektu do kontenera
 COPY . /app/
 
+# Ustaw zmienną środowiskową dla Django podczas budowania
+ENV DJANGO_SETTINGS_MODULE=nc.settings.prod
+
 # Zbierz statyczne pliki
 RUN python manage.py collectstatic --noinput
 
