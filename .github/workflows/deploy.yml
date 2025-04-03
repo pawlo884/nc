@@ -68,8 +68,8 @@ jobs:
             rm -rf * .[!.]* ..?*
             git clone git@github.com:pawlo884/nc.git .
           fi
-          echo "Copying docker-compose.yml..."
-          cat > /srv/app/docker-compose.yml << 'EOL'
+          echo "Copying docker-compose.prod.yml..."
+          cat > /srv/app/docker-compose.prod.yml << 'EOL'
           services:
             web:
               image: ${DOCKERHUB_USERNAME}/django-app:latest
@@ -92,7 +92,8 @@ jobs:
           echo "Current directory: $(pwd)"
           echo "Directory contents: $(ls -la)"
           echo "Docker Hub username: ${{ env.DOCKERHUB_USERNAME }}"
-          DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose pull
-          DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose up -d
+          echo "Starting containers..."
+          docker-compose -f docker-compose.prod.yml pull
+          docker-compose -f docker-compose.prod.yml up -d
           echo "Container logs:"
           docker-compose logs web 
