@@ -93,7 +93,7 @@ jobs:
           echo "Directory contents: $(ls -la)"
           echo "Docker Hub username: ${{ env.DOCKERHUB_USERNAME }}"
           echo "Starting containers..."
-          docker-compose -f docker-compose.prod.yml pull
-          docker-compose -f docker-compose.prod.yml up -d
+          DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose -f docker-compose.prod.yml pull
+          DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose -f docker-compose.prod.yml up -d
           echo "Container logs:"
-          docker-compose logs web 
+          docker-compose -f docker-compose.prod.yml logs web 
