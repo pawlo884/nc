@@ -31,16 +31,16 @@ jobs:
         push: true
         tags: ${{ env.DOCKERHUB_USERNAME }}/django-app:latest
         
-    - name: Deploy to DigitalOcean
-      uses: appleboy/ssh-action@master
+    - name: Install SSH key
+      uses: webfactory/ssh-agent@v0.8.0
       with:
-        host: ${{ secrets.DROPLET_HOST }}
-        username: ${{ secrets.DROPLET_USERNAME }}
-        key: ${{ secrets.DROPLET_SSH_KEY }}
-        port: 22
-        debug: true
-        command_timeout: 20m
-        script: |
+        ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
+        
+    - name: Deploy to DigitalOcean
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
+        ssh ${{ secrets.DROPLET_USERNAME }}@${{ secrets.DROPLET_HOST }} '
           echo "Testing connection..."
           whoami
           pwd
@@ -48,4 +48,5 @@ jobs:
           echo "Deploying application..."
           cd /app
           docker-compose pull
-          docker-compose up -d 
+          docker-compose up -d
+        ' 
