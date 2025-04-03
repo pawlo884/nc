@@ -77,5 +77,10 @@ jobs:
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
           echo "Deploying application..."
           cd /srv/app
+          echo "Current directory: $(pwd)"
+          echo "Directory contents: $(ls -la)"
+          echo "Docker Hub username: ${{ env.DOCKERHUB_USERNAME }}"
           DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose pull
-          DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose up -d 
+          DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose up -d
+          echo "Container logs:"
+          docker-compose logs web 
