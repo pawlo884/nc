@@ -62,12 +62,16 @@ jobs:
           echo "Updating project files..."
           cd /srv/app
           if [ -d .git ]; then
+            echo "Repository exists, updating..."
             git fetch origin
             git reset --hard origin/main
           else
+            echo "Repository does not exist, cloning..."
             rm -rf * .[!.]* ..?*
-            git clone git@github.com:pawlo884/nc.git .
+            git clone https://github.com/pawlo884/nc.git .
           fi
+          echo "Checking repository contents..."
+          ls -la
           echo "Copying docker-compose.prod.yml..."
           cat > /srv/app/docker-compose.prod.yml << 'EOL'
           services:
@@ -81,10 +85,15 @@ jobs:
                 - "8000:8000"
               env_file:
                 - .env.${ENVIRONMENT:-prod}
+              environment:
+                - DJANGO_SETTINGS_MODULE=nc.settings.prod
               restart: always
           volumes:
             static_volume:
           EOL
+          echo "Checking if docker-compose.prod.yml was created..."
+          ls -la docker-compose.prod.yml
+          cat docker-compose.prod.yml
           echo "Logging in to Docker Hub..."
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
           echo "Deploying application..."
