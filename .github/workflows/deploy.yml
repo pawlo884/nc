@@ -73,6 +73,16 @@ jobs:
                 - .env.${ENVIRONMENT:-prod}
               restart: always
           EOL
+          echo "Creating .env.prod file..."
+          cat > /srv/app/.env.prod << 'EOL'
+          DB_HOST=<db-postgresql-fra1-18304-do-user-18661095-0.l.db.ondigitalocean.com>
+          DB_PORT=<25060>
+          DB_NAME=<defaultdb>
+          DB_USER=<doadmin>
+          DB_PASSWORD=<AVNS_7h22feiJEsbaRFL7B3i>
+          DJANGO_SETTINGS_MODULE=nc_project.settings
+          DOCKERHUB_USERNAME=pawlo884
+          EOL
           echo "Deploying application..."
           cd /srv/app
           docker-compose pull
