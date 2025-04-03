@@ -11,5 +11,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Skopiuj pliki projektu do kontenera
 COPY . /app/
 
-# Uruchom migracje i serwer
-CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+# Uruchom migracje i Gunicorn
+CMD ["sh", "-c", "python manage.py migrate && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"]

@@ -1,14 +1,11 @@
 services:
   web:
-    build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    image: pawlo884/django-app:latest
+    command: gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
     volumes:
       - .:/app
     ports:
       - "8000:8000"
-    environment:
-      - DB_HOST=<db-postgresql-fra1-18304-do-user-18661095-0.l.db.ondigitalocean.com>
-      - DB_PORT=<25060>
-      - DB_NAME=<zzz_defaultdb>
-      - DB_USER=<doadmin>
-      - DB_PASSWORD=<AVNS_7h22feiJEsbaRFL7B3i>
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    restart: always
