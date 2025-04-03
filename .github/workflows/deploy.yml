@@ -37,7 +37,11 @@ jobs:
         host: ${{ secrets.DROPLET_HOST }}
         username: ${{ secrets.DROPLET_USERNAME }}
         key: ${{ secrets.DROPLET_SSH_KEY }}
+        port: 22
         script: |
+          echo "Testing connection..."
+          whoami
+          echo "Deploying application..."
           cd /app
           docker-compose pull
           docker-compose up -d 
