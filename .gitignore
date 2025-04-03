@@ -17,5 +17,5 @@ __pycache__/
 .env
 .env.dev
 .env.prod
-docker-compose.dev.yml
+.docker-compose.dev.yml
 .vscode/

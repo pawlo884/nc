@@ -11,5 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Skopiuj pliki projektu do kontenera
 COPY . /app/
 
+# Zbierz statyczne pliki
+RUN python manage.py collectstatic --noinput
+
 # Uruchom migracje i Gunicorn
 CMD ["sh", "-c", "python manage.py migrate && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"]
