@@ -59,6 +59,8 @@ jobs:
           echo "Creating /srv/app directory..."
           sudo mkdir -p /srv/app
           sudo chown ${{ secrets.DROPLET_USERNAME }}:${{ secrets.DROPLET_USERNAME }} /srv/app
+          echo "Copying project files..."
+          tar -czf - . | ssh ${{ secrets.DROPLET_USERNAME }}@${{ secrets.DROPLET_HOST }} "cd /srv/app && tar -xzf -"
           echo "Copying docker-compose.yml..."
           cat > /srv/app/docker-compose.yml << 'EOL'
           services:
