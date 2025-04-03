@@ -56,6 +56,11 @@ jobs:
           whoami
           pwd
           ls -la ~/.ssh/
+          echo "Setting up SSH for GitHub..."
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
           echo "Creating /srv/app directory..."
           sudo mkdir -p /srv/app
           sudo chown ${{ secrets.DROPLET_USERNAME }}:${{ secrets.DROPLET_USERNAME }} /srv/app
