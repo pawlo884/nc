@@ -1,7 +1,7 @@
 services:
   web:
     build: .
-    command: gunicorn nc_project.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120 --reload
+    command: gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120 --reload
     volumes:
       - .:/app
     ports:
