@@ -60,9 +60,12 @@ jobs:
           sudo mkdir -p /srv/app
           sudo chown ${{ secrets.DROPLET_USERNAME }}:${{ secrets.DROPLET_USERNAME }} /srv/app
           echo "Copying project files..."
-          git clone https://github.com/pawlo884/nc.git /tmp/nc
-          cp -r /tmp/nc/* /srv/app/
-          rm -rf /tmp/nc
+          cd /srv/app
+          rm -rf *
+          git init
+          git remote add origin git@github.com:pawlo884/nc.git
+          git fetch origin main
+          git reset --hard origin/main
           echo "Copying docker-compose.yml..."
           cat > /srv/app/docker-compose.yml << 'EOL'
           services:
