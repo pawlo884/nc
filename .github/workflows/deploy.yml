@@ -59,15 +59,15 @@ jobs:
           echo "Creating /srv/app directory..."
           sudo mkdir -p /srv/app
           sudo chown ${{ secrets.DROPLET_USERNAME }}:${{ secrets.DROPLET_USERNAME }} /srv/app
-          echo "Backing up important files..."
+          echo "Updating project files..."
           cd /srv/app
-          cp .env.prod /tmp/.env.prod.backup || true
-          echo "Cleaning /srv/app directory..."
-          rm -rf * .git
-          echo "Restoring important files..."
-          mv /tmp/.env.prod.backup .env.prod || true
-          echo "Copying project files..."
-          git clone git@github.com:pawlo884/nc.git .
+          if [ -d .git ]; then
+            git fetch origin
+            git reset --hard origin/main
+          else
+            rm -rf * .[!.]* ..?*
+            git clone git@github.com:pawlo884/nc.git .
+          fi
           echo "Copying docker-compose.yml..."
           cat > /srv/app/docker-compose.yml << 'EOL'
           services:
