@@ -73,6 +73,8 @@ jobs:
                 - .env.${ENVIRONMENT:-prod}
               restart: always
           EOL
+          echo "Logging in to Docker Hub..."
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
           echo "Deploying application..."
           cd /srv/app
           DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose pull
