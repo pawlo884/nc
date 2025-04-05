@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'whitenoise.runserver_nostatic',
     'main',
+    'matterhorn',
 ]
 
 MIDDLEWARE = [
@@ -52,6 +53,31 @@ TEMPLATES = [
         },
     },
 ]
+
+# Database routers
+DATABASE_ROUTERS = ['nc.db_routers.MatterhornRouter']
+
+# Database
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DEFAULT_DB_NAME'),
+        'USER': os.getenv('DEFAULT_DB_USER'),
+        'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
+        'HOST': os.getenv('DEFAULT_DB_HOST'),
+        'PORT': os.getenv('DEFAULT_DB_PORT'),
+    },
+    'matterhorn': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('MATTERHORN_DB_NAME'),
+        'USER': os.getenv('MATTERHORN_DB_USER'),
+        'PASSWORD': os.getenv('MATTERHORN_DB_PASSWORD'),
+        'HOST': os.getenv('MATTERHORN_DB_HOST'),
+        'PORT': os.getenv('MATTERHORN_DB_PORT'),
+    }
+}
+
+
 
 WSGI_APPLICATION = 'nc.wsgi.application'
 
