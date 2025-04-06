@@ -52,6 +52,7 @@ class Images(models.Model):
 class ProductsProxy(Products):
     class Meta:
         proxy = True
+        managed = False
         verbose_name = "Mapper"
         verbose_name_plural = "Mapper"
 
@@ -160,6 +161,7 @@ class VariantsInLine(admin.TabularInline):
     model = Variants
     extra = 0
     can_delete = False
+    managed = False
 
 
 class OtherColorsInline(admin.TabularInline):
@@ -167,6 +169,7 @@ class OtherColorsInline(admin.TabularInline):
     fk_name = 'product'
     extra = 0
     can_delete = False
+    managed = False
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "color_product":
@@ -189,6 +192,7 @@ class ProductInSetInline(admin.TabularInline):
     fk_name = 'product'
     extra = 0
     can_delete = False
+    managed = False
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'set_product':
@@ -206,6 +210,7 @@ class ProductsProxyAdminForm(forms.ModelForm):
     get_other_colors = forms.CharField(required=False, label="Other Colors", widget=forms.TextInput(attrs={'readonly': 'readonly'}))
 
     class Meta:
+        managed = False
         model = ProductsProxy
         fields = '__all__'
 

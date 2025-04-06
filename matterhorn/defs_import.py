@@ -7,6 +7,7 @@ import json
 from dotenv import load_dotenv
 import requests
 from .defs_db import connect_to_postgresql, create_tables_if_not_exist, import_insert_item
+import psycopg2
 
 load_dotenv('.env.dev')
 
@@ -43,7 +44,7 @@ def import_all_by_one():
 
     base_url = "https://matterhorn.pl/B2BAPI/ITEMS/"
 
-    for i in range(last_id + 1, last_id + 2000):
+    for i in range(last_id + 1, last_id + 100000):
         url = f"{base_url}{i}"
         print(f"Pobieranie danych z : {url}")
 
@@ -60,7 +61,7 @@ def import_all_by_one():
                     if item.get("creation_date") is None:
                         null_count += 1
                         print(f"Pominięto import dla URL: {url} ponieważ creation_date jest NULL. {null_count}")
-                        if null_count >= 33:
+                        if null_count >= 200:
                             print(f"Pole 'creation_date' jest puste dla {null_count} kolejnych importów. Koniec importu")
                             return
                         break
