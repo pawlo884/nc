@@ -18,6 +18,8 @@ services:
     command: celery -A nc.celery worker --loglevel=info
     volumes:
       - .:/app
+    env_file:
+      - .env.dev
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
     depends_on:
@@ -29,6 +31,8 @@ services:
     command: celery -A nc.celery beat --loglevel=info
     volumes:
       - .:/app
+    env_file:
+      - .env.dev
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
     depends_on:

@@ -11,11 +11,11 @@ import psycopg2
 
 load_dotenv('.env.dev')
 
-api_key = os.getenv('api_key')
+api_key1 = os.getenv('api_key1')
 
 headersMatterhorn = {
     "Content-Type": "application/json",
-    "Authorization":f"Bearer {api_key}"
+    "Authorization":f"Bearer {api_key1}"
 }
 
 logger = logging.getLogger(__name__)
@@ -34,10 +34,10 @@ def import_all_by_one():
     load_dotenv('.env.dev')
         
     # Pobieramy nagłówki z .env
-    api_key = os.getenv('api_key')
+    api_key1 = os.getenv('api_key1')
     headersMatterhorn = {
         "Content-Type": "application/json",
-        "Authorization": api_key
+        "Authorization": api_key1
     }
     last_id = get_last_id()
     null_count = 0

@@ -58,7 +58,9 @@ TEMPLATES = [
 ]
 
 # Database routers
-DATABASE_ROUTERS = ['nc.db_routers.MatterhornRouter']
+DATABASE_ROUTERS = [
+    'nc.db_routers.MatterhornRouter',
+    'nc.db_routers.MPDRouter',]
 
 # Database
 DATABASES = {
