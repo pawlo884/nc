@@ -29,7 +29,7 @@ jobs:
       with:
         context: .
         push: true
-        tags: ${{ env.prod.DOCKERHUB_USERNAME }}/django-app:latest
+        tags: ${{ env.DOCKERHUB_USERNAME }}/django-app:latest
         
     - name: Debug SSH Key
       run: |
@@ -102,10 +102,10 @@ jobs:
           cd /srv/app
           echo "Current directory: $(pwd)"
           echo "Directory contents: $(ls -la)"
-          echo "Docker Hub username: ${{ env.prod.DOCKERHUB_USERNAME }}"
+          echo "Docker Hub username: ${{ env.DOCKERHUB_USERNAME }}"
           echo "Starting containers..."
-          DOCKERHUB_USERNAME=${{ env.prod.DOCKERHUB_USERNAME }} docker-compose pull
-          DOCKERHUB_USERNAME=${{ env.prod.DOCKERHUB_USERNAME }} docker-compose up -d
+          DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose pull
+          DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }} docker-compose up -d
           echo "Container logs:"
           docker-compose logs web
           echo "Nginx logs:"
