@@ -1,7 +1,7 @@
 services:
   web:
     build: .
-    command: gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    command: bash -c "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -10,5 +10,36 @@ services:
     env_file:
       - .env.dev
     restart: always
+    depends_on:
+      - redis
+
+  celery:
+    build: .
+    command: celery -A nc.celery worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.dev
+    depends_on:
+      - redis
+      - web
+
+  celery-beat:
+    build: .
+    command: celery -A nc.celery beat --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.dev
+    depends_on:
+      - redis
+      - web
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+
 volumes:
   static_volume: 
