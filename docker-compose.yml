@@ -1,7 +1,7 @@
 services:
   web:
     image: ${DOCKERHUB_USERNAME}/django-app:latest
-    command: gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    command: bash -c "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -24,6 +24,44 @@ services:
       - nginx_logs:/var/log/nginx
     depends_on:
       - web
+    restart: always
+    networks:
+      - app_network
+
+celery:
+    image: ${DOCKERHUB_USERNAME}/django-app:latest
+    command: celery -A nc worker --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.prod
+    depends_on:
+      - web
+      - redis
+    restart: always
+    networks:
+      - app_network
+
+celery-beat:
+    image: ${DOCKERHUB_USERNAME}/django-app:latest
+    command: celery -A nc beat --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.prod
+    depends_on:
+      - web
+      - redis
+    restart: always
+    networks:
+      - app_network
+
+redis:
+    image: redis:7.0
     restart: always
     networks:
       - app_network

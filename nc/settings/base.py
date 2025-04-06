@@ -21,8 +21,11 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'whitenoise.runserver_nostatic',
+    'django_celery_beat',
+    'django_celery_results',
     'main',
     'matterhorn',
+    'MPD',
 ]
 
 MIDDLEWARE = [
@@ -74,6 +77,14 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN_DB_HOST'),
         'PORT': os.getenv('MATTERHORN_DB_PORT'),
+    },
+    'MPD': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('MPD_DB_NAME'),
+        'USER': os.getenv('MPD_DB_USER'),
+        'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
+        'HOST': os.getenv('MPD_DB_HOST'),
+        'PORT': os.getenv('MPD_DB_PORT'),
     }
 }
 
@@ -110,3 +121,12 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField' 
+
+
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Europe/Warsaw'
