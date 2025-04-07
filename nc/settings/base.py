@@ -57,10 +57,7 @@ TEMPLATES = [
     },
 ]
 
-# Database routers
-DATABASE_ROUTERS = [
-    'nc.db_routers.MatterhornRouter',
-    'nc.db_routers.MPDRouter',]
+
 
 # Database
 DATABASES = {
@@ -90,7 +87,10 @@ DATABASES = {
     }
 }
 
-
+# Database routers
+DATABASE_ROUTERS = [
+    'nc.db_routers.MatterhornRouter',
+    'nc.db_routers.MPDRouter',]
 
 WSGI_APPLICATION = 'nc.wsgi.application'
 

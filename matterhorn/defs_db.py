@@ -1,5 +1,5 @@
+# pylint: disable=wrong-import-order
 import psycopg2
-from psycopg2 import sql
 import os
 from dotenv import load_dotenv
 
@@ -28,9 +28,8 @@ def connect_to_postgresql(db_key):
             user=db_user,
             password=db_password,
             host=db_host,
-            port=db_port
+            port=db_port,)
 
-        )
         print(f"Połączono z bazą danych {db_name} na hoście {db_host} (środowisko: {'produkcja' if is_production else 'development'})")
         return conn
         
@@ -65,7 +64,10 @@ def create_tables_if_not_exist(conn):
             size_table_txt TEXT,
             size_table_html TEXT,
             price NUMERIC(10, 2),
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            mapped_product_id INT,
+            is_mapped BOOLEAN DEFAULT NULL,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     '''
 
@@ -90,6 +92,9 @@ def create_tables_if_not_exist(conn):
             ean VARCHAR(50),
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             product_id INT,
+            mapped_variant_id INT,
+            is_mapped BOOLEAN DEFAULT NULL,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         )
     '''
