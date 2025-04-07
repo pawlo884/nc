@@ -1,6 +1,9 @@
 # Wybierz obraz bazowy
 FROM python:3.12-slim
 
+# Zainstaluj psql
+RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
+
 # Ustaw katalog roboczy
 WORKDIR /app
 
