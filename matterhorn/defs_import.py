@@ -7,31 +7,37 @@ from dotenv import load_dotenv
 import requests
 from .defs_db import connect_to_postgresql, create_tables_if_not_exist, import_insert_item
 import psycopg2
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Ładowanie zmiennych środowiskowych
 load_dotenv('.env.dev')
 api_key = os.getenv('api_key')
 headersMatterhorn = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {api_key}"
+    "Authorization": api_key
 }
+
 
 def get_last_id():
     connection = connect_to_postgresql('matterhorn')
     create_tables_if_not_exist(connection)
     cursor = connection.cursor()
-    cursor.execute("SELECT MAX(id) AS last_id FROM products WHERE name != 'Placeholder Name' AND name != '0 Nowy artykul - 0'")
+    cursor.execute(
+        "SELECT MAX(id) AS last_id FROM products WHERE name != 'Placeholder Name' AND name != '0 Nowy artykul - 0'")
     result = cursor.fetchone()
     cursor.close()
     connection.close()
     return result[0] if result and result[0] is not None else 0
 
+
 def import_all_by_one():
     load_dotenv('.env.dev')
-    print("Rozpoczynam import produktów...")
+    logger.info("Rozpoczynam import produktów...")
         
     last_id = get_last_id()
-    print(f"Ostatni ID w bazie: {last_id}")
+    logger.info(f"Ostatni ID w bazie: {last_id}")
     null_count = 0
     # Pobieramy nagłówki z .env
     api_key = os.getenv('api_key')
@@ -39,12 +45,14 @@ def import_all_by_one():
         "Content-Type": "application/json",
         "Authorization": api_key
     }
+    logger.info(f"Używane nagłówki: {headersMatterhorn}")
 
     base_url = "https://matterhorn.pl/B2BAPI/ITEMS/"
+    logger.info(f"Używany URL: {base_url}")
 
     for i in range(last_id + 1, last_id + 250000):
         url = f"{base_url}{i}"
-        print(f"Pobieranie danych z: {url}")
+        logger.info(f"Pobieranie danych z: {url}")
 
         attempt = 1
         max_attempts = 100
@@ -56,38 +64,40 @@ def import_all_by_one():
         while attempt <= max_attempts:
             try:
                 response = requests.get(url, headers=headersMatterhorn)
-                print(f"Status odpowiedzi: {response.status_code}")
-                print(f"Nagłówki odpowiedzi: {response.headers}")
-                print(f"Treść odpowiedzi: {response.text[:1500]}")
-                
+
                 time.sleep(0.6)
-                
+
                 if response.status_code == 200:
                     try:
                         # Sprawdzamy czy odpowiedź nie jest pusta
                         if not response.text.strip():
-                            print(f"Pusta odpowiedź dla URL: {url}")
+                            logger.warning(f"Pusta odpowiedź dla URL: {url}")
                             break
-                            
+
                         item = response.json()
-                        print(f"Przetworzono JSON: {json.dumps(item, indent=2)[:500]}")
+                        logger.debug(
+                            f"Przetworzono JSON: {json.dumps(item, indent=2)[:500]}")
                         json_decode_attempts = 0
 
                         if item.get("creation_date") is None:
                             null_count += 1
-                            print(f"Pominięto import dla URL: {url} ponieważ creation_date jest NULL. {null_count}")
+                            logger.warning(
+                                f"Pominięto import dla URL: {url} ponieważ creation_date jest NULL. {null_count}")
                             if null_count >= 200:
-                                print("Pole 'creation_date' jest puste dla {null_count} kolejnych importów. Koniec importu")
+                                logger.warning(
+                                    f"Pole 'creation_date' jest puste dla {null_count} kolejnych importów. Koniec importu")
                                 return
                             break
                         else:
                             null_count = 0
 
-                        print(f"Pobrano produkt ID: {item['id']}, Nazwa: {item['name']}")
+                        logger.info(
+                            f"Pobrano produkt ID: {item['id']}, Nazwa: {item['name']}")
                         yield item
 
                         if 'url' in item and isinstance(item['url'], str):
-                            item['url'] = item['url'].replace('http://matterhorn-wholesale.com', 'http://matterhorn.pl')
+                            item['url'] = item['url'].replace(
+                                'http://matterhorn-wholesale.com', 'http://matterhorn.pl')
 
                         price = item["prices"].get("PLN", None)
                         item_data = (
@@ -141,7 +151,8 @@ def import_all_by_one():
                                 color_product_id = int(color_id)
 
                                 if product_id != color_product_id:
-                                    other_colors.append((product_id, color_product_id))
+                                    other_colors.append(
+                                        (product_id, color_product_id))
 
                         product_sets = []
                         if isinstance(item.get("products_in_set"), list):
@@ -150,76 +161,91 @@ def import_all_by_one():
                                 related_product_id = int(product_in_set_id)
 
                                 if product_id != related_product_id:
-                                    product_sets.append((product_id, related_product_id))
+                                    product_sets.append(
+                                        (product_id, related_product_id))
 
                         # Próba połączenia z bazą danych z ponownymi próbami
                         while db_connection_attempts < max_db_connection_attempts:
                             try:
                                 connection = connect_to_postgresql('matterhorn')
                                 create_tables_if_not_exist(connection)
-                                import_insert_item(connection, item_data, images_data, variants_data, other_colors, product_sets)
+                                import_insert_item(
+                                    connection, item_data, images_data, variants_data, other_colors, product_sets)
                                 connection.close()
-                                print(f"Zapisano produkt ID: {item['id']} do bazy danych")
+                                logger.info(
+                                    f"Zapisano produkt ID: {item['id']} do bazy danych")
                                 db_connection_attempts = 0
                                 break
                             except Exception as e:
                                 db_connection_attempts += 1
-                                print(f"Błąd połączenia z bazą danych (próba {db_connection_attempts}/{max_db_connection_attempts}): {str(e)}")
+                                logger.error(
+                                    f"Błąd połączenia z bazą danych (próba {db_connection_attempts}/{max_db_connection_attempts}): {str(e)}")
                                 if db_connection_attempts < max_db_connection_attempts:
                                     time.sleep(5)
                                 else:
-                                    print("Osiągnięto maksymalną liczbę prób połączenia z bazą danych. Przechodzę do następnego produktu.")
+                                    logger.error(
+                                        "Osiągnięto maksymalną liczbę prób połączenia z bazą danych. Przechodzę do następnego produktu.")
                                     break
 
                         break
                     except json.JSONDecodeError as e:
                         json_decode_attempts += 1
                         if json_decode_attempts < max_json_decode_attempts:
-                            print(f"Błąd dekodowania JSON dla URL: {url}. Próba {json_decode_attempts} z {max_json_decode_attempts}. Błąd: {str(e)}")
-                            print(f"Treść odpowiedzi: {response.text[:500]}")
-                            print("Ponawiam próbę po 5 sekundach...")
+                            logger.error(
+                                f"Błąd dekodowania JSON dla URL: {url}. Próba {json_decode_attempts} z {max_json_decode_attempts}. Błąd: {str(e)}")
+                            logger.debug(
+                                f"Treść odpowiedzi: {response.text[:500]}")
+                            logger.info("Ponawiam próbę po 5 sekundach...")
                             time.sleep(5)
                             continue
                         else:
-                            print(f"Błąd dekodowania JSON dla URL: {url} po {max_json_decode_attempts} próbach. Błąd: {str(e)}")
-                            print(f"Treść odpowiedzi: {response.text[:500]}")
+                            logger.error(
+                                f"Błąd dekodowania JSON dla URL: {url} po {max_json_decode_attempts} próbach. Błąd: {str(e)}")
+                            logger.debug(
+                                f"Treść odpowiedzi: {response.text[:500]}")
                             break
                     except Exception as e:
-                        print(f"Błąd podczas przetwarzania odpowiedzi dla URL: {url}. Błąd: {str(e)}")
-                        print(f"Treść odpowiedzi: {response.text[:500]}")
+                        logger.error(
+                            f"Błąd podczas przetwarzania odpowiedzi dla URL: {url}. Błąd: {str(e)}")
+                        logger.debug(f"Treść odpowiedzi: {response.text[:500]}")
                         break
                 elif 500 <= response.status_code <= 600:
-                    print(f"Otrzymano kod odpowiedzi {response.status_code} dla URL: {url}. Próba {attempt} z {max_attempts}")
+                    logger.warning(
+                        f"Otrzymano kod odpowiedzi {response.status_code} dla URL: {url}. Próba {attempt} z {max_attempts}")
                     if attempt < max_attempts:
-                        print("Odczekaj 10 sekund przed kolejną próbą...")
+                        logger.info("Odczekaj 10 sekund przed kolejną próbą...")
                         time.sleep(10)
                         attempt += 1
                         continue
                     else:
-                        print(f"Nie udało się nawiązać połączenia dla URL: {url} po {max_attempts} próbach.")
+                        logger.error(
+                            f"Nie udało się nawiązać połączenia dla URL: {url} po {max_attempts} próbach.")
                         break
                 else:
-                    print(f"Nieoczekiwany kod odpowiedzi {response.status_code} dla URL: {url}")
-                    print(f"Treść odpowiedzi: {response.text[:500]}")
+                    logger.warning(
+                        f"Nieoczekiwany kod odpowiedzi {response.status_code} dla URL: {url}")
+                    logger.debug(f"Treść odpowiedzi: {response.text[:500]}")
                     break
             except requests.exceptions.RequestException as e:
-                print(f"Błąd połączenia dla URL: {url}. Błąd: {str(e)}")
+                logger.error(f"Błąd połączenia dla URL: {url}. Błąd: {str(e)}")
                 if attempt < max_attempts:
-                    print("Odczekaj 10 sekund przed kolejną próbą...")
+                    logger.info("Odczekaj 10 sekund przed kolejną próbą...")
                     time.sleep(10)
                     attempt += 1
                     continue
                 else:
                     break
 
-    print("Import produktów zakończony.")
+    logger.info("Import produktów zakończony.")
+
 
 def get_latest_timestamp():
     """
     Pobiera najnowszy timestamp z tabeli `variants` i zwraca go jako ciąg znaków.
     """
     try:
-        connection = connect_to_postgresql('matterhorn')  # Zmienione na PostgreSQL
+        connection = connect_to_postgresql(
+            'matterhorn')  # Zmienione na PostgreSQL
         cursor = connection.cursor()
 
         # Pobieranie najnowszego timestamp
@@ -245,40 +271,49 @@ def get_latest_timestamp():
         if 'connection' in locals() and not connection.closed:
             connection.close()
 
+
 def get_last_update_time():
     try:
-        connection = connect_to_postgresql('matterhorn')  # Zmienione na PostgreSQL
+        connection = connect_to_postgresql(
+            'matterhorn')  # Zmienione na PostgreSQL
         cursor = connection.cursor()
-        cursor.execute("SELECT last_update FROM update_log ORDER BY last_update DESC LIMIT 1")
+        cursor.execute(
+            "SELECT last_update FROM update_log ORDER BY last_update DESC LIMIT 1")
         result = cursor.fetchone()
         cursor.close()
         connection.close()
-        
+
         if result and result[0]:
             return result[0].strftime("%Y-%m-%d %H:%M:%S")
         else:
             # Domyślny czas, jeśli brak wpisów
             return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
-        print(f"[ERROR] Nie udało się pobrać czasu ostatniej aktualizacji: {e}")
+        print(
+            f"[ERROR] Nie udało się pobrać czasu ostatniej aktualizacji: {e}")
         return "1970-01-01 00:00:00"
+
 
 def round_down_to_10_minutes(dt):
     """
     Zaokrągla czas w dół do najbliższych 10 minut
     """
     minute = dt.minute
-    rounded_minute = (minute // 10) * 10  # Zaokrąglenie w dół do najbliższych 10 minut
+    # Zaokrąglenie w dół do najbliższych 10 minut
+    rounded_minute = (minute // 10) * 10
     return dt.replace(minute=rounded_minute, second=0, microsecond=0)
+
 
 def log_update_error(last_update_time_rounded, description, error_message, start_time):
     try:
-        connection = connect_to_postgresql('matterhorn')  # Zmienione na PostgreSQL
+        connection = connect_to_postgresql(
+            'matterhorn')  # Zmienione na PostgreSQL
         cursor = connection.cursor()
         full_description = f"{description} (Czas aktualizacji: {start_time})"
         cursor.execute(
             "INSERT INTO update_log (last_update, description, data_items, data_inventory) VALUES (%s, %s, %s, %s)",
-            (last_update_time_rounded, full_description, json.dumps([]), json.dumps([]))
+            (last_update_time_rounded, full_description,
+             json.dumps([]), json.dumps([]))
         )
         connection.commit()
         cursor.close()
@@ -287,9 +322,11 @@ def log_update_error(last_update_time_rounded, description, error_message, start
     except Exception as e:
         print(f"[ERROR] Nie udało się zapisać błędu aktualizacji: {e}")
 
+
 def update_inventory_v3():
     print("[INFO] Rozpoczynam aktualizację stanów magazynowych.")
-    start_time = round_down_to_10_minutes(datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+    start_time = round_down_to_10_minutes(
+        datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     base_url_items = "https://matterhorn.pl/B2BAPI/ITEMS/"
     base_url_inventory = "https://matterhorn.pl/B2BAPI/ITEMS/INVENTORY/"
     last_update_time = get_last_update_time()
@@ -307,7 +344,8 @@ def update_inventory_v3():
         b_url = f"{base_url_items}?page={page}&last_update={update_date}%20{encoded_time}&limit=1000"
         i_url = f"{base_url_inventory}?page={page}&last_update={update_date}%20{encoded_time}&limit=1000"
 
-        print(f"[INFO] PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
+        print(
+            f"[INFO] PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
         attempt = 1
         max_attempts = 3
         connection = None
@@ -315,13 +353,17 @@ def update_inventory_v3():
         while attempt <= max_attempts:
             try:
                 # print(f"[INFO] Próba {attempt}/{max_attempts} pobrania danych z API.")
-                print(f"[INFO] Próba {attempt}/{max_attempts} pobrania danych z API.")
-                response_items = requests.get(b_url, headers=headersMatterhorn, timeout=120)
+                print(
+                    f"[INFO] Próba {attempt}/{max_attempts} pobrania danych z API.")
+                response_items = requests.get(
+                    b_url, headers=headersMatterhorn, timeout=120)
                 time.sleep(2)
-                response_inventory = requests.get(i_url, headers=headersMatterhorn, timeout=120)
+                response_inventory = requests.get(
+                    i_url, headers=headersMatterhorn, timeout=120)
                 # print(f"[INFO] Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
-                print(f"[INFO] Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
-        
+                print(
+                    f"[INFO] Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
+
                 if response_items.status_code == 200 and response_inventory.status_code == 200:
                     print("[INFO] Pomyślnie pobrano dane z API.")
                     # print(f"[INFO] Odpowiedź API ITEMS: {response_items.text}")
@@ -330,14 +372,17 @@ def update_inventory_v3():
                         try:
                             data_items = response_items.json()          # /ITEMS
                             data_inventory = response_inventory.json()  # /INVENTORY
-                            print(f"Liczba rekordów w odpowiedzi: ITEMS-{len(data_items)}, INVENTORY-{len(data_inventory)}")
+                            print(
+                                f"Liczba rekordów w odpowiedzi: ITEMS-{len(data_items)}, INVENTORY-{len(data_inventory)}")
                         except ValueError as e:
                             print(f"[ERROR] Błąd konwersji danych z API: {e}")
-                            log_update_error(last_update_time_rounded, "Błąd konwersji danych z API", str(e), start_time)
+                            log_update_error(
+                                last_update_time_rounded, "Błąd konwersji danych z API", str(e), start_time)
                             return False
                     else:
                         print("[ERROR] Odpowiedź API jest pusta.")
-                        log_update_error(last_update_time_rounded, "Pusta odpowiedź API", "Odpowiedź API jest pusta.", start_time)
+                        log_update_error(
+                            last_update_time_rounded, "Pusta odpowiedź API", "Odpowiedź API jest pusta.", start_time)
                         return False
 
                     # Liczenie pobranych rekordów
@@ -348,7 +393,8 @@ def update_inventory_v3():
                     total_data_items.extend(data_items)
                     total_data_inventory.extend(data_inventory)
 
-                    print(f"[INFO] Liczba rekordów w odpowiedzi: ITEMS-{data_length} INVENTORY-{data_length_inventory}")
+                    print(
+                        f"[INFO] Liczba rekordów w odpowiedzi: ITEMS-{data_length} INVENTORY-{data_length_inventory}")
                     time.sleep(1)
 
                     # Warunek zakończenia pętli, gdy brak nowych danych
@@ -366,7 +412,8 @@ def update_inventory_v3():
                     # Iteracja po danych z API ITEMS
                     for item in data_items:
                         if not item:
-                            print("[WARNING] Pusty element w danych ITEMS. Pomijanie.")
+                            print(
+                                "[WARNING] Pusty element w danych ITEMS. Pomijanie.")
                             continue
 
                         # Pobieranie informacji o produkcie
@@ -396,7 +443,8 @@ def update_inventory_v3():
                             stock_total = %s
                         WHERE id = %s
                         """
-                        cursor.execute(update_products_query, (active, new_collection, price, color, stock_total, id))
+                        cursor.execute(
+                            update_products_query, (active, new_collection, price, color, stock_total, id))
 
                         # Dodawanie powiązań zestawów
                         update_product_in_set_query = """
@@ -413,22 +461,30 @@ def update_inventory_v3():
                                 continue
 
                             # Sprawdzenie istnienia `id` w tabeli `products`
-                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (id,))                           
+                            cursor.execute(
+                                "SELECT 1 FROM products WHERE id = %s", (id,))
 
                             if not cursor.fetchone():
                                 # Jeśli `product_id` nie istnieje, dodaj placeholder
-                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                print(f"[INFO] Dodano placeholder dla produktu o ID={id}")
+                                cursor.execute(
+                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
+                                print(
+                                    f"[INFO] Dodano placeholder dla produktu o ID={id}")
 
                                 # Sprawdzenie istnienia `set_pid` w tabeli `products`
-                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (set_pid,))
+                            cursor.execute(
+                                "SELECT 1 FROM products WHERE id = %s", (set_pid,))
                             if not cursor.fetchone():
                                 # Jeśli `set_product_id` nie istnieje, dodaj placeholder
-                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (set_pid, "Placeholder Name"))
-                                print(f"[INFO] Dodano placeholder dla produktu o ID={set_pid}")
+                                cursor.execute(
+                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (set_pid, "Placeholder Name"))
+                                print(
+                                    f"[INFO] Dodano placeholder dla produktu o ID={set_pid}")
                             # Wstawienie do tabeli `product_in_set`
-                            cursor.execute(update_product_in_set_query, (id, set_pid))
-                            cursor.execute(update_product_in_set_query, (set_pid, id))
+                            cursor.execute(
+                                update_product_in_set_query, (id, set_pid))
+                            cursor.execute(
+                                update_product_in_set_query, (set_pid, id))
 
                         # Dodawanie powiązań kolorów
                         update_other_colors_query = """
@@ -444,73 +500,93 @@ def update_inventory_v3():
                                 continue
 
                             # sprawdzanie istnienia "id" w tabeli "products"
-                            cursor.execute(("SELECT 1 FROM products WHERE id = %s"), (id,))                            
+                            cursor.execute(
+                                ("SELECT 1 FROM products WHERE id = %s"), (id,))
 
                             if not cursor.fetchone():
                                 # Jeśli "product_id" nie istnieje, dodaj rekord z "id" i nazwą "Placeholder Name"
-                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                print(f"[INFO] Dodano placeholder dla produktu o ID ={id}")
+                                cursor.execute(
+                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
+                                print(
+                                    f"[INFO] Dodano placeholder dla produktu o ID ={id}")
 
                             # sprawdzanie istnienia color_pid w tabeli products
-                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (color_pid,))
+                            cursor.execute(
+                                "SELECT 1 FROM products WHERE id = %s", (color_pid,))
                             if not cursor.fetchone():
                                 # jeśli 'color_product_id" nie istnieje dodaj placeholder
-                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (color_pid, "Placeholder Name"))
-                                print(f"[INFO] Dodano placeholder dla produktu o ID={color_pid}")
+                                cursor.execute(
+                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (color_pid, "Placeholder Name"))
+                                print(
+                                    f"[INFO] Dodano placeholder dla produktu o ID={color_pid}")
 
-                            cursor.execute(update_other_colors_query, (id, color_pid))
-                            cursor.execute(update_other_colors_query, (color_pid, id))
+                            cursor.execute(
+                                update_other_colors_query, (id, color_pid))
+                            cursor.execute(
+                                update_other_colors_query, (color_pid, id))
 
                     # Iteracja po danych z API INVENTORY
                     for item in data_inventory:
                         inventory = item.get("inventory", [])
                         # Jeśli 'inventory' nie jest listą pobierz dane z bazy
                         if not isinstance(inventory, list):
-                            print(f"[WARNING] Nieprawidłowa wartość inventory dla ID={item.get('id', 'Brak')}. Ustawianie stock=0 dla wszystkich variant_uid.")
+                            print(
+                                f"[WARNING] Nieprawidłowa wartość inventory dla ID={item.get('id', 'Brak')}. Ustawianie stock=0 dla wszystkich variant_uid.")
                             inventory = []
 
                             # Pobieranie wariantów z bazy danych
-                            cursor.execute("SELECT variant_uid FROM variants WHERE product_id = %s", (item['id'],))
+                            cursor.execute(
+                                "SELECT variant_uid FROM variants WHERE product_id = %s", (item['id'],))
                             result = cursor.fetchall()
 
                             # Pominięcie rekordu, jeśli nie znaleziono wariantów
                             if not result:
-                                print(f"[WARNING] Brak wariantów dla produktu ID={item['id']}. Pomijam.")
+                                print(
+                                    f"[WARNING] Brak wariantów dla produktu ID={item['id']}. Pomijam.")
                                 continue
 
                             # dodanie wariantów z zerowym stanem magazynowym
                             for variant_uid in result:
-                                inventory.append({"variant_uid": variant_uid[0], "stock": 0})
+                                inventory.append(
+                                    {"variant_uid": variant_uid[0], "stock": 0})
 
                         for variant in inventory:
                             # Sprawdzenie, czy 'variant_uid' istnieje w danych i czy jego wartość jest prawidłowa
                             if 'variant_uid' not in variant or not isinstance(variant['variant_uid'], (int, str)):
-                                print(f"[WARNING] Pomijam rekord bez prawidłowego 'variant_uid' w inventory dla produktu ID={item['id']}")
+                                print(
+                                    f"[WARNING] Pomijam rekord bez prawidłowego 'variant_uid' w inventory dla produktu ID={item['id']}")
                                 continue  # Pominięcie rekordu
 
                             # Próba konwersji na int, jeśli się nie powiedzie, pominięcie rekordu
                             try:
                                 variant_uid = int(variant["variant_uid"])
                             except ValueError:
-                                print(f"[ERROR] Nieprawidłowy format 'variant_uid' dla produktu ID={item['id']}. Pomijam.")
+                                print(
+                                    f"[ERROR] Nieprawidłowy format 'variant_uid' dla produktu ID={item['id']}. Pomijam.")
                                 continue
 
                             stock = int(variant["stock"], 0)
-                            name = str(variant["variant_name"]).replace(" ", "")
-                            max_processing_time = int(variant.get("max_processing_time", 0))
+                            name = str(variant["variant_name"]).replace(
+                                " ", "")
+                            max_processing_time = int(
+                                variant.get("max_processing_time", 0))
                             ean = str(variant.get("ean", ""))
                             product_id = int(item["id"])
 
                             # print(f"[INFO] Przetwarzanie wariantu UID={variant_uid}, Stock={stock}, Name={name}, Ean={ean}")
                             # time.sleep(1)
                             # upewnienie się, że rekord istnieje w tabeli products
-                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (product_id,))
+                            cursor.execute(
+                                "SELECT 1 FROM products WHERE id = %s", (product_id,))
 
                             if not cursor.fetchone():
-                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (product_id, "Placeholder Name"))
-                                print(f"[INFO] Dodano placeholder dla produktu o ID={product_id}")
+                                cursor.execute(
+                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (product_id, "Placeholder Name"))
+                                print(
+                                    f"[INFO] Dodano placeholder dla produktu o ID={product_id}")
                             # Sprawdzanie czy rekord istnieje
-                            cursor.execute("SELECT stock FROM variants WHERE variant_uid = %s", (variant_uid,))
+                            cursor.execute(
+                                "SELECT stock FROM variants WHERE variant_uid = %s", (variant_uid,))
                             record = cursor.fetchone()
 
                             if record:
@@ -524,14 +600,16 @@ def update_inventory_v3():
                                     product_id = %s
                                 WHERE variant_uid = %s    
                                 """
-                                cursor.execute(update_query, (stock, name, ean, max_processing_time, product_id, variant_uid))
+                                cursor.execute(
+                                    update_query, (stock, name, ean, max_processing_time, product_id, variant_uid))
                             else:
                                 # Dodanie nowego rekordu
                                 insert_query = """
                                 INSERT INTO variants (variant_uid, stock, max_processing_time, name, ean, product_id)
                                 VALUES (%s, %s, %s, %s, %s, %s)
                                 """
-                                cursor.execute(insert_query, (variant_uid, stock, max_processing_time, name, ean, product_id))
+                                cursor.execute(
+                                    insert_query, (variant_uid, stock, max_processing_time, name, ean, product_id))
 
                             # Commit po każdej iteracji, aby uniknąć utraty danych w przypadku awarii
                             connection.commit()
@@ -542,7 +620,8 @@ def update_inventory_v3():
                             connection.commit()
                             print("[INFO] Wszystkie zmiany zostały zatwierdzone.")
                         except Exception as e:
-                            print(f"[ERROR] Błąd podczas zatwierdzania zmian: {e}")                        
+                            print(
+                                f"[ERROR] Błąd podczas zatwierdzania zmian: {e}")
                         finally:
                             cursor.close()
                             connection.close()
@@ -555,41 +634,52 @@ def update_inventory_v3():
                     break
 
             except ValueError as e:
-                print(f"[ERROR-POBRANIE Z API] Wystąpił błąd konwersji danych: {e}")
-                print(f"Nie udało się pobrać danych z API. Status: {response_items.status_code} i {response_inventory.status_code}")
-                log_update_error(last_update_time_rounded, "Błąd konwersji danych", str(e), start_time)
+                print(
+                    f"[ERROR-POBRANIE Z API] Wystąpił błąd konwersji danych: {e}")
+                print(
+                    f"Nie udało się pobrać danych z API. Status: {response_items.status_code} i {response_inventory.status_code}")
+                log_update_error(last_update_time_rounded,
+                                 "Błąd konwersji danych", str(e), start_time)
             except Exception as e:
                 print(f"[ERROR] Wystąpił błąd: {e}")
                 print(f"Wystąpił błąd: {e}")
-                log_update_error(last_update_time_rounded, "Błąd podczas aktualizacji", str(e), start_time)
+                log_update_error(last_update_time_rounded,
+                                 "Błąd podczas aktualizacji", str(e), start_time)
 
         # Jeśli brak danych, przerwij pętlę
         if data_length == 0 and data_length_inventory == 0:
             break
 
-    # Ostateczne zapisanie informacji o aktualizacji          
-    update_last_update_time(start_time, total_data_length, total_data_length_inventory, total_data_items, total_data_inventory)
+    # Ostateczne zapisanie informacji o aktualizacji
+    update_last_update_time(start_time, total_data_length,
+                            total_data_length_inventory, total_data_items, total_data_inventory)
     print("[INFO] Aktualizacja zakończona.")
     return
+
 
 def update_last_update_time(start_time, total_data_length, total_data_length_inventory, total_data_items, total_data_inventory):
     try:
         connection = connect_to_postgresql('matterhorn')
         cursor = connection.cursor()
         description = f"Zaktualizowano rekordów: {total_data_length}, {total_data_length_inventory}"
-        data_item_json = json.dumps(total_data_items)  # Serializacja danych JSON
+        # Serializacja danych JSON
+        data_item_json = json.dumps(total_data_items)
         data_inventory_json = json.dumps(total_data_inventory)
-        cursor.execute("INSERT INTO update_log (last_update, description, data_items, data_inventory) VALUES (%s, %s, %s, %s)", (start_time, description, data_item_json, data_inventory_json))
+        cursor.execute("INSERT INTO update_log (last_update, description, data_items, data_inventory) VALUES (%s, %s, %s, %s)",
+                       (start_time, description, data_item_json, data_inventory_json))
         connection.commit()
         cursor.close()
         connection.close()
         print("[INFO] Zapisano czas ostatniej aktualizacji.")
     except Exception as e:
-        print(f"[ERROR] Nie udało się zapisać czasu ostatniej aktualizacji: {e}")
+        print(
+            f"[ERROR] Nie udało się zapisać czasu ostatniej aktualizacji: {e}")
+
 
 def clean_update_log():
     try:
-        connection = connect_to_postgresql('matterhorn')  # Zmień na funkcję połączenia z PostgreSQL
+        # Zmień na funkcję połączenia z PostgreSQL
+        connection = connect_to_postgresql('matterhorn')
         cursor = connection.cursor()
 
         # usuwanie rekordów starszych niż 10 dni
@@ -601,7 +691,8 @@ def clean_update_log():
         deleted_count = cursor.rowcount
 
         connection.commit()
-        print(f"[INFO] Usunięto {deleted_count} rekordów starszych niż 10 dni.")
+        print(
+            f"[INFO] Usunięto {deleted_count} rekordów starszych niż 10 dni.")
 
         cursor.close()
         connection.close()
@@ -611,11 +702,14 @@ def clean_update_log():
         print(f"Nie udało się usunąć rekordów starszych niż 10 dni: {e}")
         return f"Nie udało się usunąć rekordów starszych niż 10 dni: {e}"
 
+
 def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, request):
-    destination_cursor.execute("SELECT id FROM brands WHERE brand_lower = %s", (product.brand.lower(),))
+    destination_cursor.execute(
+        "SELECT id FROM brands WHERE brand_lower = %s", (product.brand.lower(),))
     brand_result = destination_cursor.fetchone()
     if not brand_result:
-        messages.error(request, f"Brak marki {product.brand} dla {product.name}")
+        messages.error(
+            request, f"Brak marki {product.brand} dla {product.name}")
         return None
     brand_id = brand_result[0]
 
@@ -624,11 +718,14 @@ def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, re
             "INSERT INTO products (name, description, brand_id) VALUES (%s, %s, %s) RETURNING id",
             (product.name, product.description, brand_id))
         new_product_id = destination_cursor.fetchone()[0]
-        source_cursor.execute("UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
+        source_cursor.execute(
+            "UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
         connections['matterhorn'].commit()
-        messages.success(request, f"Dodano {product.name} jako nowy produkt z ID {new_product_id}.")
+        messages.success(
+            request, f"Dodano {product.name} jako nowy produkt z ID {new_product_id}.")
 
-    source_cursor.execute("SELECT color, price FROM products WHERE id = %s", (product.id,))
+    source_cursor.execute(
+        "SELECT color, price FROM products WHERE id = %s", (product.id,))
     product_color, product_price = source_cursor.fetchone() or (None, 0)
 
     if not product_color:
@@ -636,7 +733,8 @@ def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, re
         return None
 
     # Kolory
-    destination_cursor.execute("SELECT id FROM colors WHERE name = %s", (product_color,))
+    destination_cursor.execute(
+        "SELECT id FROM colors WHERE name = %s", (product_color,))
     color_result = destination_cursor.fetchone()
     color_id = color_result[0] if color_result else None
     if not color_id:
@@ -644,10 +742,12 @@ def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, re
         return None
 
     # Warianty
-    source_cursor.execute("SELECT name, stock, ean, variant_uid FROM variants WHERE product_id = %s", (product.id,))
+    source_cursor.execute(
+        "SELECT name, stock, ean, variant_uid FROM variants WHERE product_id = %s", (product.id,))
     variants = source_cursor.fetchall()
     for size_name, stock, ean, variant_uid in variants:
-        destination_cursor.execute("SELECT id FROM sizes WHERE name = %s", (size_name,))
+        destination_cursor.execute(
+            "SELECT id FROM sizes WHERE name = %s", (size_name,))
         size_result = destination_cursor.fetchone()
         size_id = size_result[0] if size_result else None
         if not size_id:
@@ -662,12 +762,13 @@ def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, re
             if variant_result:
                 variant_id = variant_result[0]
             else:
-                destination_cursor.execute("SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
+                destination_cursor.execute(
+                    "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
                 variant_id = destination_cursor.fetchone()[0]
                 destination_cursor.execute("""
                     INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                    (variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2))
+                                           (variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2))
 
             destination_cursor.execute("""
                 INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
@@ -683,10 +784,13 @@ def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, re
                 WHERE variant_uid = %s
                 """, (variant_id, variant_uid))
 
-            source_cursor.execute("UPDATE variants SET mapped_variant_id = %s WHERE variant_uid = %s", (variant_id, variant_uid))
+            source_cursor.execute(
+                "UPDATE variants SET mapped_variant_id = %s WHERE variant_uid = %s", (variant_id, variant_uid))
             connections['matterhorn'].commit()
 
-        messages.success(request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
+        messages.success(
+            request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
+
 
 def export_to_products(modeladmin, request, queryset):
     """
@@ -696,9 +800,11 @@ def export_to_products(modeladmin, request, queryset):
 
     if 'manual_confirm' in request.GET:
         product_id = request.GET.get('product_id')
-        confirmed_product_id = request.GET.get('confirmed_product_id')        
-        referrer = request.GET.get('referrer', request.META.get('HTTP_REFERER', '/admin/'))
-        print(f"Product ID: {product_id}, Confirmed Product ID: {confirmed_product_id}")
+        confirmed_product_id = request.GET.get('confirmed_product_id')
+        referrer = request.GET.get(
+            'referrer', request.META.get('HTTP_REFERER', '/admin/'))
+        print(
+            f"Product ID: {product_id}, Confirmed Product ID: {confirmed_product_id}")
 
         if confirmed_product_id and product_id:
             try:
@@ -708,32 +814,40 @@ def export_to_products(modeladmin, request, queryset):
                         (confirmed_product_id, product_id)
                     )
                     connections['matterhorn'].commit()
-                    print(f"Updated product {product_id} with mapped_product_id {confirmed_product_id}")
-                    messages.success(request, f"Produkt {product_id} przypisany do ID {confirmed_product_id}.")
+                    print(
+                        f"Updated product {product_id} with mapped_product_id {confirmed_product_id}")
+                    messages.success(
+                        request, f"Produkt {product_id} przypisany do ID {confirmed_product_id}.")
             except Exception as e:
                 print(f"Error updating mapped_product_id: {e}")
                 messages.error(request, f"Błąd podczas aktualizacji: {e}")
-            
+
             # Dodaj logikę eksportu wariantów poniżej:
             with connections['MasterProductDatabase'].cursor() as destination_cursor, \
-                connections['matterhorn'].cursor() as source_cursor:
+                    connections['matterhorn'].cursor() as source_cursor:
 
-                source_cursor.execute("SELECT color, price FROM products WHERE id = %s", (product_id,))
+                source_cursor.execute(
+                    "SELECT color, price FROM products WHERE id = %s", (product_id,))
                 color_result = source_cursor.fetchone()
-                product_color, product_price = color_result if color_result else (None, 0)
+                product_color, product_price = color_result if color_result else (
+                    None, 0)
 
                 if not product_color:
-                    messages.error(request, f"Brak koloru dla produktu {product.name}. Pomijam.")
+                    messages.error(
+                        request, f"Brak koloru dla produktu {product.name}. Pomijam.")
 
                 else:
-                    destination_cursor.execute("SELECT id FROM colors WHERE name = %s", (product_color,))
+                    destination_cursor.execute(
+                        "SELECT id FROM colors WHERE name = %s", (product_color,))
                     color_id = destination_cursor.fetchone()[0]
 
-                    source_cursor.execute("SELECT name, stock, ean, variant_uid FROM variants WHERE product_id = %s", (product_id,))
+                    source_cursor.execute(
+                        "SELECT name, stock, ean, variant_uid FROM variants WHERE product_id = %s", (product_id,))
                     variants = source_cursor.fetchall()
 
                     for size_name, stock, ean, variant_uid in variants:
-                        destination_cursor.execute("SELECT id FROM sizes WHERE name = %s", (size_name,))
+                        destination_cursor.execute(
+                            "SELECT id FROM sizes WHERE name = %s", (size_name,))
                         size_id = destination_cursor.fetchone()[0]
 
                         with transaction.atomic(using='MasterProductDatabase'):
@@ -746,13 +860,14 @@ def export_to_products(modeladmin, request, queryset):
                             if variant_result:
                                 variant_id = variant_result[0]
                             else:
-                                destination_cursor.execute("SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
+                                destination_cursor.execute(
+                                    "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
                                 variant_id = destination_cursor.fetchone()[0]
 
                                 destination_cursor.execute("""
                                     INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
                                     VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                                    (variant_id, confirmed_product_id, color_id, size_id, ean, variant_uid, 2))
+                                                           (variant_id, confirmed_product_id, color_id, size_id, ean, variant_uid, 2))
 
                             destination_cursor.execute("""
                                 INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
@@ -766,7 +881,8 @@ def export_to_products(modeladmin, request, queryset):
                             )
                             connections['matterhorn'].commit()
 
-                        messages.success(request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
+                        messages.success(
+                            request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
 
         return redirect(referrer)
 
@@ -781,34 +897,43 @@ def export_to_products(modeladmin, request, queryset):
                     for other_color in product.other_colors.all():
                         if other_color.color_product.mapped_product_id and other_color.color_product.id != product.id:
                             new_product_id = other_color.color_product.mapped_product_id
-                            source_cursor.execute("UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
+                            source_cursor.execute(
+                                "UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
                             connections['matterhorn'].commit()
-                            messages.info(request, f"{product.name} używa ID {new_product_id} z {other_color.color_product.name}.")
+                            messages.info(
+                                request, f"{product.name} używa ID {new_product_id} z {other_color.color_product.name}.")
 
-                            source_cursor.execute("SELECT color, price FROM products WHERE id = %s", (product.id,))
+                            source_cursor.execute(
+                                "SELECT color, price FROM products WHERE id = %s", (product.id,))
                             product_color, product_price = source_cursor.fetchone() or (None, 0)
 
                             if not product_color:
-                                messages.error(request, f"Brak koloru dla {product.name}. Pomijam.")
+                                messages.error(
+                                    request, f"Brak koloru dla {product.name}. Pomijam.")
                                 return None
 
                             # Kolory
-                            destination_cursor.execute("SELECT id FROM colors WHERE name = %s", (product_color,))
+                            destination_cursor.execute(
+                                "SELECT id FROM colors WHERE name = %s", (product_color,))
                             color_result = destination_cursor.fetchone()
                             color_id = color_result[0] if color_result else None
                             if not color_id:
-                                messages.error(request, f"Kolor '{product_color}' nie istnieje.")
+                                messages.error(
+                                    request, f"Kolor '{product_color}' nie istnieje.")
                                 continue
 
                             # Warianty
-                            source_cursor.execute("SELECT name, stock, ean, variant_uid FROM variants WHERE product_id = %s", (product.id,))
+                            source_cursor.execute(
+                                "SELECT name, stock, ean, variant_uid FROM variants WHERE product_id = %s", (product.id,))
                             variants = source_cursor.fetchall()
                             for size_name, stock, ean, variant_uid in variants:
-                                destination_cursor.execute("SELECT id FROM sizes WHERE name = %s", (size_name,))
+                                destination_cursor.execute(
+                                    "SELECT id FROM sizes WHERE name = %s", (size_name,))
                                 size_result = destination_cursor.fetchone()
                                 size_id = size_result[0] if size_result else None
                                 if not size_id:
-                                    messages.error(request, f"Brak rozmiaru '{size_name}' w bazie.")
+                                    messages.error(
+                                        request, f"Brak rozmiaru '{size_name}' w bazie.")
                                     continue
 
                                 with transaction.atomic(using='MasterProductDatabase'):
@@ -819,12 +944,14 @@ def export_to_products(modeladmin, request, queryset):
                                     if variant_result:
                                         variant_id = variant_result[0]
                                     else:
-                                        destination_cursor.execute("SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
-                                        variant_id = destination_cursor.fetchone()[0]
+                                        destination_cursor.execute(
+                                            "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
+                                        variant_id = destination_cursor.fetchone()[
+                                            0]
                                         destination_cursor.execute("""
                                             INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
                                             VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                                            (variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2))
+                                                                   (variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2))
 
                                     destination_cursor.execute("""
                                         INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
@@ -832,30 +959,34 @@ def export_to_products(modeladmin, request, queryset):
                                         ON CONFLICT (variant_id, source_id) DO UPDATE SET
                                         stock = EXCLUDED.stock, price = EXCLUDED.price
                                     """, (variant_id, 2, stock, product_price))
-                                    
+
                                     source_cursor.execute("""
                                         UPDATE variants
                                         SET mapped_variant_id = %s
                                         WHERE variant_uid = %s
                                         """, (variant_id, variant_uid))
 
-                                    source_cursor.execute("UPDATE variants SET mapped_variant_id = %s WHERE variant_uid = %s", (variant_id, variant_uid))
+                                    source_cursor.execute(
+                                        "UPDATE variants SET mapped_variant_id = %s WHERE variant_uid = %s", (variant_id, variant_uid))
                                     connections['matterhorn'].commit()
 
-                                messages.success(request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
-                            break    
+                                messages.success(
+                                    request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
+                            break
                 # 🔍 Fuzzy dopasowanie
                 if not new_product_id:
                     destination_cursor.execute("""
                         SELECT id, name FROM products 
                         WHERE brand_id = (SELECT id FROM brands WHERE brand_lower = %s)
                     """, (product.brand.lower(),))
-                    
-                    existing_products = {row[1]: row[0] for row in destination_cursor.fetchall()}
+
+                    existing_products = {row[1]: row[0]
+                                         for row in destination_cursor.fetchall()}
 
                     # Sprawdzenie, czy nazwa produktu docelowego zawiera się w nazwie nowego produktu (podciąg)
                     substring_match = next(
-                        ((existing_name, existing_id) for existing_name, existing_id in existing_products.items() if existing_name.lower() in product.name.lower()),
+                        ((existing_name, existing_id) for existing_name, existing_id in existing_products.items(
+                        ) if existing_name.lower() in product.name.lower()),
                         None
                     )
 
@@ -867,10 +998,12 @@ def export_to_products(modeladmin, request, queryset):
                             (new_product_id, product.id)
                         )
                         connections['matterhorn'].commit()
-                        messages.info(request, f"{product.name} automatycznie dopasowano (zgodność podciągu) do {existing_name}.")
+                        messages.info(
+                            request, f"{product.name} automatycznie dopasowano (zgodność podciągu) do {existing_name}.")
                     else:
                         # Jeżeli nie było podciągu, kontynuuj fuzzy matching
-                        best_matches = process.extract(product.name, existing_products.keys(), scorer=fuzz.ratio, limit=5)
+                        best_matches = process.extract(
+                            product.name, existing_products.keys(), scorer=fuzz.ratio, limit=5)
 
                         if best_matches:
                             best_match, best_score, _ = best_matches[0]
@@ -881,7 +1014,8 @@ def export_to_products(modeladmin, request, queryset):
                                     (new_product_id, product.id)
                                 )
                                 connections['matterhorn'].commit()
-                                messages.info(request, f"{product.name} dopasowano do {best_match} (score: {best_score}).")
+                                messages.info(
+                                    request, f"{product.name} dopasowano do {best_match} (score: {best_score}).")
 
                             elif best_score > 50:
                                 return render(request, 'admin/confirm_product.html', {
@@ -891,111 +1025,17 @@ def export_to_products(modeladmin, request, queryset):
                                     'referrer': request.get_full_path()
                                 })
 
-                
-                '''# 🔍 Fuzzy dopasowanie
-                if not new_product_id:
-                    destination_cursor.execute("SELECT id, name FROM products WHERE brand_id = (SELECT id FROM brands WHERE brand_lower = %s)", (product.brand.lower(),))
-                    existing_products = {row[1]: row[0] for row in destination_cursor.fetchall()}
-                    best_matches = process.extract(product.name, existing_products.keys(), scorer=fuzz.ratio, limit=5)
-
-                    if best_matches:
-                        best_match, best_score, _ = best_matches[0]
-                        if best_score > 99:
-                            new_product_id = existing_products[best_match]
-                            source_cursor.execute("UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
-                            connections['matterhorn'].commit()
-                            messages.info(request, f"{product.name} dopasowano do {best_match} (score: {best_score}).")
-
-                        elif best_score > 50:
-                            return render(request, 'admin/confirm_product.html', {
-                                'product': product,
-                                'matches': best_matches,
-                                'existing_products': existing_products,
-                                'referrer': request.get_full_path()
-                            })'''
-
                 # 🆕 Utworzenie produktu, jeśli nadal brak ID
                 if not new_product_id:
-                    new_product_id = add_new_product_to_matterhorn(destination_cursor, source_cursor, product, request)
+                    new_product_id = add_new_product_to_matterhorn(
+                        destination_cursor, source_cursor, product, request)
                     if not new_product_id:
                         continue
-                    '''destination_cursor.execute("SELECT id FROM brands WHERE brand_lower = %s", (product.brand.lower(),))
-                    brand_result = destination_cursor.fetchone()
-                    if not brand_result:
-                        messages.error(request, f"Brak marki {product.brand} dla {product.name}")
-                        continue
-                    brand_id = brand_result[0]
-                    with transaction.atomic(using='MasterProductDatabase'):
-                        destination_cursor.execute(
-                            "INSERT INTO products (name, description, brand_id) VALUES (%s, %s, %s)",
-                            (product.name, product.description, brand_id))
-                        destination_cursor.execute("SELECT LAST_INSERT_ID()")
-                        new_product_id = destination_cursor.fetchone()[0]
-                        source_cursor.execute("UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
-                        connections['matterhorn'].commit()
-                        messages.success(request, f"Dodano {product.name} jako nowy produkt z ID {new_product_id}.")
-
-                source_cursor.execute("SELECT color, price FROM products WHERE id = %s", (product.id,))
-                product_color, product_price = source_cursor.fetchone() or (None, 0)
-
-                if not product_color:
-                    messages.error(request, f"Brak koloru dla {product.name}. Pomijam.")
-                    continue
-
-                # Kolory
-                destination_cursor.execute("SELECT id FROM colors WHERE name = %s", (product_color,))
-                color_result = destination_cursor.fetchone()
-                color_id = color_result[0] if color_result else None
-                if not color_id:
-                    messages.error(request, f"Kolor '{product_color}' nie istnieje.")
-                    continue
-
-                # Warianty
-                source_cursor.execute("SELECT name, stock, ean, variant_uid FROM variants WHERE product_id = %s", (product.id,))
-                variants = source_cursor.fetchall()
-                for size_name, stock, ean, variant_uid in variants:
-                    destination_cursor.execute("SELECT id FROM sizes WHERE name = %s", (size_name,))
-                    size_result = destination_cursor.fetchone()
-                    size_id = size_result[0] if size_result else None
-                    if not size_id:
-                        messages.error(request, f"Brak rozmiaru '{size_name}' w bazie.")
-                        continue
-
-                    with transaction.atomic(using='MasterProductDatabase'):
-                        destination_cursor.execute(
-                            "SELECT variant_id FROM product_variants WHERE variant_uid = %s AND source_id = %s",
-                            (variant_uid, 2))
-                        variant_result = destination_cursor.fetchone()
-                        if variant_result:
-                            variant_id = variant_result[0]
-                        else:
-                            destination_cursor.execute("SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
-                            variant_id = destination_cursor.fetchone()[0]
-                            destination_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                                (variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2))
-
-                        destination_cursor.execute("""
-                            INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
-                            VALUES (%s, %s, %s, %s, 'PLN')
-                            ON DUPLICATE KEY UPDATE stock=VALUES(stock), price=VALUES(price)
-                        """, (variant_id, 2, stock, product_price))
-                        
-                        source_cursor.execute("""
-                            UPDATE variants
-                            SET mapped_variant_id = %s
-                            WHERE variant_uid = %s
-                            """, (variant_id, variant_uid))
-
-
-                        source_cursor.execute("UPDATE variants SET mapped_variant_id = %s WHERE variant_uid = %s", (variant_id, variant_uid))
-                        connections['matterhorn'].commit()
-
-                    messages.success(request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")'''
-        messages.success(request, f"Eksport zakończony dla {queryset.count()} produktów")
+        messages.success(
+            request, f"Eksport zakończony dla {queryset.count()} produktów")
     except Exception as e:
         messages.error(request, f"Błąd eksportu: {e}")
+
 
 def get_all_ids():
     """Pobiera wszystkie ID produktów z API Matterhorn."""
@@ -1006,36 +1046,38 @@ def get_all_ids():
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}"
         }
-        
+
         base_url = "https://matterhorn.pl/B2BAPI/ITEMS/"
         all_ids = []
         page = 1
-        
+
         while True:
             url = f"{base_url}?page={page}&limit=1000"
-            response = requests.get(url, headers=headersMatterhorn, timeout=120)
-            
+            response = requests.get(
+                url, headers=headersMatterhorn, timeout=120)
+
             if response.status_code != 200:
                 print(f"Błąd podczas pobierania ID: {response.status_code}")
                 break
-                
+
             data = response.json()
             if not data:
                 break
-                
+
             ids = [item['id'] for item in data]
             all_ids.extend(ids)
-            
+
             if len(data) < 1000:
                 break
-                
+
             page += 1
             time.sleep(0.6)  # Ograniczenie liczby zapytań
-            
+
         return all_ids
     except Exception as e:
         print(f"Błąd podczas pobierania ID: {str(e)}")
         return None
+
 
 def get_item_by_id(item_id):
     """Pobiera dane produktu o podanym ID z API Matterhorn."""
@@ -1046,19 +1088,21 @@ def get_item_by_id(item_id):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}"
         }
-        
+
         url = f"https://matterhorn.pl/B2BAPI/ITEMS/{item_id}"
         response = requests.get(url, headers=headersMatterhorn, timeout=120)
-        
+
         if response.status_code != 200:
-            print(f"Błąd podczas pobierania produktu {item_id}: {response.status_code}")
+            print(
+                f"Błąd podczas pobierania produktu {item_id}: {response.status_code}")
             return None
-            
+
         item = response.json()
-        
+
         if 'url' in item and isinstance(item['url'], str):
-            item['url'] = item['url'].replace('http://matterhorn-wholesale.com', 'http://matterhorn.pl')
-            
+            item['url'] = item['url'].replace(
+                'http://matterhorn-wholesale.com', 'http://matterhorn.pl')
+
         price = item["prices"].get("PLN", None)
         item_data = (
             item["id"],
@@ -1082,14 +1126,14 @@ def get_item_by_id(item_id):
             item["size_table_html"],
             price
         )
-        
+
         images_data = []
         if item.get("images"):
             images_data = [
-                (image.split('_')[-1].split('.jpg')[0], image, item["id"]) 
+                (image.split('_')[-1].split('.jpg')[0], image, item["id"])
                 for image in item["images"]
             ]
-            
+
         variants_data = []
         if isinstance(item.get("variants"), list):
             variants_data = [
@@ -1103,7 +1147,7 @@ def get_item_by_id(item_id):
                 )
                 for variant in item["variants"]
             ]
-            
+
         other_colors = []
         if isinstance(item.get("other_colors"), list):
             for color_id in item.get("other_colors", []):
@@ -1111,7 +1155,7 @@ def get_item_by_id(item_id):
                 color_product_id = int(color_id)
                 if product_id != color_product_id:
                     other_colors.append((product_id, color_product_id))
-                    
+
         product_sets = []
         if isinstance(item.get("products_in_set"), list):
             for product_in_set_id in item.get("products_in_set", []):
@@ -1119,9 +1163,8 @@ def get_item_by_id(item_id):
                 related_product_id = int(product_in_set_id)
                 if product_id != related_product_id:
                     product_sets.append((product_id, related_product_id))
-                    
+
         return item_data, images_data, variants_data, other_colors, product_sets
     except Exception as e:
         print(f"Błąd podczas pobierania produktu {item_id}: {str(e)}")
         return None
-
