@@ -9,14 +9,14 @@ import requests
 from .defs_db import connect_to_postgresql, create_tables_if_not_exist, import_insert_item
 import psycopg2
 
-load_dotenv('.env.dev')
+# load_dotenv('.env.dev')
 
-api_key = os.getenv('api_key')
+# api_key = os.getenv('api_key')
 
-headersMatterhorn = {
-    "Content-Type": "application/json",
-    "Authorization":f"Bearer {api_key}"
-}
+# headersMatterhorn = {
+#     "Content-Type": "application/json",
+#     "Authorization":f"Bearer {api_key}"
+# }
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def import_all_by_one():
     load_dotenv('.env.dev')
         
     # Pobieramy nagłówki z .env
-    api_key1 = os.getenv('api_key')
+    api_key = os.getenv('api_key')
     headersMatterhorn = {
         "Content-Type": "application/json",
         "Authorization": api_key
@@ -44,12 +44,12 @@ def import_all_by_one():
 
     base_url = "https://matterhorn.pl/B2BAPI/ITEMS/"
 
-    for i in range(last_id + 1, last_id + 100000):
+    for i in range(last_id + 1, last_id + 250000):
         url = f"{base_url}{i}"
         print(f"Pobieranie danych z : {url}")
 
         attempt = 1
-        max_attempts = 3
+        max_attempts = 100
 
         while attempt <= max_attempts:
             response = requests.get(url, headers=headersMatterhorn)
