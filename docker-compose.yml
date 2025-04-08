@@ -7,7 +7,6 @@ services:
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
-      - logs_volume:/app/logs
     env_file:
       - .env.${ENVIRONMENT:-prod}
     environment:
@@ -76,8 +75,6 @@ services:
 volumes:
   static_volume:
   nginx_logs:
-  logs_volume:
-    name: nc_logs
 
 networks:
   app_network:

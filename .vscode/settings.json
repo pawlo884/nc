@@ -1,14 +1,5 @@
 {
-    "sqltools.connections": [
-        {
-            "previewLimit": 50,
-            "server": "db-postgresql-fra1-18304-do-user-18661095-0.l.db.ondigitalocean.com",
-            "port": 25060,
-            "driver": "PostgreSQL",
-            "name": "zzz_def",
-            "database": "zzz_defaultdb",
-            "username": "Pawel",
-            "password": "AVNS_A1Vlq8MqVwDcfbX8qL5"
-        }
+    "cSpell.words": [
+        "dotenv"
     ]
 }

@@ -5,6 +5,7 @@ Base Django settings for nc project.
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import tempfile
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -151,44 +152,6 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Warsaw'
-
-# Logging Configuration
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple'
-        },
-        'import_all_by_one': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'import_all_by_one.log'),
-            'maxBytes': 5 * 1024 * 1024,  # 5MB
-            'backupCount': 10,
-            'formatter': 'verbose'
-        },
-    },
-    'loggers': {
-        'matterhorn.defs_import.import_all_by_one': {
-            'handlers': ['console', 'import_all_by_one'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-    },
-}
 
 # WhiteNoise Configuration
 WHITENOISE_USE_FINDERS = True
