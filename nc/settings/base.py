@@ -135,6 +135,9 @@ LOCALE_PATHS = [
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
@@ -171,8 +174,10 @@ LOGGING = {
         },
         'import_all_by_one': {
             'level': 'DEBUG',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs', 'import_all_by_one.log'),
+            'maxBytes': 5 * 1024 * 1024,  # 5MB
+            'backupCount': 10,
             'formatter': 'verbose'
         },
     },
@@ -184,3 +189,8 @@ LOGGING = {
         },
     },
 }
+
+# WhiteNoise Configuration
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_MANIFEST_STRICT = False
+WHITENOISE_ALLOW_ALL_ORIGINS = True
