@@ -14,6 +14,8 @@ load_dotenv()
 
 # Application definition
 INSTALLED_APPS = [
+    'admin_interface',
+    'colorfield',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -32,6 +34,8 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -111,10 +115,22 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+LANGUAGE_CODE = 'pl'
+TIME_ZONE = 'Europe/Warsaw'
 USE_I18N = True
+USE_L10N = True
 USE_TZ = True
+
+# Obsługiwane języki
+LANGUAGES = [
+    ('pl', 'Polski'),
+    ('en', 'English'),
+]
+
+# Ścieżka do plików tłumaczeń
+LOCALE_PATHS = [
+    os.path.join(BASE_DIR, 'locale'),
+] 
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
@@ -132,3 +148,39 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Warsaw'
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple'
+        },
+        'import_all_by_one': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'import_all_by_one.log'),
+            'formatter': 'verbose'
+        },
+    },
+    'loggers': {
+        'matterhorn.defs_import.import_all_by_one': {
+            'handlers': ['console', 'import_all_by_one'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
