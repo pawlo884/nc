@@ -17,8 +17,15 @@ COPY . /app/
 # Ustaw zmienną środowiskową dla Django podczas budowania
 ENV DJANGO_SETTINGS_MODULE=nc.settings.prod
 
+# Utwórz niezbędne katalogi
+RUN mkdir -p /app/static /app/staticfiles /app/logs && \
+    chmod -R 777 /app/logs
+
 # Zbierz statyczne pliki
 RUN python manage.py collectstatic --noinput
+
+# Zdefiniuj wolumen dla logów
+VOLUME ["/app/logs"]
 
 # Uruchom migracje i Gunicorn
 CMD ["sh", "-c", "python manage.py migrate && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"]

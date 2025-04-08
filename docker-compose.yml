@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   web:
     image: ${DOCKERHUB_USERNAME}/django-app:latest
@@ -5,6 +7,7 @@ services:
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
+      - logs_volume:/app/logs
     env_file:
       - .env.${ENVIRONMENT:-prod}
     environment:
@@ -12,6 +15,8 @@ services:
     restart: always
     networks:
       - app_network
+    depends_on:
+      - redis
 
   nginx:
     image: nginx:alpine
@@ -61,7 +66,9 @@ services:
         - app_network
 
   redis:
-      image: redis:7.0
+      image: redis:latest
+      ports:
+        - "6379:6379"
       restart: always
       networks:
         - app_network
@@ -69,6 +76,8 @@ services:
 volumes:
   static_volume:
   nginx_logs:
+  logs_volume:
+    name: nc_logs
 
 networks:
   app_network:
