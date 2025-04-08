@@ -19,3 +19,4 @@ __pycache__/
 .env.prod
 .vscode/
 logs/
+celerybeat-schedule
