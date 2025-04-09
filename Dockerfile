@@ -18,7 +18,7 @@ COPY . /app/
 ENV DJANGO_SETTINGS_MODULE=nc.settings.prod
 
 # Utwórz niezbędne katalogi z odpowiednimi uprawnieniami
-RUN mkdir -p /app/static /app/staticfiles
+RUN mkdir -p /app/static /app/staticfiles /app/logs/matterhorn
 
 # Zbierz statyczne pliki
 RUN python manage.py collectstatic --noinput
