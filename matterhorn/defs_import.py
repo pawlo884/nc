@@ -57,9 +57,9 @@ def import_all_by_one():
         attempt = 1
         max_attempts = 100
         json_decode_attempts = 0
-        max_json_decode_attempts = 30
+        max_json_decode_attempts = 100
         db_connection_attempts = 0
-        max_db_connection_attempts = 30
+        max_db_connection_attempts = 100
 
         while attempt <= max_attempts:
             try:
@@ -264,7 +264,7 @@ def get_latest_timestamp():
         return latest_timestamp
     except Exception as e:
         print(f"[ERROR] Nie udało się pobrać najnowszego timestamp: {e}")
-        return "1970-01-01 00:00:00"
+        return "2025-04-08 00:00:00"
     finally:
         if 'cursor' in locals():
             cursor.close()
@@ -291,7 +291,7 @@ def get_last_update_time():
     except Exception as e:
         print(
             f"[ERROR] Nie udało się pobrać czasu ostatniej aktualizacji: {e}")
-        return "1970-01-01 00:00:00"
+        return "2024-04-08 00:00:00"
 
 
 def round_down_to_10_minutes(dt):
@@ -325,8 +325,8 @@ def log_update_error(last_update_time_rounded, description, error_message, start
 
 def update_inventory_v3():
     print("[INFO] Rozpoczynam aktualizację stanów magazynowych.")
-    start_time = round_down_to_10_minutes(
-        datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+    # Zapisz czas rozpoczęcia aktualizacji
+    start_time = round_down_to_10_minutes(datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     base_url_items = "https://matterhorn.pl/B2BAPI/ITEMS/"
     base_url_inventory = "https://matterhorn.pl/B2BAPI/ITEMS/INVENTORY/"
     last_update_time = get_last_update_time()
@@ -341,11 +341,11 @@ def update_inventory_v3():
     total_data_inventory = []
 
     while True:
+        # Budowanie URL do pobrania danych z API
         b_url = f"{base_url_items}?page={page}&last_update={update_date}%20{encoded_time}&limit=1000"
         i_url = f"{base_url_inventory}?page={page}&last_update={update_date}%20{encoded_time}&limit=1000"
 
-        print(
-            f"[INFO] PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
+        print(f"[INFO] PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
         attempt = 1
         max_attempts = 3
         connection = None
@@ -353,16 +353,12 @@ def update_inventory_v3():
         while attempt <= max_attempts:
             try:
                 # print(f"[INFO] Próba {attempt}/{max_attempts} pobrania danych z API.")
-                print(
-                    f"[INFO] Próba {attempt}/{max_attempts} pobrania danych z API.")
-                response_items = requests.get(
-                    b_url, headers=headersMatterhorn, timeout=120)
+                print(f"[INFO] Próba {attempt}/{max_attempts} pobrania danych z API.")
+                response_items = requests.get(b_url, headers=headersMatterhorn, timeout=120)
                 time.sleep(2)
-                response_inventory = requests.get(
-                    i_url, headers=headersMatterhorn, timeout=120)
+                response_inventory = requests.get(i_url, headers=headersMatterhorn, timeout=120)
                 # print(f"[INFO] Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
-                print(
-                    f"[INFO] Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
+                print(f"[INFO] Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
 
                 if response_items.status_code == 200 and response_inventory.status_code == 200:
                     print("[INFO] Pomyślnie pobrano dane z API.")
@@ -372,17 +368,14 @@ def update_inventory_v3():
                         try:
                             data_items = response_items.json()          # /ITEMS
                             data_inventory = response_inventory.json()  # /INVENTORY
-                            print(
-                                f"Liczba rekordów w odpowiedzi: ITEMS-{len(data_items)}, INVENTORY-{len(data_inventory)}")
+                            print(f"Liczba rekordów w odpowiedzi: ITEMS-{len(data_items)}, INVENTORY-{len(data_inventory)}")
                         except ValueError as e:
                             print(f"[ERROR] Błąd konwersji danych z API: {e}")
-                            log_update_error(
-                                last_update_time_rounded, "Błąd konwersji danych z API", str(e), start_time)
+                            log_update_error(last_update_time_rounded, "Błąd konwersji danych z API", str(e), start_time)
                             return False
                     else:
                         print("[ERROR] Odpowiedź API jest pusta.")
-                        log_update_error(
-                            last_update_time_rounded, "Pusta odpowiedź API", "Odpowiedź API jest pusta.", start_time)
+                        log_update_error(last_update_time_rounded, "Pusta odpowiedź API", "Odpowiedź API jest pusta.", start_time)
                         return False
 
                     # Liczenie pobranych rekordów
@@ -393,8 +386,7 @@ def update_inventory_v3():
                     total_data_items.extend(data_items)
                     total_data_inventory.extend(data_inventory)
 
-                    print(
-                        f"[INFO] Liczba rekordów w odpowiedzi: ITEMS-{data_length} INVENTORY-{data_length_inventory}")
+                    print(f"[INFO] Liczba rekordów w odpowiedzi: ITEMS-{data_length} INVENTORY-{data_length_inventory}")
                     time.sleep(1)
 
                     # Warunek zakończenia pętli, gdy brak nowych danych
@@ -412,8 +404,7 @@ def update_inventory_v3():
                     # Iteracja po danych z API ITEMS
                     for item in data_items:
                         if not item:
-                            print(
-                                "[WARNING] Pusty element w danych ITEMS. Pomijanie.")
+                            print("[WARNING] Pusty element w danych ITEMS. Pomijanie.")
                             continue
 
                         # Pobieranie informacji o produkcie
@@ -443,8 +434,7 @@ def update_inventory_v3():
                             stock_total = %s
                         WHERE id = %s
                         """
-                        cursor.execute(
-                            update_products_query, (active, new_collection, price, color, stock_total, id))
+                        cursor.execute(update_products_query, (active, new_collection, price, color, stock_total, id))
 
                         # Dodawanie powiązań zestawów
                         update_product_in_set_query = """
@@ -461,15 +451,12 @@ def update_inventory_v3():
                                 continue
 
                             # Sprawdzenie istnienia `id` w tabeli `products`
-                            cursor.execute(
-                                "SELECT 1 FROM products WHERE id = %s", (id,))
+                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (id,))
 
                             if not cursor.fetchone():
                                 # Jeśli `product_id` nie istnieje, dodaj placeholder
-                                cursor.execute(
-                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                print(
-                                    f"[INFO] Dodano placeholder dla produktu o ID={id}")
+                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
+                                print(f"[INFO] Dodano placeholder dla produktu o ID={id}")
 
                                 # Sprawdzenie istnienia `set_pid` w tabeli `products`
                             cursor.execute(
@@ -665,15 +652,13 @@ def update_last_update_time(start_time, total_data_length, total_data_length_inv
         # Serializacja danych JSON
         data_item_json = json.dumps(total_data_items)
         data_inventory_json = json.dumps(total_data_inventory)
-        cursor.execute("INSERT INTO update_log (last_update, description, data_items, data_inventory) VALUES (%s, %s, %s, %s)",
-                       (start_time, description, data_item_json, data_inventory_json))
+        cursor.execute("INSERT INTO update_log (last_update, description, data_items, data_inventory) VALUES (%s, %s, %s, %s)", (start_time, description, data_item_json, data_inventory_json))
         connection.commit()
         cursor.close()
         connection.close()
         print("[INFO] Zapisano czas ostatniej aktualizacji.")
     except Exception as e:
-        print(
-            f"[ERROR] Nie udało się zapisać czasu ostatniej aktualizacji: {e}")
+        print(f"[ERROR] Nie udało się zapisać czasu ostatniej aktualizacji: {e}")
 
 
 def clean_update_log():
@@ -691,8 +676,7 @@ def clean_update_log():
         deleted_count = cursor.rowcount
 
         connection.commit()
-        print(
-            f"[INFO] Usunięto {deleted_count} rekordów starszych niż 10 dni.")
+        print(f"[INFO] Usunięto {deleted_count} rekordów starszych niż 10 dni.")
 
         cursor.close()
         connection.close()
@@ -704,25 +688,20 @@ def clean_update_log():
 
 
 def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, request):
-    destination_cursor.execute(
-        "SELECT id FROM brands WHERE brand_lower = %s", (product.brand.lower(),))
+    destination_cursor.execute("SELECT id FROM brands WHERE brand_lower = %s", (product.brand.lower(),))
     brand_result = destination_cursor.fetchone()
     if not brand_result:
-        messages.error(
-            request, f"Brak marki {product.brand} dla {product.name}")
+        messages.error(request, f"Brak marki {product.brand} dla {product.name}")
         return None
     brand_id = brand_result[0]
 
     with transaction.atomic(using='MasterProductDatabase'):
-        destination_cursor.execute(
-            "INSERT INTO products (name, description, brand_id) VALUES (%s, %s, %s) RETURNING id",
+        destination_cursor.execute("INSERT INTO products (name, description, brand_id) VALUES (%s, %s, %s) RETURNING id",
             (product.name, product.description, brand_id))
         new_product_id = destination_cursor.fetchone()[0]
-        source_cursor.execute(
-            "UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
+        source_cursor.execute("UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
         connections['matterhorn'].commit()
-        messages.success(
-            request, f"Dodano {product.name} jako nowy produkt z ID {new_product_id}.")
+        messages.success(request, f"Dodano {product.name} jako nowy produkt z ID {new_product_id}.")
 
     source_cursor.execute(
         "SELECT color, price FROM products WHERE id = %s", (product.id,))
@@ -1036,135 +1015,3 @@ def export_to_products(modeladmin, request, queryset):
     except Exception as e:
         messages.error(request, f"Błąd eksportu: {e}")
 
-
-def get_all_ids():
-    """Pobiera wszystkie ID produktów z API Matterhorn."""
-    try:
-        load_dotenv('.env.dev')
-        api_key = os.getenv('api_key')
-        headersMatterhorn = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
-        }
-
-        base_url = "https://matterhorn.pl/B2BAPI/ITEMS/"
-        all_ids = []
-        page = 1
-
-        while True:
-            url = f"{base_url}?page={page}&limit=1000"
-            response = requests.get(
-                url, headers=headersMatterhorn, timeout=120)
-
-            if response.status_code != 200:
-                print(f"Błąd podczas pobierania ID: {response.status_code}")
-                break
-
-            data = response.json()
-            if not data:
-                break
-
-            ids = [item['id'] for item in data]
-            all_ids.extend(ids)
-
-            if len(data) < 1000:
-                break
-
-            page += 1
-            time.sleep(0.6)  # Ograniczenie liczby zapytań
-
-        return all_ids
-    except Exception as e:
-        print(f"Błąd podczas pobierania ID: {str(e)}")
-        return None
-
-
-def get_item_by_id(item_id):
-    """Pobiera dane produktu o podanym ID z API Matterhorn."""
-    try:
-        load_dotenv('.env.dev')
-        api_key = os.getenv('api_key')
-        headersMatterhorn = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
-        }
-
-        url = f"https://matterhorn.pl/B2BAPI/ITEMS/{item_id}"
-        response = requests.get(url, headers=headersMatterhorn, timeout=120)
-
-        if response.status_code != 200:
-            print(
-                f"Błąd podczas pobierania produktu {item_id}: {response.status_code}")
-            return None
-
-        item = response.json()
-
-        if 'url' in item and isinstance(item['url'], str):
-            item['url'] = item['url'].replace(
-                'http://matterhorn-wholesale.com', 'http://matterhorn.pl')
-
-        price = item["prices"].get("PLN", None)
-        item_data = (
-            item["id"],
-            item["active"],
-            item["name"].lstrip(),
-            item["name_without_number"].lstrip(),
-            item["description"],
-            item["creation_date"],
-            item["color"],
-            item["category_name"],
-            item["category_id"],
-            item["category_path"],
-            item["brand_id"],
-            item["brand"],
-            item["stock_total"],
-            item["url"],
-            item["new_collection"],
-            item["size_table"],
-            item["weight"],
-            item["size_table_txt"],
-            item["size_table_html"],
-            price
-        )
-
-        images_data = []
-        if item.get("images"):
-            images_data = [
-                (image.split('_')[-1].split('.jpg')[0], image, item["id"])
-                for image in item["images"]
-            ]
-
-        variants_data = []
-        if isinstance(item.get("variants"), list):
-            variants_data = [
-                (
-                    int(variant["variant_uid"]),
-                    variant["name"],
-                    int(variant["stock"]),
-                    int(variant["max_processing_time"]),
-                    variant["ean"],
-                    item["id"]
-                )
-                for variant in item["variants"]
-            ]
-
-        other_colors = []
-        if isinstance(item.get("other_colors"), list):
-            for color_id in item.get("other_colors", []):
-                product_id = item["id"]
-                color_product_id = int(color_id)
-                if product_id != color_product_id:
-                    other_colors.append((product_id, color_product_id))
-
-        product_sets = []
-        if isinstance(item.get("products_in_set"), list):
-            for product_in_set_id in item.get("products_in_set", []):
-                product_id = item["id"]
-                related_product_id = int(product_in_set_id)
-                if product_id != related_product_id:
-                    product_sets.append((product_id, related_product_id))
-
-        return item_data, images_data, variants_data, other_colors, product_sets
-    except Exception as e:
-        print(f"Błąd podczas pobierania produktu {item_id}: {str(e)}")
-        return None
