@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 import tempfile
 import logging
+from logging.handlers import RotatingFileHandler
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -32,8 +33,10 @@ LOGGING = {
     'handlers': {
         'file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs/matterhorn/import_all_by_one.log'),
+            'maxBytes': 5 * 1024 * 1024,  # 10MB
+            'backupCount': 5,
             'formatter': 'verbose',
         },
         'console': {
