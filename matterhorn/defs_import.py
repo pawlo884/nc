@@ -8,8 +8,20 @@ import requests
 from .defs_db import connect_to_postgresql, create_tables_if_not_exist, import_insert_item
 import psycopg2
 import logging
+import pytz
 
 logger = logging.getLogger(__name__)
+
+# Ustawienie strefy czasowej
+warsaw_tz = pytz.timezone('Europe/Warsaw')
+
+# Dodanie filtru do loggera, który doda strefę czasową
+class TimezoneFilter(logging.Filter):
+    def filter(self, record):
+        record.timezone = datetime.now(warsaw_tz).strftime('%z')
+        return True
+
+logger.addFilter(TimezoneFilter())
 
 # Ładowanie zmiennych środowiskowych
 load_dotenv('.env.dev')
@@ -19,7 +31,7 @@ headersMatterhorn = {
     "Authorization": api_key
 }
 
-
+# OK
 def get_last_id():
     connection = connect_to_postgresql('matterhorn')
     create_tables_if_not_exist(connection)
@@ -31,7 +43,7 @@ def get_last_id():
     connection.close()
     return result[0] if result and result[0] is not None else 0
 
-
+# OK
 def import_all_by_one():
     load_dotenv('.env.dev')
     logger.info("Rozpoczynam import produktów...")
@@ -238,7 +250,7 @@ def import_all_by_one():
 
     logger.info("Import produktów zakończony.")
 
-
+# OK
 def get_latest_timestamp():
     """
     Pobiera najnowszy timestamp z tabeli `variants` i zwraca go jako ciąg znaków.
@@ -271,7 +283,7 @@ def get_latest_timestamp():
         if 'connection' in locals() and not connection.closed:
             connection.close()
 
-
+# OK
 def get_last_update_time():
     try:
         connection = connect_to_postgresql(

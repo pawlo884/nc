@@ -64,10 +64,10 @@ def create_tables_if_not_exist(conn):
             size_table_txt TEXT,
             size_table_html TEXT,
             price NUMERIC(10, 2),
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'Europe/Warsaw'),
             mapped_product_id INT,
             is_mapped BOOLEAN DEFAULT NULL,
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            last_updated TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'Europe/Warsaw')
         )
     '''
 
@@ -77,7 +77,7 @@ def create_tables_if_not_exist(conn):
             image_id SERIAL PRIMARY KEY,
             image_path TEXT,
             product_id INT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'Europe/Warsaw'),
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         )
     '''
@@ -90,11 +90,11 @@ def create_tables_if_not_exist(conn):
             stock INT,
             max_processing_time INT,
             ean VARCHAR(50),
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'Europe/Warsaw'),
             product_id INT,
             mapped_variant_id INT,
             is_mapped BOOLEAN DEFAULT NULL,
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_updated TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'Europe/Warsaw'),
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         )
     '''
@@ -106,7 +106,7 @@ def create_tables_if_not_exist(conn):
             product_id INT NOT NULL,
             color_product_id INT NOT NULL,
             UNIQUE (product_id, color_product_id),
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'Europe/Warsaw'),
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
             FOREIGN KEY (color_product_id) REFERENCES products(id) ON DELETE CASCADE
         )
@@ -119,7 +119,7 @@ def create_tables_if_not_exist(conn):
             product_id INT NOT NULL,
             set_product_id INT NOT NULL,
             UNIQUE (product_id, set_product_id),
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'Europe/Warsaw'),
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
             FOREIGN KEY (set_product_id) REFERENCES products(id) ON DELETE CASCADE
         )
@@ -129,7 +129,7 @@ def create_tables_if_not_exist(conn):
     create_update_log_table_query = '''
         CREATE TABLE IF NOT EXISTS update_log (
             id SERIAL PRIMARY KEY,
-            last_update TIMESTAMP,
+            last_update TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'Europe/Warsaw'),
             description TEXT,
             data_items TEXT,
             data_inventory TEXT
