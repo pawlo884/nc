@@ -21,6 +21,11 @@ class TimezoneFilter(logging.Filter):
         record.timezone = datetime.now(warsaw_tz).strftime('%z')
         return True
 
+# Usunięcie wszystkich istniejących handlerów
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
+
+# Dodanie filtru strefy czasowej
 logger.addFilter(TimezoneFilter())
 
 # Ładowanie zmiennych środowiskowych
@@ -286,11 +291,10 @@ def get_latest_timestamp():
 # OK
 def get_last_update_time():
     try:
-        connection = connect_to_postgresql(
-            'matterhorn')  # Zmienione na PostgreSQL
+        connection = connect_to_postgresql('matterhorn')
         cursor = connection.cursor()
         cursor.execute(
-            "SELECT last_update FROM update_log ORDER BY last_update DESC LIMIT 1")
+            "SELECT last_update AT TIME ZONE 'Europe/Warsaw' FROM update_log ORDER BY last_update DESC LIMIT 1")
         result = cursor.fetchone()
         cursor.close()
         connection.close()
@@ -299,10 +303,9 @@ def get_last_update_time():
             return result[0].strftime("%Y-%m-%d %H:%M:%S")
         else:
             # Domyślny czas, jeśli brak wpisów
-            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            return datetime.now(pytz.timezone('Europe/Warsaw')).strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
-        print(
-            f"[ERROR] Nie udało się pobrać czasu ostatniej aktualizacji: {e}")
+        print(f"[ERROR] Nie udało się pobrać czasu ostatniej aktualizacji: {e}")
         return "2024-04-08 00:00:00"
 
 
@@ -336,13 +339,13 @@ def log_update_error(last_update_time_rounded, description, error_message, start
 
 
 def update_inventory_v3():
-    print("[INFO] Rozpoczynam aktualizację stanów magazynowych.")
+    logger.info("Rozpoczynam aktualizację stanów magazynowych.")
     # Zapisz czas rozpoczęcia aktualizacji
     start_time = round_down_to_10_minutes(datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     base_url_items = "https://matterhorn.pl/B2BAPI/ITEMS/"
     base_url_inventory = "https://matterhorn.pl/B2BAPI/ITEMS/INVENTORY/"
     last_update_time = get_last_update_time()
-    print(f"[INFO] Ostatnia aktualizacja: {last_update_time}")
+    logger.info(f"Ostatnia aktualizacja: {last_update_time}")
     last_update_time_rounded = last_update_time[:-2] + "00"
     encoded_time = urllib.parse.quote(last_update_time_rounded.split(" ")[1])
     update_date = last_update_time_rounded.split(" ")[0]
@@ -357,36 +360,32 @@ def update_inventory_v3():
         b_url = f"{base_url_items}?page={page}&last_update={update_date}%20{encoded_time}&limit=1000"
         i_url = f"{base_url_inventory}?page={page}&last_update={update_date}%20{encoded_time}&limit=1000"
 
-        print(f"[INFO] PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
+        logger.info(f"PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
         attempt = 1
         max_attempts = 3
         connection = None
 
         while attempt <= max_attempts:
             try:
-                # print(f"[INFO] Próba {attempt}/{max_attempts} pobrania danych z API.")
-                print(f"[INFO] Próba {attempt}/{max_attempts} pobrania danych z API.")
+                logger.info(f"Próba {attempt}/{max_attempts} pobrania danych z API.")
                 response_items = requests.get(b_url, headers=headersMatterhorn, timeout=120)
                 time.sleep(2)
                 response_inventory = requests.get(i_url, headers=headersMatterhorn, timeout=120)
-                # print(f"[INFO] Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
-                print(f"[INFO] Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
+                logger.info(f"Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
 
                 if response_items.status_code == 200 and response_inventory.status_code == 200:
-                    print("[INFO] Pomyślnie pobrano dane z API.")
-                    # print(f"[INFO] Odpowiedź API ITEMS: {response_items.text}")
-                    # print(f"[INFO] Odpowiedź API INVENTORY: {response_inventory.text}")
+                    logger.info("Pomyślnie pobrano dane z API.")
                     if response_items.text and response_inventory.text:
                         try:
                             data_items = response_items.json()          # /ITEMS
                             data_inventory = response_inventory.json()  # /INVENTORY
-                            print(f"Liczba rekordów w odpowiedzi: ITEMS-{len(data_items)}, INVENTORY-{len(data_inventory)}")
+                            logger.info(f"Liczba rekordów w odpowiedzi: ITEMS-{len(data_items)}, INVENTORY-{len(data_inventory)}")
                         except ValueError as e:
-                            print(f"[ERROR] Błąd konwersji danych z API: {e}")
+                            logger.error(f"Błąd konwersji danych z API: {e}")
                             log_update_error(last_update_time_rounded, "Błąd konwersji danych z API", str(e), start_time)
                             return False
                     else:
-                        print("[ERROR] Odpowiedź API jest pusta.")
+                        logger.error("Odpowiedź API jest pusta.")
                         log_update_error(last_update_time_rounded, "Pusta odpowiedź API", "Odpowiedź API jest pusta.", start_time)
                         return False
 
@@ -398,25 +397,25 @@ def update_inventory_v3():
                     total_data_items.extend(data_items)
                     total_data_inventory.extend(data_inventory)
 
-                    print(f"[INFO] Liczba rekordów w odpowiedzi: ITEMS-{data_length} INVENTORY-{data_length_inventory}")
+                    logger.info(f"Liczba rekordów w odpowiedzi: ITEMS-{data_length} INVENTORY-{data_length_inventory}")
                     time.sleep(1)
 
                     # Warunek zakończenia pętli, gdy brak nowych danych
                     if data_length == 0 and data_length_inventory == 0:
-                        print("[INFO] Brak nowych danych do przetworzenia.")
-                        # print(f"[INFO] Brak nowych danych do przetworzenia.")
+                        logger.info("Brak nowych danych do przetworzenia.")
                         break
 
                     # Połączenie z bazą danych
                     connection = connect_to_postgresql('matterhorn')
-                    print("[INFO] Połączono z bazą danych.")
+                    logger.info("Połączono z bazą danych.")
                     time.sleep(1)
                     cursor = connection.cursor()
 
                     # Iteracja po danych z API ITEMS
+                    logger.info(f"Rozpoczynam przetwarzanie {len(data_items)} produktów z API ITEMS")
                     for item in data_items:
                         if not item:
-                            print("[WARNING] Pusty element w danych ITEMS. Pomijanie.")
+                            logger.warning("Pusty element w danych ITEMS. Pomijanie.")
                             continue
 
                         # Pobieranie informacji o produkcie
@@ -433,8 +432,8 @@ def update_inventory_v3():
                             other_colors = []
                         price = item["prices"].get("PLN", None)
 
-                        # print(f"[INFO] Przetwarzam produkt {id}: {active}, {new_collection}, {product_in_set}, {color}, {other_colors}, {price}")
-                        # time.sleep(1)
+                        logger.info(f"Przetwarzam produkt ID={id}")
+                        logger.info(f"Szczegóły produktu: active={active}, new_collection={new_collection}, color={color}, stock_total={stock_total}, price={price}")
 
                         # Aktualizacja tabeli products
                         update_products_query = """
@@ -446,21 +445,26 @@ def update_inventory_v3():
                             stock_total = %s
                         WHERE id = %s
                         """
-                        cursor.execute(update_products_query, (active, new_collection, price, color, stock_total, id))
+                        try:
+                            cursor.execute(update_products_query, (active, new_collection, price, color, stock_total, id))
+                            logger.info(f"Zaktualizowano produkt ID={id} w tabeli products")
+                        except Exception as e:
+                            logger.error(f"Błąd podczas aktualizacji produktu ID={id}: {e}")
+                            continue
 
                         # Dodawanie powiązań zestawów
                         update_product_in_set_query = """
-                        INSERT IGNORE INTO product_in_set (product_id, set_product_id)
+                        INSERT INTO product_in_set (product_id, set_product_id)
                         VALUES (%s, %s)
-                        ON CONFLICT (product_id) DO UPDATE SET
-                            set_product_id = EXCLUDED.set_product_id
+                        ON CONFLICT (product_id, set_product_id) DO NOTHING
                         """
 
                         for set_pid in product_in_set:
-
                             # pomijaj, gdy to ten sam produkt
                             if set_pid == id:
                                 continue
+
+                            logger.info(f"Przetwarzam powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
 
                             # Sprawdzenie istnienia `id` w tabeli `products`
                             cursor.execute("SELECT 1 FROM products WHERE id = %s", (id,))
@@ -468,124 +472,121 @@ def update_inventory_v3():
                             if not cursor.fetchone():
                                 # Jeśli `product_id` nie istnieje, dodaj placeholder
                                 cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                print(f"[INFO] Dodano placeholder dla produktu o ID={id}")
+                                logger.info(f"Dodano placeholder dla produktu o ID={id}")
 
-                                # Sprawdzenie istnienia `set_pid` w tabeli `products`
-                            cursor.execute(
-                                "SELECT 1 FROM products WHERE id = %s", (set_pid,))
+                            # Sprawdzenie istnienia `set_pid` w tabeli `products`
+                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (set_pid,))
                             if not cursor.fetchone():
                                 # Jeśli `set_product_id` nie istnieje, dodaj placeholder
-                                cursor.execute(
-                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (set_pid, "Placeholder Name"))
-                                print(
-                                    f"[INFO] Dodano placeholder dla produktu o ID={set_pid}")
-                            # Wstawienie do tabeli `product_in_set`
-                            cursor.execute(
-                                update_product_in_set_query, (id, set_pid))
-                            cursor.execute(
-                                update_product_in_set_query, (set_pid, id))
+                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (set_pid, "Placeholder Name"))
+                                logger.info(f"Dodano placeholder dla produktu o ID={set_pid}")
+                            
+                            try:
+                                # Wstawienie do tabeli `product_in_set` tylko w jednym kierunku
+                                cursor.execute(update_product_in_set_query, (id, set_pid))
+                                logger.info(f"Dodano powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
+                            except Exception as e:
+                                logger.error(f"Błąd podczas dodawania powiązania zestawu: {e}")
+                                continue
 
                         # Dodawanie powiązań kolorów
                         update_other_colors_query = """
                         INSERT INTO other_colors (product_id, color_product_id)
                         VALUES (%s, %s)
-                        ON CONFLICT (product_id) DO UPDATE SET
-                            color_product_id = EXCLUDED.color_product_id
+                        ON CONFLICT (product_id, color_product_id) DO NOTHING
                         """
-                        for color_pid in other_colors:
 
+                        for color_pid in other_colors:
                             # pomijaj, gdy to ten sam produkt
                             if color_pid == id:
                                 continue
 
+                            logger.info(f"Przetwarzam powiązanie koloru: product_id={id}, color_product_id={color_pid}")
+
                             # sprawdzanie istnienia "id" w tabeli "products"
-                            cursor.execute(
-                                ("SELECT 1 FROM products WHERE id = %s"), (id,))
+                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (id,))
 
                             if not cursor.fetchone():
                                 # Jeśli "product_id" nie istnieje, dodaj rekord z "id" i nazwą "Placeholder Name"
-                                cursor.execute(
-                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                print(
-                                    f"[INFO] Dodano placeholder dla produktu o ID ={id}")
+                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
+                                logger.info(f"Dodano placeholder dla produktu o ID={id}")
 
                             # sprawdzanie istnienia color_pid w tabeli products
-                            cursor.execute(
-                                "SELECT 1 FROM products WHERE id = %s", (color_pid,))
+                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (color_pid,))
                             if not cursor.fetchone():
                                 # jeśli 'color_product_id" nie istnieje dodaj placeholder
-                                cursor.execute(
-                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (color_pid, "Placeholder Name"))
-                                print(
-                                    f"[INFO] Dodano placeholder dla produktu o ID={color_pid}")
+                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (color_pid, "Placeholder Name"))
+                                logger.info(f"Dodano placeholder dla produktu o ID={color_pid}")
 
-                            cursor.execute(
-                                update_other_colors_query, (id, color_pid))
-                            cursor.execute(
-                                update_other_colors_query, (color_pid, id))
+                            try:
+                                cursor.execute(update_other_colors_query, (id, color_pid))
+                                logger.info(f"Dodano powiązanie koloru: product_id={id}, color_product_id={color_pid}")
+                            except Exception as e:
+                                logger.error(f"Błąd podczas dodawania powiązania koloru: {e}")
+                                continue
+
+                        # Commit po każdym produkcie
+                        try:
+                            connection.commit()
+                            logger.info(f"Zatwierdzono zmiany dla produktu ID={id}")
+                        except Exception as e:
+                            logger.error(f"Błąd podczas zatwierdzania zmian dla produktu ID={id}: {e}")
+                            connection.rollback()
+                            continue
+
+                    logger.info("Zakończono przetwarzanie produktów z API ITEMS")
 
                     # Iteracja po danych z API INVENTORY
                     for item in data_inventory:
                         inventory = item.get("inventory", [])
                         # Jeśli 'inventory' nie jest listą pobierz dane z bazy
                         if not isinstance(inventory, list):
-                            print(
-                                f"[WARNING] Nieprawidłowa wartość inventory dla ID={item.get('id', 'Brak')}. Ustawianie stock=0 dla wszystkich variant_uid.")
+                            logger.warning(f"Nieprawidłowa wartość inventory dla ID={item.get('id', 'Brak')}. Ustawianie stock=0 dla wszystkich variant_uid.")
                             inventory = []
 
                             # Pobieranie wariantów z bazy danych
-                            cursor.execute(
-                                "SELECT variant_uid FROM variants WHERE product_id = %s", (item['id'],))
+                            cursor.execute("SELECT variant_uid FROM variants WHERE product_id = %s", (item['id'],))
                             result = cursor.fetchall()
 
                             # Pominięcie rekordu, jeśli nie znaleziono wariantów
                             if not result:
-                                print(
-                                    f"[WARNING] Brak wariantów dla produktu ID={item['id']}. Pomijam.")
+                                logger.warning(f"Brak wariantów dla produktu ID={item['id']}. Pomijam.")
                                 continue
 
                             # dodanie wariantów z zerowym stanem magazynowym
                             for variant_uid in result:
-                                inventory.append(
-                                    {"variant_uid": variant_uid[0], "stock": 0})
+                                inventory.append({"variant_uid": variant_uid[0], "stock": 0})
 
                         for variant in inventory:
                             # Sprawdzenie, czy 'variant_uid' istnieje w danych i czy jego wartość jest prawidłowa
                             if 'variant_uid' not in variant or not isinstance(variant['variant_uid'], (int, str)):
-                                print(
-                                    f"[WARNING] Pomijam rekord bez prawidłowego 'variant_uid' w inventory dla produktu ID={item['id']}")
+                                logger.warning(f"Pomijam rekord bez prawidłowego 'variant_uid' w inventory dla produktu ID={item['id']}")
                                 continue  # Pominięcie rekordu
 
                             # Próba konwersji na int, jeśli się nie powiedzie, pominięcie rekordu
                             try:
                                 variant_uid = int(variant["variant_uid"])
                             except ValueError:
-                                print(
-                                    f"[ERROR] Nieprawidłowy format 'variant_uid' dla produktu ID={item['id']}. Pomijam.")
+                                logger.error(f"Nieprawidłowy format 'variant_uid' dla produktu ID={item['id']}. Pomijam.")
                                 continue
 
                             stock = int(variant["stock"], 0)
-                            name = str(variant["variant_name"]).replace(
-                                " ", "")
-                            max_processing_time = int(
-                                variant.get("max_processing_time", 0))
+                            name = str(variant["variant_name"]).replace(" ", "")
+                            max_processing_time = int(variant.get("max_processing_time", 0))
                             ean = str(variant.get("ean", ""))
                             product_id = int(item["id"])
 
-                            # print(f"[INFO] Przetwarzanie wariantu UID={variant_uid}, Stock={stock}, Name={name}, Ean={ean}")
-                            # time.sleep(1)
+                            logger.info(f"Przetwarzanie wariantu UID={variant_uid}, Stock={stock}, Name={name}, Ean={ean}")
+                            
                             # upewnienie się, że rekord istnieje w tabeli products
-                            cursor.execute(
-                                "SELECT 1 FROM products WHERE id = %s", (product_id,))
+                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (product_id,))
 
                             if not cursor.fetchone():
-                                cursor.execute(
-                                    "INSERT INTO products (id, name) VALUES (%s, %s)", (product_id, "Placeholder Name"))
-                                print(
-                                    f"[INFO] Dodano placeholder dla produktu o ID={product_id}")
+                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (product_id, "Placeholder Name"))
+                                logger.info(f"Dodano placeholder dla produktu o ID={product_id}")
+                            
                             # Sprawdzanie czy rekord istnieje
-                            cursor.execute(
-                                "SELECT stock FROM variants WHERE variant_uid = %s", (variant_uid,))
+                            cursor.execute("SELECT stock FROM variants WHERE variant_uid = %s", (variant_uid,))
                             record = cursor.fetchone()
 
                             if record:
@@ -599,16 +600,14 @@ def update_inventory_v3():
                                     product_id = %s
                                 WHERE variant_uid = %s    
                                 """
-                                cursor.execute(
-                                    update_query, (stock, name, ean, max_processing_time, product_id, variant_uid))
+                                cursor.execute(update_query, (stock, name, ean, max_processing_time, product_id, variant_uid))
                             else:
                                 # Dodanie nowego rekordu
                                 insert_query = """
                                 INSERT INTO variants (variant_uid, stock, max_processing_time, name, ean, product_id)
                                 VALUES (%s, %s, %s, %s, %s, %s)
                                 """
-                                cursor.execute(
-                                    insert_query, (variant_uid, stock, max_processing_time, name, ean, product_id))
+                                cursor.execute(insert_query, (variant_uid, stock, max_processing_time, name, ean, product_id))
 
                             # Commit po każdej iteracji, aby uniknąć utraty danych w przypadku awarii
                             connection.commit()
@@ -617,15 +616,14 @@ def update_inventory_v3():
                     if connection:
                         try:
                             connection.commit()
-                            print("[INFO] Wszystkie zmiany zostały zatwierdzone.")
+                            logger.info("Wszystkie zmiany zostały zatwierdzone.")
                         except Exception as e:
-                            print(
-                                f"[ERROR] Błąd podczas zatwierdzania zmian: {e}")
+                            logger.error(f"Błąd podczas zatwierdzania zmian: {e}")
                         finally:
                             cursor.close()
                             connection.close()
                     else:
-                        print("[ERROR] Brak połączenia z bazą danych.")
+                        logger.error("Brak połączenia z bazą danych.")
 
                     # Po zakończeniu iteracji zwiększ page
                     page += 1
@@ -633,26 +631,20 @@ def update_inventory_v3():
                     break
 
             except ValueError as e:
-                print(
-                    f"[ERROR-POBRANIE Z API] Wystąpił błąd konwersji danych: {e}")
-                print(
-                    f"Nie udało się pobrać danych z API. Status: {response_items.status_code} i {response_inventory.status_code}")
-                log_update_error(last_update_time_rounded,
-                                 "Błąd konwersji danych", str(e), start_time)
+                logger.error(f"Wystąpił błąd konwersji danych: {e}")
+                logger.error(f"Nie udało się pobrać danych z API. Status: {response_items.status_code} i {response_inventory.status_code}")
+                log_update_error(last_update_time_rounded, "Błąd konwersji danych", str(e), start_time)
             except Exception as e:
-                print(f"[ERROR] Wystąpił błąd: {e}")
-                print(f"Wystąpił błąd: {e}")
-                log_update_error(last_update_time_rounded,
-                                 "Błąd podczas aktualizacji", str(e), start_time)
+                logger.error(f"Wystąpił błąd: {e}")
+                log_update_error(last_update_time_rounded, "Błąd podczas aktualizacji", str(e), start_time)
 
         # Jeśli brak danych, przerwij pętlę
         if data_length == 0 and data_length_inventory == 0:
             break
 
     # Ostateczne zapisanie informacji o aktualizacji
-    update_last_update_time(start_time, total_data_length,
-                            total_data_length_inventory, total_data_items, total_data_inventory)
-    print("[INFO] Aktualizacja zakończona.")
+    update_last_update_time(start_time, total_data_length, total_data_length_inventory, total_data_items, total_data_inventory)
+    logger.info("Aktualizacja zakończona.")
     return
 
 

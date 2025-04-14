@@ -143,6 +143,22 @@ def create_tables_if_not_exist(conn):
     cursor.execute(create_other_colors_table_query)
     cursor.execute(create_product_in_set_table_query)
     cursor.execute(create_update_log_table_query)
+    
+    # Dodanie ograniczenia UNIQUE do tabeli product_in_set jeśli nie istnieje
+    cursor.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint 
+                WHERE conname = 'product_in_set_product_id_set_product_id_key'
+            ) THEN
+                ALTER TABLE product_in_set 
+                ADD CONSTRAINT product_in_set_product_id_set_product_id_key 
+                UNIQUE (product_id, set_product_id);
+            END IF;
+        END $$;
+    """)
+    
     conn.commit()
     cursor.close()
 
