@@ -372,6 +372,10 @@ def update_inventory_v3():
                 time.sleep(2)
                 response_inventory = requests.get(i_url, headers=headersMatterhorn, timeout=120)
                 logger.info(f"Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
+                
+                # Dodajemy logi dla treści odpowiedzi
+                logger.debug(f"Treść odpowiedzi ITEMS: {response_items.text[:500]}")
+                logger.debug(f"Treść odpowiedzi INVENTORY: {response_inventory.text[:500]}")
 
                 if response_items.status_code == 200 and response_inventory.status_code == 200:
                     logger.info("Pomyślnie pobrano dane z API.")
@@ -382,8 +386,15 @@ def update_inventory_v3():
                             logger.info(f"Liczba rekordów w odpowiedzi: ITEMS-{len(data_items)}, INVENTORY-{len(data_inventory)}")
                         except ValueError as e:
                             logger.error(f"Błąd konwersji danych z API: {e}")
-                            log_update_error(last_update_time_rounded, "Błąd konwersji danych z API", str(e), start_time)
-                            return False
+                            if attempt < max_attempts:
+                                logger.info(f"Ponawiam próbę {attempt + 1}/{max_attempts} po 15 sekundach...")
+                                time.sleep(15)
+                                attempt += 1
+                                continue
+                            else:
+                                logger.error("Osiągnięto maksymalną liczbę prób. Zapisuję błąd i kończę działanie.")
+                                log_update_error(last_update_time_rounded, "Błąd konwersji danych z API", str(e), start_time)
+                                return False
                     else:
                         logger.error("Odpowiedź API jest pusta.")
                         log_update_error(last_update_time_rounded, "Pusta odpowiedź API", "Odpowiedź API jest pusta.", start_time)
