@@ -362,7 +362,7 @@ def update_inventory_v3():
 
         logger.info(f"PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
         attempt = 1
-        max_attempts = 3
+        max_attempts = 100
         connection = None
 
         while attempt <= max_attempts:
@@ -388,7 +388,7 @@ def update_inventory_v3():
                             logger.error(f"Błąd konwersji danych z API: {e}")
                             if attempt < max_attempts:
                                 logger.info(f"Ponawiam próbę {attempt + 1}/{max_attempts} po 15 sekundach...")
-                                time.sleep(15)
+                                time.sleep(120)
                                 attempt += 1
                                 continue
                             else:
