@@ -67,7 +67,7 @@ def import_all_by_one():
     base_url = "https://matterhorn.pl/B2BAPI/ITEMS/"
     logger.info(f"Używany URL: {base_url}")
 
-    for i in range(last_id + 1, last_id + 250000):
+    for i in range(last_id + 1, last_id + 100):
         url = f"{base_url}{i}"
         logger.info(f"Pobieranie danych z: {url}")
 
@@ -100,7 +100,7 @@ def import_all_by_one():
                             null_count += 1
                             logger.warning(
                                 f"Pominięto import dla URL: {url} ponieważ creation_date jest NULL. {null_count}")
-                            if null_count >= 200:
+                            if null_count >= 5:
                                 logger.warning(
                                     f"Pole 'creation_date' jest puste dla {null_count} kolejnych importów. Koniec importu")
                                 return
@@ -294,13 +294,19 @@ def get_last_update_time():
         connection = connect_to_postgresql('matterhorn')
         cursor = connection.cursor()
         cursor.execute(
-            "SELECT last_update AT TIME ZONE 'Europe/Warsaw' FROM update_log ORDER BY last_update DESC LIMIT 1")
+            "SELECT last_update FROM update_log ORDER BY last_update DESC LIMIT 1")
         result = cursor.fetchone()
         cursor.close()
         connection.close()
 
         if result and result[0]:
-            return result[0].strftime("%Y-%m-%d %H:%M:%S")
+            # Konwertujemy czas z UTC na strefę czasową 'Europe/Warsaw'
+            warsaw_tz = pytz.timezone('Europe/Warsaw')
+            utc_time = result[0]
+            if utc_time.tzinfo is None:
+                utc_time = pytz.UTC.localize(utc_time)
+            warsaw_time = utc_time.astimezone(warsaw_tz)
+            return warsaw_time.strftime("%Y-%m-%d %H:%M:%S")
         else:
             # Domyślny czas, jeśli brak wpisów
             return datetime.now(pytz.timezone('Europe/Warsaw')).strftime("%Y-%m-%d %H:%M:%S")
@@ -313,8 +319,14 @@ def round_down_to_10_minutes(dt):
     """
     Zaokrągla czas w dół do najbliższych 10 minut
     """
+    # Konwertujemy czas na UTC jeśli nie jest
+    if dt.tzinfo is None:
+        dt = pytz.UTC.localize(dt)
+    # Konwertujemy na strefę czasową 'Europe/Warsaw'
+    warsaw_tz = pytz.timezone('Europe/Warsaw')
+    dt = dt.astimezone(warsaw_tz)
+    # Zaokrąglamy w dół do najbliższych 10 minut
     minute = dt.minute
-    # Zaokrąglenie w dół do najbliższych 10 minut
     rounded_minute = (minute // 10) * 10
     return dt.replace(minute=rounded_minute, second=0, microsecond=0)
 
@@ -341,7 +353,8 @@ def log_update_error(last_update_time_rounded, description, error_message, start
 def update_inventory_v3():
     logger.info("Rozpoczynam aktualizację stanów magazynowych.")
     # Zapisz czas rozpoczęcia aktualizacji
-    start_time = round_down_to_10_minutes(datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+    start_time = datetime.now(pytz.UTC).astimezone(pytz.timezone('Europe/Warsaw'))
+    start_time = round_down_to_10_minutes(start_time).strftime("%Y-%m-%d %H:%M:%S")
     base_url_items = "https://matterhorn.pl/B2BAPI/ITEMS/"
     base_url_inventory = "https://matterhorn.pl/B2BAPI/ITEMS/INVENTORY/"
     last_update_time = get_last_update_time()
@@ -357,8 +370,8 @@ def update_inventory_v3():
 
     while True:
         # Budowanie URL do pobrania danych z API
-        b_url = f"{base_url_items}?page={page}&last_update={update_date}%20{encoded_time}&limit=1000"
-        i_url = f"{base_url_inventory}?page={page}&last_update={update_date}%20{encoded_time}&limit=1000"
+        b_url = f"{base_url_items}?page={page}&last_update={update_date}%20{encoded_time}&limit=500"
+        i_url = f"{base_url_inventory}?page={page}&last_update={update_date}%20{encoded_time}&limit=500"
 
         logger.info(f"PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
         attempt = 1
@@ -667,13 +680,17 @@ def update_last_update_time(start_time, total_data_length, total_data_length_inv
         # Serializacja danych JSON
         data_item_json = json.dumps(total_data_items)
         data_inventory_json = json.dumps(total_data_inventory)
-        cursor.execute("INSERT INTO update_log (last_update, description, data_items, data_inventory) VALUES (%s, %s, %s, %s)", (start_time, description, data_item_json, data_inventory_json))
+        # Używamy AT TIME ZONE aby upewnić się, że czas jest zapisywany w odpowiedniej strefie
+        cursor.execute("""
+            INSERT INTO update_log (last_update, description, data_items, data_inventory) 
+            VALUES (%s::timestamp AT TIME ZONE 'Europe/Warsaw', %s, %s, %s)
+        """, (start_time, description, data_item_json, data_inventory_json))
         connection.commit()
         cursor.close()
         connection.close()
-        print("[INFO] Zapisano czas ostatniej aktualizacji.")
+        logger.info(f"Zapisano czas ostatniej aktualizacji: {start_time}")
     except Exception as e:
-        print(f"[ERROR] Nie udało się zapisać czasu ostatniej aktualizacji: {e}")
+        logger.error(f"Nie udało się zapisać czasu ostatniej aktualizacji: {e}")
 
 
 def clean_update_log():
