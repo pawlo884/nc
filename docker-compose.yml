@@ -3,7 +3,7 @@ version: '3.8'
 services:
   web:
     image: ${DOCKERHUB_USERNAME}/django-app:latest
-    command: bash -c "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"
+    command: bash -c "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -32,15 +32,35 @@ services:
     networks:
       - app_network
 
-  celery:
+  celery-import:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
-      command: celery -A nc worker --loglevel=info
+      command: celery -A nc.celery worker -Q import_queue --loglevel=info --concurrency=1
       volumes:
         - .:/app
+        - celery_data:/var/lib/celery
       env_file:
         - .env.${ENVIRONMENT:-prod}
       environment:
         - DJANGO_SETTINGS_MODULE=nc.settings.prod
+        - CELERY_STATE_DB=/var/lib/celery/worker_state_import
+      depends_on:
+        - web
+        - redis
+      restart: always
+      networks:
+        - app_network
+
+  celery-default:
+      image: ${DOCKERHUB_USERNAME}/django-app:latest
+      command: celery -A nc.celery worker -Q default --loglevel=info --concurrency=2
+      volumes:
+        - .:/app
+        - celery_data:/var/lib/celery
+      env_file:
+        - .env.${ENVIRONMENT:-prod}
+      environment:
+        - DJANGO_SETTINGS_MODULE=nc.settings.prod
+        - CELERY_STATE_DB=/var/lib/celery/worker_state_default
       depends_on:
         - web
         - redis
@@ -50,7 +70,7 @@ services:
 
   celery-beat:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
-      command: celery -A nc beat --loglevel=info
+      command: celery -A nc.celery beat --loglevel=info
       volumes:
         - .:/app
       env_file:
@@ -71,10 +91,33 @@ services:
       restart: always
       networks:
         - app_network
+      command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
+
+  flower:
+    image: ${DOCKERHUB_USERNAME}/django-app:latest
+    command: celery -A nc.celery flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+      - flower_data:/var/lib/flower
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.prod
+    depends_on:
+      - redis
+      - celery-import
+      - celery-default
+    networks:
+      - app_network
 
 volumes:
   static_volume:
   nginx_logs:
+  celery_data:
+  flower_data:
+    driver: local
 
 networks:
   app_network:

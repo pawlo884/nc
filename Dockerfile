@@ -18,10 +18,15 @@ COPY . /app/
 ENV DJANGO_SETTINGS_MODULE=nc.settings.prod
 
 # Utwórz niezbędne katalogi z odpowiednimi uprawnieniami
-RUN mkdir -p /app/static /app/staticfiles /app/logs/matterhorn
+RUN mkdir -p /app/static /app/staticfiles /app/logs/matterhorn /var/lib/celery && \
+    chmod 777 /var/lib/celery
+
+# Dodaj skrypt inicjalizacyjny
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Zbierz statyczne pliki
 RUN python manage.py collectstatic --noinput
 
-# Uruchom migracje i Gunicorn
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["sh", "-c", "python manage.py migrate && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"]

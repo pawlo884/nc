@@ -1,7 +1,7 @@
 services:
   web:
     build: .
-    command: bash -c "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"
+    command: bash -c "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 300 --keep-alive 5"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -14,15 +14,32 @@ services:
     depends_on:
       - redis
 
-  celery:
+  celery-import:
     build: .
-    command: celery -A nc.celery worker --loglevel=info
+    command: celery -A nc.celery worker -Q import_queue --loglevel=info --concurrency=1
     volumes:
       - .:/app
+      - celery_data:/var/lib/celery
     env_file:
       - .env.dev
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
+      - CELERY_STATE_DB=/var/lib/celery/worker_state_import
+    depends_on:
+      - redis
+      - web
+
+  celery-default:
+    build: .
+    command: celery -A nc.celery worker -Q default --loglevel=info --concurrency=4
+    volumes:
+      - .:/app
+      - celery_data:/var/lib/celery
+    env_file:
+      - .env.dev
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.dev
+      - CELERY_STATE_DB=/var/lib/celery/worker_state_default
     depends_on:
       - redis
       - web
@@ -40,6 +57,22 @@ services:
       - redis
       - web
 
+  flower:
+    build: .
+    command: celery -A nc.celery flower --port=5555
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+    env_file:
+      - .env.dev
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.dev
+    depends_on:
+      - redis
+      - celery-import
+      - celery-default
+
   redis:
     image: redis:alpine
     ports:
@@ -47,4 +80,5 @@ services:
     restart: always
 
 volumes:
-  static_volume: 
+  static_volume:
+  celery_data: 

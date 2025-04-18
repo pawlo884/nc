@@ -421,7 +421,6 @@ def update_inventory_v3():
                     total_data_items.extend(data_items)
                     total_data_inventory.extend(data_inventory)
 
-                    logger.info(f"Liczba rekordów w odpowiedzi: ITEMS-{data_length} INVENTORY-{data_length_inventory}")
                     time.sleep(1)
 
                     # Warunek zakończenia pętli, gdy brak nowych danych
@@ -457,7 +456,7 @@ def update_inventory_v3():
                         price = item["prices"].get("PLN", None)
 
                         logger.info(f"Przetwarzam produkt ID={id}")
-                        logger.info(f"Szczegóły produktu: active={active}, new_collection={new_collection}, color={color}, stock_total={stock_total}, price={price}")
+                        logger.debug(f"Szczegóły produktu: active={active}, new_collection={new_collection}, color={color}, stock_total={stock_total}, price={price}")
 
                         # Aktualizacja tabeli products
                         update_products_query = """
@@ -488,7 +487,7 @@ def update_inventory_v3():
                             if set_pid == id:
                                 continue
 
-                            logger.info(f"Przetwarzam powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
+                            logger.debug(f"Przetwarzam powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
 
                             # Sprawdzenie istnienia `id` w tabeli `products`
                             cursor.execute("SELECT 1 FROM products WHERE id = %s", (id,))
@@ -508,7 +507,7 @@ def update_inventory_v3():
                             try:
                                 # Wstawienie do tabeli `product_in_set` tylko w jednym kierunku
                                 cursor.execute(update_product_in_set_query, (id, set_pid))
-                                logger.info(f"Dodano powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
+                                logger.debug(f"Dodano powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
                             except Exception as e:
                                 logger.error(f"Błąd podczas dodawania powiązania zestawu: {e}")
                                 continue
@@ -525,7 +524,7 @@ def update_inventory_v3():
                             if color_pid == id:
                                 continue
 
-                            logger.info(f"Przetwarzam powiązanie koloru: product_id={id}, color_product_id={color_pid}")
+                            logger.debug(f"Przetwarzam powiązanie koloru: product_id={id}, color_product_id={color_pid}")
 
                             # sprawdzanie istnienia "id" w tabeli "products"
                             cursor.execute("SELECT 1 FROM products WHERE id = %s", (id,))
@@ -544,7 +543,7 @@ def update_inventory_v3():
 
                             try:
                                 cursor.execute(update_other_colors_query, (id, color_pid))
-                                logger.info(f"Dodano powiązanie koloru: product_id={id}, color_product_id={color_pid}")
+                                logger.debug(f"Dodano powiązanie koloru: product_id={id}, color_product_id={color_pid}")
                             except Exception as e:
                                 logger.error(f"Błąd podczas dodawania powiązania koloru: {e}")
                                 continue

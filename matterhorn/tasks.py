@@ -3,8 +3,12 @@ from celery import shared_task, chain
 from celery.utils.log import get_task_logger
 from django.db import connections, transaction
 from matterhorn.defs_import import clean_update_log
-from .models import Products, OtherColors
+from matterhorn.models import Products, OtherColors
 from django.utils.timezone import now, timedelta
+from django.core.cache import cache
+from django.db import connection
+from celery.exceptions import Ignore
+from nc.celery import app
 
 logger = get_task_logger(__name__)
 
@@ -18,7 +22,7 @@ def dynamic_import(module_name, function_name):
     return getattr(module, function_name)
 
 
-@shared_task(name="run_import_all", rate_limit='1/s')
+@shared_task(name="run_import_all", rate_limit='1/s', queue='import_queue')
 def run_import_all():
     logger.info("Rozpoczynam import...")
     import_all_by_one = dynamic_import('matterhorn.defs_import', 'import_all_by_one')
@@ -28,7 +32,7 @@ def run_import_all():
     return "Import zakończony."
 
 
-@shared_task(name='run_update_inventory', rate_limit='1/s', time_limit=99590, soft_time_limit=99580)
+@shared_task(name='run_update_inventory', rate_limit='1/s', time_limit=99590, soft_time_limit=99580, queue='import_queue')
 def run_update_inventory(*args):
     logger.info("Rozpoczynam aktualizację...")
     update_inventory_v3 = dynamic_import('matterhorn.defs_import', 'update_inventory_v3')
@@ -37,15 +41,63 @@ def run_update_inventory(*args):
     return "Aktualizacja zakończona."
 
 
-@shared_task(name='run_import_all_then_update_inventory')
-def run_import_all_then_update_inventory():
-    logger.info("Rozpoczynam łańcuch zadań: import i aktualizację...")
-    task_chain = chain(
-        run_import_all.s(),
-        run_update_inventory.s()
-    )
-    task_chain.apply_async()
-    logger.info("Łańcuch zadań zakończony.")
+@shared_task(name='run_import_all_then_update_inventory', bind=True, queue='import_queue')
+def run_import_all_then_update_inventory(self):
+    logger.info(f"Task {self.request.id} rozpoczyna sprawdzanie stanu...")
+    
+    # Klucz dla blokady
+    lock_id = 'import_and_update_lock'
+    lock_timeout = 1800  # 30 minut
+    
+    # Próba uzyskania blokady
+    acquired = cache.add(lock_id, self.request.id, lock_timeout)
+    
+    if not acquired:
+        current_lock = cache.get(lock_id)
+        logger.info(f"Zadanie jest już w trakcie wykonywania (lock: {current_lock}). Task {self.request.id} czeka.")
+        raise self.retry(countdown=60, max_retries=30)
+
+    try:
+        logger.info(f"Task {self.request.id} rozpoczyna łańcuch zadań...")
+        
+        # Tworzymy łańcuch zadań z dodatkowym callbackiem do zwolnienia blokady
+        task_chain = chain(
+            run_import_all.si(),
+            run_update_inventory.si(),
+            release_lock.si(lock_id=lock_id, task_id=self.request.id)
+        ).apply_async(queue='import_queue', link_error=release_lock.si(lock_id=lock_id, task_id=self.request.id))
+        
+        logger.info(f"Task {self.request.id} uruchomił łańcuch zadań z ID: {task_chain.id}")
+        
+        return {
+            'chain_id': task_chain.id,
+            'status': 'started',
+            'task_id': self.request.id
+        }
+        
+    except Exception as e:
+        logger.error(f"Błąd podczas uruchamiania łańcucha zadań: {str(e)}")
+        # W przypadku błędu zwalniamy blokadę
+        if cache.get(lock_id) == self.request.id:
+            cache.delete(lock_id)
+        raise
+
+
+@shared_task(name='release_lock', queue='import_queue')
+def release_lock(lock_id, task_id):
+    """
+    Task do zwalniania blokady po zakończeniu łańcucha zadań.
+    """
+    logger.info(f"Próba zwolnienia blokady {lock_id} dla taska {task_id}")
+    current_lock = cache.get(lock_id)
+    
+    if current_lock == task_id:
+        cache.delete(lock_id)
+        logger.info(f"Blokada {lock_id} została zwolniona przez task {task_id}")
+        return True
+    else:
+        logger.warning(f"Nie można zwolnić blokady {lock_id} - należy do innego taska (current: {current_lock}, requested: {task_id})")
+        return False
 
 
 @shared_task(name='matterhorn.tasks.run_clean_update_log')
@@ -172,3 +224,47 @@ def update_stock_matterhorn():
         return f"Zaktualizowano {len(updates)} rekordów."
     except Exception as e:
         return f"Błąd w update_stock: {str(e)}"
+
+
+@shared_task(name='check_queue_status')
+def check_queue_status():
+    """
+    Sprawdza stan kolejek i zadań.
+    """
+    inspector = app.control.inspect()
+    
+    # Sprawdź aktywne zadania
+    active = inspector.active()
+    logger.info("Aktywne zadania:")
+    if active:
+        for worker, tasks in active.items():
+            for task in tasks:
+                logger.info(f"Worker: {worker}, Task: {task['name']}, ID: {task['id']}")
+    else:
+        logger.info("Brak aktywnych zadań")
+    
+    # Sprawdź zadania w kolejce
+    reserved = inspector.reserved()
+    logger.info("\nZadania w kolejce:")
+    if reserved:
+        for worker, tasks in reserved.items():
+            for task in tasks:
+                logger.info(f"Worker: {worker}, Task: {task['name']}, ID: {task['id']}")
+    else:
+        logger.info("Brak zadań w kolejce")
+    
+    # Sprawdź zaplanowane zadania
+    scheduled = inspector.scheduled()
+    logger.info("\nZaplanowane zadania:")
+    if scheduled:
+        for worker, tasks in scheduled.items():
+            for task in tasks:
+                logger.info(f"Worker: {worker}, Task: {task['name']}, ID: {task['id']}")
+    else:
+        logger.info("Brak zaplanowanych zadań")
+    
+    return {
+        'active': active,
+        'reserved': reserved,
+        'scheduled': scheduled
+    }
