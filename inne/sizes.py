@@ -1,5 +1,41 @@
 import json
 import os
+import psycopg2
+from dotenv import load_dotenv
+
+
+def connect_to_postgresql():
+    try:
+        is_production = os.getenv("DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
+        env_file = '.env.prod' if is_production else '.env.dev'
+        load_dotenv(env_file)
+
+        db_name = os.getenv("MPD_DB_NAME")
+        db_user = os.getenv("MPD_DB_USER")
+        db_password = os.getenv("MPD_DB_PASSWORD")
+        db_host = os.getenv("MPD_DB_HOST")
+        db_port = os.getenv("MPD_DB_PORT")
+
+        if not all([db_name, db_user, db_password, db_host, db_port]):
+            raise ValueError(f"Brak wymaganych zmiennych środowiskowych w pliku {env_file}")
+
+        conn = psycopg2.connect(
+            dbname=db_name,
+            user=db_user,
+            password=db_password,
+            host=db_host,
+            port=db_port
+        )
+        print(f"Połączono z bazą danych {db_name} na hoście {db_host} (środowisko: {'produkcja' if is_production else 'development'})")
+        return conn
+        
+    except Exception as e:
+        print(f"Błąd podczas łączenia z bazą danych: {e}")
+        raise
+
+def fetch_existing_sizes(cursor):
+    cursor.execute("SELECT name FROM sizes;")
+    return {row[0] for row in cursor.fetchall()}
 
 def create_sizes_list():
     return [
@@ -20,8 +56,16 @@ def create_sizes_list():
         "90F", "90G", "90H", "90I", "90J", "90K", "90L", "90M", "95A",
         "95B", "95C", "95D", "95E", "95F", "95G", "95H", "95I", "95J",
         "95K", "95L", "95M", "L", "M", "S", "uniwersalny", "XL", "2XL",
-        "3XL", "4XL", "5XL", "XS"
+        "3XL", "4XL", "5XL", "XS", 
     ]
+
+def insert_new_sizes(cursor, existing_sizes):
+    sizes = create_sizes_list()
+    for size in sizes:
+        if size not in existing_sizes:
+            cursor.execute("INSERT INTO sizes (name, category, unit, name_lower) VALUES (%s, %s, %s, %s);",
+                           (size, 'underwear', 'EU', size.lower()))
+
 
 def generate_sql_insert():
     sizes = create_sizes_list()
@@ -30,7 +74,8 @@ def generate_sql_insert():
     for size in sizes:
         sql_values.append(f"('{size}', 'underwear', 'EU', '{size.lower()}')")
     
-    sql_statement = "INSERT INTO sizes (name, category, unit, name_lower) VALUES " + ", ".join(sql_values) + ";"
+    sql_statement = "INSERT INTO sizes (name, category, unit, name_lower) VALUES " + ", ".join(sql_values) + " ON CONFLICT (name, category, unit) DO NOTHING" + ";" + "\n"
+    sql_statement += "SELECT setval(pg_get_serial_sequence('sizes', 'id'), coalesce(max(id), 0) + 1, false) FROM sizes;"
     return sql_statement
 
 def export_to_json(filename, data):
@@ -63,4 +108,17 @@ if __name__ == "__main__":
     sql_insert_script = generate_sql_insert()
     save_sql_script('sizes.sql', sql_insert_script)
     
-    
+    conn = connect_to_postgresql()
+    cursor = conn.cursor()
+
+    try:
+        existing_sizes = fetch_existing_sizes(cursor)
+        insert_new_sizes(cursor, existing_sizes)
+        conn.commit()
+        print("Wstawianie zakończone.")
+    except Exception as e:
+        print(f"Błąd podczas operacji na bazie danych: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
