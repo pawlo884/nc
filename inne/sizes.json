@@ -1,0 +1,922 @@
+{
+    "sizes": [
+        {
+            "name": "100B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "100b"
+        },
+        {
+            "name": "100C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "100c"
+        },
+        {
+            "name": "100D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "100d"
+        },
+        {
+            "name": "100E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "100e"
+        },
+        {
+            "name": "100F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "100f"
+        },
+        {
+            "name": "100G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "100g"
+        },
+        {
+            "name": "100H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "100h"
+        },
+        {
+            "name": "100I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "100i"
+        },
+        {
+            "name": "105B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "105b"
+        },
+        {
+            "name": "105C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "105c"
+        },
+        {
+            "name": "105D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "105d"
+        },
+        {
+            "name": "105E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "105e"
+        },
+        {
+            "name": "105F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "105f"
+        },
+        {
+            "name": "105G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "105g"
+        },
+        {
+            "name": "105H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "105h"
+        },
+        {
+            "name": "105I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "105i"
+        },
+        {
+            "name": "110B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "110b"
+        },
+        {
+            "name": "110C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "110c"
+        },
+        {
+            "name": "110D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "110d"
+        },
+        {
+            "name": "110E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "110e"
+        },
+        {
+            "name": "110F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "110f"
+        },
+        {
+            "name": "110G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "110g"
+        },
+        {
+            "name": "110H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "110h"
+        },
+        {
+            "name": "110I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "110i"
+        },
+        {
+            "name": "115B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "115b"
+        },
+        {
+            "name": "115C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "115c"
+        },
+        {
+            "name": "115D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "115d"
+        },
+        {
+            "name": "115E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "115e"
+        },
+        {
+            "name": "115F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "115f"
+        },
+        {
+            "name": "115G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "115g"
+        },
+        {
+            "name": "115H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "115h"
+        },
+        {
+            "name": "115I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "115i"
+        },
+        {
+            "name": "120B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "120b"
+        },
+        {
+            "name": "120C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "120c"
+        },
+        {
+            "name": "120D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "120d"
+        },
+        {
+            "name": "120E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "120e"
+        },
+        {
+            "name": "120F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "120f"
+        },
+        {
+            "name": "60B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "60b"
+        },
+        {
+            "name": "60C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "60c"
+        },
+        {
+            "name": "60D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "60d"
+        },
+        {
+            "name": "60E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "60e"
+        },
+        {
+            "name": "60F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "60f"
+        },
+        {
+            "name": "60G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "60g"
+        },
+        {
+            "name": "60H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "60h"
+        },
+        {
+            "name": "65AA",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65aa"
+        },
+        {
+            "name": "65A",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65a"
+        },
+        {
+            "name": "65B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65b"
+        },
+        {
+            "name": "65BB",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65bb"
+        },
+        {
+            "name": "65C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65c"
+        },
+        {
+            "name": "65D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65d"
+        },
+        {
+            "name": "65E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65e"
+        },
+        {
+            "name": "65F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65f"
+        },
+        {
+            "name": "65G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65g"
+        },
+        {
+            "name": "65H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65h"
+        },
+        {
+            "name": "65I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65i"
+        },
+        {
+            "name": "65J",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65j"
+        },
+        {
+            "name": "65K",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65k"
+        },
+        {
+            "name": "65L",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65l"
+        },
+        {
+            "name": "65M",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "65m"
+        },
+        {
+            "name": "70AA",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70aa"
+        },
+        {
+            "name": "70A",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70a"
+        },
+        {
+            "name": "70B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70b"
+        },
+        {
+            "name": "70BB",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70bb"
+        },
+        {
+            "name": "70C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70c"
+        },
+        {
+            "name": "70D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70d"
+        },
+        {
+            "name": "70DD",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70dd"
+        },
+        {
+            "name": "70E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70e"
+        },
+        {
+            "name": "70F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70f"
+        },
+        {
+            "name": "70G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70g"
+        },
+        {
+            "name": "70H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70h"
+        },
+        {
+            "name": "70I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70i"
+        },
+        {
+            "name": "70J",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70j"
+        },
+        {
+            "name": "70K",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70k"
+        },
+        {
+            "name": "70L",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70l"
+        },
+        {
+            "name": "70M",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "70m"
+        },
+        {
+            "name": "75AA",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75aa"
+        },
+        {
+            "name": "75A",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75a"
+        },
+        {
+            "name": "75B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75b"
+        },
+        {
+            "name": "75C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75c"
+        },
+        {
+            "name": "75D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75d"
+        },
+        {
+            "name": "75DD",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75dd"
+        },
+        {
+            "name": "75E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75e"
+        },
+        {
+            "name": "75F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75f"
+        },
+        {
+            "name": "75G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75g"
+        },
+        {
+            "name": "75H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75h"
+        },
+        {
+            "name": "75I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75i"
+        },
+        {
+            "name": "75J",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75j"
+        },
+        {
+            "name": "75K",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75k"
+        },
+        {
+            "name": "75L",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75l"
+        },
+        {
+            "name": "75M",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "75m"
+        },
+        {
+            "name": "80A",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80a"
+        },
+        {
+            "name": "80B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80b"
+        },
+        {
+            "name": "80BB",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80bb"
+        },
+        {
+            "name": "80C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80c"
+        },
+        {
+            "name": "80D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80d"
+        },
+        {
+            "name": "80E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80e"
+        },
+        {
+            "name": "80F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80f"
+        },
+        {
+            "name": "80G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80g"
+        },
+        {
+            "name": "80H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80h"
+        },
+        {
+            "name": "80I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80i"
+        },
+        {
+            "name": "80J",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80j"
+        },
+        {
+            "name": "80K",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80k"
+        },
+        {
+            "name": "80L",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80l"
+        },
+        {
+            "name": "80M",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "80m"
+        },
+        {
+            "name": "85A",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85a"
+        },
+        {
+            "name": "85B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85b"
+        },
+        {
+            "name": "85C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85c"
+        },
+        {
+            "name": "85D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85d"
+        },
+        {
+            "name": "85E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85e"
+        },
+        {
+            "name": "85F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85f"
+        },
+        {
+            "name": "85G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85g"
+        },
+        {
+            "name": "85H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85h"
+        },
+        {
+            "name": "85I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85i"
+        },
+        {
+            "name": "85J",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85j"
+        },
+        {
+            "name": "85K",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85k"
+        },
+        {
+            "name": "85L",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85l"
+        },
+        {
+            "name": "85M",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "85m"
+        },
+        {
+            "name": "90A",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90a"
+        },
+        {
+            "name": "90B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90b"
+        },
+        {
+            "name": "90C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90c"
+        },
+        {
+            "name": "90D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90d"
+        },
+        {
+            "name": "90E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90e"
+        },
+        {
+            "name": "90F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90f"
+        },
+        {
+            "name": "90G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90g"
+        },
+        {
+            "name": "90H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90h"
+        },
+        {
+            "name": "90I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90i"
+        },
+        {
+            "name": "90J",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90j"
+        },
+        {
+            "name": "90K",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90k"
+        },
+        {
+            "name": "90L",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90l"
+        },
+        {
+            "name": "90M",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "90m"
+        },
+        {
+            "name": "95A",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95a"
+        },
+        {
+            "name": "95B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95b"
+        },
+        {
+            "name": "95C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95c"
+        },
+        {
+            "name": "95D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95d"
+        },
+        {
+            "name": "95E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95e"
+        },
+        {
+            "name": "95F",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95f"
+        },
+        {
+            "name": "95G",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95g"
+        },
+        {
+            "name": "95H",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95h"
+        },
+        {
+            "name": "95I",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95i"
+        },
+        {
+            "name": "95J",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95j"
+        },
+        {
+            "name": "95K",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95k"
+        },
+        {
+            "name": "95L",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95l"
+        },
+        {
+            "name": "95M",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "95m"
+        },
+        {
+            "name": "L",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "l"
+        },
+        {
+            "name": "M",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "m"
+        },
+        {
+            "name": "S",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "s"
+        },
+        {
+            "name": "uniwersalny",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "uniwersalny"
+        },
+        {
+            "name": "XL",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "xl"
+        },
+        {
+            "name": "2XL",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "2xl"
+        },
+        {
+            "name": "3XL",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "3xl"
+        },
+        {
+            "name": "4XL",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "4xl"
+        },
+        {
+            "name": "5XL",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "5xl"
+        },
+        {
+            "name": "XS",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "xs"
+        }
+    ]
+}

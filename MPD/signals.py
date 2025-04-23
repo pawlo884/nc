@@ -1,7 +1,10 @@
 from django.dispatch import receiver
 from django.db.models.signals import post_delete, pre_delete
 from django.db import connections
-from .models import MPD
+from .models import Products
+import logging
+
+logger = logging.getLogger('MPD')
 
 
 '''
@@ -38,7 +41,7 @@ def remove_variants_mapping_in_matterhorn(sender, instance, using, **kwargs):
             print(f"Bład aktualizacji mapped_variant_id: {e}")"""'''
 
 
-@receiver(pre_delete, sender=MPD)
+@receiver(pre_delete, sender=Products)
 def capture_variant_ids(sender, instance, using, **kwargs):
     if using == 'MPD':
         try:
@@ -56,7 +59,7 @@ def capture_variant_ids(sender, instance, using, **kwargs):
         except Exception as e:
             print(f"Błąd pobierania variant_id: {e}")
 
-@receiver(post_delete, sender=MPD)
+@receiver(post_delete, sender=Products)
 def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
     if using == 'MPD':
         try:
@@ -64,8 +67,9 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
             with connections['matterhorn'].cursor() as cursor:
                 cursor.execute(
                     """
-                    UPDATE products
-                    SET mapped_product_id = NULL
+                    UPDATE products 
+                    SET mapped_product_id = NULL,
+                        last_updated = NOW()
                     WHERE mapped_product_id = %s
                     """, [instance.id]
                 )
@@ -76,7 +80,8 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                     placeholders = ', '.join(['%s'] * len(instance.variant_ids))
                     cursor.execute(f"""
                         UPDATE variants
-                        SET mapped_variant_id = NULL
+                        SET mapped_variant_id = NULL,
+                            last_updated = NOW()
                         WHERE mapped_variant_id IN ({placeholders})
                         """, instance.variant_ids)
                 print(f"Zaktualizowano {cursor.rowcount} rekordów w variants.")
@@ -87,3 +92,15 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
             import traceback
             print(f"Błąd aktualizacji powiązań: {e}")
             print(traceback.format_exc())
+
+@receiver(pre_delete, sender=Products)
+def product_pre_delete(sender, instance, **kwargs):
+    message = f"Przed usunięciem produktu: {instance.id} - {instance.name}"
+    print(message)
+    logger.info(message)
+
+@receiver(post_delete, sender=Products)
+def product_post_delete(sender, instance, **kwargs):
+    message = f"Po usunięciu produktu: {instance.id} - {instance.name}"
+    print(message)
+    logger.info(message)

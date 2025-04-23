@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from .defs_import import add_new_product_to_matterhorn, export_to_products
 from .models import ProductsProxy
 from django.contrib import messages
+from django.db import transaction
 
 
 # Create your views here.
@@ -84,28 +85,46 @@ def edit_product(request, product_id):
 
 
 def add_new_product(request):
+    # Sprawdź strefę czasową bazy danych
+    with connections['matterhorn'].cursor() as cursor:
+        cursor.execute("SHOW timezone;")
+        db_timezone = cursor.fetchone()[0]
+        print(f"Strefa czasowa bazy danych: {db_timezone}")
+        
+        cursor.execute("SELECT current_timestamp;")
+        db_time = cursor.fetchone()[0]
+        print(f"Aktualny czas w bazie danych: {db_time}")
+
     # Pobierz `product_id` z żądania
     product_id = request.GET.get('product_id')
     referrer = request.GET.get('referrer', '/')
     manual_confirm = request.GET.get('manual_confirm')
     confirmed_product_id = request.GET.get('confirmed_product_id')
-    print('ref', referrer)
 
     if product_id:
         # Pobierz produkt na podstawie `product_id`
         product = ProductsProxy.objects.filter(id=product_id).first()
 
-        with connections["MasterProductDatabase"].cursor() as destination_cursor, connections["matterhorn"].cursor() as source_cursor:
+        with connections["MPD"].cursor() as destination_cursor, connections["matterhorn"].cursor() as source_cursor:
 
             if confirmed_product_id:
                 # Jeśli jest podany confirmed_product_id, aktualizuj istniejący produkt
-                source_cursor.execute(
-                    "UPDATE products SET mapped_product_id = %s WHERE id = %s",
-                    (confirmed_product_id, product_id)
-                )
+                source_cursor.execute("""
+                    UPDATE products 
+                    SET mapped_product_id = %s,
+                        last_updated = CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Warsaw'
+                    WHERE id = %s;
+                    
+                    SELECT last_updated 
+                    FROM products 
+                    WHERE id = %s;
+                """, (confirmed_product_id, product_id, product_id))
+                
+                new_time = source_cursor.fetchone()[0]
+                print(f"Nowy czas last_updated: {new_time}")
+                
                 connections["matterhorn"].commit()
                 messages.success(request, f"Produkt {product.name} przypisany do ID {confirmed_product_id}.")
-                
             elif manual_confirm:
                 # Jeśli jest manual_confirm, dodaj jako nowy produkt
                 add_new_product_to_matterhorn(destination_cursor, source_cursor, product, request)
@@ -114,4 +133,4 @@ def add_new_product(request):
                 export_to_products(None, request, [product])
 
     # Przekieruj do właściwej strony po zakończeniu
-    return redirect(referrer)  # Zaktualizuj na odpowiednią nazwę URL-a
+    return redirect(referrer)

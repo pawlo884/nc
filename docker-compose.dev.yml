@@ -1,22 +1,29 @@
+
 services:
   web:
     build: .
-    command: bash -c "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 300 --keep-alive 5"
+    command: [ "/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && python manage.py runserver 0.0.0.0:8000" ]
+    ports:
+      - "8000:8000"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
-      - ./static:/app/static
-    ports:
-      - "8000:8000"
     env_file:
       - .env.dev
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.dev
+      - TZ=Europe/Warsaw
+      - PYTHONUNBUFFERED=1
+      - DJANGO_DEBUG=1
     restart: always
+    networks:
+      - app_network
     depends_on:
       - redis
 
   celery-import:
     build: .
-    command: celery -A nc.celery worker -Q import_queue --loglevel=info --concurrency=1
+    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q import_queue --loglevel=info --concurrency=1" ]
     volumes:
       - .:/app
       - celery_data:/var/lib/celery
@@ -25,13 +32,23 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
       - CELERY_STATE_DB=/var/lib/celery/worker_state_import
+      - TZ=Europe/Warsaw
+      - C_FORCE_ROOT=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+      - CELERY_WORKER_SEND_TASK_EVENTS=true
+      - CELERY_TASK_SEND_SENT_EVENT=true
     depends_on:
-      - redis
       - web
+      - redis
+    restart: always
+    networks:
+      - app_network
 
   celery-default:
     build: .
-    command: celery -A nc.celery worker -Q default --loglevel=info --concurrency=4
+    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=2" ]
     volumes:
       - .:/app
       - celery_data:/var/lib/celery
@@ -40,45 +57,86 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
       - CELERY_STATE_DB=/var/lib/celery/worker_state_default
+      - TZ=Europe/Warsaw
+      - C_FORCE_ROOT=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+      - CELERY_WORKER_SEND_TASK_EVENTS=true
+      - CELERY_TASK_SEND_SENT_EVENT=true
     depends_on:
-      - redis
       - web
+      - redis
+    restart: always
+    networks:
+      - app_network
 
   celery-beat:
     build: .
-    command: celery -A nc.celery beat --loglevel=info
+    command: [ "/bin/bash", "-c", "celery -A nc.celery beat --loglevel=info" ]
     volumes:
       - .:/app
     env_file:
       - .env.dev
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
+      - TZ=Europe/Warsaw
     depends_on:
-      - redis
       - web
+      - redis
+    restart: always
+    networks:
+      - app_network
 
   flower:
     build: .
-    command: celery -A nc.celery flower --port=5555
+    command: [ "/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://redis:6379/0" ]
     ports:
       - "5555:5555"
     volumes:
       - .:/app
+      - flower_data:/var/lib/flower
     env_file:
       - .env.dev
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
+      - TZ=Europe/Warsaw
+      - C_FORCE_ROOT=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+      - CELERY_WORKER_SEND_TASK_EVENTS=true
+      - CELERY_TASK_SEND_SENT_EVENT=true
+      - CELERY_TASK_EVENTS=true
+      - CELERY_WORKER_SEND_TASK_EVENTS=true
+      - CELERY_TASK_SEND_SENT_EVENT=true
+      - CELERY_TASK_TRACK_STARTED=true
+      - CELERY_TASK_IGNORE_RESULT=false
+      - CELERY_TASK_STORE_EAGER_RESULT=true
     depends_on:
       - redis
       - celery-import
       - celery-default
+    networks:
+      - app_network
 
   redis:
-    image: redis:alpine
+    image: redis:latest
     ports:
       - "6379:6379"
+    environment:
+      - TZ=Europe/Warsaw
     restart: always
+    networks:
+      - app_network
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru --protected-mode no
 
 volumes:
   static_volume:
-  celery_data: 
+  celery_data:
+  flower_data:
+    driver: local
+
+networks:
+  app_network:
+    driver: bridge

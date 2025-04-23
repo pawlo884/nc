@@ -9,6 +9,11 @@ from .defs_db import connect_to_postgresql, create_tables_if_not_exist, import_i
 import psycopg2
 import logging
 import pytz
+from django.contrib import messages
+from rapidfuzz import fuzz, process
+from django.shortcuts import render, redirect
+from django.db import connections ,transaction
+
 
 logger = logging.getLogger(__name__)
 
@@ -455,7 +460,7 @@ def update_inventory_v3():
                             other_colors = []
                         price = item["prices"].get("PLN", None)
 
-                        logger.info(f"Przetwarzam produkt ID={id}")
+                        logger.debug(f"Przetwarzam produkt ID={id}")
                         logger.debug(f"Szczegóły produktu: active={active}, new_collection={new_collection}, color={color}, stock_total={stock_total}, price={price}")
 
                         # Aktualizacja tabeli products
@@ -470,7 +475,7 @@ def update_inventory_v3():
                         """
                         try:
                             cursor.execute(update_products_query, (active, new_collection, price, color, stock_total, id))
-                            logger.info(f"Zaktualizowano produkt ID={id} w tabeli products")
+                            logger.debug(f"Zaktualizowano produkt ID={id} w tabeli products")
                         except Exception as e:
                             logger.error(f"Błąd podczas aktualizacji produktu ID={id}: {e}")
                             continue
@@ -495,14 +500,14 @@ def update_inventory_v3():
                             if not cursor.fetchone():
                                 # Jeśli `product_id` nie istnieje, dodaj placeholder
                                 cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                logger.info(f"Dodano placeholder dla produktu o ID={id}")
+                                logger.debug(f"Dodano placeholder dla produktu o ID={id}")
 
                             # Sprawdzenie istnienia `set_pid` w tabeli `products`
                             cursor.execute("SELECT 1 FROM products WHERE id = %s", (set_pid,))
                             if not cursor.fetchone():
                                 # Jeśli `set_product_id` nie istnieje, dodaj placeholder
                                 cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (set_pid, "Placeholder Name"))
-                                logger.info(f"Dodano placeholder dla produktu o ID={set_pid}")
+                                logger.debug(f"Dodano placeholder dla produktu o ID={set_pid}")
                             
                             try:
                                 # Wstawienie do tabeli `product_in_set` tylko w jednym kierunku
@@ -532,14 +537,14 @@ def update_inventory_v3():
                             if not cursor.fetchone():
                                 # Jeśli "product_id" nie istnieje, dodaj rekord z "id" i nazwą "Placeholder Name"
                                 cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                logger.info(f"Dodano placeholder dla produktu o ID={id}")
+                                logger.debug(f"Dodano placeholder dla produktu o ID={id}")
 
                             # sprawdzanie istnienia color_pid w tabeli products
                             cursor.execute("SELECT 1 FROM products WHERE id = %s", (color_pid,))
                             if not cursor.fetchone():
                                 # jeśli 'color_product_id" nie istnieje dodaj placeholder
                                 cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (color_pid, "Placeholder Name"))
-                                logger.info(f"Dodano placeholder dla produktu o ID={color_pid}")
+                                logger.debug(f"Dodano placeholder dla produktu o ID={color_pid}")
 
                             try:
                                 cursor.execute(update_other_colors_query, (id, color_pid))
@@ -551,7 +556,7 @@ def update_inventory_v3():
                         # Commit po każdym produkcie
                         try:
                             connection.commit()
-                            logger.info(f"Zatwierdzono zmiany dla produktu ID={id}")
+                            logger.debug(f"Zatwierdzono zmiany dla produktu ID={id}")
                         except Exception as e:
                             logger.error(f"Błąd podczas zatwierdzania zmian dla produktu ID={id}: {e}")
                             connection.rollback()
@@ -599,14 +604,14 @@ def update_inventory_v3():
                             ean = str(variant.get("ean", ""))
                             product_id = int(item["id"])
 
-                            logger.info(f"Przetwarzanie wariantu UID={variant_uid}, Stock={stock}, Name={name}, Ean={ean}")
+                            logger.debug(f"Przetwarzanie wariantu UID={variant_uid}, Stock={stock}, Name={name}, Ean={ean}")
                             
                             # upewnienie się, że rekord istnieje w tabeli products
                             cursor.execute("SELECT 1 FROM products WHERE id = %s", (product_id,))
 
                             if not cursor.fetchone():
                                 cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (product_id, "Placeholder Name"))
-                                logger.info(f"Dodano placeholder dla produktu o ID={product_id}")
+                                logger.debug(f"Dodano placeholder dla produktu o ID={product_id}")
                             
                             # Sprawdzanie czy rekord istnieje
                             cursor.execute("SELECT stock FROM variants WHERE variant_uid = %s", (variant_uid,))
@@ -719,6 +724,9 @@ def clean_update_log():
 
 
 def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, request):
+    # Ustawienie strefy czasowej dla sesji
+    source_cursor.execute("SET timezone TO 'Europe/Warsaw';")
+    
     destination_cursor.execute("SELECT id FROM brands WHERE brand_lower = %s", (product.brand.lower(),))
     brand_result = destination_cursor.fetchone()
     if not brand_result:
@@ -726,11 +734,16 @@ def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, re
         return None
     brand_id = brand_result[0]
 
-    with transaction.atomic(using='MasterProductDatabase'):
+    with transaction.atomic(using='MPD'):
         destination_cursor.execute("INSERT INTO products (name, description, brand_id) VALUES (%s, %s, %s) RETURNING id",
             (product.name, product.description, brand_id))
         new_product_id = destination_cursor.fetchone()[0]
-        source_cursor.execute("UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
+        source_cursor.execute("""
+            UPDATE products 
+            SET mapped_product_id = %s,
+                last_updated = NOW()
+            WHERE id = %s
+        """, (new_product_id, product.id))
         connections['matterhorn'].commit()
         messages.success(request, f"Dodano {product.name} jako nowy produkt z ID {new_product_id}.")
 
@@ -764,7 +777,7 @@ def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, re
             messages.error(request, f"Brak rozmiaru '{size_name}' w bazie.")
             continue
 
-        with transaction.atomic(using='MasterProductDatabase'):
+        with transaction.atomic(using='MPD'):
             destination_cursor.execute(
                 "SELECT variant_id FROM product_variants WHERE variant_uid = %s AND source_id = %s",
                 (variant_uid, 2))
@@ -790,12 +803,13 @@ def add_new_product_to_matterhorn(destination_cursor, source_cursor, product, re
 
             source_cursor.execute("""
                 UPDATE variants
-                SET mapped_variant_id = %s
+                SET mapped_variant_id = %s,
+                    last_updated = NOW()
                 WHERE variant_uid = %s
                 """, (variant_id, variant_uid))
 
             source_cursor.execute(
-                "UPDATE variants SET mapped_variant_id = %s WHERE variant_uid = %s", (variant_id, variant_uid))
+                "UPDATE variants SET mapped_variant_id = %s, last_updated = NOW() WHERE variant_uid = %s", (variant_id, variant_uid))
             connections['matterhorn'].commit()
 
         messages.success(
@@ -811,40 +825,42 @@ def export_to_products(modeladmin, request, queryset):
     if 'manual_confirm' in request.GET:
         product_id = request.GET.get('product_id')
         confirmed_product_id = request.GET.get('confirmed_product_id')
-        referrer = request.GET.get(
-            'referrer', request.META.get('HTTP_REFERER', '/admin/'))
-        print(
-            f"Product ID: {product_id}, Confirmed Product ID: {confirmed_product_id}")
+        referrer = request.GET.get('referrer', request.META.get('HTTP_REFERER', '/admin/'))
+        print(f"Product ID: {product_id}, Confirmed Product ID: {confirmed_product_id}")
 
         if confirmed_product_id and product_id:
             try:
                 with connections['matterhorn'].cursor() as source_cursor:
-                    source_cursor.execute(
-                        "UPDATE products SET mapped_product_id = %s WHERE id = %s",
-                        (confirmed_product_id, product_id)
-                    )
+                    # Ustaw strefę czasową dla sesji
+                    source_cursor.execute("SET timezone TO 'Europe/Warsaw';")
+                    
+                    # Wykonaj aktualizację
+                    source_cursor.execute("""
+                        UPDATE products 
+                        SET mapped_product_id = %s,
+                            last_updated = NOW()
+                        WHERE id = %s;
+                    """, (confirmed_product_id, product_id))
+                    
+                    # Zatwierdź zmiany
                     connections['matterhorn'].commit()
-                    print(
-                        f"Updated product {product_id} with mapped_product_id {confirmed_product_id}")
-                    messages.success(
-                        request, f"Produkt {product_id} przypisany do ID {confirmed_product_id}.")
+                    
+                    messages.success(request, f"Produkt {product_id} przypisany do ID {confirmed_product_id}.")
             except Exception as e:
                 print(f"Error updating mapped_product_id: {e}")
                 messages.error(request, f"Błąd podczas aktualizacji: {e}")
 
             # Dodaj logikę eksportu wariantów poniżej:
-            with connections['MasterProductDatabase'].cursor() as destination_cursor, \
+            with connections['MPD'].cursor() as destination_cursor, \
                     connections['matterhorn'].cursor() as source_cursor:
 
                 source_cursor.execute(
                     "SELECT color, price FROM products WHERE id = %s", (product_id,))
                 color_result = source_cursor.fetchone()
-                product_color, product_price = color_result if color_result else (
-                    None, 0)
+                product_color, product_price = color_result if color_result else (None, 0)
 
                 if not product_color:
-                    messages.error(
-                        request, f"Brak koloru dla produktu {product.name}. Pomijam.")
+                    messages.error(request, f"Brak koloru dla produktu {product.name}. Pomijam.")
 
                 else:
                     destination_cursor.execute(
@@ -860,7 +876,7 @@ def export_to_products(modeladmin, request, queryset):
                             "SELECT id FROM sizes WHERE name = %s", (size_name,))
                         size_id = destination_cursor.fetchone()[0]
 
-                        with transaction.atomic(using='MasterProductDatabase'):
+                        with transaction.atomic(using='MPD'):
                             destination_cursor.execute(
                                 "SELECT variant_id FROM product_variants WHERE variant_uid = %s AND source_id = %s",
                                 (variant_uid, 2)
@@ -882,22 +898,22 @@ def export_to_products(modeladmin, request, queryset):
                             destination_cursor.execute("""
                                 INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
                                 VALUES (%s, %s, %s, %s, 'PLN')
-                                ON DUPLICATE KEY UPDATE stock=VALUES(stock), price=VALUES(price)
+                                ON CONFLICT (variant_id, source_id) DO UPDATE SET
+                                stock = EXCLUDED.stock, price = EXCLUDED.price
                             """, (variant_id, 2, stock, product_price))
 
                             source_cursor.execute(
-                                "UPDATE variants SET mapped_variant_id = %s WHERE variant_uid = %s",
+                                "UPDATE variants SET mapped_variant_id = %s, last_updated = NOW() WHERE variant_uid = %s",
                                 (variant_id, variant_uid)
                             )
                             connections['matterhorn'].commit()
 
-                        messages.success(
-                            request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
+                        messages.success(request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
 
         return redirect(referrer)
 
     try:
-        with connections['MasterProductDatabase'].cursor() as destination_cursor, connections['matterhorn'].cursor() as source_cursor:
+        with connections['MPD'].cursor() as destination_cursor, connections['matterhorn'].cursor() as source_cursor:
 
             for product in queryset:
                 new_product_id = product.mapped_product_id
@@ -907,19 +923,23 @@ def export_to_products(modeladmin, request, queryset):
                     for other_color in product.other_colors.all():
                         if other_color.color_product.mapped_product_id and other_color.color_product.id != product.id:
                             new_product_id = other_color.color_product.mapped_product_id
-                            source_cursor.execute(
-                                "UPDATE products SET mapped_product_id = %s WHERE id = %s", (new_product_id, product.id))
+                            # Ustaw strefę czasową dla sesji
+                            source_cursor.execute("SET timezone TO 'Europe/Warsaw';")
+                            source_cursor.execute("""
+                                UPDATE products 
+                                SET mapped_product_id = %s,
+                                    last_updated = NOW()
+                                WHERE id = %s
+                            """, (new_product_id, product.id))
                             connections['matterhorn'].commit()
-                            messages.info(
-                                request, f"{product.name} używa ID {new_product_id} z {other_color.color_product.name}.")
+                            messages.info(request, f"{product.name} używa ID {new_product_id} z {other_color.color_product.name}.")
 
                             source_cursor.execute(
                                 "SELECT color, price FROM products WHERE id = %s", (product.id,))
                             product_color, product_price = source_cursor.fetchone() or (None, 0)
 
                             if not product_color:
-                                messages.error(
-                                    request, f"Brak koloru dla {product.name}. Pomijam.")
+                                messages.error(request, f"Brak koloru dla {product.name}. Pomijam.")
                                 return None
 
                             # Kolory
@@ -928,8 +948,7 @@ def export_to_products(modeladmin, request, queryset):
                             color_result = destination_cursor.fetchone()
                             color_id = color_result[0] if color_result else None
                             if not color_id:
-                                messages.error(
-                                    request, f"Kolor '{product_color}' nie istnieje.")
+                                messages.error(request, f"Kolor '{product_color}' nie istnieje.")
                                 continue
 
                             # Warianty
@@ -942,11 +961,10 @@ def export_to_products(modeladmin, request, queryset):
                                 size_result = destination_cursor.fetchone()
                                 size_id = size_result[0] if size_result else None
                                 if not size_id:
-                                    messages.error(
-                                        request, f"Brak rozmiaru '{size_name}' w bazie.")
+                                    messages.error(request, f"Brak rozmiaru '{size_name}' w bazie.")
                                     continue
 
-                                with transaction.atomic(using='MasterProductDatabase'):
+                                with transaction.atomic(using='MPD'):
                                     destination_cursor.execute(
                                         "SELECT variant_id FROM product_variants WHERE variant_uid = %s AND source_id = %s",
                                         (variant_uid, 2))
@@ -956,8 +974,7 @@ def export_to_products(modeladmin, request, queryset):
                                     else:
                                         destination_cursor.execute(
                                             "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
-                                        variant_id = destination_cursor.fetchone()[
-                                            0]
+                                        variant_id = destination_cursor.fetchone()[0]
                                         destination_cursor.execute("""
                                             INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
                                             VALUES (%s, %s, %s, %s, %s, %s, %s)""",
@@ -972,16 +989,16 @@ def export_to_products(modeladmin, request, queryset):
 
                                     source_cursor.execute("""
                                         UPDATE variants
-                                        SET mapped_variant_id = %s
+                                        SET mapped_variant_id = %s,
+                                            last_updated = NOW()
                                         WHERE variant_uid = %s
                                         """, (variant_id, variant_uid))
 
                                     source_cursor.execute(
-                                        "UPDATE variants SET mapped_variant_id = %s WHERE variant_uid = %s", (variant_id, variant_uid))
+                                        "UPDATE variants SET mapped_variant_id = %s, last_updated = NOW() WHERE variant_uid = %s", (variant_id, variant_uid))
                                     connections['matterhorn'].commit()
 
-                                messages.success(
-                                    request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
+                                messages.success(request, f"Wariant '{size_name}/{product_color}' zaktualizowany/dodany.")
                             break
                 # 🔍 Fuzzy dopasowanie
                 if not new_product_id:
@@ -990,8 +1007,7 @@ def export_to_products(modeladmin, request, queryset):
                         WHERE brand_id = (SELECT id FROM brands WHERE brand_lower = %s)
                     """, (product.brand.lower(),))
 
-                    existing_products = {row[1]: row[0]
-                                         for row in destination_cursor.fetchall()}
+                    existing_products = {row[1]: row[0] for row in destination_cursor.fetchall()}
 
                     # Sprawdzenie, czy nazwa produktu docelowego zawiera się w nazwie nowego produktu (podciąg)
                     substring_match = next(
@@ -1003,13 +1019,17 @@ def export_to_products(modeladmin, request, queryset):
                     if substring_match:
                         existing_name, existing_id = substring_match
                         new_product_id = existing_id
-                        source_cursor.execute(
-                            "UPDATE products SET mapped_product_id = %s WHERE id = %s",
-                            (new_product_id, product.id)
-                        )
+                        current_time = datetime.now(pytz.timezone('Europe/Warsaw'))
+                        # Ustaw strefę czasową dla sesji
+                        source_cursor.execute("SET timezone TO 'Europe/Warsaw';")
+                        source_cursor.execute("""
+                            UPDATE products 
+                            SET mapped_product_id = %s,
+                                last_updated = %s
+                            WHERE id = %s
+                        """, (new_product_id, current_time, product.id))
                         connections['matterhorn'].commit()
-                        messages.info(
-                            request, f"{product.name} automatycznie dopasowano (zgodność podciągu) do {existing_name}.")
+                        messages.info(request, f"{product.name} automatycznie dopasowano (zgodność podciągu) do {existing_name}.")
                     else:
                         # Jeżeli nie było podciągu, kontynuuj fuzzy matching
                         best_matches = process.extract(
@@ -1019,13 +1039,17 @@ def export_to_products(modeladmin, request, queryset):
                             best_match, best_score, _ = best_matches[0]
                             if best_score > 99:
                                 new_product_id = existing_products[best_match]
-                                source_cursor.execute(
-                                    "UPDATE products SET mapped_product_id = %s WHERE id = %s",
-                                    (new_product_id, product.id)
-                                )
+                                current_time = datetime.now(pytz.timezone('Europe/Warsaw'))
+                                # Ustaw strefę czasową dla sesji
+                                source_cursor.execute("SET timezone TO 'Europe/Warsaw';")
+                                source_cursor.execute("""
+                                    UPDATE products 
+                                    SET mapped_product_id = %s,
+                                        last_updated = %s
+                                    WHERE id = %s
+                                """, (new_product_id, current_time, product.id))
                                 connections['matterhorn'].commit()
-                                messages.info(
-                                    request, f"{product.name} dopasowano do {best_match} (score: {best_score}).")
+                                messages.info(request, f"{product.name} dopasowano do {best_match} (score: {best_score}).")
 
                             elif best_score > 50:
                                 return render(request, 'admin/confirm_product.html', {
@@ -1041,8 +1065,7 @@ def export_to_products(modeladmin, request, queryset):
                         destination_cursor, source_cursor, product, request)
                     if not new_product_id:
                         continue
-        messages.success(
-            request, f"Eksport zakończony dla {queryset.count()} produktów")
+        messages.success(request, "Eksport zakończony pomyślnie.")
     except Exception as e:
         messages.error(request, f"Błąd eksportu: {e}")
 

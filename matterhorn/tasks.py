@@ -133,32 +133,41 @@ def update_is_mapped_status():
         # **DEBUG: Sprawdzamy wartości mapped_product_id**
         print(f"🔍 Produkt ID={product.id}, mapped_product_id={product.mapped_product_id}, is_mapped={product.is_mapped}")
 
-        # **Jeśli produkt ma mapped_product_id i nie ma other_colors, uznajemy go za zmapowany**
+        # **Sprawdzamy czy mapped_product_id istnieje w docelowej bazie danych**
         if product.mapped_product_id and isinstance(product.mapped_product_id, int) and product.mapped_product_id > 0:
-            print(f"✅ Produkt {product.id} ma poprawny mapped_product_id ({product.mapped_product_id}), ustawiamy is_mapped = True")
-            all_mapped = True
+            try:
+                with connections['MPD'].cursor() as cursor:
+                    cursor.execute("SELECT 1 FROM products WHERE id = %s", [product.mapped_product_id])
+                    if cursor.fetchone():
+                        print(f"✅ Produkt {product.id} ma poprawny mapped_product_id ({product.mapped_product_id})")
+                        all_mapped = True
+                    else:
+                        print(f"❌ Produkt {product.id} ma nieprawidłowy mapped_product_id ({product.mapped_product_id})")
+                        all_mapped = False
+            except Exception as e:
+                print(f"❌ Błąd podczas sprawdzania mapped_product_id: {e}")
+                all_mapped = False
 
-        # **Jeśli produkt ma other_colors, wszystkie muszą być zmapowane, aby is_mapped = True**
-        other_colors = OtherColors.objects.filter(product=product)
+        # **Sprawdzamy czy wszystkie warianty są zmapowane**
+        if all_mapped:
+            variants = product.variants.all()
+            if variants.exists():
+                for variant in variants:
+                    if not variant.mapped_variant_id:
+                        print(f"❌ Wariant {variant.variant_uid} nie jest zmapowany")
+                        all_mapped = False
+                        break
 
-        if other_colors.exists():
-            print(f"🔍 Produkt {product.id} ma powiązane kolory. Sprawdzamy ich mapped_product_id...")
-            product_ids = {
-                color.color_product.id for color in other_colors 
-                if color.color_product and color.color_product.id != product.id
-            }
-
-            if product_ids:
-                # **Jeśli choć jeden powiązany produkt nie ma mapped_product_id, to is_mapped = False**
-                all_mapped = all(
-                    Products.objects.filter(id=prod_id, mapped_product_id__isnull=False).exists()
-                    for prod_id in product_ids
-                )
-
-                if all_mapped:
-                    print(f"✅ Wszystkie powiązane produkty dla {product.id} są zmapowane. Ustawiamy is_mapped = True")
-                else:
-                    print(f"❌ Nie wszystkie powiązane produkty dla {product.id} są zmapowane. Ustawiamy is_mapped = False")
+        # **Jeśli produkt ma other_colors, wszystkie muszą być zmapowane**
+        if all_mapped:
+            other_colors = OtherColors.objects.filter(product=product)
+            if other_colors.exists():
+                print(f"🔍 Produkt {product.id} ma powiązane kolory. Sprawdzamy ich mapped_product_id...")
+                for color in other_colors:
+                    if not color.color_product or not color.color_product.mapped_product_id:
+                        print(f"❌ Powiązany produkt {color.color_product_id} nie jest zmapowany")
+                        all_mapped = False
+                        break
 
         # **Aktualizujemy `is_mapped` tylko jeśli wartość się zmieniła**
         if product.is_mapped != all_mapped:
@@ -181,7 +190,7 @@ def update_stock_matterhorn():
         # Ustawienie czasu (ostatnie 8 minut)
         threshold_time = now() - timedelta(minutes=8)
 
-        with connections['matterhorn'].cursor() as source_cursor, connections['MasterProductDatabase'].cursor() as destination_cursor:
+        with connections['matterhorn'].cursor() as source_cursor, connections['MPD'].cursor() as destination_cursor:
             # Pobranie zmienionych stanów magazynowych z matterhorn
             source_cursor.execute(
                 """
@@ -213,7 +222,7 @@ def update_stock_matterhorn():
             updates = [(stock_map[uid], variant_mapping[uid]) for uid in variant_mapping if uid in stock_map]
 
             if updates:
-                with transaction.atomic(using='MasterProductDatabase'):
+                with transaction.atomic(using='MPD'):
                     destination_cursor.executemany(
                         """
                         UPDATE stock_and_prices

@@ -1,0 +1,188 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Lista produktów</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+            position: relative;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .description-column {
+            width: 120%;
+            /* Ustaw szerokość kolumny opisu */
+        }
+
+        th.resizable {
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        th.resizable::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            width: 5px;
+            cursor: col-resize;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('form.edit-product-form').on('submit', function (event) {
+                event.preventDefault();
+                var form = $(this);
+                $.ajax({
+                    type: form.attr('method'),
+                    url: form.attr('action'),
+                    data: form.serialize(),
+                    success: function (response) {
+                        if (response.success) {
+                            $('#message').text('Produkt został zapisany.').css('color', 'green');
+                        } else {
+                            $('#message').text('Wystąpił błąd podczas zapisywania produktu.').css('color', 'red');
+                        }
+                    }
+                });
+            });
+            // Dodaj obsługę zmiany rozmiaru kolumn
+            let isResizing = false;
+            let lastDownX = 0;
+            let th;
+
+            $(document).on('mousedown', 'th.resizable::after', function (e) {
+                th = $(this).parent();
+                isResizing = true;
+                lastDownX = e.clientX;
+                $(document).on('mousemove', handleMouseMove);
+                $(document).on('mouseup', handleMouseUp);
+            });
+
+            function handleMouseMove(e) {
+                if (!isResizing) return;
+                let offset = e.clientX - lastDownX;
+                let newWidth = th.width() + offset;
+                th.width(newWidth);
+                lastDownX = e.clientX;
+            }
+
+            function handleMouseUp() {
+                isResizing = false;
+                $(document).off('mousemove', handleMouseMove);
+                $(document).off('mouseup', handleMouseUp);
+            }
+        });
+
+    </script>
+    <link rel="stylesheet" href="{% static 'moj.css' %}">
+</head>
+
+<body>
+    <h1>Lista produktów</h1>
+
+    <div id="message"></div>
+
+    <!-- Formularz filtrowania -->
+    <table>
+        <form method="get" action="{% url 'products' %}">
+
+            <table>
+                <tr>
+                    <th>id<input type="text" name="id" value="{{ request.GET.id }}"></th>
+                    <th>active<input type="text" name="active" value="{{ request.GET.active }}"></th>
+                    <th>name<input type="text" name="name" value="{{ request.GET.name }}"></th>
+                    <th>name_without_number<input type="text" name="name_without_number" value="{{ request.GET.name_without_number }}"></th>
+                    <th class="description-column">description<input type="text" name="description" value="{{ request.GET.description }}"></th>
+                    <th>creation_date<input type="text" name="creation_date" value="{{ request.GET.creation_date }}"></th>
+                    <th>color<input type="text" name="color" value="{{ request.GET.color }}"></th>
+                    <th>category_name<input type="text" name="category_name" value="{{ request.GET.category_name }}"></th>
+                    <th>category_id<input type="text" name="category_id" value="{{ request.GET.category_id }}"></th>
+                    <th>category_path<input type="text" name="category_path" value="{{ request.GET.category_path }}"></th>
+                    <th>brand_id<input type="text" name="brand_id" value="{{ request.GET.brand_id }}"></th>
+                    <th>brand<input type="text" name="brand" value="{{ request.GET.brand }}"></th>
+                    <th>stock_total<input type="text" name="stock_total" value="{{ request.GET.stock_total }}"></th>
+                    <th>url<input type="text" name="url" value="{{ request.GET.url }}"></th>
+                    <th>new_collection<input type="text" name="new_collection" value="{{ request.GET.new_collection }}"></th>
+                    <th>size_table<input type="text" name="size_table" value="{{ request.GET.size_table }}"></th>
+                    <th>weight<input type="text" name="weight" value="{{ request.GET.weight }}"></th>
+                    <th>size_table_txt<input type="text" name="size_table_txt" value="{{ request.GET.size_table_txt }}"></th>
+                    <th>size_table_html<input type="text" name="size_table_html" value="{{ request.GET.size_table_html }}"></th>
+                    <th>price<input type="text" name="price" value="{{ request.GET.price }}"></th>
+                    <th>timestamp</th>
+                    <th>variants</th>
+                    <th><button type="submit">Filtruj</button></th>
+                </tr>
+
+        </form>
+        </tr>
+        {% for product in page_obj %}
+
+        <tr>
+            <form method="post" action="{% url 'edit_product' product.id %}" class="edit-product-form">
+                {% csrf_token %}
+                <td>{{ product.id }}</td>
+                <td><input type="text" name="active" value="{{ product.active }}"></td>
+                <td><input type="text" name="name" value="{{ product.name }}"></td>
+                <td><input type="text" name="name_without_number" value="{{ product.name_without_number }}"></td>
+                <td class="description-column"><input type="text" name="description" value="{{ product.description }}"></td>
+                <td><input type="text" name="creation_date" value="{{ product.creation_date }}"></td>
+                <td><input type="text" name="color" value="{{ product.color }}"></td>
+                <td><input type="text" name="category_name" value="{{ product.category_name }}"></td>
+                <td><input type="text" name="category_id" value="{{ product.category_id }}"></td>
+                <td><input type="text" name="category_path" value="{{ product.category_path }}"></td>
+                <td><input type="text" name="brand_id" value="{{ product.brand_id }}"></td>
+                <td><input type="text" name="brand" value="{{ product.brand }}"></td>
+                <td><input type="text" name="stock_total" value="{{ product.stock_total }}"></td>
+                <td><input type="text" name="url" value="{{ product.url }}"></td>
+                <td><input type="text" name="new_collection" value="{{ product.new_collection }}"></td>
+                <td><input type="text" name="size_table" value="{{ product.size_table }}"></td>
+                <td><input type="text" name="weight" value="{{ product.weight }}"></td>
+                <td><input type="text" name="size_table_txt" value="{{ product.size_table_txt }}"></td>
+                <td><input type="text" name="size_table_html" value="{{ product.size_table_html }}"></td>
+                <td><input type="text" name="price" value="{{ product.price }}"></td>
+                <td>{{ product.timestamp }}</td>
+                <td>
+                    {% for variant in product.variants.all %}
+                    {{ variant.name }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </td>
+                <td><button type="submit">Save</button></td>
+            </form>
+        </tr>
+        {% endfor %}
+    </table>
+    <div class="pagination">
+        <span class="step-links">
+            {% if page_obj.has_previous %}
+            <a href="?page=1">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+            {% endif %}
+
+            <span class="current">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+            </span>
+
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+            {% endif %}
+    </div>
+</body>
+
+</html>
