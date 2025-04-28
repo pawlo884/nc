@@ -56,7 +56,7 @@ def create_sizes_list():
         "90F", "90G", "90H", "90I", "90J", "90K", "90L", "90M", "95A",
         "95B", "95C", "95D", "95E", "95F", "95G", "95H", "95I", "95J",
         "95K", "95L", "95M", "L", "M", "S", "uniwersalny", "XL", "2XL",
-        "3XL", "4XL", "5XL", "XS", 
+        "3XL", "4XL", "5XL", "XS", "36B", "36C", "38B", "38C", "38D", "38E", "40B", "40C", "40D", "40E", "42C", "42D", "42E", "44C", "44D", "46C",  
     ]
 
 def insert_new_sizes(cursor, existing_sizes):

@@ -917,6 +917,102 @@
             "category": "underwear",
             "unit": "EU",
             "name_lower": "xs"
+        },
+        {
+            "name": "36B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "36b"
+        },
+        {
+            "name": "36C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "36c"
+        },
+        {
+            "name": "38B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "38b"
+        },
+        {
+            "name": "38C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "38c"
+        },
+        {
+            "name": "38D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "38d"
+        },
+        {
+            "name": "38E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "38e"
+        },
+        {
+            "name": "40B",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "40b"
+        },
+        {
+            "name": "40C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "40c"
+        },
+        {
+            "name": "40D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "40d"
+        },
+        {
+            "name": "40E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "40e"
+        },
+        {
+            "name": "42C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "42c"
+        },
+        {
+            "name": "42D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "42d"
+        },
+        {
+            "name": "42E",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "42e"
+        },
+        {
+            "name": "44C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "44c"
+        },
+        {
+            "name": "44D",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "44d"
+        },
+        {
+            "name": "46C",
+            "category": "underwear",
+            "unit": "EU",
+            "name_lower": "46c"
         }
     ]
 }
