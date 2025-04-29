@@ -3,6 +3,7 @@ from django.db.models.signals import post_delete, pre_delete
 from django.db import connections
 from .models import Products
 import logging
+import traceback
 
 logger = logging.getLogger('MPD')
 
@@ -63,6 +64,8 @@ def capture_variant_ids(sender, instance, using, **kwargs):
 def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
     if using == 'MPD':
         try:
+            logger.info(f"Rozpoczęto usuwanie mapowań dla produktu MPD ID: {instance.id}")
+            
             # Usunięcie produktu z tabeli products w matterhorn
             with connections['matterhorn'].cursor() as cursor:
                 cursor.execute(
@@ -73,6 +76,8 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                     WHERE mapped_product_id = %s
                     """, [instance.id]
                 )
+                products_updated = cursor.rowcount
+                logger.info(f"Zaktualizowano {products_updated} rekordów w tabeli products")
             
             # Usunięcie wartości variant_id z mapped_variant_id w tabeli variants w matterhorn
             if hasattr(instance, 'variant_ids') and instance.variant_ids:
@@ -84,14 +89,18 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                             last_updated = NOW()
                         WHERE mapped_variant_id IN ({placeholders})
                         """, instance.variant_ids)
-                print(f"Zaktualizowano {cursor.rowcount} rekordów w variants.")
+                    variants_updated = cursor.rowcount
+                    logger.info(f"Zaktualizowano {variants_updated} rekordów w tabeli variants")
             else:
-                print("Brak variant_id do usunięcia.")
+                logger.info("Brak variant_id do usunięcia")
+            
+            logger.info(f"Zakończono usuwanie mapowań dla produktu MPD ID: {instance.id}")
         
         except Exception as e:
-            import traceback
-            print(f"Błąd aktualizacji powiązań: {e}")
-            print(traceback.format_exc())
+            error_message = f"Błąd podczas usuwania mapowań dla produktu MPD ID: {instance.id} - {str(e)}"
+            logger.error(error_message)
+            logger.error(traceback.format_exc())
+            raise  # Ponownie rzucamy wyjątek, aby Django wiedział o błędzie
 
 @receiver(pre_delete, sender=Products)
 def product_pre_delete(sender, instance, **kwargs):

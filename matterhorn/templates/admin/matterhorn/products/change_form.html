@@ -1,0 +1,261 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .container {
+        display: flex;
+        width: 100%;
+        height: calc(100vh - 200px);
+        margin-top: 20px;
+        position: relative;
+    }
+
+    .column {
+        padding: 20px;
+        overflow: auto;
+    }
+
+    .left-column {
+        flex: 1;
+        border-right: 1px solid #ccc;
+    }
+
+    .right-column {
+        flex: 1;
+        background-color: #f8f8f8;
+        transition: all 0.3s ease;
+    }
+    
+    .right-column.collapsed {
+        flex: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+    
+    .toggle-button {
+        position: absolute;
+        right: -40px;
+        top: 50%;
+        transform: translateY(-50%);
+        background-color: #417690;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        cursor: pointer;
+        border-radius: 3px;
+        z-index: 1000;
+        font-size: 16px;
+    }
+
+    .toggle-button:hover {
+        background-color: #295270;
+    }
+
+    .mpd-form {
+        margin-top: 20px;
+    }
+
+    .mpd-form h2 {
+        margin-bottom: 20px;
+        color: #417690;
+    }
+    
+    .mpd-form .form-row {
+        margin-bottom: 15px;
+    }
+    
+    .mpd-form label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    
+    .mpd-form input[type="text"],
+    .mpd-form textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    
+    .mpd-form textarea {
+        height: 100px;
+        resize: vertical;
+    }
+
+    .mpd-form button {
+        background-color: #417690;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .mpd-form button:hover {
+        background-color: #295270;
+    }
+    
+    .status-message {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 4px;
+    }
+    
+    .status-message.success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-message.error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="column left-column">
+        {{ block.super }}
+    </div>
+    <div class="column right-column {% if not is_mapped %}collapsed{% endif %}">
+        <div class="mpd-form">
+            <h2>Dane MPD</h2>
+            <div id="status-message"></div>
+            {% if not is_mapped and suggested_products %}
+            <div class="form-row" style="margin-bottom:30px;">
+                <h3>Sugerowane podobne produkty w MPD:</h3>
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left; border-bottom:1px solid #ccc;">Nazwa</th>
+                            <th style="text-align:left; border-bottom:1px solid #ccc;">Marka</th>
+                            <th style="text-align:left; border-bottom:1px solid #ccc;">Podobieństwo</th>
+                            <th style="text-align:left; border-bottom:1px solid #ccc;">Akcja</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prod in suggested_products %}
+                        <tr>
+                            <td>{{ prod.name }}</td>
+                            <td>{{ prod.brand }}</td>
+                            <td>{{ prod.similarity|floatformat:2 }}</td>
+                            <td>
+                                <button type="button" class="assign-mapping-btn" data-mpd-id="{{ prod.id }}">Przypisz do tego produktu</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            <form id="mpd-form">
+                {% csrf_token %}
+                <input type="hidden" name="product_id" value="{{ original.id }}">
+                <div class="form-row">
+                    <label for="mpd_name">Nazwa:</label>
+                    <input type="text" id="mpd_name" name="mpd_name" value="{{ mpd_data.name }}">
+                </div>
+                <div class="form-row">
+                    <label for="mpd_description">Opis:</label>
+                    <textarea id="mpd_description" name="mpd_description">{{ mpd_data.description }}</textarea>
+                </div>
+                <div class="form-row">
+                    <label for="mpd_brand">Marka:</label>
+                    <input type="text" id="mpd_brand" name="mpd_brand" value="{{ mpd_data.brand }}">
+                </div>
+                <div class="form-row">
+                    <label for="mpd_size_category">Grupa rozmiarowa:</label>
+                    <select id="mpd_size_category" name="mpd_size_category">
+                        <option value="">-- wybierz grupę --</option>
+                        {% for cat in size_categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit">
+                    {% if is_mapped %}Aktualizuj dane MPD{% else %}Utwórz nowy produkt MPD{% endif %}
+                </button>
+            </form>
+        </div>
+    </div>
+    <button class="toggle-button">{% if is_mapped %}◀{% else %}▶{% endif %}</button>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rightColumn = document.querySelector('.right-column');
+    const toggleButton = document.querySelector('.toggle-button');
+    const mpdForm = document.getElementById('mpd-form');
+    const statusMessage = document.getElementById('status-message');
+    
+    toggleButton.addEventListener('click', function() {
+        rightColumn.classList.toggle('collapsed');
+        this.textContent = rightColumn.classList.contains('collapsed') ? '▶' : '◀';
+    });
+    
+    mpdForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(mpdForm);
+        const url = '{% if is_mapped %}{% url "admin:mpd-update" original.id %}{% else %}{% url "admin:mpd-create" original.id %}{% endif %}';
+        
+        fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+            statusMessage.textContent = data.message;
+            
+            if (data.success) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            }
+        })
+        .catch(error => {
+            statusMessage.className = 'status-message error';
+            statusMessage.textContent = 'Wystąpił błąd podczas przetwarzania żądania.';
+        });
+    });
+
+    document.querySelectorAll('.assign-mapping-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const mpdId = this.getAttribute('data-mpd-id');
+            if (confirm('Czy na pewno chcesz przypisać ten produkt do MPD ID ' + mpdId + '?')) {
+                fetch(`/admin/matterhorn/products/assign-mapping/${document.querySelector('[name=product_id]').value}/${mpdId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const statusMessage = document.getElementById('status-message');
+                    statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+                    statusMessage.textContent = data.message || data.error;
+                    if (data.success) {
+                        setTimeout(() => { window.location.reload(); }, 1500);
+                    }
+                })
+                .catch(() => {
+                    const statusMessage = document.getElementById('status-message');
+                    statusMessage.className = 'status-message error';
+                    statusMessage.textContent = 'Wystąpił błąd podczas przypisywania produktu.';
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

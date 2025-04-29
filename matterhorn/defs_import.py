@@ -487,32 +487,43 @@ def update_inventory_v3():
                         ON CONFLICT (product_id, set_product_id) DO NOTHING
                         """
 
+                        # Walidacja product_in_set
+                        if not isinstance(product_in_set, list):
+                            logger.warning(f"Nieprawidłowy typ danych dla product_in_set: {type(product_in_set)}. Konwertuję na listę.")
+                            product_in_set = []
+
                         for set_pid in product_in_set:
-                            # pomijaj, gdy to ten sam produkt
-                            if set_pid == id:
-                                continue
-
-                            logger.debug(f"Przetwarzam powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
-
-                            # Sprawdzenie istnienia `id` w tabeli `products`
-                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (id,))
-
-                            if not cursor.fetchone():
-                                # Jeśli `product_id` nie istnieje, dodaj placeholder
-                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                logger.debug(f"Dodano placeholder dla produktu o ID={id}")
-
-                            # Sprawdzenie istnienia `set_pid` w tabeli `products`
-                            cursor.execute("SELECT 1 FROM products WHERE id = %s", (set_pid,))
-                            if not cursor.fetchone():
-                                # Jeśli `set_product_id` nie istnieje, dodaj placeholder
-                                cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (set_pid, "Placeholder Name"))
-                                logger.debug(f"Dodano placeholder dla produktu o ID={set_pid}")
-                            
                             try:
-                                # Wstawienie do tabeli `product_in_set` tylko w jednym kierunku
-                                cursor.execute(update_product_in_set_query, (id, set_pid))
-                                logger.debug(f"Dodano powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
+                                # Konwersja na int i walidacja
+                                set_pid = int(set_pid)
+                                if set_pid == id:
+                                    logger.debug(f"Pominięto powiązanie zestawu - ten sam produkt: {id}")
+                                    continue
+
+                                logger.debug(f"Przetwarzam powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
+
+                                # Sprawdzenie istnienia produktów w transakcji
+                                with transaction.atomic(using='matterhorn'):
+                                    # Sprawdzenie istnienia `id` w tabeli `products`
+                                    cursor.execute("SELECT 1 FROM products WHERE id = %s", (id,))
+                                    if not cursor.fetchone():
+                                        cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
+                                        logger.debug(f"Dodano placeholder dla produktu o ID={id}")
+
+                                    # Sprawdzenie istnienia `set_pid` w tabeli `products`
+                                    cursor.execute("SELECT 1 FROM products WHERE id = %s", (set_pid,))
+                                    if not cursor.fetchone():
+                                        cursor.execute("INSERT INTO products (id, name) VALUES (%s, %s)", (set_pid, "Placeholder Name"))
+                                        logger.debug(f"Dodano placeholder dla produktu o ID={set_pid}")
+
+                                    # Wstawienie powiązań w obu kierunkach
+                                    cursor.execute(update_product_in_set_query, (id, set_pid))
+                                    cursor.execute(update_product_in_set_query, (set_pid, id))
+                                    logger.debug(f"Dodano dwukierunkowe powiązanie zestawu: {id} <-> {set_pid}")
+
+                            except ValueError as e:
+                                logger.error(f"Nieprawidłowy format ID produktu w zestawie: {set_pid}. Błąd: {e}")
+                                continue
                             except Exception as e:
                                 logger.error(f"Błąd podczas dodawania powiązania zestawu: {e}")
                                 continue
@@ -594,11 +605,19 @@ def update_inventory_v3():
                             # Próba konwersji na int, jeśli się nie powiedzie, pominięcie rekordu
                             try:
                                 variant_uid = int(variant["variant_uid"])
+                                # Bezpieczna konwersja stock na int
+                                try:
+                                    stock = int(str(variant["stock"]).strip())
+                                    if stock < 0:
+                                        logger.warning(f"Ujemny stan magazynowy dla variant_uid={variant_uid}. Ustawiam na 0.")
+                                        stock = 0
+                                except (ValueError, TypeError):
+                                    logger.warning(f"Nieprawidłowa wartość stock dla variant_uid={variant_uid}. Ustawiam na 0.")
+                                    stock = 0
                             except ValueError:
                                 logger.error(f"Nieprawidłowy format 'variant_uid' dla produktu ID={item['id']}. Pomijam.")
                                 continue
 
-                            stock = int(variant["stock"], 0)
                             name = str(variant["variant_name"]).replace(" ", "")
                             max_processing_time = int(variant.get("max_processing_time", 0))
                             ean = str(variant.get("ean", ""))

@@ -34,6 +34,21 @@ class Products(models.Model):
         db_table = 'products'
         verbose_name = "Product"
         verbose_name_plural = "Products"
+
+    @admin.display(description="Product Color ID's")
+    def get_product_color_id(self):
+        other_colors = self.other_colors.all()  # Pobiera wszystkie powiązane rekordy z OtherColors
+        return ', '.join(str(color.color_product.id) for color in other_colors) if other_colors else ""
+
+    @admin.display(description="Variant Names")
+    def get_variant_names(self):
+        variants = self.variants.all()
+        return ', '.join(variant.name for variant in variants if variant.name) if variants else ""
+
+    @admin.display(description="Product in set")
+    def get_product_in_set(self):
+        product_in_set = self.product_in_set.all()
+        return ', '.join(str(product.set_product.id) for product in product_in_set) if product_in_set else "" 
     
     def __str__(self):
         return self.name or "Unnamed Product"
