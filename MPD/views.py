@@ -6,7 +6,28 @@ from django.db import connections
 
 def products(request):
     products = Products.objects.all()
-    return render(request, 'mpd.html', {'products': products})
+    
+    # Pobierz warianty, stany magazynowe i ceny dla każdego produktu
+    for product in products:
+        with connections['MPD'].cursor() as cursor:
+            cursor.execute("""
+                SELECT pv.variant_id, pv.size_id, s.name as size_name, sp.stock, sp.price
+                FROM product_variants pv
+                JOIN sizes s ON pv.size_id = s.id
+                LEFT JOIN stock_and_prices sp ON pv.variant_id = sp.variant_id AND sp.source_id = 2
+                WHERE pv.product_id = %s
+                ORDER BY s.name
+            """, [product.id])
+            variants = cursor.fetchall()
+            setattr(product, 'variants', [{
+                'variant_id': row[0],
+                'size_id': row[1],
+                'size_name': row[2],
+                'stock': row[3],
+                'price': row[4]
+            } for row in variants])
+    
+    return render(request, 'MPD/mpd.html', {'products': products})
 
 def test_connection(request):
     try:

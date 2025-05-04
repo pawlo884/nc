@@ -72,6 +72,7 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                     """
                     UPDATE products 
                     SET mapped_product_id = NULL,
+                        is_mapped = NULL,
                         last_updated = NOW()
                     WHERE mapped_product_id = %s
                     """, [instance.id]
@@ -86,6 +87,7 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                     cursor.execute(f"""
                         UPDATE variants
                         SET mapped_variant_id = NULL,
+                            is_mapped = NULL,
                             last_updated = NOW()
                         WHERE mapped_variant_id IN ({placeholders})
                         """, instance.variant_ids)

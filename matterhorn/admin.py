@@ -1,16 +1,23 @@
 from django.contrib import admin  # type: ignore
-from .models import Products, UpdateLog, ProductsProxy, ProductsProxyAdminForm, Images
-from .defs_import import export_to_products
+from .models import Products, UpdateLog, Images
 from django.utils.html import format_html
 from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
-from django.db import connections
-from django.contrib.auth.decorators import user_passes_test
+from django.db import connections, transaction
 import logging
-from rapidfuzz import fuzz, process
+import os
 
 logger = logging.getLogger(__name__)
+
+# Logger do osobnego pliku dla mapowania wariantów
+variant_logger = logging.getLogger('matterhorn.variant_mapping')
+if not variant_logger.handlers:
+    log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    fh = logging.FileHandler(os.path.join(log_dir, 'matterhorn_variant_mapping.log'), encoding='utf-8')
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    fh.setFormatter(formatter)
+    variant_logger.addHandler(fh)
+    variant_logger.setLevel(logging.INFO)
 
 # Register your models here.
 # admin.site.register(Products)
@@ -20,11 +27,41 @@ logger = logging.getLogger(__name__)
 class ProductsAdmin(admin.ModelAdmin):
     show_full_result_count = False
     list_per_page = 30
-    fields = ['active', 'name', 'description', 'creation_date', 'color', 'category_name', 'category_path', 'brand',  'url_link', 'new_collection', 'size_table', 'size_table_txt', 'size_table_html', 'price', 'get_product_images', 'get_variants', 'get_other_colors', 'get_product_in_set', ]
-    list_display = ['id', 'active', 'name', 'color', 'category_name', 'brand', 'new_collection', 'price', 'timestamp', 'url_link', 'is_mapped', 'mapped_product_id', 'get_variant_names', 'get_other_colors_ids', 'get_product_in_set_ids']
-    list_filter = ['active', 'category_name', 'brand', 'is_mapped']
-    readonly_fields = ["active", "name", "description", "creation_date", 'url', 'url_link', "color", "category_name", "category_path", "brand", "new_collection", "size_table", "size_table_txt", "size_table_html", "price", "mapped_product_id", "is_mapped", "get_product_images", "get_variants", "get_other_colors", "get_product_in_set"]
+    fields = ['active', 'name', 'description', 'creation_date', 'color', 'category_name', 'category_path', 'brand', 'url_link', 'new_collection', 'price', 'get_product_images', 'get_variants', 'get_other_colors', 'get_product_in_set', 'get_size_table_html',]
+    list_display = ['id', 'product_thumbnail', 'active', 'name', 'color', 'category_name', 'brand', 'new_collection', 'price', 'timestamp', 'url_link', 'is_mapped', 'mapped_product_id', 'get_variant_names', 'get_other_colors_ids', 'get_product_in_set_ids']
+    list_filter = ['active', 'category_name', 'is_mapped']
+    readonly_fields = ["active", "name", "description", "creation_date", 'url', 'url_link', "color", "category_name", "category_path", "brand", "new_collection", "size_table", "size_table_txt", "size_table_html", "price", "mapped_product_id", "is_mapped", "get_product_images", "get_variants", "get_other_colors", "get_product_in_set", "get_size_table_html"]
     search_fields = ['id', 'name', 'brand', 'category_name']
+
+    def get_list_filter(self, request):
+        # Pobierz aktualnie wybraną kategorię z parametrów URL
+        category = request.GET.get('category_name__exact')
+        
+        # Jeśli kategoria jest wybrana, zwróć tylko aktywne filtry
+        if category:
+            return ['active', 'category_name', 'is_mapped']
+        
+        # Jeśli kategoria nie jest wybrana, zwróć wszystkie filtry
+        return ['active', 'category_name', 'brand', 'is_mapped']
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        category = request.GET.get('category_name__exact')
+        
+        if category:
+            # Pobierz unikalne marki dla wybranej kategorii
+            self.brand_choices = list(queryset.filter(category_name=category).values_list('brand', flat=True).distinct())
+        else:
+            # Pobierz wszystkie marki
+            self.brand_choices = list(queryset.values_list('brand', flat=True).distinct())
+            
+        return queryset
+
+    def lookup_allowed(self, lookup, value):
+        # Zezwól na filtrowanie po kategorii i marce
+        if lookup in ('category_name__exact', 'brand__exact'):
+            return True
+        return super().lookup_allowed(lookup, value)
 
     def get_urls(self):
         from django.urls import path
@@ -47,222 +84,94 @@ class ProductsAdmin(admin.ModelAdmin):
                         return JsonResponse({'success': False, 'error': 'Produkt nie jest zmapowany'})
                     mapped_product_id = result[0]
 
-                # Pobierz kategorię rozmiarową z już zmapowanych wariantów
-                with connections['matterhorn'].cursor() as cursor:
-                    cursor.execute("SELECT mapped_variant_id FROM variants WHERE product_id = %s AND mapped_variant_id IS NOT NULL LIMIT 1", [product_id])
-                    variant_result = cursor.fetchone()
-                    if not variant_result or not variant_result[0]:
-                        return JsonResponse({'success': False, 'error': 'Brak zmapowanych wariantów – nie można ustalić grupy rozmiarowej.'})
-                    mapped_variant_id = variant_result[0]
-
-                with connections['MPD'].cursor() as cursor:
-                    cursor.execute("SELECT size_id FROM product_variants WHERE variant_id = %s", [mapped_variant_id])
-                    size_result = cursor.fetchone()
-                    if not size_result or not size_result[0]:
-                        return JsonResponse({'success': False, 'error': 'Nie można ustalić size_id dla zmapowanego wariantu.'})
-                    size_id = size_result[0]
-
-                    cursor.execute("SELECT category FROM sizes WHERE id = %s", [size_id])
-                    cat_result = cursor.fetchone()
-                    if not cat_result or not cat_result[0]:
-                        return JsonResponse({'success': False, 'error': 'Nie można ustalić grupy rozmiarowej na podstawie size_id.'})
-                    size_category = cat_result[0]
-
-                # Pobierz warianty z Matterhorn, które nie są jeszcze zmapowane
-                with connections['matterhorn'].cursor() as matterhorn_cursor:
-                    matterhorn_cursor.execute("""
-                        SELECT name, stock, ean, variant_uid 
-                        FROM variants 
-                        WHERE product_id = %s AND mapped_variant_id IS NULL
-                    """, [product_id])
-                    variants = matterhorn_cursor.fetchall()
-
-                    if not variants:
-                        return JsonResponse({'success': True, 'message': 'Brak nowych wariantów do dodania.'})
-
-                    # Pobierz kolor i cenę produktu
-                    matterhorn_cursor.execute("SELECT color, price FROM products WHERE id = %s", [product_id])
-                    color_result = matterhorn_cursor.fetchone()
-                    if not color_result:
-                        return JsonResponse({'success': False, 'error': 'Brak koloru dla produktu'})
-                    product_color, product_price = color_result
-
-                with connections['MPD'].cursor() as cursor:
-                    # Pobierz ID koloru z MPD
-                    cursor.execute("SELECT id FROM colors WHERE name = %s", [product_color])
-                    color_result = cursor.fetchone()
-                    if not color_result:
-                        return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
-                    color_id = color_result[0]
-
-                    for size_name, stock, ean, variant_uid in variants:
-                        # Pobierz ID rozmiaru tylko z ustalonej kategorii
-                        cursor.execute("SELECT id FROM sizes WHERE name = %s AND category = %s", [size_name, size_category])
-                        size_result = cursor.fetchone()
-                        if not size_result:
-                            continue
-                        size_id = size_result[0]
-
-                        # Utwórz nowy wariant
-                        cursor.execute("SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
-                        variant_id = cursor.fetchone()[0]
-                        cursor.execute("""
-                            INSERT INTO product_variants 
-                            (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2])
-
-                        cursor.execute("""
-                            INSERT INTO stock_and_prices 
-                            (variant_id, source_id, stock, price, currency)
-                            VALUES (%s, %s, %s, %s, 'PLN')
-                            ON CONFLICT (variant_id, source_id) DO UPDATE SET
-                            stock = EXCLUDED.stock,
-                            price = EXCLUDED.price
-                        """, [variant_id, 2, stock, product_price])
-
-                        with connections['matterhorn'].cursor() as matterhorn_cursor:
-                            matterhorn_cursor.execute("""
-                                UPDATE variants 
-                                SET mapped_variant_id = %s,
-                                    is_mapped = true,
-                                    last_updated = NOW()
-                                WHERE variant_uid = %s
-                            """, [variant_id, variant_uid])
-                    connections['matterhorn'].commit()
-
-                return JsonResponse({'success': True, 'message': 'Nowe warianty zostały dodane do MPD (jeśli były do dodania).'})
-            except Exception as e:
-                logger.error(f"Błąd podczas aktualizacji wariantów produktu {product_id}: {str(e)}")
-                return JsonResponse({'success': False, 'error': str(e)})
-        return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
-
-    def mpd_create(self, request, product_id):
-        if request.method == 'POST':
-            try:
+                # Pobierz dane z formularza
                 name = request.POST.get('mpd_name')
                 description = request.POST.get('mpd_description')
                 brand = request.POST.get('mpd_brand')
                 size_category = request.POST.get('mpd_size_category')
+                producer_code = request.POST.get('producer_code')
+                series_name = request.POST.get('series_name')
 
-                if not size_category:
-                    return JsonResponse({'success': False, 'error': 'Wybierz grupę rozmiarową przed mapowaniem produktu.'})
-
-                logger.info(f"Rozpoczynam mapowanie produktu {product_id} z grupą rozmiarową: {size_category}")
-
-                # Sprawdź czy produkt ma powiązane kolory
-                with connections['matterhorn'].cursor() as cursor:
-                    cursor.execute("""
-                        SELECT p.mapped_product_id 
-                        FROM products p
-                        JOIN other_colors oc ON p.id = oc.product_id
-                        WHERE oc.color_product_id = %s AND p.mapped_product_id IS NOT NULL
-                        LIMIT 1
-                    """, [product_id])
-                    result = cursor.fetchone()
-                    
-                    if result and result[0]:
-                        mapped_product_id = result[0]
-                        logger.info(f"Znaleziono powiązany produkt z ID {mapped_product_id}")
-                        
-                        cursor.execute("""
-                            UPDATE products 
-                            SET mapped_product_id = %s,
-                                last_updated = NOW()
-                            WHERE id = %s
-                        """, [mapped_product_id, product_id])
-                        connections['matterhorn'].commit()
-                        
-                        return JsonResponse({
-                            'success': True, 
-                            'message': f'Produkt został przypisany do istniejącego ID {mapped_product_id} z powiązanego koloru'
-                        })
-
-                # Utwórz nowy produkt w bazie MPD
+                # Pobierz brand_id z MPD
                 with connections['MPD'].cursor() as cursor:
                     cursor.execute("SELECT id FROM brands WHERE name = %s", [brand])
                     brand_result = cursor.fetchone()
                     if not brand_result:
-                        logger.error(f"Nie znaleziono marki {brand} w bazie MPD")
-                        return JsonResponse({'success': False, 'error': 'Marka nie istnieje w bazie MPD'})
+                        return JsonResponse({'success': False, 'error': 'Nie znaleziono marki w bazie MPD'})
                     brand_id = brand_result[0]
 
-                    cursor.execute("""
-                        INSERT INTO products (name, description, brand_id)
-                        VALUES (%s, %s, %s)
-                        RETURNING id
-                    """, [name, description, brand_id])
-                    new_product_id = cursor.fetchone()[0]
-                    logger.info(f"Utworzono nowy produkt w MPD z ID {new_product_id}")
+                # Pobierz series_id jeśli istnieje
+                series_id = None
+                if series_name:
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("SELECT id FROM product_series WHERE name = %s", [series_name])
+                        row = cursor.fetchone()
+                        if row:
+                            series_id = row[0]
 
-                    # Pobierz kolor produktu
+                # Jeśli produkt już istnieje w MPD, wykonaj UPDATE
+                with connections['MPD'].cursor() as cursor:
+                    update_query = "UPDATE products SET name=%s, description=%s, brand_id=%s{} WHERE id=%s".format(
+                        ", series_id=%s" if series_id else "")
+                    params = [name, description, brand_id]
+                    if series_id:
+                        params.append(series_id)
+                    params.append(mapped_product_id)
+                    cursor.execute(update_query, params)
+
+                # Sprawdź, czy są już jakiekolwiek warianty w MPD dla tego produktu
+                with connections['MPD'].cursor() as cursor:
+                    cursor.execute("SELECT COUNT(*) FROM product_variants WHERE product_id = %s", [mapped_product_id])
+                    variant_count = cursor.fetchone()[0]
+
+                # Jeśli są już warianty, nie wymagaj size_category i dodaj tylko brakujące warianty
+                if variant_count > 0:
+                    # Pobierz istniejące variant_uid
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("SELECT variant_uid FROM product_variants WHERE product_id = %s", [mapped_product_id])
+                        existing_variant_uids = set(row[0] for row in cursor.fetchall() if row[0])
+                    # Pobierz warianty z Matterhorna, które nie są jeszcze w MPD
                     with connections['matterhorn'].cursor() as matterhorn_cursor:
-                        matterhorn_cursor.execute("""
-                            SELECT color, price FROM products WHERE id = %s
-                        """, [product_id])
-                        color_result = matterhorn_cursor.fetchone()
-                        if not color_result:
-                            logger.error(f"Brak koloru dla produktu {product_id}")
-                            return JsonResponse({'success': False, 'error': 'Brak koloru dla produktu'})
-                        product_color, product_price = color_result
-                        logger.info(f"Pobrano kolor {product_color} i cenę {product_price}")
-
-                        cursor.execute("SELECT id FROM colors WHERE name = %s", [product_color])
-                        color_result = cursor.fetchone()
-                        if not color_result:
-                            logger.error(f"Brak koloru {product_color} w bazie MPD")
-                            return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
-                        color_id = color_result[0]
-
-                        # Pobierz warianty produktu
                         matterhorn_cursor.execute("""
                             SELECT name, stock, ean, variant_uid 
                             FROM variants 
-                            WHERE product_id = %s
+                            WHERE product_id = %s AND mapped_variant_id IS NULL
                         """, [product_id])
                         variants = matterhorn_cursor.fetchall()
-                        logger.info(f"Znaleziono {len(variants)} wariantów dla produktu {product_id}")
-
                         if not variants:
-                            logger.error(f"Brak wariantów dla produktu {product_id}")
-                            return JsonResponse({'success': False, 'error': 'Brak wariantów dla produktu'})
-
-                        # Dodaj warianty do MPD tylko z wybranej kategorii rozmiarowej
+                            return JsonResponse({'success': True, 'message': 'Brak nowych wariantów do dodania.'})
+                        # Pobierz kolor i cenę produktu
+                        matterhorn_cursor.execute("SELECT color, price FROM products WHERE id = %s", [product_id])
+                        color_result = matterhorn_cursor.fetchone()
+                        if not color_result:
+                            return JsonResponse({'success': False, 'error': 'Brak koloru dla produktu'})
+                        product_color, product_price = color_result
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("SELECT id FROM colors WHERE name = %s", [product_color])
+                        color_result = cursor.fetchone()
+                        if not color_result:
+                            return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
+                        color_id = color_result[0]
+                        cursor.execute("SELECT producer_color_id, producer_code FROM product_variants WHERE product_id = %s AND producer_color_id IS NOT NULL AND producer_code IS NOT NULL LIMIT 1", [mapped_product_id])
+                        pcid_result = cursor.fetchone()
+                        producer_color_id = pcid_result[0] if pcid_result else None
+                        producer_code_db = pcid_result[1] if pcid_result else None
                         for size_name, stock, ean, variant_uid in variants:
-                            logger.info(f"Przetwarzam wariant: {size_name}, stock: {stock}, ean: {ean}, uid: {variant_uid}")
-                            
-                            # Pobierz ID rozmiaru tylko z wybranej kategorii
-                            cursor.execute("SELECT id FROM sizes WHERE name = %s AND category = %s", [size_name, size_category])
+                            if variant_uid in existing_variant_uids:
+                                continue
+                            # Pobierz size_id bez wymuszania kategorii
+                            cursor.execute("SELECT id FROM sizes WHERE UPPER(name) = UPPER(%s)", [size_name])
                             size_result = cursor.fetchone()
                             if not size_result:
-                                logger.warning(f"Brak rozmiaru {size_name} w grupie {size_category} w bazie MPD")
                                 continue
                             size_id = size_result[0]
-
+                            cursor.execute("SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
+                            variant_id = cursor.fetchone()[0]
                             cursor.execute("""
-                                SELECT variant_id 
-                                FROM product_variants 
-                                WHERE variant_uid = %s AND source_id = %s
-                            """, [variant_uid, 2])
-                            variant_result = cursor.fetchone()
-
-                            if variant_result:
-                                variant_id = variant_result[0]
-                                logger.info(f"Znaleziono istniejący wariant z ID {variant_id}")
-                            else:
-                                cursor.execute("""
-                                    SELECT COALESCE(MAX(variant_id), 0) + 1 
-                                    FROM product_variants
-                                """)
-                                variant_id = cursor.fetchone()[0]
-                                logger.info(f"Utworzono nowy wariant z ID {variant_id}")
-
-                                cursor.execute("""
-                                    INSERT INTO product_variants 
-                                    (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                                """, [variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2])
-
+                                INSERT INTO product_variants 
+                                (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_color_id, producer_code)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2, producer_color_id, producer_code or producer_code_db])
                             cursor.execute("""
                                 INSERT INTO stock_and_prices 
                                 (variant_id, source_id, stock, price, currency)
@@ -271,28 +180,392 @@ class ProductsAdmin(admin.ModelAdmin):
                                 stock = EXCLUDED.stock,
                                 price = EXCLUDED.price
                             """, [variant_id, 2, stock, product_price])
-
-                            matterhorn_cursor.execute("""
+                            with connections['matterhorn'].cursor() as matterhorn_cursor2:
+                                matterhorn_cursor2.execute("""
+                                    UPDATE variants 
+                                    SET mapped_variant_id = %s,
+                                        is_mapped = true,
+                                        last_updated = NOW()
+                                    WHERE variant_uid = %s
+                                """, [variant_id, variant_uid])
+                        connections['matterhorn'].commit()
+                    return JsonResponse({'success': True, 'message': 'Dodano brakujące warianty do MPD.'})
+                # Jeśli nie ma jeszcze wariantów, zachowaj dotychczasową logikę (wymagaj size_category)
+                # Dalej jak dotychczas, używając size_category (z POST lub automatycznie)
+                if not size_category:
+                    # Jeśli nie, spróbuj ustalić automatycznie
+                    with connections['matterhorn'].cursor() as cursor:
+                        cursor.execute("SELECT mapped_variant_id FROM variants WHERE product_id = %s AND mapped_variant_id IS NOT NULL LIMIT 1", [product_id])
+                        variant_result = cursor.fetchone()
+                        if not variant_result or not variant_result[0]:
+                            return JsonResponse({'success': False, 'error': 'Brak zmapowanych wariantów – nie można ustalić grupy rozmiarowej. Wybierz ją ręcznie.'})
+                        mapped_variant_id = variant_result[0]
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("SELECT size_id FROM product_variants WHERE variant_id = %s", [mapped_variant_id])
+                        size_result = cursor.fetchone()
+                        if not size_result or not size_result[0]:
+                            return JsonResponse({'success': False, 'error': 'Nie można ustalić size_id dla zmapowanego wariantu.'})
+                        size_id = size_result[0]
+                        cursor.execute("SELECT category FROM sizes WHERE id = %s", [size_id])
+                        cat_result = cursor.fetchone()
+                        if not cat_result or not cat_result[0]:
+                            return JsonResponse({'success': False, 'error': 'Nie można ustalić grupy rozmiarowej na podstawie size_id.'})
+                        size_category = cat_result[0]
+                # Dalej jak dotychczas, używając size_category (z POST lub automatycznie)
+                with connections['matterhorn'].cursor() as matterhorn_cursor:
+                    matterhorn_cursor.execute("""
+                        SELECT name, stock, ean, variant_uid 
+                        FROM variants 
+                        WHERE product_id = %s AND mapped_variant_id IS NULL
+                    """, [product_id])
+                    variants = matterhorn_cursor.fetchall()
+                    if not variants:
+                        return JsonResponse({'success': True, 'message': 'Brak nowych wariantów do dodania.'})
+                    # Pobierz kolor i cenę produktu
+                    matterhorn_cursor.execute("SELECT color, price FROM products WHERE id = %s", [product_id])
+                    color_result = matterhorn_cursor.fetchone()
+                    if not color_result:
+                        return JsonResponse({'success': False, 'error': 'Brak koloru dla produktu'})
+                    product_color, product_price = color_result
+                with connections['MPD'].cursor() as cursor:
+                    cursor.execute("SELECT id FROM colors WHERE name = %s", [product_color])
+                    color_result = cursor.fetchone()
+                    if not color_result:
+                        return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
+                    color_id = color_result[0]
+                    cursor.execute("SELECT producer_color_id, producer_code FROM product_variants WHERE product_id = %s AND producer_color_id IS NOT NULL AND producer_code IS NOT NULL LIMIT 1", [mapped_product_id])
+                    pcid_result = cursor.fetchone()
+                    producer_color_id = pcid_result[0] if pcid_result else None
+                    producer_code_db = pcid_result[1] if pcid_result else None
+                    for size_name, stock, ean, variant_uid in variants:
+                        cursor.execute("SELECT id FROM sizes WHERE UPPER(name) = UPPER(%s) AND category = %s", [size_name, size_category])
+                        size_result = cursor.fetchone()
+                        if not size_result:
+                            continue
+                        size_id = size_result[0]
+                        cursor.execute("SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
+                        variant_id = cursor.fetchone()[0]
+                        cursor.execute("""
+                            INSERT INTO product_variants 
+                            (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_color_id, producer_code)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2, producer_color_id, producer_code or producer_code_db])
+                        cursor.execute("""
+                            INSERT INTO stock_and_prices 
+                            (variant_id, source_id, stock, price, currency)
+                            VALUES (%s, %s, %s, %s, 'PLN')
+                            ON CONFLICT (variant_id, source_id) DO UPDATE SET
+                            stock = EXCLUDED.stock,
+                            price = EXCLUDED.price
+                        """, [variant_id, 2, stock, product_price])
+                        with connections['matterhorn'].cursor() as matterhorn_cursor2:
+                            matterhorn_cursor2.execute("""
                                 UPDATE variants 
                                 SET mapped_variant_id = %s,
                                     is_mapped = true,
                                     last_updated = NOW()
                                 WHERE variant_uid = %s
                             """, [variant_id, variant_uid])
-                            logger.info(f"Zaktualizowano wariant {variant_uid} w bazie Matterhorn")
+                    connections['matterhorn'].commit()
+                return JsonResponse({'success': True, 'message': 'Nowe warianty zostały dodane do MPD (jeśli były do dodania).'})
+            except Exception as e:
+                logger.error(f"Błąd podczas aktualizacji wariantów produktu {product_id}: {str(e)}")
+                return JsonResponse({'success': False, 'error': str(e)})
+        return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
 
-                        connections['matterhorn'].commit()
+    def add_new_variants_to_mpd(self, product_id, mapped_product_id, size_category, producer_color_id=None, producer_code=None):
+        variant_logger.info(f"[add_new_variants_to_mpd] START: product_id={product_id}, mapped_product_id={mapped_product_id}, size_category={size_category}, producer_color_id={producer_color_id}, producer_code={producer_code}")
+        missing_sizes = []
+        missing_colors = False
+        added_variants = 0
+        skipped_existing = 0
+        total_variants = 0
+        try:
+            with connections['matterhorn'].cursor() as matterhorn_cursor, connections['MPD'].cursor() as mpd_cursor:
+                # Pobierz kolor i cenę produktu
+                matterhorn_cursor.execute("""
+                    SELECT color, price FROM products WHERE id = %s
+                """, [product_id])
+                color_result = matterhorn_cursor.fetchone()
+                if not color_result:
+                    variant_logger.error(f"[add_new_variants_to_mpd] Brak koloru dla produktu {product_id}")
+                    return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': True, 'total': 0}
+                product_color, product_price = color_result
+                variant_logger.info(f"[add_new_variants_to_mpd] Kolor produktu: {product_color}, cena: {product_price}")
 
-                    with connections['matterhorn'].cursor() as matterhorn_cursor:
+                # Pobierz ID koloru w MPD
+                mpd_cursor.execute("SELECT id FROM colors WHERE name = %s", [product_color])
+                color_result = mpd_cursor.fetchone()
+                if not color_result:
+                    variant_logger.error(f"[add_new_variants_to_mpd] Brak koloru {product_color} w bazie MPD")
+                    missing_colors = True
+                    return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': True, 'total': 0}
+                color_id = color_result[0]
+                variant_logger.info(f"[add_new_variants_to_mpd] ID koloru w MPD: {color_id}")
+
+                # Pobierz warianty produktu z Matterhorna
+                matterhorn_cursor.execute("""
+                    SELECT name, stock, ean, variant_uid FROM variants WHERE product_id = %s
+                """, [product_id])
+                variants = matterhorn_cursor.fetchall()
+                variant_logger.info(f"[add_new_variants_to_mpd] Znaleziono {len(variants)} wariantów do sprawdzenia dla produktu {product_id}")
+                total_variants = len(variants)
+
+                for size_name, stock, ean, variant_uid in variants:
+                    variant_logger.info(f"[add_new_variants_to_mpd] Próba dodania wariantu: size_name={size_name}, stock={stock}, ean={ean}, variant_uid={variant_uid}")
+                    # Pobierz ID rozmiaru tylko z wybranej kategorii
+                    mpd_cursor.execute("SELECT id FROM sizes WHERE UPPER(name) = UPPER(%s) AND category = %s", [size_name, size_category])
+                    size_result = mpd_cursor.fetchone()
+                    if not size_result:
+                        variant_logger.warning(f"[add_new_variants_to_mpd] Brak rozmiaru {size_name} w grupie {size_category} w bazie MPD")
+                        missing_sizes.append(size_name)
+                        continue
+                    size_id = size_result[0]
+                    variant_logger.info(f"[add_new_variants_to_mpd] Znaleziono rozmiar: {size_name} (id={size_id}) w kategorii {size_category}")
+
+                    # Sprawdź, czy wariant już istnieje w MPD
+                    mpd_cursor.execute("""
+                        SELECT variant_id FROM product_variants WHERE variant_uid = %s AND product_id = %s AND source_id = %s
+                    """, [variant_uid, mapped_product_id, 2])
+                    variant_result = mpd_cursor.fetchone()
+                    if variant_result:
+                        variant_logger.info(f"[add_new_variants_to_mpd] Wariant {variant_uid} już istnieje w MPD - pomijam")
+                        skipped_existing += 1
+                        continue
+
+                    # Dodaj nowy wariant
+                    mpd_cursor.execute("SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
+                    variant_id = mpd_cursor.fetchone()[0]
+                    variant_logger.info(f"[add_new_variants_to_mpd] Dodaję nowy wariant {variant_uid} jako variant_id {variant_id} (product_id={mapped_product_id}, color_id={color_id}, size_id={size_id}, ean={ean}, producer_color_id={producer_color_id}, producer_code={producer_code})")
+
+                    try:
+                        if producer_color_id:
+                            mpd_cursor.execute("""
+                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, ean, variant_uid, source_id, producer_code)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, [variant_id, mapped_product_id, color_id, producer_color_id, size_id, ean, variant_uid, 2, producer_code])
+                        else:
+                            mpd_cursor.execute("""
+                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_code)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2, producer_code])
+                        variant_logger.info(f"[add_new_variants_to_mpd] Dodano wariant {variant_uid} do product_variants")
+                    except Exception as e:
+                        variant_logger.error(f"[add_new_variants_to_mpd] Błąd podczas dodawania wariantu {variant_uid} do product_variants: {e}")
+                        continue
+
+                    try:
+                        mpd_cursor.execute("""
+                            INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
+                            VALUES (%s, %s, %s, %s, 'PLN')
+                            ON CONFLICT (variant_id, source_id) DO UPDATE SET
+                            stock = EXCLUDED.stock,
+                            price = EXCLUDED.price
+                        """, [variant_id, 2, stock, product_price])
+                        variant_logger.info(f"[add_new_variants_to_mpd] Dodano/uzupełniono stock_and_prices dla wariantu {variant_uid} (variant_id={variant_id})")
+                    except Exception as e:
+                        variant_logger.error(f"[add_new_variants_to_mpd] Błąd podczas dodawania/uzupełniania stock_and_prices dla wariantu {variant_uid}: {e}")
+                        continue
+
+                    try:
                         matterhorn_cursor.execute("""
-                            UPDATE products 
-                            SET mapped_product_id = %s,
-                                is_mapped = true,
-                                last_updated = NOW()
-                            WHERE id = %s
-                        """, [new_product_id, product_id])
-                        connections['matterhorn'].commit()
-                        logger.info(f"Zaktualizowano produkt {product_id} w bazie Matterhorn")
+                            UPDATE variants SET mapped_variant_id = %s, is_mapped = true, last_updated = NOW() WHERE variant_uid = %s
+                        """, [variant_id, variant_uid])
+                        variant_logger.info(f"[add_new_variants_to_mpd] Zaktualizowano mapped_variant_id w Matterhornie dla wariantu {variant_uid}")
+                    except Exception as e:
+                        variant_logger.error(f"[add_new_variants_to_mpd] Błąd podczas aktualizacji mapped_variant_id w Matterhornie dla wariantu {variant_uid}: {e}")
+                        continue
+                    added_variants += 1
+                connections['matterhorn'].commit()
+                variant_logger.info(f"[add_new_variants_to_mpd] Podsumowanie mapowania wariantów: dodano {added_variants}, pominięto {skipped_existing} (istniały), brak rozmiarów: {missing_sizes}, brak koloru: {missing_colors}")
+                return {
+                    'added': added_variants,
+                    'skipped_existing': skipped_existing,
+                    'missing_sizes': missing_sizes,
+                    'missing_color': missing_colors,
+                    'total': total_variants
+                }
+        except Exception as e:
+            variant_logger.error(f"[add_new_variants_to_mpd] Błąd podczas dodawania nowych wariantów do MPD: {str(e)}")
+            return {'added': added_variants, 'skipped_existing': skipped_existing, 'missing_sizes': missing_sizes, 'missing_color': missing_colors, 'total': total_variants}
+        finally:
+            variant_logger.info(f"[add_new_variants_to_mpd] END: product_id={product_id}, mapped_product_id={mapped_product_id}, size_category={size_category}, producer_color_id={producer_color_id}, producer_code={producer_code}")
+
+    def mpd_create(self, request, product_id):
+        variant_logger.info(f"[mpd_create] START: product_id={product_id}, method={request.method}")
+        if request.method == 'POST':
+            try:
+                name = request.POST.get('mpd_name')
+                description = request.POST.get('mpd_description')
+                brand = request.POST.get('mpd_brand')
+                size_category = request.POST.get('mpd_size_category')
+                producer_code = request.POST.get('producer_code')
+                series_name = request.POST.get('series_name')
+                variant_logger.info(f"[mpd_create] POST data: name={name}, description={description}, brand={brand}, size_category={size_category}, producer_code={producer_code}, series_name={series_name}")
+
+                if not size_category:
+                    variant_logger.warning(f"[mpd_create] Brak wybranej grupy rozmiarowej dla produktu {product_id}")
+                    return JsonResponse({'success': False, 'error': 'Wybierz grupę rozmiarową przed mapowaniem produktu.'})
+
+                logger.info(f"Rozpoczynam mapowanie produktu {product_id} z grupą rozmiarową: {size_category}")
+
+                # --- MAPOWANIE SERII ---
+                # Pobierz powiązane produkty z Matterhorn
+                with connections['matterhorn'].cursor() as matterhorn_cursor:
+                    matterhorn_cursor.execute("""
+                        SELECT set_product_id FROM product_in_set WHERE product_id = %s
+                    """, [product_id])
+                    related_ids = [row[0] for row in matterhorn_cursor.fetchall()]
+
+                    # Pobierz mapped_product_id dla powiązanych produktów
+                    mapped_ids = []
+                    if related_ids:
+                        format_strings = ','.join(['%s'] * len(related_ids))
+                        matterhorn_cursor.execute(f"SELECT id, mapped_product_id FROM products WHERE id IN ({format_strings})", related_ids)
+                        mapped_ids = [row[1] for row in matterhorn_cursor.fetchall() if row[1]]
+
+                # Dodajemy też nowo tworzony produkt (będzie miał new_product_id po utworzeniu)
+                series_id = None
+                # Sprawdź, czy któryś z powiązanych produktów w MPD ma już series_id
+                if mapped_ids:
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("SELECT series_id FROM products WHERE id IN %s AND series_id IS NOT NULL LIMIT 1", [tuple(mapped_ids)])
+                        row = cursor.fetchone()
+                        if row and row[0]:
+                            series_id = row[0]
+                # Jeśli nie ma, utwórz nową serię
+                if not series_id:
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("INSERT INTO product_series (name) VALUES (%s) RETURNING id", [series_name])
+                        series_id = cursor.fetchone()[0]
+
+                with transaction.atomic(using='MPD'):
+                    # Utwórz nowy produkt w bazie MPD
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("SELECT id FROM brands WHERE name = %s", [brand])
+                        brand_result = cursor.fetchone()
+                        if not brand_result:
+                            logger.error(f"Nie znaleziono marki {brand} w bazie MPD")
+                            raise Exception('Marka nie istnieje w bazie MPD')
+                        brand_id = brand_result[0]
+
+                        cursor.execute("""
+                            INSERT INTO products (name, description, brand_id, series_id)
+                            VALUES (%s, %s, %s, %s)
+                            RETURNING id
+                        """, [name, description, brand_id, series_id])
+                        new_product_id = cursor.fetchone()[0]
+                        logger.info(f"Utworzono nowy produkt w MPD z ID {new_product_id}")
+
+                        # Przypisz series_id wszystkim powiązanym produktom w MPD
+                        if mapped_ids:
+                            cursor.execute(f"UPDATE products SET series_id = %s WHERE id IN ({','.join(['%s']*len(mapped_ids))})", [series_id] + mapped_ids)
+
+                        # Pobierz kolor produktu
+                        with connections['matterhorn'].cursor() as matterhorn_cursor:
+                            matterhorn_cursor.execute("""
+                                SELECT color, price FROM products WHERE id = %s
+                            """, [product_id])
+                            color_result = matterhorn_cursor.fetchone()
+                            if not color_result:
+                                logger.error(f"Brak koloru dla produktu {product_id}")
+                                raise Exception('Brak koloru dla produktu')
+                            product_color, product_price = color_result
+                            logger.info(f"Pobrano kolor {product_color} i cenę {product_price}")
+
+                            # Główny kolor (color_id)
+                            color_id = int(size_category)
+
+                            # Kolor producenta (producer_color_id)
+                            producer_color_id = None
+                            if producer_color_name:
+                                # Sprawdź czy kolor producenta już istnieje
+                                cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s", [producer_color_name, color_id])
+                                pc_result = cursor.fetchone()
+                                if pc_result:
+                                    producer_color_id = pc_result[0]
+                                else:
+                                    # Dodaj nowy kolor producenta (bez podawania id)
+                                    cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id", [producer_color_name, color_id])
+                                    producer_color_id = cursor.fetchone()[0]
+                                    logger.info(f"Dodano nowy kolor producenta: {producer_color_name} (id={producer_color_id})")
+
+                            # Pobierz warianty produktu
+                            matterhorn_cursor.execute("""
+                                SELECT name, stock, ean, variant_uid 
+                                FROM variants 
+                                WHERE product_id = %s
+                            """, [product_id])
+                            variants = matterhorn_cursor.fetchall()
+                            logger.info(f"Znaleziono {len(variants)} wariantów dla produktu {product_id}")
+
+                            if not variants:
+                                logger.error(f"Brak wariantów dla produktu {product_id}")
+                                raise Exception('Brak wariantów dla produktu')
+
+                            # Dodaj warianty do MPD tylko z wybranej kategorii rozmiarowej
+                            for size_name, stock, ean, variant_uid in variants:
+                                logger.info(f"Przetwarzam wariant: {size_name}, stock: {stock}, ean: {ean}, uid: {variant_uid}")
+                                # Pobierz ID rozmiaru tylko z wybranej kategorii
+                                cursor.execute("SELECT id FROM sizes WHERE UPPER(name) = UPPER(%s) AND category = %s", [size_name, size_category])
+                                size_result = cursor.fetchone()
+                                if not size_result:
+                                    logger.warning(f"Brak rozmiaru {size_name} w grupie {size_category} w bazie MPD")
+                                    continue
+                                size_id = size_result[0]
+
+                                cursor.execute("""
+                                    SELECT variant_id 
+                                    FROM product_variants 
+                                    WHERE variant_uid = %s AND source_id = %s
+                                """, [variant_uid, 2])
+                                variant_result = cursor.fetchone()
+
+                                if variant_result:
+                                    variant_id = variant_result[0]
+                                    logger.info(f"Znaleziono istniejący wariant z ID {variant_id}")
+                                else:
+                                    cursor.execute("""
+                                        SELECT COALESCE(MAX(variant_id), 0) + 1 
+                                        FROM product_variants
+                                    """)
+                                    variant_id = cursor.fetchone()[0]
+                                    logger.info(f"Utworzono nowy wariant z ID {variant_id}")
+
+                                    cursor.execute("""
+                                        INSERT INTO product_variants 
+                                        (variant_id, product_id, color_id, producer_color_id, size_id, ean, variant_uid, source_id, producer_code)
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    """, [variant_id, new_product_id, color_id, producer_color_id, size_id, ean, variant_uid, 2, producer_code])
+
+                                cursor.execute("""
+                                    INSERT INTO stock_and_prices 
+                                    (variant_id, source_id, stock, price, currency)
+                                    VALUES (%s, %s, %s, %s, 'PLN')
+                                    ON CONFLICT (variant_id, source_id) DO UPDATE SET
+                                    stock = EXCLUDED.stock,
+                                    price = EXCLUDED.price
+                                """, [variant_id, 2, stock, product_price])
+
+                                matterhorn_cursor.execute("""
+                                    UPDATE variants 
+                                    SET mapped_variant_id = %s,
+                                        is_mapped = true,
+                                        last_updated = NOW()
+                                    WHERE variant_uid = %s
+                                """, [variant_id, variant_uid])
+                            connections['matterhorn'].commit()
+
+                        with connections['matterhorn'].cursor() as matterhorn_cursor:
+                            matterhorn_cursor.execute("""
+                                UPDATE products 
+                                SET mapped_product_id = %s,
+                                    is_mapped = true,
+                                    last_updated = NOW()
+                                WHERE id = %s
+                            """, [new_product_id, product_id])
+                            connections['matterhorn'].commit()
+                            logger.info(f"Zaktualizowano produkt {product_id} w bazie Matterhorn")
 
                 return JsonResponse({'success': True, 'message': 'Produkt został pomyślnie zmapowany'})
             except Exception as e:
@@ -301,8 +574,22 @@ class ProductsAdmin(admin.ModelAdmin):
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
 
     def assign_mapping(self, request, product_id, mpd_product_id):
+        variant_logger.info(f"[assign_mapping] START: product_id={product_id}, mpd_product_id={mpd_product_id}, method={request.method}")
         if request.method == 'POST':
             try:
+                producer_code = request.POST.get('producer_code')
+                producer_color_id = None
+                if producer_color_name:
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s", [producer_color_name, main_color_id])
+                        pc_result = cursor.fetchone()
+                        if pc_result:
+                            producer_color_id = pc_result[0]
+                        else:
+                            cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id", [producer_color_name, main_color_id])
+                            producer_color_id = cursor.fetchone()[0]
+                            logger.info(f"[assign_mapping] Dodano nowy kolor producenta: {producer_color_name} (id={producer_color_id})")
+
                 with connections['matterhorn'].cursor() as cursor:
                     cursor.execute("""
                         UPDATE products
@@ -310,8 +597,34 @@ class ProductsAdmin(admin.ModelAdmin):
                         WHERE id = %s
                     """, [mpd_product_id, product_id])
                     connections['matterhorn'].commit()
-                return JsonResponse({'success': True, 'message': f'Produkt został przypisany do MPD ID {mpd_product_id}.'})
+                    variant_logger.info(f"[assign_mapping] Przypisano mapped_product_id={mpd_product_id} do produktu {product_id}")
+
+                # Pobierz kategorię rozmiarową z MPD na podstawie mapped_product_id i pierwszego wariantu
+                with connections['MPD'].cursor() as mpd_cursor:
+                    mpd_cursor.execute("""
+                        SELECT s.category
+                        FROM product_variants pv
+                        JOIN sizes s ON pv.size_id = s.id
+                        WHERE pv.product_id = %s
+                        LIMIT 1
+                    """, [mpd_product_id])
+                    size_cat_result = mpd_cursor.fetchone()
+                    if not size_cat_result or not size_cat_result[0]:
+                        variant_logger.warning(f"[assign_mapping] Nie można ustalić kategorii rozmiarowej dla produktu MPD {mpd_product_id}")
+                        size_category = None
+                    else:
+                        size_category = size_cat_result[0]
+
+                if size_category:
+                    variant_logger.info(f"[assign_mapping] Wywołanie add_new_variants_to_mpd({product_id}, {mpd_product_id}, {size_category}, {producer_color_id}, {producer_code})")
+                    mapping_info = self.add_new_variants_to_mpd(product_id, mpd_product_id, size_category, producer_color_id, producer_code)
+                    variant_logger.info(f"[assign_mapping] Wynik add_new_variants_to_mpd: {mapping_info}")
+                else:
+                    mapping_info = {'error': 'Brak kategorii rozmiarowej w MPD'}
+
+                return JsonResponse({'success': True, 'message': f'Produkt został przypisany do MPD ID {mpd_product_id}.', 'mapping_info': mapping_info})
             except Exception as e:
+                variant_logger.error(f"[assign_mapping] Błąd: {e}")
                 return JsonResponse({'success': False, 'error': str(e)})
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
 
@@ -337,6 +650,9 @@ class ProductsAdmin(admin.ModelAdmin):
         if variants:
             html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
             for variant in variants:
+                is_mapped = variant.is_mapped
+                color = 'green' if is_mapped else 'red'
+                is_mapped_label = f'<span style="color: {color}; font-weight: bold;">{is_mapped}</span>'
                 html += f'''
                     <div style="border: 1px solid #ccc; padding: 10px; border-radius: 5px; min-width: 200px;">
                         <div><strong>Nazwa:</strong> {variant.name or '-'}</div>
@@ -344,7 +660,7 @@ class ProductsAdmin(admin.ModelAdmin):
                         <div><strong>EAN:</strong> {variant.ean or '-'}</div>
                         <div><strong>Czas przetwarzania:</strong> {variant.max_processing_time or '-'}</div>
                         <div><strong>Mapped variant ID:</strong> {variant.mapped_variant_id or '-'}</div>
-                        <div><strong>Is mapped:</strong> {variant.is_mapped or '-'}</div>
+                        <div><strong>Is mapped:</strong> {is_mapped_label}</div>
                     </div>
                 '''
             html += '</div>'
@@ -355,10 +671,6 @@ class ProductsAdmin(admin.ModelAdmin):
     def get_other_colors(self, obj):
         other_colors = obj.other_colors.all()
         if other_colors:
-            # W widoku listy zawsze zwracamy tylko ID
-            if obj._state.adding or not hasattr(obj, '_meta'):
-                return ", ".join([str(color.color_product.id) for color in other_colors if color.color_product])
-            # Dla widoku szczegółów zachowujemy obecną funkcjonalność
             html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
             for color in other_colors:
                 if color.color_product:
@@ -366,13 +678,17 @@ class ProductsAdmin(admin.ModelAdmin):
                     image_html = ''
                     if first_image and first_image.image_path:
                         image_html = f'<a href="{first_image.image_path}" target="_blank" rel="noopener noreferrer"><img src="{first_image.image_path}" style="max-height: 100px; max-width: 100px; margin: 5px; cursor: pointer;" /></a>'
-                    
+                    # Dodaj is_mapped z kolorowaniem
+                    is_mapped = color.color_product.is_mapped
+                    color_val = 'green' if is_mapped else 'red'
+                    is_mapped_label = f'<span style="color: {color_val}; font-weight: bold;">{is_mapped}</span>'
                     html += f'''
                         <div style="border: 1px solid #ccc; padding: 10px; border-radius: 5px; min-width: 200px;">
                             <div style="text-align: center; margin-bottom: 10px;">{image_html}</div>
                             <div><strong>ID:</strong> {color.color_product.id}</div>
                             <div><strong>Nazwa:</strong> {color.color_product.name or '-'}</div>
                             <div><strong>Kolor:</strong> {color.color_product.color or '-'}</div>
+                            <div><strong>Is mapped:</strong> {is_mapped_label}</div>
                             <div style="margin-top: 10px;">
                                 <a href="/admin/matterhorn/products/{color.color_product.id}/change/" class="button" style="background-color: #417690; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;">Zobacz produkt</a>
                             </div>
@@ -389,18 +705,21 @@ class ProductsAdmin(admin.ModelAdmin):
             html = '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
             for product in products_in_set:
                 if product.set_product:
-                    # Pobierz pierwsze zdjęcie produktu
                     first_image = Images.objects.filter(product=product.set_product).first()
                     image_html = ''
                     if first_image and first_image.image_path:
                         image_html = f'<a href="{first_image.image_path}" target="_blank" rel="noopener noreferrer"><img src="{first_image.image_path}" style="max-height: 100px; max-width: 100px; margin: 5px; cursor: pointer;" /></a>'
-                    
+                    # Dodaj is_mapped z kolorowaniem
+                    is_mapped = product.set_product.is_mapped
+                    color_val = 'green' if is_mapped else 'red'
+                    is_mapped_label = f'<span style="color: {color_val}; font-weight: bold;">{is_mapped}</span>'
                     html += f'''
                         <div style="border: 1px solid #ccc; padding: 10px; border-radius: 5px; min-width: 200px;">
                             <div style="text-align: center; margin-bottom: 10px;">{image_html}</div>
                             <div><strong>ID:</strong> {product.set_product.id}</div>
                             <div><strong>Nazwa:</strong> {product.set_product.name or '-'}</div>
                             <div><strong>Kolor:</strong> {product.set_product.color or '-'}</div>
+                            <div><strong>Is mapped:</strong> {is_mapped_label}</div>
                             <div style="margin-top: 10px;">
                                 <a href="/admin/matterhorn/products/{product.set_product.id}/change/" class="button" style="background-color: #417690; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;">Edytuj produkt</a>
                             </div>
@@ -409,7 +728,7 @@ class ProductsAdmin(admin.ModelAdmin):
             html += '</div>'
             return format_html(html)
         return "-"
-    get_product_in_set.short_description = 'Products in Set'
+    get_product_in_set.short_description = 'Products in Series'
 
     def url_link(self, obj):
         if obj.url:
@@ -443,7 +762,7 @@ class ProductsAdmin(admin.ModelAdmin):
         if products_in_set:
             return ", ".join([str(product.set_product.id) for product in products_in_set if product.set_product])
         return "-"
-    get_product_in_set_ids.short_description = 'Products in Set IDs'
+    get_product_in_set_ids.short_description = 'Products in Series IDs'
 
     def get_mpd_data(self, product_id):
         """Pobiera dane produktu z MPD na podstawie mapped_product_id"""
@@ -478,6 +797,20 @@ class ProductsAdmin(admin.ModelAdmin):
         except Exception as e:
             logger.error(f"Błąd pobierania kategorii rozmiarów z MPD: {e}")
             extra_context['size_categories'] = []
+
+        # Pobierz główne kolory i kolory producenta z MPD
+        try:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute("SELECT id, name FROM colors WHERE parent_id IS NULL ORDER BY name")
+                main_colors = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
+                cursor.execute("SELECT id, name, parent_id FROM colors WHERE parent_id IS NOT NULL ORDER BY name")
+                producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]} for row in cursor.fetchall()]
+            extra_context['main_colors'] = main_colors
+            extra_context['producer_colors'] = producer_colors
+        except Exception as e:
+            logger.error(f"Błąd pobierania kolorów z MPD: {e}")
+            extra_context['main_colors'] = []
+            extra_context['producer_colors'] = []
 
         # Dodaj sugerowane produkty z fuzzy search (RapidFuzz po stronie Pythona)
         suggested_products = []
@@ -534,6 +867,13 @@ class ProductsAdmin(admin.ModelAdmin):
             }
         
         return super().change_view(request, object_id, form_url, extra_context)
+
+    def product_thumbnail(self, obj):
+        image = Images.objects.filter(product=obj).first()
+        if image and getattr(image, 'image_path', None):
+            return format_html('<img src="{}" style="max-height:40px; max-width:40px;" />', image.image_path)
+        return "-"
+    product_thumbnail.short_description = "Miniatura"
 
 
 '''@admin.register(ProductsProxy)

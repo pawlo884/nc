@@ -1,0 +1,74 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <h1>Produkty MPD</h1>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nazwa</th>
+                <th>Marka</th>
+                <th>Warianty</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td>{{ product.id }}</td>
+                <td>{{ product.name }}</td>
+                <td>{{ product.get_brand_name }}</td>
+                <td>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Rozmiar</th>
+                                <th>Stan</th>
+                                <th>Cena</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for variant in product.variants %}
+                            <tr>
+                                <td>{{ variant.size_name }}</td>
+                                <td>{{ variant.stock|default:"0" }}</td>
+                                <td>{{ variant.price|default:"0.00" }} PLN</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+.container {
+    padding: 20px;
+}
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+    background-color: transparent;
+    border-collapse: collapse;
+}
+.table th,
+.table td {
+    padding: 0.75rem;
+    vertical-align: top;
+    border-top: 1px solid #dee2e6;
+}
+.table thead th {
+    vertical-align: bottom;
+    border-bottom: 2px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+.table-sm th,
+.table-sm td {
+    padding: 0.3rem;
+}
+</style>
+{% endblock %} 

@@ -115,6 +115,31 @@
         color: #721c24;
         border: 1px solid #f5c6cb;
     }
+
+    .size-table-container {
+        margin-top: 20px;
+        padding: 20px;
+        background-color: #fff;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .size-table-container h3 {
+        margin-bottom: 15px;
+        color: #417690;
+    }
+
+    .variant-mapped {
+        border: 2px solid #28a745 !important;
+        box-shadow: 0 0 8px #28a74533;
+    }
+    .variant-box {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 10px;
+        margin: 10px;
+        background: #fff;
+    }
 </style>
 {% endblock %}
 
@@ -136,17 +161,39 @@
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Nazwa</th>
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Marka</th>
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Podobieństwo</th>
+                            <th style="text-align:left; border-bottom:1px solid #ccc;">Główny kolor</th>
+                            <th style="text-align:left; border-bottom:1px solid #ccc;">Kolor producenta</th>
+                            <th style="text-align:left; border-bottom:1px solid #ccc;">Kod producenta</th>
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Akcja</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for prod in suggested_products %}
+                        {% for product in suggested_products %}
                         <tr>
-                            <td>{{ prod.name }}</td>
-                            <td>{{ prod.brand }}</td>
-                            <td>{{ prod.similarity|floatformat:2 }}</td>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.brand }}</td>
+                            <td>{{ product.similarity }}%</td>
                             <td>
-                                <button type="button" class="assign-mapping-btn" data-mpd-id="{{ prod.id }}">Przypisz do tego produktu</button>
+                                <select class="main-color-select">
+                                    <option value="">-- wybierz kolor --</option>
+                                    {% for color in main_colors %}
+                                    <option value="{{ color.id }}">{{ color.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" class="producer-color-input" list="producer_colors_list" autocomplete="off">
+                                <datalist id="producer_colors_list">
+                                    {% for color in producer_colors %}
+                                    <option value="{{ color.name }}">{{ color.name }}</option>
+                                    {% endfor %}
+                                </datalist>
+                            </td>
+                            <td>
+                                <input type="text" class="producer-code-input" placeholder="Kod producenta">
+                            </td>
+                            <td>
+                                <button type="button" class="assign-mapping-btn" data-mpd-id="{{ product.id }}">Przypisz</button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -174,9 +221,35 @@
                     <select id="mpd_size_category" name="mpd_size_category">
                         <option value="">-- wybierz grupę --</option>
                         {% for cat in size_categories %}
-                            <option value="{{ cat }}">{{ cat }}</option>
+                            <option value="{{ cat }}" {% if mpd_data.size_category == cat %}selected{% endif %}>{{ cat }}</option>
                         {% endfor %}
                     </select>
+                </div>
+                <div class="form-row">
+                    <label for="main_color_id">Główny kolor:</label>
+                    <select id="main_color_id" name="main_color_id">
+                        <option value="">-- wybierz kolor --</option>
+                        {% for color in main_colors %}
+                            <option value="{{ color.id }}" {% if mpd_data.main_color_id == color.id or original.color == color.name %}selected{% endif %}>{{ color.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="producer_color_name">Kolor producenta:</label>
+                    <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off">
+                    <datalist id="producer_colors_list">
+                        {% for color in producer_colors %}
+                            <option value="{{ color.name }}">{{ color.name }}</option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <div class="form-row">
+                    <label for="producer_code">Kod producenta:</label>
+                    <input type="text" id="producer_code" name="producer_code" placeholder="Kod producenta">
+                </div>
+                <div class="form-row">
+                    <label for="series_name">Nazwa serii (opcjonalnie):</label>
+                    <input type="text" id="series_name" name="series_name" placeholder="Nazwa serii">
                 </div>
                 <button type="submit">
                     {% if is_mapped %}Aktualizuj dane MPD{% else %}Utwórz nowy produkt MPD{% endif %}
@@ -187,68 +260,62 @@
     <button class="toggle-button">{% if is_mapped %}◀{% else %}▶{% endif %}</button>
 </div>
 
+<div style="margin: 20px 0;">
+  <span style="font-size: 15px; color: #555;">Variants:</span>
+  <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+    {% for variant in variants %}
+      <div class="variant-box {% if variant.is_mapped %}variant-mapped{% endif %}" style="width: 300px;">
+        <b>Nazwa:</b> {{ variant.name }}<br>
+        <b>Stan:</b> {{ variant.stock }}<br>
+        <b>EAN:</b> {{ variant.ean }}<br>
+        <b>Czas przetwarzania:</b> {{ variant.processing_time|default:'-' }}<br>
+        <b>Mapped variant ID:</b> {{ variant.mapped_variant_id|default:'-' }}<br>
+        <b>Is mapped:</b> <span style="color: {% if variant.is_mapped %}#28a745{% else %}#d9534f{% endif %}; font-weight: bold;">{{ variant.is_mapped|yesno:'True,False' }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const rightColumn = document.querySelector('.right-column');
     const toggleButton = document.querySelector('.toggle-button');
-    const mpdForm = document.getElementById('mpd-form');
-    const statusMessage = document.getElementById('status-message');
+    const rightColumn = document.querySelector('.right-column');
     
     toggleButton.addEventListener('click', function() {
         rightColumn.classList.toggle('collapsed');
-        this.textContent = rightColumn.classList.contains('collapsed') ? '▶' : '◀';
-    });
-    
-    mpdForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(mpdForm);
-        const url = '{% if is_mapped %}{% url "admin:mpd-update" original.id %}{% else %}{% url "admin:mpd-create" original.id %}{% endif %}';
-        
-        fetch(url, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
-            statusMessage.textContent = data.message;
-            
-            if (data.success) {
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            }
-        })
-        .catch(error => {
-            statusMessage.className = 'status-message error';
-            statusMessage.textContent = 'Wystąpił błąd podczas przetwarzania żądania.';
-        });
+        toggleButton.textContent = rightColumn.classList.contains('collapsed') ? '▶' : '◀';
     });
 
     document.querySelectorAll('.assign-mapping-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const mpdId = this.getAttribute('data-mpd-id');
+            const row = this.closest('tr');
+            const mainColorId = row.querySelector('.main-color-select').value;
+            const producerColorName = row.querySelector('.producer-color-input').value;
+            const producerCode = row.querySelector('.producer-code-input').value;
             if (confirm('Czy na pewno chcesz przypisać ten produkt do MPD ID ' + mpdId + '?')) {
+                const formData = new FormData();
+                formData.append('main_color_id', mainColorId);
+                formData.append('producer_color_name', producerColorName);
+                formData.append('producer_code', producerCode);
                 fetch(`/admin/matterhorn/products/assign-mapping/${document.querySelector('[name=product_id]').value}/${mpdId}/`, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    }
+                    },
+                    body: formData
                 })
                 .then(response => response.json())
                 .then(data => {
                     const statusMessage = document.getElementById('status-message');
                     statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
-                    statusMessage.textContent = data.message || data.error;
+                    statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
                     if (data.success) {
                         setTimeout(() => { window.location.reload(); }, 1500);
                     }
                 })
-                .catch(() => {
+                .catch(error => {
+                    console.error('Error:', error);
                     const statusMessage = document.getElementById('status-message');
                     statusMessage.className = 'status-message error';
                     statusMessage.textContent = 'Wystąpił błąd podczas przypisywania produktu.';
@@ -256,6 +323,38 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Dodaj obsługę submit formularza MPD
+    const mpdForm = document.getElementById('mpd-form');
+    if (mpdForm) {
+        mpdForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(mpdForm);
+            const productId = formData.get('product_id');
+            fetch(`/admin/matterhorn/products/mpd-create/${productId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const statusMessage = document.getElementById('status-message');
+                statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+                statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+                if (data.success) {
+                    setTimeout(() => { window.location.reload(); }, 1500);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const statusMessage = document.getElementById('status-message');
+                statusMessage.className = 'status-message error';
+                statusMessage.textContent = 'Wystąpił błąd podczas tworzenia produktu MPD.';
+            });
+        });
+    }
 });
 </script>
 {% endblock %} 

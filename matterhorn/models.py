@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib import admin
 from django import forms
+from django.utils.html import format_html
 
 # Create your models here.
 class Products(models.Model):
@@ -45,13 +46,20 @@ class Products(models.Model):
         variants = self.variants.all()
         return ', '.join(variant.name for variant in variants if variant.name) if variants else ""
 
-    @admin.display(description="Product in set")
+    @admin.display(description="Product in Series")
     def get_product_in_set(self):
         product_in_set = self.product_in_set.all()
         return ', '.join(str(product.set_product.id) for product in product_in_set) if product_in_set else "" 
     
     def __str__(self):
         return self.name or "Unnamed Product"
+
+    def get_size_table_html(self):
+        if self.size_table_html:
+            return format_html(self.size_table_html)
+        return "-"
+    get_size_table_html.short_description = "Tabela rozmiarów"
+    get_size_table_html.allow_tags = True
 
 
 class Images(models.Model):
@@ -81,7 +89,7 @@ class ProductsProxy(Products):
         variants = self.variants.all()
         return ', '.join(variant.name for variant in variants if variant.name) if variants else ""
 
-    @admin.display(description="Product in set")
+    @admin.display(description="Product in Series")
     def get_product_in_set(self):
         product_in_set = self.product_in_set.all()
         return ', '.join(str(product.set_product.id) for product in product_in_set) if product_in_set else ""
@@ -135,7 +143,7 @@ class ProductInSet(models.Model):
     class Meta:
         managed = False
         db_table = 'product_in_set'
-        verbose_name_plural = "Product In Set"
+        verbose_name_plural = "Product in Series"
         unique_together = (('product', 'set_product'),)
         indexes = [
             models.Index(fields=['product']),
