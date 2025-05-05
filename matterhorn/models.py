@@ -52,7 +52,7 @@ class Products(models.Model):
         return ', '.join(str(product.set_product.id) for product in product_in_set) if product_in_set else "" 
     
     def __str__(self):
-        return self.name or "Unnamed Product"
+        return f"{self.id} {self.name}" or "Unnamed Product"
 
     def get_size_table_html(self):
         if self.size_table_html:
