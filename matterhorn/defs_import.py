@@ -458,7 +458,7 @@ def update_inventory_v3():
                         other_colors = item.get("other_colors", [])
                         if other_colors is None:
                             other_colors = []
-                        logger.info(f"other_colors: {other_colors}")
+                        logger.debug(f"other_colors: {other_colors}")
 
                         price = item["prices"].get("PLN", None)
 
@@ -542,7 +542,7 @@ def update_inventory_v3():
                             if color_pid == id:
                                 continue
 
-                            logger.info(f"Przetwarzam powiązanie koloru: product_id={id}, color_product_id={color_pid}")
+                            logger.debug(f"Przetwarzam powiązanie koloru: product_id={id}, color_product_id={color_pid}")
 
                             # sprawdzanie istnienia "id" w tabeli "products"
                             cursor.execute("SELECT 1 FROM products WHERE id = %s", (id,))

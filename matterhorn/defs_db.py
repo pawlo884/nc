@@ -331,15 +331,8 @@ def import_insert_item(conn, item, images_data, variants_data, other_colors, pro
         cursor.executemany(insert_image_query, images_data)
         cursor.executemany(insert_variants_query, variants_data)
 
-        # Upload zdjęć do bucketa i zapis linków do product_images
-        product_id = item[0]
-        mapped_product_id = item[0]
-        for image_tuple in images_data:
-            image_id, image_path, _ = image_tuple
-            print(f"UPLOAD TRY: {image_path}")
-            file_url = upload_image_to_bucket_and_get_url(image_path, mapped_product_id)
-            if file_url:
-                cursor.execute(insert_product_images_query, [mapped_product_id, file_url])
+        # Usuwamy automatyczne przesyłanie zdjęć do S3 podczas importu
+        # Zdjęcia będą przesyłane tylko podczas mapowania produktu
 
         for product_id, color_product_id in other_colors:
             if product_id != color_product_id:
