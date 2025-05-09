@@ -28,11 +28,11 @@ if not variant_logger.handlers:
 class ProductsAdmin(admin.ModelAdmin):
     show_full_result_count = False
     list_per_page = 30
-    fields = ['active', 'name', 'description', 'creation_date', 'color', 'category_name', 'category_path', 'brand', 'url_link', 'new_collection', 'price', 'get_product_images', 'get_variants', 'get_other_colors', 'get_product_in_set', 'get_size_table_html',]
+    fields = ['active', 'name', 'description', 'creation_date', 'color', 'category_name', 'category_path', 'brand', 'url_link', 'new_collection', 'price', 'mapped_product_id', 'get_product_images', 'get_variants', 'get_other_colors', 'get_product_in_set', 'get_size_table_html',]
     list_display = ['id', 'product_thumbnail', 'active', 'name', 'color', 'category_name', 'brand', 'new_collection', 'price', 'timestamp', 'url_link', 'is_mapped', 'mapped_product_id', 'get_variant_names', 'get_other_colors_ids', 'get_product_in_set_ids']
     list_filter = ['active', 'category_name', 'is_mapped']
     readonly_fields = ["active", "name", "description", "creation_date", 'url', 'url_link', "color", "category_name", "category_path", "brand", "new_collection", "size_table", "size_table_txt", "size_table_html", "price", "mapped_product_id", "is_mapped", "get_product_images", "get_variants", "get_other_colors", "get_product_in_set", "get_size_table_html"]
-    search_fields = ['id', 'name', 'brand', 'category_name']
+    search_fields = ['id', 'name', 'brand', 'category_name', 'mapped_product_id']
 
     def get_list_filter(self, request):
         # Pobierz aktualnie wybraną kategorię z parametrów URL
@@ -72,6 +72,7 @@ class ProductsAdmin(admin.ModelAdmin):
             path('mpd-create/<int:product_id>/', self.admin_site.admin_view(self.mpd_create), name='mpd-create'),
             path('assign-mapping/<int:product_id>/<int:mpd_product_id>/', self.admin_site.admin_view(self.assign_mapping), name='assign-mapping'),
             path('add-missing-variants/<int:product_id>/', self.admin_site.admin_view(self.add_missing_variants), name='add-missing-variants'),
+            path('add-to-set/<int:product_id>/', self.admin_site.admin_view(self.add_to_set), name='add-to-set'),
         ]
         return custom_urls + urls
 
@@ -86,11 +87,6 @@ class ProductsAdmin(admin.ModelAdmin):
                         return JsonResponse({'success': False, 'error': 'Produkt nie jest zmapowany'})
                     mapped_product_id = result[0]
 
-                # Sprawdź, czy są już jakiekolwiek warianty w MPD dla tego produktu
-                with connections['MPD'].cursor() as mpd_cursor:
-                    mpd_cursor.execute("SELECT COUNT(*) FROM product_variants WHERE product_id = %s", [mapped_product_id])
-                    variant_count = mpd_cursor.fetchone()[0]
-
                 # Pobierz dane z formularza
                 name = request.POST.get('mpd_name')
                 description = request.POST.get('mpd_description')
@@ -98,24 +94,30 @@ class ProductsAdmin(admin.ModelAdmin):
                 size_category = request.POST.get('mpd_size_category')
                 producer_code = request.POST.get('producer_code')
                 series_name = request.POST.get('series_name')
+                product_set_id = request.POST.get('product_set')
 
-                # Jeśli produkt ma już warianty w MPD, pobierz grupę rozmiarową z istniejącego wariantu
-                if variant_count > 0:
-                    with connections['MPD'].cursor() as mpd_cursor:
-                        mpd_cursor.execute("""
-                            SELECT DISTINCT s.category 
-                            FROM product_variants pv 
-                            JOIN sizes s ON pv.size_id = s.id 
-                            WHERE pv.product_id = %s 
-                            LIMIT 1
-                        """, [mapped_product_id])
-                        size_category_result = mpd_cursor.fetchone()
-                        if size_category_result and size_category_result[0]:
-                            size_category = size_category_result[0]
-                            logger.info(f"Pobrano grupę rozmiarową {size_category} z istniejących wariantów")
-                elif not size_category:
-                    # Tylko jeśli produkt nie ma wariantów, wymagaj wyboru grupy rozmiarowej
-                    return JsonResponse({'success': False, 'error': 'Wybierz grupę rozmiarową przed mapowaniem produktu.'})
+                # Jeśli podano product_set_id, utwórz zestaw i przypisz go do obu produktów
+                if product_set_id:
+                    with connections['MPD'].cursor() as cursor:
+                        # Sprawdź czy produkt o podanym ID istnieje
+                        cursor.execute("SELECT id FROM products WHERE id = %s", [product_set_id])
+                        if not cursor.fetchone():
+                            return JsonResponse({'success': False, 'error': f'Produkt o ID {product_set_id} nie istnieje w bazie MPD'})
+                        
+                        # Utwórz nowy zestaw
+                        cursor.execute("""
+                            INSERT INTO product_set (name, description, mapped_product_id)
+                            VALUES (%s, %s, %s)
+                            RETURNING id
+                        """, [f"Zestaw {name}", f"Zestaw zawierający {name}", mapped_product_id])
+                        new_set_id = cursor.fetchone()[0]
+                        
+                        # Przypisz zestaw do obu produktów
+                        cursor.execute("""
+                            UPDATE products 
+                            SET product_set_id = %s
+                            WHERE id IN (%s, %s)
+                        """, [new_set_id, mapped_product_id, product_set_id])
 
                 # Pobierz brand_id z MPD
                 with connections['MPD'].cursor() as mpd_cursor:
@@ -144,109 +146,23 @@ class ProductsAdmin(admin.ModelAdmin):
                     params.append(mapped_product_id)
                     mpd_cursor.execute(update_query, params)
 
-                    # Prześlij zdjęcia do bucketu i zaktualizuj ścieżki
-                    with connections['matterhorn'].cursor() as matterhorn_cursor:
-                        matterhorn_cursor.execute("""
-                            SELECT image_path FROM images WHERE product_id = %s
-                        """, [product_id])
-                        images = matterhorn_cursor.fetchall()
-                        
-                        for image_path in images:
-                            if image_path[0]:
-                                from matterhorn.defs_db import upload_image_to_bucket_and_get_url
-                                new_image_path = upload_image_to_bucket_and_get_url(image_path[0], mapped_product_id)
-                                if new_image_path:
-                                    mpd_cursor.execute("""
-                                        INSERT INTO product_images (product_id, file_path)
-                                        VALUES (%s, %s)
-                                        ON CONFLICT (product_id, file_path) DO NOTHING
-                                    """, [mapped_product_id, new_image_path])
-
-                    # Dodaj nowe warianty do MPD
-                    with connections['matterhorn'].cursor() as matterhorn_cursor:
-                        matterhorn_cursor.execute("""
-                            SELECT name, stock, ean, variant_uid 
-                            FROM variants 
-                            WHERE product_id = %s AND mapped_variant_id IS NULL
-                        """, [product_id])
-                        variants = matterhorn_cursor.fetchall()
-                        if not variants:
-                            return JsonResponse({'success': True, 'message': 'Brak nowych wariantów do dodania.'})
-                        
-                        # Pobierz kolor i cenę produktu
-                        matterhorn_cursor.execute("SELECT color, price FROM products WHERE id = %s", [product_id])
-                        color_result = matterhorn_cursor.fetchone()
-                        if not color_result:
-                            return JsonResponse({'success': False, 'error': 'Brak koloru dla produktu'})
-                        product_color, product_price = color_result
-
-                        # Pobierz ID koloru w MPD
-                        mpd_cursor.execute("SELECT id FROM colors WHERE name = %s", [product_color])
-                        color_result = mpd_cursor.fetchone()
-                        if not color_result:
-                            return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
-                        color_id = color_result[0]
-
-                        # Pobierz producer_color_id i producer_code z istniejących wariantów
-                        mpd_cursor.execute("""
-                            SELECT producer_color_id, producer_code 
-                            FROM product_variants 
-                            WHERE product_id = %s 
-                            AND producer_color_id IS NOT NULL 
-                            AND producer_code IS NOT NULL 
-                            LIMIT 1
-                        """, [mapped_product_id])
-                        pcid_result = mpd_cursor.fetchone()
-                        producer_color_id = pcid_result[0] if pcid_result else None
-                        producer_code_db = pcid_result[1] if pcid_result else None
-
-                        # Dodaj nowe warianty
-                        for size_name, stock, ean, variant_uid in variants:
-                            mpd_cursor.execute("""
-                                SELECT id FROM sizes 
-                                WHERE UPPER(name) = UPPER(%s) 
-                                AND category = %s
-                            """, [size_name, size_category])
-                            size_result = mpd_cursor.fetchone()
-                            if not size_result:
-                                continue
-                            size_id = size_result[0]
-
-                            # Pobierz następny variant_id
-                            mpd_cursor.execute("SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
-                            variant_id = mpd_cursor.fetchone()[0]
-
-                            # Sprawdź czy rekord już istnieje
-                            mpd_cursor.execute("""
-                                SELECT variant_id FROM stock_and_prices 
-                                WHERE variant_id = %s AND source_id = %s
-                            """, [variant_id, 2])
-                            existing_record = mpd_cursor.fetchone()
-
-                            if existing_record:
-                                # Aktualizuj istniejący rekord
+                # Prześlij zdjęcia do bucketu i zaktualizuj ścieżki
+                with connections['matterhorn'].cursor() as matterhorn_cursor:
+                    matterhorn_cursor.execute("""
+                        SELECT image_path FROM images WHERE product_id = %s
+                    """, [product_id])
+                    images = matterhorn_cursor.fetchall()
+                    
+                    for image_path in images:
+                        if image_path[0]:
+                            from matterhorn.defs_db import upload_image_to_bucket_and_get_url
+                            new_image_path = upload_image_to_bucket_and_get_url(image_path[0], mapped_product_id)
+                            if new_image_path:
                                 mpd_cursor.execute("""
-                                    UPDATE stock_and_prices 
-                                    SET stock = %s, price = %s, currency = 'PLN'
-                                    WHERE variant_id = %s AND source_id = %s
-                                """, [stock, product_price, variant_id, 2])
-                            else:
-                                # Dodaj nowy rekord
-                                mpd_cursor.execute("""
-                                    INSERT INTO stock_and_prices 
-                                    (variant_id, source_id, stock, price, currency)
-                                    VALUES (%s, %s, %s, %s, 'PLN')
-                                """, [variant_id, 2, stock, product_price])
-
-                            # Zaktualizuj informacje o wariancie w Matterhorn
-                            with connections['matterhorn'].cursor() as matterhorn_cursor2:
-                                matterhorn_cursor2.execute("""
-                                    UPDATE variants 
-                                    SET mapped_variant_id = %s,
-                                        is_mapped = true,
-                                        last_updated = NOW()
-                                    WHERE variant_uid = %s
-                                """, [variant_id, variant_uid])
+                                    INSERT INTO product_images (product_id, file_path)
+                                    VALUES (%s, %s)
+                                    ON CONFLICT (product_id, file_path) DO NOTHING
+                                """, [mapped_product_id, new_image_path])
 
                 connections['matterhorn'].commit()
                 connections['MPD'].commit()
@@ -401,7 +317,8 @@ class ProductsAdmin(admin.ModelAdmin):
                 producer_code = request.POST.get('producer_code')
                 series_name = request.POST.get('series_name')
                 producer_color_name = request.POST.get('producer_color_name')
-                variant_logger.info(f"[mpd_create] POST data: name={name}, description={description}, brand={brand}, size_category={size_category}, main_color_id={main_color_id}, producer_code={producer_code}, series_name={series_name}, producer_color_name={producer_color_name}")
+                product_set_id = request.POST.get('product_set')
+                variant_logger.info(f"[mpd_create] POST data: name={name}, description={description}, brand={brand}, size_category={size_category}, main_color_id={main_color_id}, producer_code={producer_code}, series_name={series_name}, producer_color_name={producer_color_name}, product_set_id={product_set_id}")
 
                 if not size_category:
                     variant_logger.warning(f"[mpd_create] Brak wybranej grupy rozmiarowej dla produktu {product_id}")
@@ -465,6 +382,32 @@ class ProductsAdmin(admin.ModelAdmin):
                         """, [name, description, brand_id, series_id])
                         new_product_id = cursor.fetchone()[0]
                         logger.info(f"Utworzono nowy produkt w MPD z ID {new_product_id}")
+
+                        # --- LOGIKA ZESTAWÓW (wiele-do-wielu) ---
+                        if product_set_id:
+                            # Sprawdź czy produkt o podanym ID istnieje
+                            cursor.execute("SELECT id FROM products WHERE id = %s", [product_set_id])
+                            if not cursor.fetchone():
+                                return JsonResponse({'success': False, 'error': f'Produkt o ID {product_set_id} nie istnieje w bazie MPD'})
+                            # Utwórz nowy zestaw
+                            cursor.execute("""
+                                INSERT INTO product_set (name, description, mapped_product_id)
+                                VALUES (%s, %s, %s)
+                                RETURNING id
+                            """, [f"Zestaw {name}", f"Zestaw zawierający {name}", new_product_id])
+                            new_set_id = cursor.fetchone()[0]
+                            # Dodaj oba produkty do tabeli pośredniej
+                            cursor.execute("""
+                                INSERT INTO product_set_items (product_set_id, product_id)
+                                VALUES (%s, %s)
+                                ON CONFLICT DO NOTHING
+                            """, [new_set_id, new_product_id])
+                            cursor.execute("""
+                                INSERT INTO product_set_items (product_set_id, product_id)
+                                VALUES (%s, %s)
+                                ON CONFLICT DO NOTHING
+                            """, [new_set_id, product_set_id])
+                        # --- KONIEC LOGIKI ZESTAWÓW ---
 
                         # Prześlij zdjęcia do bucketu i zaktualizuj ścieżki
                         with connections['matterhorn'].cursor() as matterhorn_cursor:
@@ -863,6 +806,32 @@ class ProductsAdmin(admin.ModelAdmin):
             extra_context['main_colors'] = []
             extra_context['producer_colors'] = []
 
+        # Pobierz listę zestawów powiązanych z produktem w MPD
+        product_sets = []
+        mapped_id = getattr(product, 'mapped_product_id', None)
+        if mapped_id:
+            with connections['MPD'].cursor() as cursor:
+                # Najpierw pobierz ID zestawów, do których należy produkt
+                cursor.execute('''
+                    SELECT psi.product_set_id
+                    FROM product_set_items psi
+                    WHERE psi.product_id = %s
+                ''', [mapped_id])
+                set_ids = [row[0] for row in cursor.fetchall()]
+                if set_ids:
+                    # Pobierz wszystkie produkty z tych zestawów
+                    format_strings = ','.join(['%s'] * len(set_ids))
+                    cursor.execute(f'''
+                        SELECT ps.id, ps.name, array_agg(psi.product_id)
+                        FROM product_set ps
+                        JOIN product_set_items psi ON psi.product_set_id = ps.id
+                        WHERE ps.id IN ({format_strings})
+                        GROUP BY ps.id, ps.name
+                    ''', set_ids)
+                    for row in cursor.fetchall():
+                        product_sets.append({'id': row[0], 'name': row[1], 'items': list(row[2])})
+        extra_context['product_sets'] = product_sets
+
         # Dodaj sugerowane produkty z fuzzy search (RapidFuzz po stronie Pythona)
         suggested_products = []
         if product:
@@ -1031,6 +1000,57 @@ class ProductsAdmin(admin.ModelAdmin):
                 logger.error(f"Błąd podczas dodawania brakujących wariantów produktu {product_id}: {str(e)}")
                 return JsonResponse({'success': False, 'error': str(e)})
 
+        return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
+
+    def add_to_set(self, request, product_id):
+        if request.method == 'POST':
+            try:
+                # Pobierz mapped_product_id dla aktualnego produktu
+                with connections['matterhorn'].cursor() as mh_cursor:
+                    mh_cursor.execute("SELECT mapped_product_id FROM products WHERE id = %s", [product_id])
+                    row = mh_cursor.fetchone()
+                    if not row or not row[0]:
+                        return JsonResponse({'success': False, 'error': f'Produkt (Matterhorn) o ID {product_id} nie jest zmapowany do MPD.'})
+                    mpd_product_id = row[0]
+                related_product_id = request.POST.get('related_product_id')
+                set_name = request.POST.get('set_name') or f'Zestaw {mpd_product_id} + {related_product_id}'
+                if not related_product_id:
+                    return JsonResponse({'success': False, 'error': 'Nie podano ID produktu do powiązania.'})
+                # Jeśli podano ID z Matterhorna, pobierz mapped_product_id
+                with connections['matterhorn'].cursor() as mh_cursor:
+                    mh_cursor.execute("SELECT mapped_product_id FROM products WHERE id = %s", [related_product_id])
+                    row = mh_cursor.fetchone()
+                    if row and row[0]:
+                        related_product_id = row[0]
+                with connections['MPD'].cursor() as cursor:
+                    # Sprawdź czy oba produkty istnieją w MPD
+                    cursor.execute("SELECT id FROM products WHERE id = %s", [related_product_id])
+                    if not cursor.fetchone():
+                        return JsonResponse({'success': False, 'error': f'Produkt o ID {related_product_id} nie istnieje w MPD.'})
+                    cursor.execute("SELECT id FROM products WHERE id = %s", [mpd_product_id])
+                    if not cursor.fetchone():
+                        return JsonResponse({'success': False, 'error': f'Produkt o ID {mpd_product_id} nie istnieje w MPD.'})
+                    # Utwórz nowy zestaw
+                    cursor.execute("""
+                        INSERT INTO product_set (name, description, mapped_product_id)
+                        VALUES (%s, %s, %s)
+                        RETURNING id
+                    """, [set_name, f'Zestaw: {set_name}', mpd_product_id])
+                    new_set_id = cursor.fetchone()[0]
+                    # Dodaj oba produkty do tabeli pośredniej
+                    cursor.execute("""
+                        INSERT INTO product_set_items (product_set_id, product_id)
+                        VALUES (%s, %s)
+                        ON CONFLICT DO NOTHING
+                    """, [new_set_id, mpd_product_id])
+                    cursor.execute("""
+                        INSERT INTO product_set_items (product_set_id, product_id)
+                        VALUES (%s, %s)
+                        ON CONFLICT DO NOTHING
+                    """, [new_set_id, related_product_id])
+                return JsonResponse({'success': True, 'message': 'Produkty zostały powiązane w nowym zestawie.'})
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': str(e)})
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
 
 

@@ -23,6 +23,7 @@
                     <table class="table table-sm">
                         <thead>
                             <tr>
+                                <th>Kolor</th>
                                 <th>Rozmiar</th>
                                 <th>Stan</th>
                                 <th>Cena</th>
@@ -31,7 +32,17 @@
                         <tbody>
                             {% for variant in product.variants %}
                             <tr>
-                                <td>{{ variant.size_name }}</td>
+                                <td>
+                                    {% if variant.color_name %}
+                                    <div class="color-info">
+                                        <span class="color-dot" style="background-color: {{ variant.hex_code|default:'#ccc' }}"></span>
+                                        {{ variant.color_name }}
+                                    </div>
+                                    {% else %}
+                                    Brak koloru
+                                    {% endif %}
+                                </td>
+                                <td>{{ variant.size_name|default:"Brak rozmiaru" }}</td>
                                 <td>{{ variant.stock|default:"0" }}</td>
                                 <td>{{ variant.price|default:"0.00" }} PLN</td>
                             </tr>
@@ -69,6 +80,18 @@
 .table-sm th,
 .table-sm td {
     padding: 0.3rem;
+}
+.color-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.color-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 1px solid #ddd;
 }
 </style>
 {% endblock %} 

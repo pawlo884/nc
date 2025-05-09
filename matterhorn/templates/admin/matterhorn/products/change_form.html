@@ -283,6 +283,23 @@
                     <label for="series_name">Nazwa serii (opcjonalnie):</label>
                     <input type="text" id="series_name" name="series_name" placeholder="Nazwa serii">
                 </div>
+                <div class="form-row" style="margin-bottom: 10px;">
+                    <b>ID w MPD:</b> {{ original.mapped_product_id|default:'-' }}
+                    <pre style="font-size:12px; color:#888;">DEBUG: {{ product_sets|safe }}</pre>
+                    {% if original.mapped_product_id and product_sets %}
+                        {% with mpd_id=original.mapped_product_id %}
+                            {% for set in product_sets %}
+                                {% if set.items|length > 1 and mpd_id in set.items %}
+                                    <br><span style="font-size: 13px; color: #417690;">W zestawie z:
+                                        {% for pid in set.items %}
+                                            {% if pid != mpd_id %}{{ pid }} {% endif %}
+                                        {% endfor %}
+                                    </span>
+                                {% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    {% endif %}
+                </div>
                 <div class="form-row" style="display: flex; gap: 10px; align-items: center;">
                     <button type="submit">
                         {% if is_mapped %}Aktualizuj dane MPD{% else %}Utwórz nowy produkt MPD{% endif %}
@@ -292,6 +309,9 @@
                             Dodaj brakujące warianty
                         </button>
                     {% endif %}
+                    <input type="number" name="related_product_id" id="related_product_id_inline" placeholder="ID produktu z MPD (mapped_product_id) do powiązania" style="width: 220px; margin-left: 10px;" />
+                    <input type="text" name="set_name" id="set_name_inline" placeholder="Nazwa zestawu" style="width: 180px; margin-left: 10px;" />
+                    <button type="button" class="button" style="margin-left: 0;" onclick="addToSetInline({{ original.id }})">Dodaj do zestawu</button>
                 </div>
                 <div id="add-missing-variants-status" class="mt-2"></div>
             </form>
@@ -435,5 +455,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+function addToSetInline(productId) {
+    const relatedProductId = document.getElementById('related_product_id_inline').value;
+    const setName = document.getElementById('set_name_inline').value;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    fetch(`/admin/matterhorn/products/add-to-set/${productId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `related_product_id=${relatedProductId}&set_name=${encodeURIComponent(setName)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.success ? data.message : data.error);
+        if(data.success) location.reload();
+    });
+}
 </script>
 {% endblock %} 
