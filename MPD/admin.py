@@ -1,7 +1,8 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, ProductSeries
+from django.db import connections
 # Register your models here.
 
 
@@ -9,29 +10,45 @@ from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSe
 class ProductsAdmin(admin.ModelAdmin):
     show_full_result_count = False
     list_per_page = 30
-    fields = ['name', 'description', 'brand', 'show_variants', 'show_images']
+    fields = ['name', 'description', 'brand', 'show_variants',
+              'show_images', 'show_related_products']
     list_display = ['id', 'name', 'description', 'brand', 'updated_at']
     list_filter = ['brand']
     search_fields = ['id', 'name', 'description', 'brand__name']
-    readonly_fields = ['show_variants', 'show_images']
+    readonly_fields = ['show_variants', 'show_images', 'show_related_products']
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
 
+    @admin.display(description="Warianty produktu")
     def show_variants(self, obj):
-        variants = obj.productvariants_set.all()
+        variants = ProductVariants.objects.filter(product=obj)
         if not variants:
             return "Brak wariantów"
         html = "<table style='border-collapse:collapse;'>"
-        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
+        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
         for v in variants:
             size_name = v.size.name if v.size else ""
-            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{v.color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size_name}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{v.total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{v.ean}</td></tr>"
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute("""
+                    SELECT s.name, SUM(sp.stock) as total_stock
+                    FROM stock_and_prices sp
+                    JOIN sources s ON sp.source_id = s.id
+                    WHERE sp.variant_id = %s
+                    GROUP BY s.name
+                """, [v.variant_id])
+                stock_data = cursor.fetchall()
+            total_stock = sum([row[1]
+                              for row in stock_data]) if stock_data else 0
+            sources_str = ", ".join(
+                [f"{row[0]}: {row[1]}" for row in stock_data]) if stock_data else "-"
+            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{v.color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size_name}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{v.ean}</td></tr>"
         html += "</table>"
         return mark_safe(html)
 
+    @admin.display(description="Zdjęcia produktu")
     def show_images(self, obj):
-        images = obj.images.all()
+        images = obj.images.all() if hasattr(obj, 'images') else []
         if not images:
             return "Brak zdjęć"
         html = ""
@@ -39,7 +56,64 @@ class ProductsAdmin(admin.ModelAdmin):
             url = img.file_path
             html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
         return format_html(html)
-    show_images.short_description = "Zdjęcia produktu"
+
+    @admin.display(description="Powiązane produkty")
+    def show_related_products(self, obj):
+        html = ""
+        # Zestawy, do których należy ten produkt
+        set_items = list(ProductSetItem.objects.filter(product_id=obj.id))
+        set_ids = [si.product_set_id for si in set_items]
+        if set_items:
+            html += "<b>Zestawy, do których należy ten produkt:</b>"
+            for set_id in set_ids:
+                try:
+                    set_obj = ProductSet.objects.get(id=set_id)
+                    set_products = ProductSetItem.objects.filter(
+                        product_set_id=set_id).exclude(product_id=obj.id)
+                    html += f"<div style='margin-bottom:8px;'><span style='font-weight:600;'>Zestaw: {set_obj.name} (ID: {set_obj.id})</span></div>"
+                    html += "<div style='display:flex; flex-direction:row; flex-wrap:wrap; gap:24px; align-items:flex-start; margin-bottom:16px; width:100%;'>"
+                    for sp in set_products:
+                        try:
+                            prod = Products.objects.get(id=sp.product_id)
+                            admin_url = f"/admin/MPD/products/{prod.id}/change/"
+                            img_html = ""
+                            images_rel = getattr(prod, 'images', None)
+                            first_img = images_rel.first() if images_rel and hasattr(
+                                images_rel, 'first') else None
+                            if first_img:
+                                img_html = f'<a href="{admin_url}"><img src="{first_img.file_path}" style="max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;" /></a>'
+                            name_html = f'<a href="{admin_url}" style="vertical-align:middle;">{prod.name}</a>'
+                            html += f"<div style='display:flex; align-items:center; gap:8px;'>{img_html}{name_html}</div>"
+                        except Exception as e:
+                            html += f"<div>Błąd pobierania produktu {sp.product_id}: {e}</div>"
+                    html += "</div>"
+                except Exception as e:
+                    html += f"<div>Błąd pobierania zestawu {set_id}: {e}</div>"
+        # Produkty z tej samej serii
+        series = getattr(obj, 'series', None)
+        series_products = []
+        series_name = ""
+        if series:
+            series_name = series.name
+            series_products = list(Products.objects.filter(
+                series=series).exclude(id=obj.id))
+        if series and series_products:
+            html += f"<b>Produkty z tej samej serii ({series_name}):</b>"
+            html += "<div style='display:flex; flex-direction:row; gap:24px; align-items:flex-start; margin-bottom:8px;'>"
+            for p in series_products:
+                admin_url = f"/admin/MPD/products/{p.id}/change/"
+                img_html = ""
+                images_rel = getattr(p, 'images', None)
+                first_img = images_rel.first() if images_rel and hasattr(
+                    images_rel, 'first') else None
+                if first_img:
+                    img_html = f'<a href=\"{admin_url}\"><img src=\"{first_img.file_path}\" style=\"max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;\" /></a>'
+                name_html = f'<a href=\"{admin_url}\" style=\"vertical-align:middle;\">{p.name}</a>'
+                html += f"<div style='display:flex; align-items:center; gap:8px;'>{img_html}{name_html}</div>"
+            html += "</div>"
+        if not html:
+            html = "Brak powiązanych produktów"
+        return mark_safe(html)
 
 
 @admin.register(Brands)
@@ -61,14 +135,16 @@ class SizesAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
 
+
 @admin.register(Sources)
 class SourceAdmin(admin.ModelAdmin):
-    fields = ['name', 'location','type']
-    list_display = ['id', 'name', 'location','type']
+    fields = ['name', 'location', 'type']
+    list_display = ['id', 'name', 'location', 'type']
     search_fields = ['name']
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
+
 
 @admin.register(ProductSet)
 class ProductSetAdmin(admin.ModelAdmin):
@@ -77,9 +153,10 @@ class ProductSetAdmin(admin.ModelAdmin):
     list_filter = ('created_at', 'updated_at')
     raw_id_fields = ('mapped_product',)
 
+
 @admin.register(ProductSetItem)
 class ProductSetItemAdmin(admin.ModelAdmin):
-    list_display = (  'quantity', 'created_at')
+    list_display = ('quantity', 'created_at')
     # search_fields = ('')
     list_filter = ('created_at',)
-    #raw_id_fields = ('set', 'mapped_product',)
+    # raw_id_fields = ('set', 'mapped_product',)

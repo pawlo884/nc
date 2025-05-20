@@ -181,6 +181,7 @@
     <div class="column right-column {% if not is_mapped %}collapsed{% endif %}">
         <div class="mpd-form">
             <h2>Dane MPD</h2>
+            <div id="inline-status-message" class="status-message" style="display:none;"></div>
             <div id="status-message"></div>
             {% if not is_mapped and suggested_products %}
             <div class="form-row" style="margin-bottom:30px;">
@@ -237,14 +238,17 @@
                 <div class="form-row">
                     <label for="mpd_name">Nazwa:</label>
                     <input type="text" id="mpd_name" name="mpd_name" value="{{ mpd_data.name }}">
+                    <button type="button" onclick="updateField('name', 'mpd_name')">Zapisz</button>
                 </div>
                 <div class="form-row">
                     <label for="mpd_description">Opis:</label>
                     <textarea id="mpd_description" name="mpd_description">{{ mpd_data.description }}</textarea>
+                    <button type="button" onclick="updateField('description', 'mpd_description')">Zapisz</button>
                 </div>
                 <div class="form-row">
                     <label for="mpd_brand">Marka:</label>
                     <input type="text" id="mpd_brand" name="mpd_brand" value="{{ mpd_data.brand }}">
+                    <button type="button" onclick="updateField('brand_id', 'mpd_brand')">Zapisz</button>
                 </div>
                 {% if not is_mapped or not mpd_data.has_variants %}
                 <div class="form-row">
@@ -265,10 +269,12 @@
                             <option value="{{ color.id }}" {% if mpd_data.main_color_id == color.id or original.color == color.name %}selected{% endif %}>{{ color.name }}</option>
                         {% endfor %}
                     </select>
+                    <button type="button" onclick="updateField('color_id', 'main_color_id')">Zapisz</button>
                 </div>
                 <div class="form-row">
                     <label for="producer_color_name">Kolor producenta:</label>
-                    <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off">
+                    <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off" value="{{ producer_color_name }}" placeholder="Kolor producenta">
+                    <button type="button" onclick="updateField('producer_color_id', 'producer_color_name')">Zapisz</button>
                     <datalist id="producer_colors_list">
                         {% for color in producer_colors %}
                             <option value="{{ color.name }}">{{ color.name }}</option>
@@ -277,11 +283,13 @@
                 </div>
                 <div class="form-row">
                     <label for="producer_code">Kod producenta:</label>
-                    <input type="text" id="producer_code" name="producer_code" placeholder="Kod producenta">
+                    <input type="text" id="producer_code" name="producer_code" value="{{ producer_code }}" placeholder="Kod producenta">
+                    <button type="button" onclick="updateField('producer_code', 'producer_code')">Zapisz</button>
                 </div>
                 <div class="form-row">
                     <label for="series_name">Nazwa serii (opcjonalnie):</label>
-                    <input type="text" id="series_name" name="series_name" placeholder="Nazwa serii">
+                    <input type="text" id="series_name" name="series_name" value="{{ series_name }}" placeholder="Nazwa serii">
+                    <button type="button" onclick="updateField('series_id', 'series_name')">Zapisz</button>
                 </div>
                 <div class="form-row" style="margin-bottom: 10px;">
                     <b>ID w MPD:</b> {{ original.mapped_product_id|default:'-' }}
@@ -301,9 +309,6 @@
                     {% endif %}
                 </div>
                 <div class="form-row" style="display: flex; gap: 10px; align-items: center;">
-                    <button type="submit">
-                        {% if is_mapped %}Aktualizuj dane MPD{% else %}Utwórz nowy produkt MPD{% endif %}
-                    </button>
                     {% if is_mapped %}
                         <button type="button" class="btn btn-primary" id="add-missing-variants-btn">
                             Dodaj brakujące warianty
@@ -315,6 +320,9 @@
                 </div>
                 <div id="add-missing-variants-status" class="mt-2"></div>
             </form>
+            {% if not is_mapped %}
+            <button type="button" id="create-mpd-product-btn" class="mpd-form-btn" style="margin-top:20px; background:#417690; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Utwórz nowy produkt w MPD</button>
+            {% endif %}
         </div>
     </div>
     <button class="toggle-button">{% if is_mapped %}◀{% else %}▶{% endif %}</button>
@@ -454,6 +462,31 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    // Dodaj obsługę przycisku "Utwórz nowy produkt w MPD"
+    const createBtn = document.getElementById('create-mpd-product-btn');
+    if (createBtn) {
+        createBtn.addEventListener('click', function() {
+            const productId = {{ original.id }};
+            const formData = new FormData(document.getElementById('mpd-form'));
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.className = 'status-message';
+            statusMessage.textContent = 'Tworzenie produktu w MPD...';
+            fetch(`/admin/matterhorn/products/mpd-create/${productId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+                statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+                if (data.success) setTimeout(() => { window.location.reload(); }, 1500);
+            });
+        });
+    }
 });
 
 function addToSetInline(productId) {
@@ -473,6 +506,35 @@ function addToSetInline(productId) {
         alert(data.success ? data.message : data.error);
         if(data.success) location.reload();
     });
+}
+
+function updateField(field, inputId) {
+    const value = document.getElementById(inputId).value;
+    const productId = {{ original.mapped_product_id|default:'null' }};
+    if (!productId) {
+        showInlineStatus('Brak mapped_product_id!', false);
+        return;
+    }
+    fetch(`/admin/matterhorn/products/mpd-update-field/${productId}/${field}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ value: value })
+    })
+    .then(response => response.json())
+    .then(data => {
+        showInlineStatus(data.success ? 'Zaktualizowano!' : 'Błąd: ' + data.error, data.success);
+    });
+}
+
+function showInlineStatus(msg, success) {
+    const el = document.getElementById('inline-status-message');
+    el.textContent = msg;
+    el.className = 'status-message ' + (success ? 'success' : 'error');
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 2500);
 }
 </script>
 {% endblock %} 

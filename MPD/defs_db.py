@@ -160,7 +160,6 @@ def create_tables_if_not_exist(conn):
             source_id INT NOT NULL DEFAULT 2,
             color_id INT,
             size_id BIGINT,
-            total_stock INT DEFAULT 0,
             ean VARCHAR(50),
             variant_uid INT,
             FOREIGN KEY (color_id) REFERENCES colors(id) ON DELETE CASCADE,

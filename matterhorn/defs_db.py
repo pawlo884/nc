@@ -5,16 +5,18 @@ from dotenv import load_dotenv
 import boto3
 import logging
 import requests
-import tempfile
 from django.db import connections
 
 logger = logging.getLogger(__name__)
 
 # Połączenie z bazą danych
+
+
 def connect_to_postgresql(db_key):
 
     try:
-        is_production = os.getenv("DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
+        is_production = os.getenv(
+            "DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
 
         env_file = '.env.prod' if is_production else '.env.dev'
 
@@ -27,7 +29,8 @@ def connect_to_postgresql(db_key):
         db_port = os.getenv("MATTERHORN_DB_PORT")
 
         if not all([db_name, db_user, db_password, db_host, db_port]):
-            raise ValueError(f"Brak wymaganych zmiennych środowiskowych w pliku {env_file}")
+            raise ValueError(
+                f"Brak wymaganych zmiennych środowiskowych w pliku {env_file}")
 
         conn = psycopg2.connect(
             dbname=db_name,
@@ -36,14 +39,17 @@ def connect_to_postgresql(db_key):
             host=db_host,
             port=db_port,)
 
-        print(f"Połączono z bazą danych {db_name} na hoście {db_host} (środowisko: {'produkcja' if is_production else 'development'})")
+        print(
+            f"Połączono z bazą danych {db_name} na hoście {db_host} (środowisko: {'produkcja' if is_production else 'development'})")
         return conn
-        
+
     except Exception as e:
         print(f"Błąd podczas łączenia z bazą danych: {e}")
-        raise  
-  
+        raise
+
 # Tworzenie tabel jeśli nie istnieją
+
+
 def create_tables_if_not_exist(conn):
     cursor = conn.cursor()
 
@@ -149,7 +155,7 @@ def create_tables_if_not_exist(conn):
     cursor.execute(create_other_colors_table_query)
     cursor.execute(create_product_in_set_table_query)
     cursor.execute(create_update_log_table_query)
-    
+
     # Dodanie ograniczenia UNIQUE do tabeli product_in_set jeśli nie istnieje
     cursor.execute("""
         DO $$ 
@@ -164,9 +170,10 @@ def create_tables_if_not_exist(conn):
             END IF;
         END $$;
     """)
-    
+
     conn.commit()
     cursor.close()
+
 
 load_dotenv('.env.dev')
 
@@ -178,20 +185,29 @@ DO_SPACES_SECRET = os.getenv('DO_SPACES_SECRET')
 
 # Inicjalizacja klienta S3
 s3_client = boto3.client('s3',
-    region_name=DO_SPACES_REGION,
-    endpoint_url=f'https://{DO_SPACES_REGION}.digitaloceanspaces.com',
-    aws_access_key_id=DO_SPACES_ACCESS_KEY_ID,
-    aws_secret_access_key=DO_SPACES_SECRET
-)
+                         region_name=DO_SPACES_REGION,
+                         endpoint_url=f'https://{DO_SPACES_REGION}.digitaloceanspaces.com',
+                         aws_access_key_id=DO_SPACES_ACCESS_KEY_ID,
+                         aws_secret_access_key=DO_SPACES_SECRET
+                         )
+
 
 def upload_image_to_bucket_and_get_url(image_path, product_id):
     try:
-        logger.info(f"Rozpoczynam przesyłanie zdjęcia: {image_path} dla produktu {product_id}")
-        
+        logger.info(
+            f"Rozpoczynam przesyłanie zdjęcia: {image_path} dla produktu {product_id}")
+
+        # Sprawdź środowisko
+        is_production = os.getenv(
+            "DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
+        bucket_folder = "MPD" if is_production else "MPD_test"
+        logger.info(
+            f"Środowisko: {'produkcyjne' if is_production else 'testowe'}, folder: {bucket_folder}")
+
         # Pobierz rozszerzenie pliku
         file_extension = os.path.splitext(image_path)[1].lower()
         logger.info(f"Rozszerzenie pliku: {file_extension}")
-        
+
         # Sprawdź czy rozszerzenie jest dozwolone
         if file_extension not in ['.jpg', '.jpeg', '.png']:
             logger.error(f"Nieprawidłowe rozszerzenie pliku: {file_extension}")
@@ -204,11 +220,12 @@ def upload_image_to_bucket_and_get_url(image_path, product_id):
             """, [product_id])
             result = cursor.fetchone()
             image_count = result[0] if result else 0
-            logger.info(f"Liczba istniejących zdjęć dla produktu {product_id}: {image_count}")
+            logger.info(
+                f"Liczba istniejących zdjęć dla produktu {product_id}: {image_count}")
 
         # Utwórz nową nazwę pliku z numerem
         new_filename = f"{image_count + 1}{file_extension}"
-        new_path = f"MPD/{product_id}/{new_filename}"
+        new_path = f"{bucket_folder}/{product_id}/{new_filename}"
         logger.info(f"Nowa nazwa pliku: {new_filename}, ścieżka: {new_path}")
 
         # Pobierz plik z lokalnej ścieżki lub URL-a
@@ -217,12 +234,15 @@ def upload_image_to_bucket_and_get_url(image_path, product_id):
             try:
                 response = requests.get(image_path, stream=True, timeout=10)
                 if response.status_code != 200:
-                    logger.error(f"Nie można pobrać pliku z URL: {image_path}. Status code: {response.status_code}")
+                    logger.error(
+                        f"Nie można pobrać pliku z URL: {image_path}. Status code: {response.status_code}")
                     return None
                 file_data = response.content
-                logger.info(f"Pobrano plik z URL, rozmiar: {len(file_data)} bajtów")
+                logger.info(
+                    f"Pobrano plik z URL, rozmiar: {len(file_data)} bajtów")
             except requests.exceptions.RequestException as e:
-                logger.error(f"Błąd podczas pobierania pliku z URL: {image_path}. Błąd: {str(e)}")
+                logger.error(
+                    f"Błąd podczas pobierania pliku z URL: {image_path}. Błąd: {str(e)}")
                 return None
         else:
             logger.info(f"Otwieranie pliku lokalnego: {image_path}")
@@ -231,7 +251,8 @@ def upload_image_to_bucket_and_get_url(image_path, product_id):
                 return None
             with open(image_path, 'rb') as f:
                 file_data = f.read()
-                logger.info(f"Odczytano plik lokalny, rozmiar: {len(file_data)} bajtów")
+                logger.info(
+                    f"Odczytano plik lokalny, rozmiar: {len(file_data)} bajtów")
 
         # Prześlij plik do S3
         logger.info(f"Przesyłanie pliku do S3: {new_path}")
@@ -321,11 +342,6 @@ def import_insert_item(conn, item, images_data, variants_data, other_colors, pro
         'ON CONFLICT (id) DO NOTHING'
     )
 
-    # Nowy kod: upload zdjęć do bucketa i zapis do product_images
-    insert_product_images_query = (
-        'INSERT INTO product_images (product_id, file_ath) VALUES (%s, %s)'
-    )
-
     try:
         cursor.execute(insert_product_query, item)
         cursor.executemany(insert_image_query, images_data)
@@ -336,17 +352,23 @@ def import_insert_item(conn, item, images_data, variants_data, other_colors, pro
 
         for product_id, color_product_id in other_colors:
             if product_id != color_product_id:
-                cursor.execute("SELECT 1 FROM products WHERE id = %s", (color_product_id,))
+                cursor.execute(
+                    "SELECT 1 FROM products WHERE id = %s", (color_product_id,))
                 if not cursor.fetchone():
-                    cursor.execute(insert_missing_product_query, (color_product_id, "Placeholder Name"))
-                cursor.execute(insert_other_colors_query, (product_id, color_product_id))
+                    cursor.execute(insert_missing_product_query,
+                                   (color_product_id, "Placeholder Name"))
+                cursor.execute(insert_other_colors_query,
+                               (product_id, color_product_id))
 
         for product_id, set_product_id in product_sets:
             if product_id != set_product_id:
-                cursor.execute("SELECT 1 FROM products WHERE id = %s", (set_product_id,))
+                cursor.execute(
+                    "SELECT 1 FROM products WHERE id = %s", (set_product_id,))
                 if not cursor.fetchone():
-                    cursor.execute(insert_missing_product_query, (set_product_id, "Placeholder Name"))
-                cursor.execute(insert_product_sets_query, (product_id, set_product_id))
+                    cursor.execute(insert_missing_product_query,
+                                   (set_product_id, "Placeholder Name"))
+                cursor.execute(insert_product_sets_query,
+                               (product_id, set_product_id))
 
         conn.commit()
 
@@ -356,3 +378,21 @@ def import_insert_item(conn, item, images_data, variants_data, other_colors, pro
 
     finally:
         cursor.close()
+
+
+def delete_product_folder_from_bucket(product_id):
+    try:
+        is_production = os.getenv(
+            "DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
+        bucket_folder = "MPD" if is_production else "MPD_test"
+        prefix = f"{bucket_folder}/{product_id}/"
+        response = s3_client.list_objects_v2(
+            Bucket=DO_SPACES_BUCKET, Prefix=prefix)
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                s3_client.delete_object(
+                    Bucket=DO_SPACES_BUCKET, Key=obj['Key'])
+        logger.info(f"Usunięto folder {prefix} z bucketa.")
+    except Exception as e:
+        logger.error(
+            f"Błąd podczas usuwania folderu {prefix} z bucketa: {str(e)}")
