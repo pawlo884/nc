@@ -49,13 +49,44 @@ class ProductsAdmin(admin.ModelAdmin):
 
     @admin.display(description="Zdjęcia produktu")
     def show_images(self, obj):
-        images = obj.images.all() if hasattr(obj, 'images') else []
-        if not images:
-            return "Brak zdjęć"
+        # Pobierz wszystkie unikalne kolory producenta z wariantów produktu
+        producer_colors = (
+            ProductVariants.objects.filter(
+                product=obj, producer_color__isnull=False)
+            .values_list('producer_color__id', 'producer_color__name')
+            .distinct()
+        )
+        if not producer_colors:
+            images = obj.images.all() if hasattr(obj, 'images') else []
+            if not images:
+                return "Brak zdjęć"
+            html = ""
+            for img in images:
+                url = img.file_path
+                html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
+            return format_html(html)
+        # Jeśli są kolory producenta, grupuj zdjęcia wg koloru producenta
         html = ""
-        for img in images:
-            url = img.file_path
-            html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
+        # Sortuj po nazwie koloru
+        producer_colors = sorted(
+            producer_colors, key=lambda x: (x[1] or '').lower())
+        for color_id, color_name in producer_colors:
+            # Pobierz warianty dla tego koloru producenta
+            variants = ProductVariants.objects.filter(
+                product=obj, producer_color_id=color_id)
+            variant_ids = [v.variant_id for v in variants]
+            # Pobierz zdjęcia powiązane z tymi wariantami lub produktem
+            images = obj.images.filter(
+                variant_id__in=variant_ids) if variant_ids else obj.images.none()
+            if not images:
+                continue
+            html += f'<div style="margin-bottom: 12px;"><b>{color_name or "Brak nazwy koloru"}</b><br>'
+            for img in images:
+                url = img.file_path
+                html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
+            html += '</div>'
+        if not html:
+            return "Brak zdjęć przypisanych do kolorów producenta"
         return format_html(html)
 
     @admin.display(description="Powiązane produkty")
