@@ -476,11 +476,11 @@ class ProductsAdmin(admin.ModelAdmin):
                             """, [product_id])
                             images = matterhorn_cursor.fetchall()
 
-                            for image_path in images:
+                            for idx, image_path in enumerate(images, start=1):
                                 if image_path[0]:
                                     from matterhorn.defs_db import upload_image_to_bucket_and_get_url
                                     new_image_path = upload_image_to_bucket_and_get_url(
-                                        image_path[0], new_product_id)
+                                        image_path[0], new_product_id, producer_color_name, image_number=idx)
                                     if new_image_path:
                                         cursor.execute("""
                                             INSERT INTO product_images (product_id, file_path)
@@ -702,6 +702,26 @@ class ProductsAdmin(admin.ModelAdmin):
                         product_id, mpd_product_id, size_category, producer_color_id, producer_code)
                     variant_logger.info(
                         f"[assign_mapping] Wynik add_new_variants_to_mpd: {mapping_info}")
+
+                    # --- DODAJ: upload zdjęć do bucketa po przypisaniu wariantu ---
+                    from matterhorn.models import Images
+                    from matterhorn.defs_db import upload_image_to_bucket_and_get_url
+                    images = list(Images.objects.filter(product_id=product_id))
+                    upload_errors = []
+                    # Numeracja zdjęć dla danego koloru producenta
+                    for idx, img in enumerate(images, start=1):
+                        if img.image_path:
+                            url = upload_image_to_bucket_and_get_url(
+                                img.image_path, mpd_product_id, producer_color_name, image_number=idx)
+                            if not url:
+                                upload_errors.append(img.image_path)
+                    if upload_errors:
+                        variant_logger.error(
+                            f"[assign_mapping] Błędy uploadu zdjęć: {upload_errors}")
+                    else:
+                        variant_logger.info(
+                            f"[assign_mapping] Wszystkie zdjęcia zostały poprawnie przesłane do bucketa.")
+                    # --- KONIEC DODATKU ---
                 else:
                     mapping_info = {
                         'error': 'Brak kategorii rozmiarowej w MPD'}
@@ -929,6 +949,30 @@ class ProductsAdmin(admin.ModelAdmin):
                         product_sets.append(
                             {'id': row[0], 'name': row[1], 'items': list(row[2])})
         extra_context['product_sets'] = product_sets
+
+        # Pobierz warianty z MPD wraz z kolorem producenta
+        mpd_variants = []
+        if mapped_id:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute('''
+                    SELECT pv.variant_id, pv.ean, pv.stock, pv.size_id, s.name as size_name, pv.producer_code, c.name as producer_color_name
+                    FROM product_variants pv
+                    LEFT JOIN colors c ON pv.producer_color_id = c.id
+                    LEFT JOIN sizes s ON pv.size_id = s.id
+                    WHERE pv.product_id = %s
+                    ORDER BY pv.variant_id
+                ''', [mapped_id])
+                for row in cursor.fetchall():
+                    mpd_variants.append({
+                        'variant_id': row[0],
+                        'ean': row[1],
+                        'stock': row[2],
+                        'size_id': row[3],
+                        'size_name': row[4],
+                        'producer_code': row[5],
+                        'producer_color_name': row[6] or ''
+                    })
+        extra_context['mpd_variants'] = mpd_variants
 
         # Dodaj sugerowane produkty z fuzzy search (RapidFuzz po stronie Pythona)
         suggested_products = []

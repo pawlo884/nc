@@ -192,43 +192,32 @@ s3_client = boto3.client('s3',
                          )
 
 
-def upload_image_to_bucket_and_get_url(image_path, product_id):
+def upload_image_to_bucket_and_get_url(image_path, product_id, producer_color_name=None, image_number=1):
     try:
         logger.info(
             f"Rozpoczynam przesyłanie zdjęcia: {image_path} dla produktu {product_id}")
 
-        # Sprawdź środowisko
         is_production = os.getenv(
             "DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
         bucket_folder = "MPD" if is_production else "MPD_test"
         logger.info(
             f"Środowisko: {'produkcyjne' if is_production else 'testowe'}, folder: {bucket_folder}")
 
-        # Pobierz rozszerzenie pliku
         file_extension = os.path.splitext(image_path)[1].lower()
         logger.info(f"Rozszerzenie pliku: {file_extension}")
 
-        # Sprawdź czy rozszerzenie jest dozwolone
         if file_extension not in ['.jpg', '.jpeg', '.png']:
             logger.error(f"Nieprawidłowe rozszerzenie pliku: {file_extension}")
             return None
 
-        # Pobierz liczbę zdjęć dla danego produktu
-        with connections['MPD'].cursor() as cursor:
-            cursor.execute("""
-                SELECT COUNT(*) FROM product_images WHERE product_id = %s
-            """, [product_id])
-            result = cursor.fetchone()
-            image_count = result[0] if result else 0
-            logger.info(
-                f"Liczba istniejących zdjęć dla produktu {product_id}: {image_count}")
-
-        # Utwórz nową nazwę pliku z numerem
-        new_filename = f"{image_count + 1}{file_extension}"
+        # Zamień znaki niedozwolone na podkreślnik
+        safe_color = producer_color_name.replace(
+            '/', '_').replace(' ', '_') if producer_color_name else ""
+        suffix = f"_{safe_color}" if safe_color else ""
+        new_filename = f"{product_id}_{image_number}{suffix}{file_extension}"
         new_path = f"{bucket_folder}/{product_id}/{new_filename}"
         logger.info(f"Nowa nazwa pliku: {new_filename}, ścieżka: {new_path}")
 
-        # Pobierz plik z lokalnej ścieżki lub URL-a
         if image_path.startswith(('http://', 'https://')):
             logger.info(f"Pobieranie pliku z URL: {image_path}")
             try:
@@ -254,7 +243,6 @@ def upload_image_to_bucket_and_get_url(image_path, product_id):
                 logger.info(
                     f"Odczytano plik lokalny, rozmiar: {len(file_data)} bajtów")
 
-        # Prześlij plik do S3
         logger.info(f"Przesyłanie pliku do S3: {new_path}")
         try:
             s3_client.put_object(
@@ -269,7 +257,6 @@ def upload_image_to_bucket_and_get_url(image_path, product_id):
             logger.error(f"Błąd podczas przesyłania pliku do S3: {str(e)}")
             return None
 
-        # Zwróć pełny URL do pliku
         file_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/{new_path}"
         logger.info(f"Wygenerowany URL pliku: {file_url}")
         return file_url

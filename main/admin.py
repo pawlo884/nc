@@ -1,3 +1,2 @@
 from django.contrib import admin
-
-# Register your models here.
+# Nie rejestrujemy StockAndPrices ani StockHistory w main

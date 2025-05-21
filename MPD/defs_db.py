@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 def connect_to_postgresql(db_key):
 
     try:
-        is_production = os.getenv("DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
+        is_production = os.getenv(
+            "DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
 
         env_file = '.env.prod' if is_production else '.env.dev'
 
@@ -21,7 +22,8 @@ def connect_to_postgresql(db_key):
         db_port = os.getenv("MPD_DB_PORT")
 
         if not all([db_name, db_user, db_password, db_host, db_port]):
-            raise ValueError(f"Brak wymaganych zmiennych środowiskowych w pliku {env_file}")
+            raise ValueError(
+                f"Brak wymaganych zmiennych środowiskowych w pliku {env_file}")
 
         conn = psycopg2.connect(
             dbname=db_name,
@@ -31,14 +33,17 @@ def connect_to_postgresql(db_key):
             port=db_port
 
         )
-        print(f"Połączono z bazą danych {db_name} na hoście {db_host} (środowisko: {'produkcja' if is_production else 'development'})")
+        print(
+            f"Połączono z bazą danych {db_name} na hoście {db_host} (środowisko: {'produkcja' if is_production else 'development'})")
         return conn
-        
+
     except Exception as e:
         print(f"Błąd podczas łączenia z bazą danych: {e}")
-        raise  
-  
+        raise
+
 # Tworzenie tabel jeśli nie istnieją
+
+
 def create_tables_if_not_exist(conn):
     cursor = conn.cursor()
 
@@ -49,16 +54,15 @@ def create_tables_if_not_exist(conn):
             name VARCHAR(100) NOT NULL UNIQUE
         )
     """
-    create_brands_table_queries ="""
+    create_brands_table_queries = """
         CREATE TABLE IF NOT EXISTS brands (
             id BIGSERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
+            name VARCHAR(255),
             logo_url TEXT,
-            brand_lower VARCHAR(255),
-            opis TEXT NOT NULL
+            opis TEXT
         )
     """
-    create_categories_table_queries ="""
+    create_categories_table_queries = """
         CREATE TABLE IF NOT EXISTS categories (
             id BIGSERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL UNIQUE,
@@ -67,7 +71,7 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
         )
     """
-    create_colors_table_queries ="""
+    create_colors_table_queries = """
         CREATE TABLE IF NOT EXISTS colors (
             id SERIAL PRIMARY KEY,
             name VARCHAR(50) NOT NULL UNIQUE,
@@ -76,19 +80,19 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (parent_id) REFERENCES colors(id) ON DELETE SET NULL
         )
     """
-    create_data_sources_table_queries ="""
+    create_data_sources_table_queries = """
         CREATE TABLE IF NOT EXISTS data_sources (
             id SERIAL PRIMARY KEY,
             source_name VARCHAR(50) NOT NULL
         )
     """
-    create_den_thickness_table_queries ="""
+    create_den_thickness_table_queries = """
         CREATE TABLE IF NOT EXISTS den_thickness (
             id SERIAL PRIMARY KEY,
             value INT NOT NULL UNIQUE
         )
     """
-    create_product_attributes_table_queries ="""
+    create_product_attributes_table_queries = """
         CREATE TABLE IF NOT EXISTS product_attributes (
             id SERIAL PRIMARY KEY,
             product_id BIGINT NOT NULL,
@@ -97,7 +101,7 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (attribute_id) REFERENCES attributes(id) ON DELETE CASCADE
         )
     """
-    create_product_categories_table_queries ="""
+    create_product_categories_table_queries = """
         CREATE TABLE IF NOT EXISTS product_categories (
             product_id BIGINT NOT NULL,
             category_id BIGINT NOT NULL,
@@ -106,7 +110,7 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         )
     """
-    create_product_den_table_queries ="""
+    create_product_den_table_queries = """
         CREATE TABLE IF NOT EXISTS product_den (
             id SERIAL PRIMARY KEY,
             product_id BIGINT NOT NULL,
@@ -115,7 +119,7 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (den_id) REFERENCES den_thickness(id) ON DELETE CASCADE
         )
     """
-    create_product_images_table_queries ="""
+    create_product_images_table_queries = """
         CREATE TABLE IF NOT EXISTS product_images (
             id BIGSERIAL PRIMARY KEY,
             product_id BIGINT NOT NULL,
@@ -124,7 +128,7 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         )
     """
-    create_product_seasons_table_queries ="""
+    create_product_seasons_table_queries = """
         CREATE TABLE IF NOT EXISTS product_seasons (
             id SERIAL PRIMARY KEY,
             product_id BIGINT NOT NULL,
@@ -133,7 +137,7 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (season_id) REFERENCES season_categories(id) ON DELETE CASCADE
         )
     """
-    create_product_set_items_table_queries ="""
+    create_product_set_items_table_queries = """
         CREATE TABLE IF NOT EXISTS product_set_items (
             id SERIAL PRIMARY KEY,
             set_id INT NOT NULL,
@@ -143,7 +147,7 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         )
     """
-    create_product_sets_table_queries ="""
+    create_product_sets_table_queries = """
         CREATE TABLE IF NOT EXISTS product_sets (
             id SERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
@@ -152,7 +156,7 @@ def create_tables_if_not_exist(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """
-    create_product_variants_table_queries ="""
+    create_product_variants_table_queries = """
         CREATE TABLE IF NOT EXISTS product_variants (
             id SERIAL PRIMARY KEY,
             product_id BIGINT NOT NULL,
@@ -169,7 +173,7 @@ def create_tables_if_not_exist(conn):
             UNIQUE (variant_id, source_id)
         )
     """
-    create_products_table_queries ="""
+    create_products_table_queries = """
         CREATE TABLE IF NOT EXISTS products (
             id BIGSERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
@@ -180,13 +184,13 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE SET NULL
         )
     """
-    create_season_categories_table_queries ="""
+    create_season_categories_table_queries = """
         CREATE TABLE IF NOT EXISTS season_categories (
             id SERIAL PRIMARY KEY,
             name VARCHAR(50) NOT NULL UNIQUE
         )
     """
-    create_size_attributes_table_queries ="""
+    create_size_attributes_table_queries = """
         CREATE TABLE IF NOT EXISTS size_attributes (
             id SERIAL PRIMARY KEY,
             size_id BIGINT NOT NULL,
@@ -196,7 +200,7 @@ def create_tables_if_not_exist(conn):
             FOREIGN KEY (size_id) REFERENCES sizes(id) ON DELETE CASCADE
         )
     """
-    create_sizes_table_queries ="""
+    create_sizes_table_queries = """
         CREATE TABLE IF NOT EXISTS sizes (
             id BIGSERIAL PRIMARY KEY,
             name VARCHAR(50) NOT NULL,
@@ -205,7 +209,7 @@ def create_tables_if_not_exist(conn):
             name_lower VARCHAR(50) NOT NULL
         )
     """
-    create_sources_table_queries ="""
+    create_sources_table_queries = """
         CREATE TABLE IF NOT EXISTS sources (
             id SERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
@@ -213,7 +217,7 @@ def create_tables_if_not_exist(conn):
             type VARCHAR(20) NOT NULL
         )
     """
-    create_stock_and_prices_table_queries ="""
+    create_stock_and_prices_table_queries = """
         CREATE TABLE IF NOT EXISTS stock_and_prices (
             id BIGSERIAL PRIMARY KEY,
             variant_id INT NOT NULL,

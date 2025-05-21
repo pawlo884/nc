@@ -1,4 +1,6 @@
 from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 # Create your models here.
@@ -8,7 +10,6 @@ class Brands(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255, blank=True, null=True)
     logo_url = models.TextField(blank=True, null=True)
-    brand_lower = models.CharField(max_length=255, blank=True, null=True)
     opis = models.TextField(blank=True, null=True)
 
     class Meta:
@@ -35,7 +36,7 @@ class Colors(models.Model):
         'self', on_delete=models.SET_NULL, null=True, blank=True, db_column='parent_id')
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'colors'
         app_label = 'MPD'
         verbose_name = 'Color'
@@ -111,6 +112,8 @@ class ProductVariants(models.Model):
         Sources, on_delete=models.RESTRICT, db_column='source_id', null=True, blank=True)
     color = models.ForeignKey(
         Colors, on_delete=models.CASCADE, db_column='color_id', null=True, blank=True)
+    producer_color = models.ForeignKey(
+        Colors, on_delete=models.CASCADE, db_column='producer_color_id', null=True, blank=True, related_name='producer_variants')
     size = models.ForeignKey(
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
     ean = models.CharField(max_length=50, blank=True, null=True)
@@ -201,3 +204,34 @@ class ProductSeries(models.Model):
 
     def __str__(self):
         return str(self.name) if self.name else f'Seria {self.id}'
+
+
+class StockAndPrices(models.Model):
+    id = models.BigIntegerField(primary_key=True)
+    variant_id = models.BigIntegerField()
+    source_id = models.BigIntegerField()
+    stock = models.IntegerField()
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=10)
+    last_updated = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = 'stock_and_prices'
+        verbose_name = 'Stan magazynowy'
+        verbose_name_plural = 'Stany magazynowe'
+
+
+class StockHistory(models.Model):
+    id = models.BigIntegerField(primary_key=True)
+    stock_id = models.BigIntegerField()
+    source_id = models.BigIntegerField(null=True, blank=True)
+    previous_stock = models.IntegerField()
+    new_stock = models.IntegerField()
+    change_date = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = 'stock_history'
+        verbose_name = 'Historia stanu magazynowego'
+        verbose_name_plural = 'Historia stanów magazynowych'

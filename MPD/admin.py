@@ -1,7 +1,7 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, ProductSeries
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors
 from django.db import connections
 # Register your models here.
 
@@ -26,9 +26,10 @@ class ProductsAdmin(admin.ModelAdmin):
         if not variants:
             return "Brak wariantów"
         html = "<table style='border-collapse:collapse;'>"
-        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
+        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
         for v in variants:
             size_name = v.size.name if v.size else ""
+            producer_color_name = v.producer_color.name if v.producer_color else "-"
             with connections['MPD'].cursor() as cursor:
                 cursor.execute("""
                     SELECT s.name, SUM(sp.stock) as total_stock
@@ -42,7 +43,7 @@ class ProductsAdmin(admin.ModelAdmin):
                               for row in stock_data]) if stock_data else 0
             sources_str = ", ".join(
                 [f"{row[0]}: {row[1]}" for row in stock_data]) if stock_data else "-"
-            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{v.color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size_name}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{v.ean}</td></tr>"
+            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{v.color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color_name}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size_name}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{v.ean}</td></tr>"
         html += "</table>"
         return mark_safe(html)
 
@@ -118,7 +119,7 @@ class ProductsAdmin(admin.ModelAdmin):
 
 @admin.register(Brands)
 class BrandsAdmin(admin.ModelAdmin):
-    fields = ['name', 'logo_url', 'brand_lower', 'opis']
+    fields = ['name', 'logo_url', 'opis']
     list_display = ['id', 'name']
     search_fields = ['name']
 
@@ -157,6 +158,31 @@ class ProductSetAdmin(admin.ModelAdmin):
 @admin.register(ProductSetItem)
 class ProductSetItemAdmin(admin.ModelAdmin):
     list_display = ('quantity', 'created_at')
-    # search_fields = ('')
     list_filter = ('created_at',)
-    # raw_id_fields = ('set', 'mapped_product',)
+
+
+@admin.register(StockAndPrices)
+class StockAndPricesAdmin(admin.ModelAdmin):
+    list_display = ('id', 'variant_id', 'source_id', 'stock',
+                    'price', 'currency', 'last_updated')
+    search_fields = ('id', 'variant_id', 'source_id')
+    list_filter = ('last_updated',)
+    readonly_fields = ('id', 'variant_id', 'source_id',
+                       'stock', 'price', 'currency', 'last_updated')
+
+
+@admin.register(StockHistory)
+class StockHistoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'stock_id', 'source_id',
+                    'previous_stock', 'new_stock', 'change_date')
+    list_filter = ('change_date',)
+    search_fields = ('stock_id',)
+    readonly_fields = ('id', 'stock_id', 'source_id',
+                       'previous_stock', 'new_stock', 'change_date')
+
+
+@admin.register(Colors)
+class ColorsAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'hex_code', 'parent_id']
+    search_fields = ['name', 'hex_code']
+    list_filter = ['name']
