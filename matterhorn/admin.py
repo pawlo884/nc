@@ -955,10 +955,11 @@ class ProductsAdmin(admin.ModelAdmin):
         if mapped_id:
             with connections['MPD'].cursor() as cursor:
                 cursor.execute('''
-                    SELECT pv.variant_id, pv.ean, pv.stock, pv.size_id, s.name as size_name, pv.producer_code, c.name as producer_color_name
+                    SELECT pv.variant_id, pv.ean, sp.stock, pv.size_id, s.name as size_name, pv.producer_code, c.name as producer_color_name
                     FROM product_variants pv
                     LEFT JOIN colors c ON pv.producer_color_id = c.id
                     LEFT JOIN sizes s ON pv.size_id = s.id
+                    LEFT JOIN stock_and_prices sp ON pv.variant_id = sp.variant_id AND sp.source_id = 2
                     WHERE pv.product_id = %s
                     ORDER BY pv.variant_id
                 ''', [mapped_id])
