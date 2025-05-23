@@ -28,11 +28,18 @@ def track_recent_stock_changes():
             last_stock = row[0] if row else None
 
             if last_stock is None:
-                print(f"Nowy produkt {stock_id}, dodaję do historii")
+                print(f"Nowy produkt {stock_id}, dodaję do historii od zera")
+                # Najpierw wpis 0 -> 0
                 cursor.execute("""
                     INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, change_date)
                     VALUES (%s, %s, %s, %s, %s)
-                """, [stock_id, source_id, None, current_stock, now])
+                """, [stock_id, source_id, 0, 0, now])
+                # Następnie wpis 0 -> current_stock (jeśli current_stock > 0)
+                if current_stock != 0:
+                    cursor.execute("""
+                        INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, change_date)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, [stock_id, source_id, 0, current_stock, now])
             elif last_stock != current_stock:
                 print(
                     f"Zmiana stanu dla {stock_id}: {last_stock} -> {current_stock}")

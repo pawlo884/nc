@@ -51,62 +51,81 @@ class ProductsAdmin(admin.ModelAdmin):
     def show_images(self, obj):
         print(f"\n=== DEBUG: show_images dla produktu {obj.id} ===")
 
-        # Pobierz wszystkie unikalne kolory producenta z wariantów produktu
+        # Grupowanie zdjęć po nazwie koloru producenta lub zwykłego koloru (nie używamy variant_id)
+        images = obj.images.all() if hasattr(obj, 'images') else []
+        # Pobierz wszystkie unikalne kolory producenta i zwykłe kolory z wariantów produktu
         producer_colors = (
             ProductVariants.objects.filter(
                 product=obj, producer_color__isnull=False)
             .values_list('producer_color__id', 'producer_color__name')
             .distinct()
         )
-        print(f"Znalezione kolory producenta: {list(producer_colors)}")
-
-        if not producer_colors:
-            print("Brak kolorów producenta - próba pobrania wszystkich zdjęć")
-            images = obj.images.all() if hasattr(obj, 'images') else []
-            print(f"Liczba znalezionych zdjęć: {len(images)}")
-            if not images:
-                return "Brak zdjęć"
-            html = ""
-            for img in images:
-                url = img.file_path
-                html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
-            return format_html(html)
-
-        # Jeśli są kolory producenta, grupuj zdjęcia wg koloru producenta
+        normal_colors = (
+            ProductVariants.objects.filter(product=obj, color__isnull=False)
+            .values_list('color__id', 'color__name')
+            .distinct()
+        )
+        color_name_map = {str(cid): cname for cid,
+                          cname in producer_colors if cname}
+        color_name_map_lower = {cname.lower().replace(
+            '/', '_').replace(' ', '_'): cid for cid, cname in producer_colors if cname}
+        normal_color_name_map = {
+            str(cid): cname for cid, cname in normal_colors if cname}
+        normal_color_name_map_lower = {cname.lower().replace(
+            '/', '_').replace(' ', '_'): cid for cid, cname in normal_colors if cname}
+        print(f"DEBUG: Dostępne kolory producenta: {color_name_map}")
+        print(f"DEBUG: Dostępne zwykłe kolory: {normal_color_name_map}")
+        images_by_color = {cid: [] for cid in color_name_map}
+        images_by_normal_color = {cid: [] for cid in normal_color_name_map}
+        images_no_color = []
+        for img in images:
+            file_name = img.file_path.split('/')[-1].lower()
+            matched = False
+            # Najpierw próbuj dopasować do koloru producenta
+            for cname, cid in color_name_map_lower.items():
+                if cname in file_name:
+                    images_by_color[str(cid)].append(img)
+                    matched = True
+                    break
+            # Jeśli nie znaleziono, próbuj dopasować do zwykłego koloru
+            if not matched:
+                for cname, cid in normal_color_name_map_lower.items():
+                    if cname in file_name:
+                        images_by_normal_color[str(cid)].append(img)
+                        matched = True
+                        break
+            if not matched:
+                images_no_color.append(img)
+        print(
+            f"DEBUG: Zdjęcia pogrupowane po producer_color_id (nazwa pliku): {{cid: len(imgs) for cid, imgs in images_by_color.items()}}, po color_id: {{cid: len(imgs) for cid, imgs in images_by_normal_color.items()}}, zdjęcia bez koloru: {len(images_no_color)}")
         html = ""
-        # Sortuj po nazwie koloru
-        producer_colors = sorted(
-            producer_colors, key=lambda x: (x[1] or '').lower())
-        print(f"Posortowane kolory producenta: {list(producer_colors)}")
-
-        for color_id, color_name in producer_colors:
-            print(f"\nPrzetwarzanie koloru: {color_name} (id: {color_id})")
-            # Pobierz warianty dla tego koloru producenta
-            variants = ProductVariants.objects.filter(
-                product=obj, producer_color_id=color_id)
-            variant_ids = [v.variant_id for v in variants]
-            print(f"Znalezione warianty dla koloru: {variant_ids}")
-
-            # Pobierz zdjęcia powiązane z tymi wariantami lub produktem
-            images = obj.images.filter(
-                variant_id__in=variant_ids) if variant_ids else obj.images.none()
-            print(f"Liczba znalezionych zdjęć dla koloru: {len(images)}")
-
-            if not images:
-                print(f"Brak zdjęć dla koloru {color_name}")
-                continue
-
-            html += f'<div style="margin-bottom: 12px;"><b>{color_name or "Brak nazwy koloru"}</b><br>'
-            for img in images:
+        # Wyświetl zdjęcia z przypisanym kolorem producenta
+        for cid, imgs in images_by_color.items():
+            color_name = color_name_map.get(cid, f"ID {cid}")
+            if imgs:
+                html += f'<div style="margin-bottom: 12px;"><b>{color_name}</b><br>'
+                for img in imgs:
+                    url = img.file_path
+                    html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
+                html += '</div>'
+        # Wyświetl zdjęcia z przypisanym zwykłym kolorem
+        for cid, imgs in images_by_normal_color.items():
+            color_name = normal_color_name_map.get(cid, f"ID {cid}")
+            if imgs:
+                html += f'<div style="margin-bottom: 12px;"><b>{color_name}</b><br>'
+                for img in imgs:
+                    url = img.file_path
+                    html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
+                html += '</div>'
+        # Wyświetl zdjęcia bez przypisanego koloru
+        if images_no_color:
+            html += '<div style="margin-bottom: 12px;"><b>Inne zdjęcia</b><br>'
+            for img in images_no_color:
                 url = img.file_path
                 html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
             html += '</div>'
-
         if not html:
-            print("Nie znaleziono żadnych zdjęć dla żadnego koloru")
-            return "Brak zdjęć przypisanych do kolorów producenta"
-
-        print("=== KONIEC DEBUG ===")
+            return "Brak zdjęć produktu"
         return format_html(html)
 
     @admin.display(description="Powiązane produkty")

@@ -192,6 +192,7 @@
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Nazwa</th>
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Marka</th>
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Podobieństwo</th>
+                            <th style="text-align:left; border-bottom:1px solid #ccc;">Pokrycie słów (%)</th>
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Główny kolor</th>
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Kolor producenta</th>
                             <th style="text-align:left; border-bottom:1px solid #ccc;">Kod producenta</th>
@@ -203,7 +204,8 @@
                         <tr>
                             <td>{{ product.name }}</td>
                             <td>{{ product.brand }}</td>
-                            <td>{{ product.similarity }}%</td>
+                            <td>{{ product.similarity|floatformat:1 }}%</td>
+                            <td>{{ product.suggested_in_query|floatformat:1 }}%</td>
                             <td>
                                 <select class="main-color-select">
                                     <option value="">-- wybierz kolor --</option>
@@ -223,6 +225,7 @@
                             <td>
                                 <input type="text" class="producer-code-input" placeholder="Kod producenta">
                             </td>
+                            
                             <td>
                                 <button type="button" class="assign-mapping-btn" data-mpd-id="{{ product.id }}">Przypisz</button>
                             </td>

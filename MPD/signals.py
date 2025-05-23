@@ -18,7 +18,7 @@ def remove_product_mapping_in_matterhorn(sender, instance, using, **kwargs):
                 cursor.execute(
                     """
                    # UPDATE products
-                   # SET mapped_product_id = NULL
+                   # SET mapped_product_id = False
                    # WHERE mapped_product_id = %s
                     """, [instance.id])
         except Exception as e:
@@ -77,7 +77,7 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                     """
                     UPDATE products 
                     SET mapped_product_id = NULL,
-                        is_mapped = NULL,
+                        is_mapped = False,
                         last_updated = NOW()
                     WHERE mapped_product_id = %s
                     """, [instance.id]
@@ -94,7 +94,7 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                     cursor.execute(f"""
                         UPDATE variants
                         SET mapped_variant_id = NULL,
-                            is_mapped = NULL,
+                            is_mapped = False,
                             last_updated = NOW()
                         WHERE mapped_variant_id IN ({placeholders})
                         """, instance.variant_ids)

@@ -703,24 +703,23 @@ class ProductsAdmin(admin.ModelAdmin):
                     variant_logger.info(
                         f"[assign_mapping] Wynik add_new_variants_to_mpd: {mapping_info}")
 
-                    # --- DODAJ: upload zdjęć do bucketa po przypisaniu wariantu ---
-                    from matterhorn.models import Images
+                    # --- DODAJ: upload zdjęć do bucketa i zapis do bazy MPD (jak w mpd_create) ---
                     from matterhorn.defs_db import upload_image_to_bucket_and_get_url
-                    images = list(Images.objects.filter(product_id=product_id))
-                    upload_errors = []
-                    # Numeracja zdjęć dla danego koloru producenta
-                    for idx, img in enumerate(images, start=1):
-                        if img.image_path:
-                            url = upload_image_to_bucket_and_get_url(
-                                img.image_path, mpd_product_id, producer_color_name, image_number=idx)
-                            if not url:
-                                upload_errors.append(img.image_path)
-                    if upload_errors:
-                        variant_logger.error(
-                            f"[assign_mapping] Błędy uploadu zdjęć: {upload_errors}")
-                    else:
-                        variant_logger.info(
-                            f"[assign_mapping] Wszystkie zdjęcia zostały poprawnie przesłane do bucketa.")
+                    with connections['matterhorn'].cursor() as matterhorn_cursor, connections['MPD'].cursor() as mpd_cursor:
+                        matterhorn_cursor.execute(
+                            "SELECT image_path FROM images WHERE product_id = %s", [product_id])
+                        images = matterhorn_cursor.fetchall()
+                        for idx, image_path in enumerate(images, start=1):
+                            if image_path[0]:
+                                new_image_path = upload_image_to_bucket_and_get_url(
+                                    image_path[0], mpd_product_id, producer_color_name, image_number=idx)
+                                if new_image_path:
+                                    mpd_cursor.execute("""
+                                        INSERT INTO product_images (product_id, file_path)
+                                        VALUES (%s, %s)
+                                        ON CONFLICT (product_id, file_path) DO NOTHING
+                                    """, [mpd_product_id, new_image_path])
+                        connections['MPD'].commit()
                     # --- KONIEC DODATKU ---
                 else:
                     mapping_info = {
@@ -991,8 +990,18 @@ class ProductsAdmin(admin.ModelAdmin):
                     scored = []
                     for row in all_products:
                         score = fuzz.token_sort_ratio(product.name, row[1])
+                        # Nowa metryka: ile % słów sugerowanego produktu jest w nazwie szukanego produktu
+                        suggested_words = set(row[1].lower().replace(
+                            '(', '').replace(')', '').replace('-', ' ').split())
+                        query_words = set(product.name.lower().replace(
+                            '(', '').replace(')', '').replace('-', ' ').split())
+                        if suggested_words:
+                            suggested_in_query = int(
+                                100 * len(suggested_words & query_words) / len(suggested_words))
+                        else:
+                            suggested_in_query = 0
                         scored.append(
-                            {'id': row[0], 'name': row[1], 'brand': row[2], 'similarity': score})
+                            {'id': row[0], 'name': row[1], 'brand': row[2], 'similarity': score, 'suggested_in_query': suggested_in_query})
                     suggested_products = sorted(
                         scored, key=lambda x: x['similarity'], reverse=True)[:5]
             except Exception as e:
