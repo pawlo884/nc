@@ -41,7 +41,7 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name': 'Historia stanu magazynowego',
                 'verbose_name_plural': 'Historia stanów magazynowych',
-                'db_table': 'stock_history',
+                'db_table': '',
                 'managed': False,
             },
         ),

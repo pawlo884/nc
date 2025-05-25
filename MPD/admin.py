@@ -75,21 +75,26 @@ class ProductsAdmin(admin.ModelAdmin):
             '/', '_').replace(' ', '_'): cid for cid, cname in normal_colors if cname}
         print(f"DEBUG: Dostępne kolory producenta: {color_name_map}")
         print(f"DEBUG: Dostępne zwykłe kolory: {normal_color_name_map}")
+        # Sortuj nazwy kolorów od najdłuższych do najkrótszych, aby najpierw dopasować np. 'light pink' przed 'pink'
+        color_name_map_lower_sorted = sorted(
+            color_name_map_lower.items(), key=lambda x: -len(x[0]))
+        normal_color_name_map_lower_sorted = sorted(
+            normal_color_name_map_lower.items(), key=lambda x: -len(x[0]))
         images_by_color = {cid: [] for cid in color_name_map}
         images_by_normal_color = {cid: [] for cid in normal_color_name_map}
         images_no_color = []
         for img in images:
             file_name = img.file_path.split('/')[-1].lower()
             matched = False
-            # Najpierw próbuj dopasować do koloru producenta
-            for cname, cid in color_name_map_lower.items():
+            # Najpierw próbuj dopasować do koloru producenta (od najdłuższych nazw)
+            for cname, cid in color_name_map_lower_sorted:
                 if cname in file_name:
                     images_by_color[str(cid)].append(img)
                     matched = True
                     break
-            # Jeśli nie znaleziono, próbuj dopasować do zwykłego koloru
+            # Jeśli nie znaleziono, próbuj dopasować do zwykłego koloru (od najdłuższych nazw)
             if not matched:
-                for cname, cid in normal_color_name_map_lower.items():
+                for cname, cid in normal_color_name_map_lower_sorted:
                     if cname in file_name:
                         images_by_normal_color[str(cid)].append(img)
                         matched = True

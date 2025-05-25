@@ -84,11 +84,11 @@ def import_all_by_one():
         logger.info(f"Pobieranie danych z: {url}")
 
         attempt = 1
-        max_attempts = 100
+        max_attempts = 1000
         json_decode_attempts = 0
-        max_json_decode_attempts = 100
+        max_json_decode_attempts = 1000
         db_connection_attempts = 0
-        max_db_connection_attempts = 100
+        max_db_connection_attempts = 1000
 
         while attempt <= max_attempts:
             try:
@@ -398,7 +398,7 @@ def update_inventory_v3():
         logger.info(
             f"PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
         attempt = 1
-        max_attempts = 100
+        max_attempts = 1000
         connection = None
 
         while attempt <= max_attempts:
