@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from decimal import Decimal
 
 
 # Create your models here.
@@ -228,6 +229,10 @@ class StockHistory(models.Model):
     source_id = models.BigIntegerField(null=True, blank=True)
     previous_stock = models.IntegerField()
     new_stock = models.IntegerField()
+    previous_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    new_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'))
     change_date = models.DateTimeField()
 
     class Meta:

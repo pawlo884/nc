@@ -1102,19 +1102,19 @@ class ProductsAdmin(admin.ModelAdmin):
                         return JsonResponse({'success': False, 'error': 'Produkt nie jest zmapowany'})
                     mapped_product_id = result[0]
 
-                # Pobierz grupę rozmiarową z istniejących wariantów
+                # Pobierz grupę rozmiarową i producer_color_id/producer_code z istniejących wariantów
                 with connections['MPD'].cursor() as mpd_cursor:
                     mpd_cursor.execute("""
-                        SELECT DISTINCT s.category 
+                        SELECT DISTINCT s.category, pv.producer_color_id, pv.producer_code
                         FROM product_variants pv 
                         JOIN sizes s ON pv.size_id = s.id 
                         WHERE pv.product_id = %s 
                         LIMIT 1
                     """, [mapped_product_id])
-                    size_category_result = mpd_cursor.fetchone()
-                    if not size_category_result or not size_category_result[0]:
+                    existing_variant = mpd_cursor.fetchone()
+                    if not existing_variant or not existing_variant[0]:
                         return JsonResponse({'success': False, 'error': 'Nie można ustalić grupy rozmiarowej'})
-                    size_category = size_category_result[0]
+                    size_category, producer_color_id, producer_code = existing_variant
 
                 # Pobierz brakujące warianty (te bez mapped_variant_id)
                 with connections['matterhorn'].cursor() as matterhorn_cursor:
@@ -1162,12 +1162,12 @@ class ProductsAdmin(admin.ModelAdmin):
                                 "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
                             variant_id = mpd_cursor.fetchone()[0]
 
-                            # Dodaj wariant
+                            # Dodaj wariant z producer_color_id i producer_code z istniejących wariantów
                             mpd_cursor.execute("""
                                 INSERT INTO product_variants 
-                                (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                            """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2])
+                                (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_color_id, producer_code)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2, producer_color_id, producer_code])
 
                             # Dodaj stan magazynowy i cenę
                             mpd_cursor.execute("""

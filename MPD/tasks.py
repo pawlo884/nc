@@ -4,8 +4,14 @@ from datetime import timedelta
 from django.utils import timezone
 from django.utils.timezone import localtime
 import logging
+from celery.signals import worker_ready
 
 logger = logging.getLogger(__name__)
+
+
+@worker_ready.connect
+def at_start(sender, **kwargs):
+    sender.app.send_task('MPD.tasks.track_recent_stock_changes')
 
 
 @shared_task
@@ -38,7 +44,7 @@ def track_recent_stock_changes():
         logger.info(f"TOP 10 rekordów w stock_and_prices: {cursor.fetchall()}")
 
         cursor.execute("""
-            SELECT id, stock, source_id, last_updated
+            SELECT id, stock, price, source_id, last_updated
             FROM stock_and_prices
             WHERE last_updated >= %s
         """, [seven_minutes_ago])
@@ -46,11 +52,11 @@ def track_recent_stock_changes():
         logger.info(
             f"Znaleziono {len(updated_products)} rekordów do sprawdzenia")
 
-        for stock_id, current_stock, source_id, last_updated in updated_products:
+        for stock_id, current_stock, current_price, source_id, last_updated in updated_products:
             logger.info(
                 f"Przetwarzanie produktu {stock_id}, ostatnia aktualizacja: {last_updated}")
             cursor.execute("""
-                SELECT new_stock
+                SELECT new_stock, new_price
                 FROM stock_history
                 WHERE stock_id = %s
                 ORDER BY change_date DESC
@@ -58,28 +64,29 @@ def track_recent_stock_changes():
             """, [stock_id])
             row = cursor.fetchone()
             last_stock = row[0] if row else None
+            last_price = row[1] if row else None
 
             if last_stock is None:
                 logger.info(
                     f"Nowy produkt {stock_id}, dodaję do historii od zera")
-                # Najpierw wpis 0 -> 0
+                # Najpierw wpis 0 -> 0 dla stock i price
                 cursor.execute("""
-                    INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, change_date)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, [stock_id, source_id, 0, 0, now])
-                # Następnie wpis 0 -> current_stock (jeśli current_stock > 0)
-                if current_stock != 0:
+                    INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, previous_price, new_price, change_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, [stock_id, source_id, 0, 0, 0, 0, now])
+                # Następnie wpis 0 -> current_stock/price (jeśli current_stock > 0 lub current_price > 0)
+                if current_stock != 0 or current_price != 0:
                     cursor.execute("""
-                        INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, change_date)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, [stock_id, source_id, 0, current_stock, now])
-            elif last_stock != current_stock:
+                        INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, previous_price, new_price, change_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, [stock_id, source_id, 0, current_stock, 0, current_price, now])
+            elif last_stock != current_stock or last_price != current_price:
                 logger.info(
-                    f"Zmiana stanu dla {stock_id}: {last_stock} -> {current_stock}")
+                    f"Zmiana stanu dla {stock_id}: stock {last_stock} -> {current_stock}, price {last_price} -> {current_price}")
                 cursor.execute("""
-                    INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, change_date)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, [stock_id, source_id, last_stock, current_stock, now])
+                    INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, previous_price, new_price, change_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, [stock_id, source_id, last_stock, current_stock, last_price, current_price, now])
 
     end_time = timezone.now()
     execution_time = end_time - start_time
