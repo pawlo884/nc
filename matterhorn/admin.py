@@ -48,10 +48,10 @@ class ProductsAdmin(admin.ModelAdmin):
 
         # Jeśli kategoria jest wybrana, zwróć tylko aktywne filtry
         if category:
-            return ['active', 'category_name', 'is_mapped']
+            return ['active', 'category_name', 'category_path', 'is_mapped']
 
         # Jeśli kategoria nie jest wybrana, zwróć wszystkie filtry
-        return ['active', 'category_name', 'brand', 'is_mapped']
+        return ['active', 'category_name', 'category_path', 'brand', 'is_mapped']
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -515,24 +515,20 @@ class ProductsAdmin(admin.ModelAdmin):
                                 raise Exception(
                                     f"Nieprawidłowy główny kolor (main_color_id): {main_color_id}")
 
-                            # Pobierz producer_color_id jeśli podano producer_color_name
-                            producer_color_id = None
+                            # Pobierz lub utwórz producer_color_id powiązany z color_id
+                            producer_color_id_to_use = None
                             if producer_color_name:
-                                # Najpierw sprawdź czy kolor o takiej nazwie już istnieje
-                                cursor.execute("SELECT id FROM colors WHERE name = %s", [
-                                               producer_color_name])
-                                pc_result = cursor.fetchone()
-                                if pc_result:
-                                    producer_color_id = pc_result[0]
-                                    logger.info(
-                                        f"[mpd_create] Użyto istniejącego koloru producenta: {producer_color_name} (id={producer_color_id})")
+                                cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s", [
+                                               producer_color_name, color_id])
+                                pc_row = cursor.fetchone()
+                                if pc_row:
+                                    producer_color_id_to_use = pc_row[0]
                                 else:
-                                    # Jeśli nie istnieje, dodaj nowy kolor
                                     cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id", [
                                                    producer_color_name, color_id])
-                                    producer_color_id = cursor.fetchone()[0]
-                                    logger.info(
-                                        f"[mpd_create] Dodano nowy kolor producenta: {producer_color_name} (id={producer_color_id})")
+                                    pc_row = cursor.fetchone()
+                                    if pc_row:
+                                        producer_color_id_to_use = pc_row[0]
 
                             # Pobierz warianty produktu
                             matterhorn_cursor.execute("""
@@ -583,10 +579,12 @@ class ProductsAdmin(admin.ModelAdmin):
                                     logger.info(
                                         f"Utworzono nowy wariant z ID {variant_id}")
 
+                                    # Dodaj wariant z odpowiednim producer_color_id
                                     cursor.execute("""
-                                        INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_code, producer_color_id)
+                                        INSERT INTO product_variants 
+                                        (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_color_id, producer_code)
                                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                    """, [variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2, producer_code, producer_color_id])
+                                    """, [variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2, producer_color_id_to_use, producer_code])
 
                                 # Sprawdź czy rekord już istnieje
                                 cursor.execute("""
@@ -974,6 +972,30 @@ class ProductsAdmin(admin.ModelAdmin):
                     })
         extra_context['mpd_variants'] = mpd_variants
 
+        # Pobierz mapped_variant_id pierwszego wariantu z Matterhorn
+        mapped_variant_id = None
+        if hasattr(product, 'variants'):
+            first_variant = product.variants.first()
+            if first_variant and getattr(first_variant, 'mapped_variant_id', None):
+                mapped_variant_id = first_variant.mapped_variant_id
+
+        producer_color_name = ''
+        if mapped_variant_id:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute('''
+                    SELECT c.name
+                    FROM product_variants pv
+                    LEFT JOIN colors c ON pv.producer_color_id = c.id
+                    WHERE pv.variant_id = %s
+                    LIMIT 1
+                ''', [mapped_variant_id])
+                row = cursor.fetchone()
+                if row:
+                    producer_color_name = row[0] or ''
+            logger.info(
+                f"[change_view] mapped_variant_id: {mapped_variant_id}, producer_color_name: {producer_color_name}")
+        extra_context['producer_color_name'] = producer_color_name
+
         # Dodaj sugerowane produkty z fuzzy search (RapidFuzz po stronie Pythona)
         suggested_products = []
         if product:
@@ -1050,23 +1072,33 @@ class ProductsAdmin(admin.ModelAdmin):
 
         # Pobierz domyślne wartości dla kodu producenta, koloru producenta i serii
         producer_code = ''
-        producer_color_name = ''
         series_name = ''
         if mapped_id:
+            # Pobierz color_id produktu (główny kolor)
+            main_color_id = None
+            if product.color:
+                with connections['MPD'].cursor() as cursor:
+                    cursor.execute(
+                        "SELECT id FROM colors WHERE name = %s AND parent_id IS NULL", [product.color])
+                    color_row = cursor.fetchone()
+                    if color_row:
+                        main_color_id = color_row[0]
+            if main_color_id:
+                with connections['MPD'].cursor() as cursor:
+                    # Pobierz wariant z tym samym color_id
+                    cursor.execute('''
+                        SELECT pv.producer_code, c.name as producer_color_name
+                        FROM product_variants pv
+                        LEFT JOIN colors c ON pv.producer_color_id = c.id
+                        WHERE pv.product_id = %s AND pv.color_id = %s
+                        LIMIT 1
+                    ''', [mapped_id, main_color_id])
+                    row = cursor.fetchone()
+                    if row and len(row) > 1:
+                        producer_code = row[0] or ''
+                        producer_color_name = row[1] or ''
+            # Nazwa serii
             with connections['MPD'].cursor() as cursor:
-                # Kod producenta i kolor producenta z pierwszego wariantu
-                cursor.execute('''
-                    SELECT pv.producer_code, c.name as producer_color_name
-                    FROM product_variants pv
-                    LEFT JOIN colors c ON pv.producer_color_id = c.id
-                    WHERE pv.product_id = %s
-                    LIMIT 1
-                ''', [mapped_id])
-                row = cursor.fetchone()
-                if row:
-                    producer_code = row[0] or ''
-                    producer_color_name = row[1] or ''
-                # Nazwa serii
                 cursor.execute('''
                     SELECT ps.name
                     FROM products p
@@ -1075,10 +1107,9 @@ class ProductsAdmin(admin.ModelAdmin):
                     LIMIT 1
                 ''', [mapped_id])
                 row = cursor.fetchone()
-                if row:
+                if row and len(row) > 0:
                     series_name = row[0] or ''
         extra_context['producer_code'] = producer_code
-        extra_context['producer_color_name'] = producer_color_name
         extra_context['series_name'] = series_name
 
         return super().change_view(request, object_id, form_url, extra_context)
@@ -1162,12 +1193,22 @@ class ProductsAdmin(admin.ModelAdmin):
                                 "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
                             variant_id = mpd_cursor.fetchone()[0]
 
-                            # Dodaj wariant z producer_color_id i producer_code z istniejących wariantów
+                            # Pobierz producer_color_id powiązany z color_id
+                            mpd_cursor.execute("""
+                                SELECT producer_color_id 
+                                FROM product_variants 
+                                WHERE product_id = %s AND color_id = %s AND producer_color_id IS NOT NULL
+                                LIMIT 1
+                            """, [mapped_product_id, color_id])
+                            pc_row = mpd_cursor.fetchone()
+                            producer_color_id_to_use = pc_row[0] if pc_row else None
+
+                            # Dodaj wariant z odpowiednim producer_color_id
                             mpd_cursor.execute("""
                                 INSERT INTO product_variants 
                                 (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_color_id, producer_code)
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                            """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2, producer_color_id, producer_code])
+                            """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2, producer_color_id_to_use, producer_code])
 
                             # Dodaj stan magazynowy i cenę
                             mpd_cursor.execute("""
