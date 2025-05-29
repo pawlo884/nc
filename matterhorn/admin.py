@@ -58,15 +58,14 @@ class ProductsAdmin(admin.ModelAdmin):
         category = request.GET.get('category_name__exact')
 
         if category:
-            # Pobierz unikalne marki dla wybranej kategorii
             self.brand_choices = list(queryset.filter(
                 category_name=category).values_list('brand', flat=True).distinct())
         else:
-            # Pobierz wszystkie marki
             self.brand_choices = list(
                 queryset.values_list('brand', flat=True).distinct())
 
-        return queryset
+        # Optymalizacja zapytań do relacji używanych w list_display i metodach
+        return queryset.select_related('brand').prefetch_related('images', 'variants', 'other_colors', 'product_in_set')
 
     def lookup_allowed(self, lookup, value):
         # Zezwól na filtrowanie po kategorii i marce

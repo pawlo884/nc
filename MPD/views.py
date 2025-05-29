@@ -5,17 +5,21 @@ from django.db import connections
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from collections import defaultdict
 
 # Create your views here.
 
+
 def products(request):
-    products = Products.objects.all()
-    
-    # Pobierz warianty, stany magazynowe i ceny dla każdego produktu
-    for product in products:
+    products = list(Products.objects.all())
+    product_ids = [p.id for p in products]
+    variants_by_product = {}
+    if product_ids:
+        variants_by_product = defaultdict(list)
         with connections['MPD'].cursor() as cursor:
             cursor.execute("""
                 SELECT 
+                    pv.product_id,
                     pv.variant_id,
                     pv.size_id,
                     s.name as size_name,
@@ -28,22 +32,25 @@ def products(request):
                 LEFT JOIN sizes s ON pv.size_id = s.id
                 LEFT JOIN colors c ON pv.color_id = c.id
                 LEFT JOIN stock_and_prices sp ON pv.variant_id = sp.variant_id AND sp.source_id = 2
-                WHERE pv.product_id = %s
-                ORDER BY s.name, c.name
-            """, [product.id])
+                WHERE pv.product_id IN %s
+                ORDER BY pv.product_id, s.name, c.name
+            """, [tuple(product_ids)])
             variants = cursor.fetchall()
-            setattr(product, 'variants', [{
-                'variant_id': row[0],
-                'size_id': row[1],
-                'size_name': row[2],
-                'color_id': row[3],
-                'color_name': row[4],
-                'hex_code': row[5],
-                'stock': row[6],
-                'price': row[7]
-            } for row in variants])
-    
+            for row in variants:
+                variants_by_product[row[0]].append({
+                    'variant_id': row[1],
+                    'size_id': row[2],
+                    'size_name': row[3],
+                    'color_id': row[4],
+                    'color_name': row[5],
+                    'hex_code': row[6],
+                    'stock': row[7],
+                    'price': row[8]
+                })
+    for product in products:
+        setattr(product, 'variants', variants_by_product.get(product.id, []))
     return render(request, 'MPD/mpd.html', {'products': products})
+
 
 def test_connection(request):
     try:
@@ -56,7 +63,7 @@ def test_connection(request):
                 AND table_schema = 'public'
             """)
             tables = cursor.fetchall()
-            
+
             # Sprawdźmy uprawnienia do tabel
             cursor.execute("""
                 SELECT grantee, privilege_type, table_name
@@ -65,7 +72,7 @@ def test_connection(request):
                 AND table_schema = 'public'
             """)
             permissions = cursor.fetchall()
-            
+
             return JsonResponse({
                 'status': 'success',
                 'message': 'Połączenie z bazą MPD działa poprawnie',
@@ -74,6 +81,7 @@ def test_connection(request):
             })
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
 
 def test_table_structure(request):
     try:
@@ -92,7 +100,7 @@ def test_table_structure(request):
                 ORDER BY ordinal_position;
             """)
             columns = cursor.fetchall()
-            
+
             return JsonResponse({
                 'status': 'success',
                 'table_structure': [
@@ -107,6 +115,7 @@ def test_table_structure(request):
             })
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
 
 class ProductSetViewSet(viewsets.ModelViewSet):
     queryset = ProductSet.objects.all()

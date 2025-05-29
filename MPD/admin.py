@@ -1,7 +1,7 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, Categories
 from django.db import connections
 # Register your models here.
 
@@ -260,4 +260,11 @@ class StockHistoryAdmin(admin.ModelAdmin):
 class ColorsAdmin(admin.ModelAdmin):
     list_display = ['id', 'name', 'hex_code', 'parent_id']
     search_fields = ['name', 'hex_code']
+    list_filter = ['name']
+
+
+@admin.register(Categories)
+class CategoriesAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'path', 'parent_id']
+    search_fields = ['name', 'path']
     list_filter = ['name']

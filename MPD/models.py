@@ -240,3 +240,16 @@ class StockHistory(models.Model):
         db_table = 'stock_history'
         verbose_name = 'Historia stanu magazynowego'
         verbose_name_plural = 'Historia stanów magazynowych'
+
+
+class Categories(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=255, blank=True, null=True)
+    path = models.CharField(max_length=255, blank=True, null=True)
+    parent_id = models.BigIntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'categories'
+        verbose_name = 'Kategoria'
+        verbose_name_plural = 'Kategorie'
