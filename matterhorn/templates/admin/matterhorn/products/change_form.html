@@ -298,9 +298,12 @@
                     <label for="mpd_paths">Ścieżki produktu (możesz wybrać wiele):</label>
                     <select id="mpd_paths" name="mpd_paths" multiple size="5">
                         {% for path in mpd_paths %}
-                            <option value="{{ path.id }}">{{ path.name }} ({{ path.path }})</option>
+                            <option value="{{ path.id }}" {% if path.id in selected_paths %}selected{% endif %}>
+                                {{ path.name }} ({{ path.path }})
+                            </option>
                         {% endfor %}
                     </select>
+                    <button type="button" onclick="savePaths()" style="margin-left:10px;">Zapisz</button>
                 </div>
                 <div class="form-row" style="margin-bottom: 10px;">
                     <b>ID w MPD:</b> {{ original.mapped_product_id|default:'-' }}
@@ -546,6 +549,27 @@ function showInlineStatus(msg, success) {
     el.className = 'status-message ' + (success ? 'success' : 'error');
     el.style.display = 'block';
     setTimeout(() => { el.style.display = 'none'; }, 2500);
+}
+
+function savePaths() {
+    const formData = new FormData();
+    const select = document.getElementById('mpd_paths');
+    for (const option of select.selectedOptions) {
+        formData.append('mpd_paths', option.value);
+    }
+    const productId = {{ original.id }};
+    fetch(`/admin/matterhorn/products/mpd-update/${productId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.success ? 'Zaktualizowano ścieżki!' : (data.error || 'Błąd aktualizacji ścieżek.'));
+        if(data.success) window.location.reload();
+    });
 }
 </script>
 {% endblock %} 

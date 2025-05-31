@@ -95,7 +95,6 @@ class ProductsAdmin(admin.ModelAdmin):
     def mpd_update(self, request, product_id):
         if request.method == 'POST':
             try:
-                # Pobierz mapped_product_id
                 with connections['matterhorn'].cursor() as cursor:
                     cursor.execute(
                         "SELECT mapped_product_id FROM products WHERE id = %s", [product_id])
@@ -104,94 +103,81 @@ class ProductsAdmin(admin.ModelAdmin):
                         return JsonResponse({'success': False, 'error': 'Produkt nie jest zmapowany'})
                     mapped_product_id = result[0]
 
-                # Pobierz dane z formularza
-                name = request.POST.get('mpd_name')
-                description = request.POST.get('mpd_description')
-                brand = request.POST.get('mpd_brand')
-                size_category = request.POST.get('mpd_size_category')
-                producer_code = request.POST.get('producer_code')
-                series_name = request.POST.get('series_name')
-                product_set_id = request.POST.get('product_set')
-
-                # Jeśli podano product_set_id, utwórz zestaw i przypisz go do obu produktów
-                if product_set_id:
+                # Aktualizacja ścieżek
+                mpd_paths = request.POST.getlist('mpd_paths')
+                if mpd_paths and len(request.POST) == 1:
                     with connections['MPD'].cursor() as cursor:
-                        # Sprawdź czy produkt o podanym ID istnieje
-                        cursor.execute("SELECT id FROM products WHERE id = %s", [
-                                       product_set_id])
-                        if not cursor.fetchone():
-                            return JsonResponse({'success': False, 'error': f'Produkt o ID {product_set_id} nie istnieje w bazie MPD'})
+                        cursor.execute("DELETE FROM product_path WHERE product_id = %s", [
+                                       mapped_product_id])
+                        for path_id in mpd_paths:
+                            cursor.execute(
+                                "INSERT INTO product_path (product_id, path_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                                [mapped_product_id, path_id]
+                            )
+                    return JsonResponse({'success': True, 'message': 'Zaktualizowano ścieżki.'})
 
-                        # Utwórz nowy zestaw
-                        cursor.execute("""
-                            INSERT INTO product_set (name, description, mapped_product_id)
-                            VALUES (%s, %s, %s)
-                            RETURNING id
-                        """, [f"Zestaw {name}", f"Zestaw zawierający {name}", mapped_product_id])
-                        new_set_id = cursor.fetchone()[0]
+                # Aktualizacja nazwy
+                if 'mpd_name' in request.POST and len(request.POST) == 1:
+                    name = request.POST.get('mpd_name')
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("UPDATE products SET name = %s WHERE id = %s", [
+                                       name, mapped_product_id])
+                    return JsonResponse({'success': True, 'message': 'Zaktualizowano nazwę.'})
 
-                        # Przypisz zestaw do obu produktów
-                        cursor.execute("""
-                            UPDATE products 
-                            SET product_set_id = %s
-                            WHERE id IN (%s, %s)
-                        """, [new_set_id, mapped_product_id, product_set_id])
+                # Aktualizacja opisu
+                if 'mpd_description' in request.POST and len(request.POST) == 1:
+                    description = request.POST.get('mpd_description')
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("UPDATE products SET description = %s WHERE id = %s", [
+                                       description, mapped_product_id])
+                    return JsonResponse({'success': True, 'message': 'Zaktualizowano opis.'})
 
-                # Pobierz brand_id z MPD
-                with connections['MPD'].cursor() as mpd_cursor:
-                    mpd_cursor.execute(
-                        "SELECT id FROM brands WHERE name = %s", [brand])
-                    brand_result = mpd_cursor.fetchone()
-                    if not brand_result:
-                        return JsonResponse({'success': False, 'error': 'Nie znaleziono marki w bazie MPD'})
-                    brand_id = brand_result[0]
+                # Aktualizacja marki
+                if 'mpd_brand' in request.POST and len(request.POST) == 1:
+                    brand = request.POST.get('mpd_brand')
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute(
+                            "SELECT id FROM brands WHERE name = %s", [brand])
+                        brand_result = cursor.fetchone()
+                        if not brand_result:
+                            return JsonResponse({'success': False, 'error': 'Nie znaleziono marki w bazie MPD'})
+                        brand_id = brand_result[0]
+                        cursor.execute("UPDATE products SET brand_id = %s WHERE id = %s", [
+                                       brand_id, mapped_product_id])
+                    return JsonResponse({'success': True, 'message': 'Zaktualizowano markę.'})
 
-                # Pobierz series_id jeśli istnieje
-                series_id = None
-                if series_name:
-                    with connections['MPD'].cursor() as mpd_cursor:
-                        mpd_cursor.execute(
+                # Aktualizacja kodu producenta
+                if 'producer_code' in request.POST and len(request.POST) == 1:
+                    producer_code = request.POST.get('producer_code')
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("UPDATE products SET producer_code = %s WHERE id = %s", [
+                                       producer_code, mapped_product_id])
+                    return JsonResponse({'success': True, 'message': 'Zaktualizowano kod producenta.'})
+
+                # Aktualizacja serii
+                if 'series_name' in request.POST and len(request.POST) == 1:
+                    series_name = request.POST.get('series_name')
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute(
                             "SELECT id FROM product_series WHERE name = %s", [series_name])
-                        row = mpd_cursor.fetchone()
+                        row = cursor.fetchone()
                         if row:
                             series_id = row[0]
+                        else:
+                            cursor.execute(
+                                "INSERT INTO product_series (name) VALUES (%s) RETURNING id", [series_name])
+                            series_id = cursor.fetchone()[0]
+                        cursor.execute("UPDATE products SET series_id = %s WHERE id = %s", [
+                                       series_id, mapped_product_id])
+                    return JsonResponse({'success': True, 'message': 'Zaktualizowano serię.'})
 
-                # Jeśli produkt już istnieje w MPD, wykonaj UPDATE
-                with connections['MPD'].cursor() as mpd_cursor:
-                    update_query = "UPDATE products SET name=%s, description=%s, brand_id=%s{} WHERE id=%s".format(
-                        ", series_id=%s" if series_id else "")
-                    params = [name, description, brand_id]
-                    if series_id:
-                        params.append(series_id)
-                    params.append(mapped_product_id)
-                    mpd_cursor.execute(update_query, params)
+                # Analogicznie możesz dodać kolejne pola...
 
-                # Prześlij zdjęcia do bucketu i zaktualizuj ścieżki
-                with connections['matterhorn'].cursor() as matterhorn_cursor:
-                    matterhorn_cursor.execute("""
-                        SELECT image_path FROM images WHERE product_id = %s
-                    """, [product_id])
-                    images = matterhorn_cursor.fetchall()
-
-                    for image_path in images:
-                        if image_path[0]:
-                            from matterhorn.defs_db import upload_image_to_bucket_and_get_url
-                            new_image_path = upload_image_to_bucket_and_get_url(
-                                image_path[0], mapped_product_id)
-                            if new_image_path:
-                                mpd_cursor.execute("""
-                                    INSERT INTO product_images (product_id, file_path)
-                                    VALUES (%s, %s)
-                                    ON CONFLICT (product_id, file_path) DO NOTHING
-                                """, [mapped_product_id, new_image_path])
-
-                connections['matterhorn'].commit()
-                connections['MPD'].commit()
-                return JsonResponse({'success': True, 'message': 'Nowe warianty zostały dodane do MPD (jeśli były do dodania).'})
+                return JsonResponse({'success': False, 'error': 'Nieprawidłowe pole lub brak obsługi.'})
 
             except Exception as e:
                 logger.error(
-                    f"Błąd podczas aktualizacji wariantów produktu {product_id}: {str(e)}")
+                    f"Błąd podczas aktualizacji produktu {product_id}: {str(e)}")
                 return JsonResponse({'success': False, 'error': str(e)})
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
@@ -908,6 +894,16 @@ class ProductsAdmin(admin.ModelAdmin):
         except Exception as e:
             logger.error(f"Błąd pobierania ścieżek z MPD: {e}")
             extra_context['mpd_paths'] = []
+        # Pobierz aktualnie przypisane ścieżki do produktu (jeśli zmapowany)
+        mapped_id = getattr(product, 'mapped_product_id', None)
+        if mapped_id:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute(
+                    "SELECT path_id FROM product_path WHERE product_id = %s", [mapped_id])
+                selected_paths = [row[0] for row in cursor.fetchall()]
+            extra_context['selected_paths'] = selected_paths
+        else:
+            extra_context['selected_paths'] = []
         # Pobierz kategorie rozmiarów z MPD
         try:
             with connections['MPD'].cursor() as cursor:
@@ -939,7 +935,6 @@ class ProductsAdmin(admin.ModelAdmin):
 
         # Pobierz listę zestawów powiązanych z produktem w MPD
         product_sets = []
-        mapped_id = getattr(product, 'mapped_product_id', None)
         if mapped_id:
             with connections['MPD'].cursor() as cursor:
                 # Najpierw pobierz ID zestawów, do których należy produkt
