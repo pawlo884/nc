@@ -441,6 +441,15 @@ class ProductsAdmin(admin.ModelAdmin):
                         logger.info(
                             f"Utworzono nowy produkt w MPD z ID {new_product_id}")
 
+                        # --- DODAJ: zapis ścieżek produktu ---
+                        mpd_paths = request.POST.getlist('mpd_paths')
+                        if mpd_paths:
+                            for path_id in mpd_paths:
+                                cursor.execute(
+                                    "INSERT INTO product_path (product_id, path_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                                    [new_product_id, path_id]
+                                )
+
                         # --- LOGIKA ZESTAWÓW (wiele-do-wielu) ---
                         if product_set_id:
                             # Sprawdź czy produkt o podanym ID istnieje
@@ -889,7 +898,16 @@ class ProductsAdmin(admin.ModelAdmin):
     def change_view(self, request, object_id, form_url='', extra_context=None):
         extra_context = extra_context or {}
         product = self.get_object(request, object_id)
-
+        # Pobierz dostępne ścieżki z MPD
+        try:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute("SELECT id, name, path FROM path ORDER BY name")
+                mpd_paths = [{'id': row[0], 'name': row[1], 'path': row[2]}
+                             for row in cursor.fetchall()]
+            extra_context['mpd_paths'] = mpd_paths
+        except Exception as e:
+            logger.error(f"Błąd pobierania ścieżek z MPD: {e}")
+            extra_context['mpd_paths'] = []
         # Pobierz kategorie rozmiarów z MPD
         try:
             with connections['MPD'].cursor() as cursor:
