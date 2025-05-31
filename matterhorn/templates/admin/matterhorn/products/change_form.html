@@ -303,7 +303,20 @@
                             </option>
                         {% endfor %}
                     </select>
-                    <button type="button" onclick="savePaths()" style="margin-left:10px;">Zapisz</button>
+                    <button type="button" onclick="addPaths()" style="margin-left:10px;">Dodaj</button>
+                </div>
+                <div class="form-row">
+                    <label>Przypisane ścieżki:</label>
+                    <ul style="list-style: none; padding: 0;">
+                        {% for path in mpd_paths %}
+                            {% if path.id in selected_paths %}
+                                <li style="display: flex; align-items: center; margin-bottom: 5px;">
+                                    <span style="flex-grow: 1;">{{ path.name }} ({{ path.path }})</span>
+                                    <button type="button" class="remove-path-btn" data-path-id="{{ path.id }}" style="background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 8px; cursor: pointer; margin-left: 10px;">×</button>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
                 </div>
                 <div class="form-row" style="margin-bottom: 10px;">
                     <b>ID w MPD:</b> {{ original.mapped_product_id|default:'-' }}
@@ -501,6 +514,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    // Dodaj obsługę przycisków usuwania ścieżek
+    document.querySelectorAll('.remove-path-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const pathId = this.getAttribute('data-path-id');
+            removePath(pathId);
+        });
+    });
 });
 
 function addToSetInline(productId) {
@@ -551,7 +572,7 @@ function showInlineStatus(msg, success) {
     setTimeout(() => { el.style.display = 'none'; }, 2500);
 }
 
-function savePaths() {
+function addPaths() {
     const formData = new FormData();
     const select = document.getElementById('mpd_paths');
     for (const option of select.selectedOptions) {
@@ -567,7 +588,26 @@ function savePaths() {
     })
     .then(response => response.json())
     .then(data => {
-        alert(data.success ? 'Zaktualizowano ścieżki!' : (data.error || 'Błąd aktualizacji ścieżek.'));
+        showInlineStatus(data.success ? 'Dodano ścieżki!' : (data.error || 'Błąd dodawania ścieżek.'), data.success);
+        if(data.success) window.location.reload();
+    });
+}
+
+function removePath(pathId) {
+    const productId = {{ original.id }};
+    const formData = new FormData();
+    formData.append('remove_path_id', pathId);
+    
+    fetch(`/admin/matterhorn/products/mpd-update/${productId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        showInlineStatus(data.success ? 'Usunięto ścieżkę!' : (data.error || 'Błąd usuwania ścieżki.'), data.success);
         if(data.success) window.location.reload();
     });
 }

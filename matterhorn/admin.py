@@ -103,18 +103,26 @@ class ProductsAdmin(admin.ModelAdmin):
                         return JsonResponse({'success': False, 'error': 'Produkt nie jest zmapowany'})
                     mapped_product_id = result[0]
 
-                # Aktualizacja ścieżek
+                # Dodawanie ścieżek (nie usuwaj istniejących)
                 mpd_paths = request.POST.getlist('mpd_paths')
                 if mpd_paths and len(request.POST) == 1:
                     with connections['MPD'].cursor() as cursor:
-                        cursor.execute("DELETE FROM product_path WHERE product_id = %s", [
-                                       mapped_product_id])
                         for path_id in mpd_paths:
                             cursor.execute(
                                 "INSERT INTO product_path (product_id, path_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                                 [mapped_product_id, path_id]
                             )
-                    return JsonResponse({'success': True, 'message': 'Zaktualizowano ścieżki.'})
+                    return JsonResponse({'success': True, 'message': 'Dodano ścieżki.'})
+
+                # Usuwanie ścieżki
+                remove_path_id = request.POST.get('remove_path_id')
+                if remove_path_id and len(request.POST) == 1:
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute(
+                            "DELETE FROM product_path WHERE product_id = %s AND path_id = %s",
+                            [mapped_product_id, remove_path_id]
+                        )
+                    return JsonResponse({'success': True, 'message': 'Usunięto ścieżkę.'})
 
                 # Aktualizacja nazwy
                 if 'mpd_name' in request.POST and len(request.POST) == 1:
