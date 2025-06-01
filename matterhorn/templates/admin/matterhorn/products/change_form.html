@@ -249,6 +249,31 @@
                     <button type="button" onclick="updateField('description', 'mpd_description')">Zapisz</button>
                 </div>
                 <div class="form-row">
+                    <label for="mpd_attributes">Atrybuty:</label>
+                    <select multiple name="mpd_attributes" id="mpd_attributes" size="10" style="width: 100%;">
+                        {% for attribute in mpd_attributes %}
+                        <option value="{{ attribute.id }}" {% if attribute.id in selected_attributes %}selected{% endif %}>
+                            {{ attribute.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="help" style="margin-top: 5px; color: #666;">Wybierz atrybuty produktu. Możesz wybrać wiele atrybutów trzymając Ctrl.</div>
+                    <button type="button" onclick="updateAttributes()">Zapisz atrybuty</button>
+                </div>
+                <div class="form-row">
+                    <label>Przypisane atrybuty:</label>
+                    <ul style="list-style: none; padding: 0;">
+                        {% for attribute in mpd_attributes %}
+                            {% if attribute.id in selected_attributes %}
+                                <li style="display: flex; align-items: center; margin-bottom: 5px;">
+                                    <span style="flex-grow: 1;">{{ attribute.name }}</span>
+                                    <button type="button" class="remove-attribute-btn" data-attribute-id="{{ attribute.id }}" style="background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 8px; cursor: pointer; margin-left: 10px;">×</button>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="form-row">
                     <label for="mpd_brand">Marka:</label>
                     <input type="text" id="mpd_brand" name="mpd_brand" value="{{ mpd_data.brand }}">
                     <button type="button" onclick="updateField('brand_id', 'mpd_brand')">Zapisz</button>
@@ -490,6 +515,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Dodaj obsługę przycisków usuwania ścieżek
+    document.querySelectorAll('.remove-path-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const pathId = this.getAttribute('data-path-id');
+            removePath(pathId);
+        });
+    });
+
+    // Dodaj obsługę przycisków usuwania atrybutów
+    document.querySelectorAll('.remove-attribute-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const attributeId = this.getAttribute('data-attribute-id');
+            removeAttribute(attributeId);
+        });
+    });
+
     // Dodaj obsługę przycisku "Utwórz nowy produkt w MPD"
     const createBtn = document.getElementById('create-mpd-product-btn');
     if (createBtn) {
@@ -499,6 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const statusMessage = document.getElementById('status-message');
             statusMessage.className = 'status-message';
             statusMessage.textContent = 'Tworzenie produktu w MPD...';
+            
             fetch(`/admin/matterhorn/products/mpd-create/${productId}/`, {
                 method: 'POST',
                 headers: {
@@ -510,18 +552,17 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
                 statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
-                if (data.success) setTimeout(() => { window.location.reload(); }, 1500);
+                if (data.success) {
+                    setTimeout(() => { window.location.reload(); }, 1500);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusMessage.className = 'status-message error';
+                statusMessage.textContent = 'Wystąpił błąd podczas tworzenia produktu MPD.';
             });
         });
     }
-
-    // Dodaj obsługę przycisków usuwania ścieżek
-    document.querySelectorAll('.remove-path-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            const pathId = this.getAttribute('data-path-id');
-            removePath(pathId);
-        });
-    });
 });
 
 function addToSetInline(productId) {
@@ -609,6 +650,62 @@ function removePath(pathId) {
     .then(data => {
         showInlineStatus(data.success ? 'Usunięto ścieżkę!' : (data.error || 'Błąd usuwania ścieżki.'), data.success);
         if(data.success) window.location.reload();
+    });
+}
+
+function removeAttribute(attributeId) {
+    const productId = {{ original.id }};
+    const formData = new FormData();
+    formData.append('remove_attribute_id', attributeId);
+    
+    fetch(`/admin/matterhorn/products/mpd-update/${productId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        showInlineStatus(data.success ? 'Usunięto atrybut!' : (data.error || 'Błąd usuwania atrybutu.'), data.success);
+        if(data.success) window.location.reload();
+    });
+}
+
+function updateAttributes() {
+    const attributesSelect = document.getElementById('mpd_attributes');
+    const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
+    
+    fetch(`/admin/matterhorn/products/mpd-update/{{ original.id }}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: new URLSearchParams({
+            'mpd_attributes': selectedAttributes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        const statusMessage = document.getElementById('inline-status-message');
+        statusMessage.style.display = 'block';
+        if (data.success) {
+            statusMessage.className = 'status-message success';
+            statusMessage.textContent = data.message;
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            statusMessage.className = 'status-message error';
+            statusMessage.textContent = 'Błąd: ' + data.error;
+        }
+    })
+    .catch(error => {
+        const statusMessage = document.getElementById('inline-status-message');
+        statusMessage.style.display = 'block';
+        statusMessage.className = 'status-message error';
+        statusMessage.textContent = 'Błąd: ' + error;
     });
 }
 </script>
