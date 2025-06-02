@@ -104,16 +104,15 @@ services:
 
   redis:
       image: redis:latest
-      # Usuwam mapowanie portu na hosta
-      # ports:
-      #   - "6379:6379"
+      volumes:
+        - ./redis.conf:/usr/local/etc/redis/redis.conf
       environment:
         - TZ=Europe/Warsaw
-        - REDIS_PASSWORD=${REDIS_PASSWORD:-twoje_silne_haslo}  # Dodajemy hasło
+        - REDIS_PASSWORD=${REDIS_PASSWORD:-twoje_silne_haslo}
       restart: always
       networks:
         - app_network
-      command: redis-server --requirepass ${REDIS_PASSWORD:-twoje_silne_haslo} --maxmemory 100mb --maxmemory-policy allkeys-lru
+      command: redis-server /usr/local/etc/redis/redis.conf
 
   flower:
     image: ${DOCKERHUB_USERNAME}/django-app:latest
