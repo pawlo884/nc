@@ -31,17 +31,6 @@ jobs:
         push: true
         tags: ${{ env.DOCKERHUB_USERNAME }}/django-app:latest
         
-    - name: Debug SSH Key
-      run: |
-        echo "Checking if DEPLOY_KEY is set..."
-        if [ -n "${{ secrets.DEPLOY_KEY }}" ]; then
-          echo "DEPLOY_KEY is set"
-          echo "First line of key:"
-          echo "${{ secrets.DEPLOY_KEY }}" | head -n 1
-        else
-          echo "DEPLOY_KEY is not set"
-        fi
-        
     - name: Deploy to DigitalOcean
       uses: appleboy/ssh-action@master
       with:
@@ -55,7 +44,6 @@ jobs:
           echo "Testing connection..."
           whoami
           pwd
-          ls -la ~/.ssh/
           echo "Creating /srv/app directory..."
           sudo mkdir -p /srv/app
           sudo chown ${{ secrets.DROPLET_USERNAME }}:${{ secrets.DROPLET_USERNAME }} /srv/app
@@ -111,10 +99,4 @@ jobs:
           echo "Nginx logs:"
           docker-compose logs nginx
           echo "Container status:"
-          docker-compose ps
-          echo "Nginx configuration:"
-          cat nginx.conf
-          echo "Environment variables:"
-          env | grep DOCKERHUB_USERNAME
-          echo "Docker compose file:"
-          cat docker-compose.yml 
+          docker-compose ps 
