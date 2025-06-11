@@ -382,8 +382,8 @@ def update_inventory_v3():
         data_length_inventory = 0
 
         # Budowanie URL do pobrania danych z API
-        b_url = f"{base_url_items}?page={page}&last_update={update_date}%20{encoded_time}&limit=500"
-        i_url = f"{base_url_inventory}?page={page}&last_update={update_date}%20{encoded_time}&limit=500"
+        b_url = f"{base_url_items}?page={page}&last_update={update_date}%20{encoded_time}&limit=100"
+        i_url = f"{base_url_inventory}?page={page}&last_update={update_date}%20{encoded_time}&limit=100"
 
         logger.info(
             f"PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
