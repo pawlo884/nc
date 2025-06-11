@@ -456,6 +456,7 @@ def update_inventory_v3():
                     cursor = connection.cursor()
 
                     # Iteracja po danych z API ITEMS
+                    
                     logger.info(
                         f"Rozpoczynam przetwarzanie {len(data_items)} produktów z API ITEMS")
                     for item in data_items:
