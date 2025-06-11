@@ -798,11 +798,6 @@ def update_inventory_v3():
         if data_length == 0 and data_length_inventory == 0:
             break
 
-        # Po zakończeniu iteracji zwiększ page o 1
-        page = page + 1
-        logger.info(f"Przechodzę do strony {page}")
-        time.sleep(1)  # Zachowano opóźnienie po każdej iteracji
-
     # Ostateczne zapisanie informacji o aktualizacji
     update_last_update_time(start_time, total_data_length,
                             total_data_length_inventory, total_data_items, total_data_inventory)
