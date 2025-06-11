@@ -7,11 +7,13 @@ services:
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
+      - media_volume:/app/media
     env_file:
       - .env.${ENVIRONMENT:-prod}
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw
+      - DJANGO_ENV=prod
     restart: always
     networks:
       - app_network

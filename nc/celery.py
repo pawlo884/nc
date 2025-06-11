@@ -1,7 +1,9 @@
 from celery import Celery
 import os
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nc.settings.dev')
+# Ustawienie odpowiedniego pliku ustawień w zależności od środowiska
+environment = os.getenv('DJANGO_ENV', 'dev')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', f'nc.settings.{environment}')
 
 app = Celery('nc')
 app.config_from_object('django.conf:settings', namespace='CELERY')
@@ -28,8 +30,9 @@ app.conf.worker_prefetch_multiplier = 1
 app.conf.task_acks_late = True
 
 # Konfiguracja brokera i backendu
-app.conf.broker_url = 'redis://redis:6379/0'
-app.conf.result_backend = 'redis://redis:6379/0'
+redis_password = os.getenv('REDIS_PASSWORD', 'prod_password')
+app.conf.broker_url = f'redis://:{redis_password}@redis:6379/0'
+app.conf.result_backend = f'redis://:{redis_password}@redis:6379/0'
 
 # Konfiguracja serializacji
 app.conf.task_serializer = 'json'
@@ -47,8 +50,6 @@ app.conf.task_track_started = True
 app.conf.task_ignore_result = False
 app.conf.task_store_eager_result = True
 app.conf.task_events = True
-app.conf.worker_send_task_events = True
-app.conf.task_send_sent_event = True
 
 # Konfiguracja workerów
 app.conf.worker_pool_restarts = True
