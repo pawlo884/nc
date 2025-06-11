@@ -79,196 +79,182 @@ def import_all_by_one():
     base_url = "https://matterhorn.pl/B2BAPI/ITEMS/"
     logger.info(f"Używany URL: {base_url}")
 
-    for i in range(last_id + 1, last_id + 100):
-        url = f"{base_url}{i}"
-        logger.info(f"Pobieranie danych z: {url}")
+    connection = None
+    try:
+        connection = connect_to_postgresql('matterhorn')
+        create_tables_if_not_exist(connection)
 
-        attempt = 1
-        max_attempts = 1000
-        json_decode_attempts = 0
-        max_json_decode_attempts = 1000
-        db_connection_attempts = 0
-        max_db_connection_attempts = 1000
+        for i in range(last_id + 1, last_id + 100):
+            url = f"{base_url}{i}"
+            logger.info(f"Pobieranie danych z: {url}")
 
-        while attempt <= max_attempts:
-            try:
-                response = requests.get(url, headers=headersMatterhorn)
+            attempt = 1
+            max_attempts = 10
+            json_decode_attempts = 0
+            max_json_decode_attempts = 10
 
-                time.sleep(0.6)
+            while attempt <= max_attempts:
+                try:
+                    response = requests.get(url, headers=headersMatterhorn)
+                    time.sleep(0.6)
 
-                if response.status_code == 200:
-                    try:
-                        # Sprawdzamy czy odpowiedź nie jest pusta
-                        if not response.text.strip():
-                            logger.warning(f"Pusta odpowiedź dla URL: {url}")
-                            break
-
-                        item = response.json()
-                        logger.debug(
-                            f"Przetworzono JSON: {json.dumps(item, indent=2)[:500]}")
-                        json_decode_attempts = 0
-
-                        if item.get("creation_date") is None:
-                            null_count += 1
-                            logger.warning(
-                                f"Pominięto import dla URL: {url} ponieważ creation_date jest NULL. {null_count}")
-                            if null_count >= 5:
+                    if response.status_code == 200:
+                        try:
+                            if not response.text.strip():
                                 logger.warning(
-                                    f"Pole 'creation_date' jest puste dla {null_count} kolejnych importów. Koniec importu")
-                                return
-                            break
-                        else:
-                            null_count = 0
-
-                        logger.info(
-                            f"Pobrano produkt ID: {item['id']}, Nazwa: {item['name']}")
-                        yield item
-
-                        if 'url' in item and isinstance(item['url'], str):
-                            item['url'] = item['url'].replace(
-                                'http://matterhorn-wholesale.com', 'http://matterhorn.pl')
-
-                        price = item["prices"].get("PLN", None)
-                        item_data = (
-                            item["id"],
-                            item["active"],
-                            item["name"].lstrip(),
-                            item["name_without_number"].lstrip(),
-                            item["description"],
-                            item["creation_date"],
-                            item["color"],
-                            item["category_name"],
-                            item["category_id"],
-                            item["category_path"],
-                            item["brand_id"],
-                            item["brand"],
-                            item["stock_total"],
-                            item["url"],
-                            item["new_collection"],
-                            item["size_table"],
-                            item["weight"],
-                            item["size_table_txt"],
-                            item["size_table_html"],
-                            price
-                        )
-
-                        if item.get("images"):
-                            images_data = [
-                                (image.split('_')[-1].split('.jpg')[0], image, item["id"]) for image in item["images"]
-                            ]
-                        else:
-                            images_data = []
-
-                        variants_data = []
-                        if isinstance(item.get("variants"), list):
-                            variants_data = [
-                                (
-                                    int(variant["variant_uid"]),
-                                    variant["name"],
-                                    int(variant["stock"]),
-                                    int(variant["max_processing_time"]),
-                                    variant["ean"],
-                                    item["id"]
-                                )
-                                for variant in item["variants"]
-                            ]
-
-                        other_colors = []
-                        if isinstance(item.get("other_colors"), list):
-                            for color_id in item.get("other_colors", []):
-                                product_id = item["id"]
-                                color_product_id = int(color_id)
-
-                                if product_id != color_product_id:
-                                    other_colors.append(
-                                        (product_id, color_product_id))
-
-                        product_sets = []
-                        if isinstance(item.get("products_in_set"), list):
-                            for product_in_set_id in item.get("products_in_set", []):
-                                product_id = item["id"]
-                                related_product_id = int(product_in_set_id)
-
-                                if product_id != related_product_id:
-                                    product_sets.append(
-                                        (product_id, related_product_id))
-
-                        # Próba połączenia z bazą danych z ponownymi próbami
-                        while db_connection_attempts < max_db_connection_attempts:
-                            try:
-                                connection = connect_to_postgresql(
-                                    'matterhorn')
-                                create_tables_if_not_exist(connection)
-                                import_insert_item(
-                                    connection, item_data, images_data, variants_data, other_colors, product_sets)
-                                connection.close()
-                                logger.info(
-                                    f"Zapisano produkt ID: {item['id']} do bazy danych")
-                                db_connection_attempts = 0
+                                    f"Pusta odpowiedź dla URL: {url}")
                                 break
-                            except Exception as e:
-                                db_connection_attempts += 1
-                                logger.error(
-                                    f"Błąd połączenia z bazą danych (próba {db_connection_attempts}/{max_db_connection_attempts}): {str(e)}")
-                                if db_connection_attempts < max_db_connection_attempts:
-                                    time.sleep(5)
-                                else:
-                                    logger.error(
-                                        "Osiągnięto maksymalną liczbę prób połączenia z bazą danych. Przechodzę do następnego produktu.")
-                                    break
 
-                        break
-                    except json.JSONDecodeError as e:
-                        json_decode_attempts += 1
-                        if json_decode_attempts < max_json_decode_attempts:
-                            logger.error(
-                                f"Błąd dekodowania JSON dla URL: {url}. Próba {json_decode_attempts} z {max_json_decode_attempts}. Błąd: {str(e)}")
+                            item = response.json()
                             logger.debug(
-                                f"Treść odpowiedzi: {response.text[:500]}")
-                            logger.info("Ponawiam próbę po 5 sekundach...")
-                            time.sleep(5)
-                            continue
-                        else:
+                                f"Przetworzono JSON: {json.dumps(item, indent=2)[:500]}")
+                            json_decode_attempts = 0
+
+                            if item.get("creation_date") is None:
+                                null_count += 1
+                                logger.warning(
+                                    f"Pominięto import dla URL: {url} ponieważ creation_date jest NULL. {null_count}")
+                                if null_count >= 5:
+                                    logger.warning(
+                                        f"Pole 'creation_date' jest puste dla {null_count} kolejnych importów. Koniec importu")
+                                    return
+                                break
+                            else:
+                                null_count = 0
+
+                            logger.info(
+                                f"Pobrano produkt ID: {item['id']}, Nazwa: {item['name']}")
+                            yield item
+
+                            if 'url' in item and isinstance(item['url'], str):
+                                item['url'] = item['url'].replace(
+                                    'http://matterhorn-wholesale.com', 'http://matterhorn.pl')
+
+                            price = item["prices"].get("PLN", None)
+                            item_data = (
+                                item["id"],
+                                item["active"],
+                                item["name"].lstrip(),
+                                item["name_without_number"].lstrip(),
+                                item["description"],
+                                item["creation_date"],
+                                item["color"],
+                                item["category_name"],
+                                item["category_id"],
+                                item["category_path"],
+                                item["brand_id"],
+                                item["brand"],
+                                item["stock_total"],
+                                item["url"],
+                                item["new_collection"],
+                                item["size_table"],
+                                item["weight"],
+                                item["size_table_txt"],
+                                item["size_table_html"],
+                                price
+                            )
+
+                            if item.get("images"):
+                                images_data = [
+                                    (image.split('_')[-1].split('.jpg')[0], image, item["id"]) for image in item["images"]
+                                ]
+                            else:
+                                images_data = []
+
+                            variants_data = []
+                            if isinstance(item.get("variants"), list):
+                                variants_data = [
+                                    (
+                                        int(variant["variant_uid"]),
+                                        variant["name"],
+                                        int(variant["stock"]),
+                                        int(variant["max_processing_time"]),
+                                        variant["ean"],
+                                        item["id"]
+                                    )
+                                    for variant in item["variants"]
+                                ]
+
+                            other_colors = []
+                            if isinstance(item.get("other_colors"), list):
+                                for color_id in item.get("other_colors", []):
+                                    product_id = item["id"]
+                                    color_product_id = int(color_id)
+                                    if product_id != color_product_id:
+                                        other_colors.append(
+                                            (product_id, color_product_id))
+
+                            product_sets = []
+                            if isinstance(item.get("products_in_set"), list):
+                                for product_in_set_id in item.get("products_in_set", []):
+                                    product_id = item["id"]
+                                    related_product_id = int(product_in_set_id)
+                                    if product_id != related_product_id:
+                                        product_sets.append(
+                                            (product_id, related_product_id))
+
+                            try:
+                                with transaction.atomic():
+                                    import_insert_item(
+                                        connection, item_data, images_data, variants_data, other_colors, product_sets)
+                                    logger.info(
+                                        f"Zapisano produkt ID: {item['id']} do bazy danych")
+                            except Exception as e:
+                                logger.error(
+                                    f"Błąd podczas zapisywania produktu ID={item['id']}: {str(e)}")
+                                raise
+
+                            break
+                        except json.JSONDecodeError as e:
+                            json_decode_attempts += 1
+                            if json_decode_attempts < max_json_decode_attempts:
+                                logger.error(
+                                    f"Błąd dekodowania JSON dla URL: {url}. Próba {json_decode_attempts} z {max_json_decode_attempts}. Błąd: {str(e)}")
+                                logger.debug(
+                                    f"Treść odpowiedzi: {response.text[:500]}")
+                                logger.info("Ponawiam próbę po 5 sekundach...")
+                                time.sleep(5)
+                                continue
+                            else:
+                                logger.error(
+                                    f"Błąd dekodowania JSON dla URL: {url} po {max_json_decode_attempts} próbach. Błąd: {str(e)}")
+                                logger.debug(
+                                    f"Treść odpowiedzi: {response.text[:500]}")
+                                break
+                        except Exception as e:
                             logger.error(
-                                f"Błąd dekodowania JSON dla URL: {url} po {max_json_decode_attempts} próbach. Błąd: {str(e)}")
+                                f"Błąd podczas przetwarzania odpowiedzi dla URL: {url}. Błąd: {str(e)}")
                             logger.debug(
                                 f"Treść odpowiedzi: {response.text[:500]}")
                             break
-                    except Exception as e:
-                        logger.error(
-                            f"Błąd podczas przetwarzania odpowiedzi dla URL: {url}. Błąd: {str(e)}")
-                        logger.debug(
-                            f"Treść odpowiedzi: {response.text[:500]}")
-                        break
-                elif 500 <= response.status_code <= 600:
-                    logger.warning(
-                        f"Otrzymano kod odpowiedzi {response.status_code} dla URL: {url}. Próba {attempt} z {max_attempts}")
-                    if attempt < max_attempts:
-                        logger.info(
-                            "Odczekaj 10 sekund przed kolejną próbą...")
-                        time.sleep(10)
-                        attempt += 1
-                        continue
+                    elif 500 <= response.status_code <= 600:
+                        logger.warning(
+                            f"Otrzymano kod odpowiedzi {response.status_code} dla URL: {url}. Próba {attempt} z {max_attempts}")
+                        if attempt < max_attempts:
+                            logger.info(
+                                "Odczekaj 10 sekund przed kolejną próbą...")
+                            time.sleep(10)
+                            attempt += 1
+                        else:
+                            logger.error(
+                                f"Osiągnięto maksymalną liczbę prób dla URL: {url}")
+                            break
                     else:
-                        logger.error(
-                            f"Nie udało się nawiązać połączenia dla URL: {url} po {max_attempts} próbach.")
+                        logger.warning(
+                            f"Otrzymano nieoczekiwany kod odpowiedzi {response.status_code} dla URL: {url}")
                         break
-                else:
-                    logger.warning(
-                        f"Nieoczekiwany kod odpowiedzi {response.status_code} dla URL: {url}")
-                    logger.debug(f"Treść odpowiedzi: {response.text[:500]}")
+                except Exception as e:
+                    logger.error(
+                        f"Błąd podczas pobierania danych z URL: {url}. Błąd: {str(e)}")
                     break
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Błąd połączenia dla URL: {url}. Błąd: {str(e)}")
-                if attempt < max_attempts:
-                    logger.info("Odczekaj 10 sekund przed kolejną próbą...")
-                    time.sleep(10)
-                    attempt += 1
-                    continue
-                else:
-                    break
-
-    logger.info("Import produktów zakończony.")
+    finally:
+        if connection:
+            try:
+                connection.close()
+                logger.info("Zamknięto połączenie z bazą danych")
+            except Exception as e:
+                logger.error(
+                    f"Błąd podczas zamykania połączenia z bazą danych: {str(e)}")
 
 # OK
 
@@ -353,10 +339,9 @@ def round_down_to_10_minutes(dt):
 
 def log_update_error(last_update_time_rounded, description, error_message, start_time):
     try:
-        connection = connect_to_postgresql(
-            'matterhorn')  # Zmienione na PostgreSQL
+        connection = connect_to_postgresql('matterhorn')
         cursor = connection.cursor()
-        full_description = f"{description} (Czas aktualizacji: {start_time})"
+        full_description = f"{description} (Czas aktualizacji: {start_time}, Błąd: {error_message})"
         cursor.execute(
             "INSERT INTO update_log (last_update, description, data_items, data_inventory) VALUES (%s, %s, %s, %s)",
             (last_update_time_rounded, full_description,
@@ -398,7 +383,7 @@ def update_inventory_v3():
         logger.info(
             f"PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
         attempt = 1
-        max_attempts = 1000
+        max_attempts = 10
         connection = None
 
         while attempt <= max_attempts:
