@@ -374,6 +374,9 @@ def update_inventory_v3():
     total_data_length_inventory = 0
     total_data_items = []
     total_data_inventory = []
+    attempt = 1
+    max_attempts = 10
+    connection = None
 
     while True:
         # Budowanie URL do pobrania danych z API
@@ -382,9 +385,6 @@ def update_inventory_v3():
 
         logger.info(
             f"PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
-        attempt = 1
-        max_attempts = 10
-        connection = None
 
         while attempt <= max_attempts:
             try:
@@ -398,13 +398,9 @@ def update_inventory_v3():
                 logger.info(
                     f"Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
 
-                # Dodajemy logi dla treści odpowiedzi
-                logger.debug(
-                    f"Treść odpowiedzi ITEMS: {response_items.text[:500]}")
-                logger.debug(
-                    f"Treść odpowiedzi INVENTORY: {response_inventory.text[:500]}")
-
                 if response_items.status_code == 200 and response_inventory.status_code == 200:
+                    # Reset licznika prób po udanym połączeniu
+                    attempt = 1
                     logger.info("Pomyślnie pobrano dane z API.")
                     if response_items.text and response_inventory.text:
                         try:
