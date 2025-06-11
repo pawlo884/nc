@@ -1,7 +1,9 @@
+import os
 from .base import *
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!')
+SECRET_KEY = os.getenv(
+    'DJANGO_SECRET_KEY', 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -27,4 +29,8 @@ SECURE_FRAME_DENY = False
 
 # Dodatkowe ustawienia dla proxy
 USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = None 
+SECURE_PROXY_SSL_HEADER = None
+
+# Celery Configuration
+CELERY_BROKER_URL = f'redis://:{os.getenv("REDIS_PASSWORD", "prod_password")}@redis:6379/0'
+CELERY_RESULT_BACKEND = f'redis://:{os.getenv("REDIS_PASSWORD", "prod_password")}@redis:6379/0'

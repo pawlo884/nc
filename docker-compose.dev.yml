@@ -14,6 +14,7 @@ services:
       - TZ=Europe/Warsaw
       - PYTHONUNBUFFERED=1
       - DJANGO_DEBUG=1
+      - REDIS_PASSWORD=dev_password
     restart: always
     networks:
       - app_network
@@ -33,8 +34,9 @@ services:
       - CELERY_STATE_DB=/var/lib/celery/worker_state_import
       - TZ=Europe/Warsaw
       - C_FORCE_ROOT=true
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_PASSWORD=dev_password
+      - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
@@ -58,8 +60,9 @@ services:
       - CELERY_STATE_DB=/var/lib/celery/worker_state_default
       - TZ=Europe/Warsaw
       - C_FORCE_ROOT=true
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_PASSWORD=dev_password
+      - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
@@ -80,8 +83,9 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
       - TZ=Europe/Warsaw
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_PASSWORD=dev_password
+      - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
     depends_on:
       - web
       - redis
@@ -91,7 +95,7 @@ services:
 
   flower:
     build: .
-    command: [ "/bin/bash", "-c", "sleep 120 && celery -A nc.celery --broker=redis://redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 " ]
+    command: [ "/bin/bash", "-c", "sleep 120 && celery -A nc.celery --broker=redis://:dev_password@redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30" ]
     ports:
       - "5555:5555"
     volumes:
@@ -103,8 +107,9 @@ services:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
       - TZ=Europe/Warsaw
       - C_FORCE_ROOT=true
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_PASSWORD=dev_password
+      - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
@@ -127,10 +132,11 @@ services:
       - "6379:6379"
     environment:
       - TZ=Europe/Warsaw
+      - REDIS_PASSWORD=dev_password
     restart: always
     networks:
       - app_network
-    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru --protected-mode no
+    command: redis-server --requirepass dev_password --maxmemory 100mb --maxmemory-policy allkeys-lru --protected-mode no
 
 volumes:
   static_volume:

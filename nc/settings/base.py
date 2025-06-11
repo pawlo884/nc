@@ -188,8 +188,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # Celery Configuration
-CELERY_BROKER_URL = f'redis://:{os.getenv("REDIS_PASSWORD", "twoje_silne_haslo")}@redis:6379/0'
-CELERY_RESULT_BACKEND = f'redis://:{os.getenv("REDIS_PASSWORD", "twoje_silne_haslo")}@redis:6379/0'
+CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
+CELERY_RESULT_BACKEND = 'redis://:dev_password@redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
