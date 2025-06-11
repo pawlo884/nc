@@ -16,7 +16,7 @@ services:
       - DJANGO_ENV=prod
     restart: always
     networks:
-      - app_network
+      - nc_network
     depends_on:
       - redis
 
@@ -35,7 +35,7 @@ services:
       - web
     restart: always
     networks:
-      - app_network
+      - nc_network
 
   celery-import:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
@@ -50,8 +50,8 @@ services:
         - CELERY_STATE_DB=/var/lib/celery/worker_state_import
         - TZ=Europe/Warsaw
         - C_FORCE_ROOT=true
-        - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-twoje_silne_haslo}@redis:6379/0
-        - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-twoje_silne_haslo}@redis:6379/0
+        - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+        - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
         - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
         - CELERY_WORKER_SEND_TASK_EVENTS=true
         - CELERY_TASK_SEND_SENT_EVENT=true
@@ -60,7 +60,7 @@ services:
         - redis
       restart: always
       networks:
-        - app_network
+        - nc_network
 
   celery-default:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
@@ -75,8 +75,8 @@ services:
         - CELERY_STATE_DB=/var/lib/celery/worker_state_default
         - TZ=Europe/Warsaw
         - C_FORCE_ROOT=true
-        - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-twoje_silne_haslo}@redis:6379/0
-        - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-twoje_silne_haslo}@redis:6379/0
+        - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+        - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
         - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
         - CELERY_WORKER_SEND_TASK_EVENTS=true
         - CELERY_TASK_SEND_SENT_EVENT=true
@@ -85,7 +85,7 @@ services:
         - redis
       restart: always
       networks:
-        - app_network
+        - nc_network
 
   celery-beat:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
@@ -102,7 +102,7 @@ services:
         - redis
       restart: always
       networks:
-        - app_network
+        - nc_network
 
   redis:
     image: redis:7.2-alpine
@@ -121,7 +121,7 @@ services:
 
   flower:
     image: ${DOCKERHUB_USERNAME}/django-app:latest
-    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-twoje_silne_haslo}@redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-twoje_silne_haslo}@redis:6379/0"]
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0"]
     ports:
       - "5555:5555"
     volumes:
@@ -133,8 +133,8 @@ services:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw
       - C_FORCE_ROOT=true
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-twoje_silne_haslo}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-twoje_silne_haslo}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
@@ -149,7 +149,7 @@ services:
       - celery-import
       - celery-default
     networks:
-      - app_network
+      - nc_network
 
 volumes:
   redis_data:
@@ -164,7 +164,5 @@ volumes:
     driver: local
 
 networks:
-  app_network:
-    driver: bridge
   nc_network:
     driver: bridge
