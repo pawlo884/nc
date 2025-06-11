@@ -9,9 +9,9 @@ from celery.signals import worker_ready
 logger = logging.getLogger(__name__)
 
 
-@worker_ready.connect
-def at_start(sender, **kwargs):
-    sender.app.send_task('MPD.tasks.track_recent_stock_changes')
+# @worker_ready.connect
+# def at_start(sender, **kwargs):
+#     sender.app.send_task('MPD.tasks.track_recent_stock_changes')
 
 
 @shared_task

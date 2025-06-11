@@ -54,7 +54,8 @@ app.conf.task_send_sent_event = True
 app.conf.worker_pool_restarts = True
 app.conf.worker_proc_alive_timeout = 60.0
 app.conf.worker_max_tasks_per_child = 1000
-app.conf.worker_state_db = os.getenv('CELERY_STATE_DB', '/var/lib/celery/worker_state')
+app.conf.worker_state_db = os.getenv(
+    'CELERY_STATE_DB', '/var/lib/celery/worker_state')
 app.conf.event_queue_ttl = 5.0
 app.conf.event_queue_expires = 60.0
 app.conf.worker_hijack_root_logger = False
@@ -88,5 +89,3 @@ app.conf.worker_send_task_events = True
 app.conf.task_send_sent_event = True
 
 app.autodiscover_tasks()
-
-

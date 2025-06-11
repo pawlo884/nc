@@ -380,22 +380,6 @@
     <button class="toggle-button">{% if is_mapped %}◀{% else %}▶{% endif %}</button>
 </div>
 
-<div style="margin: 20px 0;">
-  <span style="font-size: 15px; color: #555;">Variants:</span>
-  <div style="display: flex; flex-wrap: wrap; gap: 16px;">
-    {% for variant in variants %}
-      <div class="variant-box {% if variant.is_mapped %}variant-mapped{% endif %}" style="width: 300px;">
-        <b>Nazwa:</b> {{ variant.name }}<br>
-        <b>Stan:</b> {{ variant.stock }}<br>
-        <b>EAN:</b> {{ variant.ean }}<br>
-        <b>Czas przetwarzania:</b> {{ variant.processing_time|default:'-' }}<br>
-        <b>Mapped variant ID:</b> {{ variant.mapped_variant_id|default:'-' }}<br>
-        <b>Is mapped:</b> <span style="color: {% if variant.is_mapped %}#28a745{% else %}#d9534f{% endif %}; font-weight: bold;">{{ variant.is_mapped|yesno:'True,False' }}</span>
-      </div>
-    {% endfor %}
-  </div>
-</div>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const toggleButton = document.querySelector('.toggle-button');

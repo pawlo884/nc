@@ -1,4 +1,3 @@
-
 services:
   web:
     build: .
@@ -81,6 +80,8 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
       - TZ=Europe/Warsaw
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       - web
       - redis
@@ -90,7 +91,7 @@ services:
 
   flower:
     build: .
-    command: [ "/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://redis:6379/0" ]
+    command: [ "/bin/bash", "-c", "sleep 120 && celery -A nc.celery --broker=redis://redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 " ]
     ports:
       - "5555:5555"
     volumes:

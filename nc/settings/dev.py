@@ -1,3 +1,4 @@
+import socket
 from .base import *
 
 # SECURITY WARNING: keep the secret key used in production secret!
@@ -20,13 +21,17 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_FRAME_DENY = False
 
 # Debug Toolbar Configuration
-import socket
 hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
-INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.1.109'] + [ip[:-1] + '1' for ip in ips]
+INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.1.109'] + \
+    [ip[:-1] + '1' for ip in ips]
 
 DEBUG_TOOLBAR_CONFIG = {
     'SHOW_TOOLBAR_CALLBACK': lambda request: True,
     'SHOW_TEMPLATE_CONTEXT': True,
     'ENABLE_STACKTRACES': True,
     'SQL_WARNING_THRESHOLD': 500,  # milliseconds
-} 
+}
+
+# Celery Configuration for development
+CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
