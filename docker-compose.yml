@@ -150,7 +150,12 @@ services:
       - app_network
 
 volumes:
+  redis_data:
   static_volume:
+  media_volume:
+  postgres_data:
+  celery_beat_data:
+  celery_worker_data:
   nginx_logs:
   celery_data:
   flower_data:
