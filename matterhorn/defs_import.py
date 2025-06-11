@@ -398,14 +398,20 @@ def update_inventory_v3():
                 logger.info(
                     f"Status odpowiedzi API: {response_items.status_code} i {response_inventory.status_code}")
 
+                # Dodajemy logi dla treści odpowiedzi
+                logger.debug(
+                    f"Treść odpowiedzi ITEMS: {response_items.text[:500]}")
+                logger.debug(
+                    f"Treść odpowiedzi INVENTORY: {response_inventory.text[:500]}")
+
                 if response_items.status_code == 200 and response_inventory.status_code == 200:
                     # Reset licznika prób po udanym połączeniu
                     attempt = 1
                     logger.info("Pomyślnie pobrano dane z API.")
                     if response_items.text and response_inventory.text:
                         try:
-                            data_items = response_items.json()          # /ITEMS
-                            data_inventory = response_inventory.json()  # /INVENTORY
+                            data_items = response_items.json()
+                            data_inventory = response_inventory.json()
                             logger.info(
                                 f"Liczba rekordów w odpowiedzi: ITEMS-{len(data_items)}, INVENTORY-{len(data_inventory)}")
                         except ValueError as e:
@@ -420,7 +426,7 @@ def update_inventory_v3():
                                 logger.error(
                                     "Osiągnięto maksymalną liczbę prób. Zapisuję błąd i kończę działanie.")
                                 log_update_error(
-                                    last_update_time_rounded, "Błąd konwersji danych z API", str(e), start_time)
+                                    last_update_time_rounded, "Błąd konwersji danych", str(e), start_time)
                                 return False
                     else:
                         logger.error("Odpowiedź API jest pusta.")
@@ -749,8 +755,17 @@ def update_inventory_v3():
                                  "Błąd konwersji danych", str(e), start_time)
             except Exception as e:
                 logger.error(f"Wystąpił błąd: {e}")
-                log_update_error(last_update_time_rounded,
-                                 "Błąd podczas aktualizacji", str(e), start_time)
+                if attempt < max_attempts:
+                    logger.info(
+                        f"Ponawiam próbę {attempt + 1}/{max_attempts} po 15 sekundach...")
+                    time.sleep(15)
+                    attempt += 1
+                else:
+                    logger.error(
+                        "Osiągnięto maksymalną liczbę prób. Zapisuję błąd i kończę działanie.")
+                    log_update_error(last_update_time_rounded,
+                                     "Błąd połączenia", str(e), start_time)
+                    return False
 
         # Jeśli brak danych, przerwij pętlę
         if data_length == 0 and data_length_inventory == 0:
