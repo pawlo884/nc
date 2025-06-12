@@ -487,7 +487,7 @@ def update_inventory_v3():
 
                                 logger.info(
                                     f"Przetwarzam produkt ID={id}")
-                                logger.info(
+                                logger.debug(
                                     f"Szczegóły produktu: active={active}, new_collection={new_collection}, color={color}, stock_total={stock_total}, price={price}")
 
                                 # Aktualizacja tabeli products
@@ -503,7 +503,7 @@ def update_inventory_v3():
                                 try:
                                     cursor.execute(
                                         update_products_query, (active, new_collection, price, color, stock_total, id))
-                                    logger.info(
+                                    logger.debug(
                                         f"Zaktualizowano produkt ID={id} w tabeli products")
                                 except Exception as e:
                                     logger.error(
@@ -621,7 +621,7 @@ def update_inventory_v3():
                                 # Commit po każdym produkcie
                                 try:
                                     connection.commit()
-                                    logger.info(
+                                    logger.debug(
                                         f"Zatwierdzono zmiany dla produktu ID={id}")
                                 except Exception as e:
                                     logger.error(
@@ -692,7 +692,7 @@ def update_inventory_v3():
                                     ean = str(variant.get("ean", ""))
                                     product_id = int(item["id"])
 
-                                    logger.info(
+                                    logger.debug(
                                         f"Przetwarzanie wariantu UID={variant_uid}, Stock={stock}, Name={name}, Ean={ean}")
 
                                     # upewnienie się, że rekord istnieje w tabeli products

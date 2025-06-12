@@ -89,4 +89,11 @@ app.conf.worker_enable_remote_control = True
 app.conf.worker_send_task_events = True
 app.conf.task_send_sent_event = True
 
+# Konfiguracja heartbeatów
+app.conf.broker_heartbeat = 10
+app.conf.broker_connection_timeout = 30
+app.conf.broker_connection_retry = True
+app.conf.broker_connection_max_retries = 10
+app.conf.broker_connection_retry_on_startup = True
+
 app.autodiscover_tasks()
