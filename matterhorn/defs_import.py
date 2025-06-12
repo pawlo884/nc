@@ -337,11 +337,11 @@ def round_down_to_10_minutes(dt):
     return dt.replace(minute=rounded_minute, second=0, microsecond=0)
 
 
-def log_update_error(last_update_time_rounded, description, error_message, start_time):
+def log_update_error(last_update_time_rounded, description, error_message, start_time, page=None):
     try:
         connection = connect_to_postgresql('matterhorn')
         cursor = connection.cursor()
-        full_description = f"{description} (Czas aktualizacji: {start_time}, Błąd: {error_message})"
+        full_description = f"{description} (Czas aktualizacji: {start_time}, Błąd: {error_message}, page={page})"
         cursor.execute(
             "INSERT INTO update_log (last_update, description, data_items, data_inventory) VALUES (%s, %s, %s, %s)",
             (last_update_time_rounded, full_description,
@@ -368,7 +368,30 @@ def update_inventory_v3():
     last_update_time_rounded = last_update_time[:-2] + "00"
     encoded_time = urllib.parse.quote(last_update_time_rounded.split(" ")[1])
     update_date = last_update_time_rounded.split(" ")[0]
+
+    # Sprawdzenie czy istnieje zapisana strona w description
+    connection = connect_to_postgresql('matterhorn')
+    cursor = connection.cursor()
+    cursor.execute("""
+        SELECT description FROM update_log 
+        WHERE description LIKE '%Błąd%' 
+        ORDER BY last_update DESC LIMIT 1
+    """)
+    last_error = cursor.fetchone()
     page = 1
+
+    if last_error and last_error[0]:
+        try:
+            # Próba wyciągnięcia numeru strony z description
+            import re
+            page_match = re.search(r'page=(\d+)', last_error[0])
+            if page_match:
+                page = int(page_match.group(1))
+                logger.info(f"Wznawiam aktualizację od strony {page}")
+        except Exception as e:
+            logger.error(f"Błąd podczas parsowania numeru strony: {e}")
+            page = 1
+
     total_data_length = 0
     total_data_length_inventory = 0
     total_data_items = []
@@ -425,7 +448,8 @@ def update_inventory_v3():
                                 break
 
                             # Połączenie z bazą danych
-                            connection = connect_to_postgresql('matterhorn')
+                            connection = connect_to_postgresql(
+                                'matterhorn')
                             logger.info("Połączono z bazą danych.")
                             time.sleep(1)
                             cursor = connection.cursor()
@@ -455,11 +479,13 @@ def update_inventory_v3():
                                 other_colors = item.get("other_colors", [])
                                 if other_colors is None:
                                     other_colors = []
-                                logger.debug(f"other_colors: {other_colors}")
+                                logger.debug(
+                                    f"other_colors: {other_colors}")
 
                                 price = item["prices"].get("PLN", None)
 
-                                logger.debug(f"Przetwarzam produkt ID={id}")
+                                logger.debug(
+                                    f"Przetwarzam produkt ID={id}")
                                 logger.debug(
                                     f"Szczegóły produktu: active={active}, new_collection={new_collection}, color={color}, stock_total={stock_total}, price={price}")
 
@@ -721,7 +747,8 @@ def update_inventory_v3():
                                     cursor.close()
                                     connection.close()
                             else:
-                                logger.error("Brak połączenia z bazą danych.")
+                                logger.error(
+                                    "Brak połączenia z bazą danych.")
 
                             # Po zakończeniu iteracji zwiększ page o 1
                             page = page + 1
@@ -731,7 +758,8 @@ def update_inventory_v3():
                             break
 
                         except ValueError as e:
-                            logger.error(f"Błąd konwersji danych z API: {e}")
+                            logger.error(
+                                f"Błąd konwersji danych z API: {e}")
                             if attempt < max_attempts:
                                 logger.info(
                                     f"Ponawiam próbę {attempt + 1}/{max_attempts} po 15 sekundach...")
@@ -742,7 +770,7 @@ def update_inventory_v3():
                                 logger.error(
                                     "Osiągnięto maksymalną liczbę prób. Zapisuję błąd i kończę działanie.")
                                 log_update_error(
-                                    last_update_time_rounded, "Błąd konwersji danych", str(e), start_time)
+                                    last_update_time_rounded, "Błąd konwersji danych", str(e), start_time, page)
                                 return False
                         except Exception as e:
                             logger.error(f"Wystąpił błąd: {e}")
@@ -756,12 +784,12 @@ def update_inventory_v3():
                                 logger.error(
                                     "Osiągnięto maksymalną liczbę prób. Zapisuję błąd i kończę działanie.")
                                 log_update_error(
-                                    last_update_time_rounded, "Błąd połączenia", str(e), start_time)
+                                    last_update_time_rounded, "Błąd połączenia", str(e), start_time, page)
                                 return False
                     else:
                         logger.error("Odpowiedź API jest pusta.")
                         log_update_error(
-                            last_update_time_rounded, "Pusta odpowiedź API", "Odpowiedź API jest pusta.", start_time)
+                            last_update_time_rounded, "Pusta odpowiedź API", "Odpowiedź API jest pusta.", start_time, page)
                         return False
                 else:
                     logger.warning(
@@ -776,7 +804,7 @@ def update_inventory_v3():
                         logger.error(
                             "Osiągnięto maksymalną liczbę prób. Zapisuję błąd i kończę działanie.")
                         log_update_error(last_update_time_rounded, "Błąd połączenia",
-                                         f"Status: {response_items.status_code} i {response_inventory.status_code}", start_time)
+                                         f"Status: {response_items.status_code} i {response_inventory.status_code}", start_time, page)
                         return False
 
             except Exception as e:
@@ -791,18 +819,18 @@ def update_inventory_v3():
                     logger.error(
                         "Osiągnięto maksymalną liczbę prób. Zapisuję błąd i kończę działanie.")
                     log_update_error(last_update_time_rounded,
-                                     "Błąd połączenia", str(e), start_time)
+                                     "Błąd połączenia", str(e), start_time, page)
                     return False
 
         # Jeśli brak danych, przerwij pętlę
         if data_length == 0 and data_length_inventory == 0:
             break
 
-    # Ostateczne zapisanie informacji o aktualizacji
+    # Aktualizacja czasu ostatniej aktualizacji tylko gdy cała aktualizacja zakończyła się sukcesem
     update_last_update_time(start_time, total_data_length,
                             total_data_length_inventory, total_data_items, total_data_inventory)
-    logger.info("Aktualizacja zakończona.")
-    return
+    logger.info("Aktualizacja zakończona pomyślnie.")
+    return True
 
 
 def update_last_update_time(start_time, total_data_length, total_data_length_inventory, total_data_items, total_data_inventory):
@@ -825,6 +853,7 @@ def update_last_update_time(start_time, total_data_length, total_data_length_inv
     except Exception as e:
         logger.error(
             f"Nie udało się zapisać czasu ostatniej aktualizacji: {e}")
+        raise  # Rzucamy wyjątek dalej, aby funkcja update_inventory_v3 mogła go obsłużyć
 
 
 def clean_update_log():
@@ -1122,8 +1151,8 @@ def export_to_products(modeladmin, request, queryset):
                                         variant_id = destination_cursor.fetchone()[
                                             0]
                                         destination_cursor.execute("""
-                                            INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
-                                            VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
+                                                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
                                                                    (variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2))
 
                                     destination_cursor.execute("""
