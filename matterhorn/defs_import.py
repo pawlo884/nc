@@ -63,10 +63,10 @@ def get_last_id():
 
 def import_all_by_one():
     load_dotenv('.env.dev')
-    logger.debug("Rozpoczynam import produktów...")
+    logger.info("Rozpoczynam import produktów...")
 
     last_id = get_last_id()
-    logger.debug(f"Ostatni ID w bazie: {last_id}")
+    logger.info(f"Ostatni ID w bazie: {last_id}")
     null_count = 0
     # Pobieramy nagłówki z .env
     api_key = os.getenv('api_key')
@@ -86,7 +86,7 @@ def import_all_by_one():
 
         for i in range(last_id + 1, last_id + 100):
             url = f"{base_url}{i}"
-            logger.debug(f"Pobieranie danych z: {url}")
+            logger.info(f"Pobieranie danych z: {url}")
 
             attempt = 1
             max_attempts = 10
@@ -122,7 +122,7 @@ def import_all_by_one():
                             else:
                                 null_count = 0
 
-                            logger.debug(
+                            logger.info(
                                 f"Pobrano produkt ID: {item['id']}, Nazwa: {item['name']}")
                             yield item
 
@@ -212,7 +212,7 @@ def import_all_by_one():
                                     f"Błąd dekodowania JSON dla URL: {url}. Próba {json_decode_attempts} z {max_json_decode_attempts}. Błąd: {str(e)}")
                                 logger.debug(
                                     f"Treść odpowiedzi: {response.text[:500]}")
-                                logger.debug(
+                                logger.info(
                                     "Ponawiam próbę po 5 sekundach...")
                                 time.sleep(5)
                                 continue
@@ -232,7 +232,7 @@ def import_all_by_one():
                         logger.warning(
                             f"Otrzymano kod odpowiedzi {response.status_code} dla URL: {url}. Próba {attempt} z {max_attempts}")
                         if attempt < max_attempts:
-                            logger.debug(
+                            logger.info(
                                 "Odczekaj 10 sekund przed kolejną próbą...")
                             time.sleep(10)
                             attempt += 1
@@ -252,7 +252,7 @@ def import_all_by_one():
         if connection:
             try:
                 connection.close()
-                logger.debug("Zamknięto połączenie z bazą danych")
+                logger.info("Zamknięto połączenie z bazą danych")
             except Exception as e:
                 logger.error(
                     f"Błąd podczas zamykania połączenia z bazą danych: {str(e)}")
@@ -357,7 +357,7 @@ def log_update_error(last_update_time_rounded, description, error_message, start
 
 
 def update_inventory_v3():
-    logger.debug("Rozpoczynam aktualizację stanów magazynowych.")
+    logger.info("Rozpoczynam aktualizację stanów magazynowych.")
     start_time = datetime.now(pytz.UTC).astimezone(
         pytz.timezone('Europe/Warsaw'))
     start_time = round_down_to_10_minutes(
@@ -365,7 +365,7 @@ def update_inventory_v3():
     base_url_items = "https://matterhorn.pl/B2BAPI/ITEMS/"
     base_url_inventory = "https://matterhorn.pl/B2BAPI/ITEMS/INVENTORY/"
     last_update_time = get_last_update_time()
-    logger.debug(f"Ostatnia aktualizacja: {last_update_time}")
+    logger.info(f"Ostatnia aktualizacja: {last_update_time}")
     last_update_time_rounded = last_update_time[:-2] + "00"
     encoded_time = urllib.parse.quote(last_update_time_rounded.split(" ")[1])
     update_date = last_update_time_rounded.split(" ")[0]
@@ -388,7 +388,7 @@ def update_inventory_v3():
             page_match = re.search(r'page=(\d+)', last_error[0])
             if page_match:
                 page = int(page_match.group(1))
-                logger.debug(f"Wznawiam aktualizację od strony {page}")
+                logger.info(f"Wznawiam aktualizację od strony {page}")
         except Exception as e:
             logger.error(f"Błąd podczas parsowania numeru strony: {e}")
             page = 1
@@ -426,7 +426,7 @@ def update_inventory_v3():
 
                 if response_items.status_code == 200 and response_inventory.status_code == 200:
                     attempt = 1
-                    logger.debug("Pomyślnie pobrano dane z API.")
+                    logger.info("Pomyślnie pobrano dane z API.")
                     if response_items.text and response_inventory.text:
                         try:
                             data_items = response_items.json()
@@ -451,7 +451,7 @@ def update_inventory_v3():
                             # Połączenie z bazą danych
                             connection = connect_to_postgresql(
                                 'matterhorn')
-                            logger.debug("Połączono z bazą danych.")
+                            logger.info("Połączono z bazą danych.")
                             time.sleep(1)
                             cursor = connection.cursor()
 
@@ -480,7 +480,7 @@ def update_inventory_v3():
                                 other_colors = item.get("other_colors", [])
                                 if other_colors is None:
                                     other_colors = []
-                                logger.info(
+                                logger.debug(
                                     f"other_colors: {other_colors}")
 
                                 price = item["prices"].get("PLN", None)
@@ -528,11 +528,11 @@ def update_inventory_v3():
                                         # Konwersja na int i walidacja
                                         set_pid = int(set_pid)
                                         if set_pid == id:
-                                            logger.info(
+                                            logger.debug(
                                                 f"Pominięto powiązanie zestawu - ten sam produkt: {id}")
                                             continue
 
-                                        logger.info(
+                                        logger.debug(
                                             f"Przetwarzam powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
 
                                         # Sprawdzenie istnienia produktów w transakcji
@@ -560,7 +560,7 @@ def update_inventory_v3():
                                                 update_product_in_set_query, (id, set_pid))
                                             cursor.execute(
                                                 update_product_in_set_query, (set_pid, id))
-                                            logger.info(
+                                            logger.debug(
                                                 f"Dodano dwukierunkowe powiązanie zestawu: {id} <-> {set_pid}")
 
                                     except ValueError as e:
@@ -584,7 +584,7 @@ def update_inventory_v3():
                                     if color_pid == id:
                                         continue
 
-                                    logger.info(
+                                    logger.debug(
                                         f"Przetwarzam powiązanie koloru: product_id={id}, color_product_id={color_pid}")
 
                                     # sprawdzanie istnienia "id" w tabeli "products"
@@ -611,7 +611,7 @@ def update_inventory_v3():
                                     try:
                                         cursor.execute(
                                             update_other_colors_query, (id, color_pid))
-                                        logger.info(
+                                        logger.debug(
                                             f"Dodano powiązanie koloru: product_id={id}, color_product_id={color_pid}")
                                     except Exception as e:
                                         logger.error(
@@ -753,7 +753,7 @@ def update_inventory_v3():
 
                             # Po zakończeniu iteracji zwiększ page o 1
                             page = page + 1
-                            logger.debug(f"Przechodzę do strony {page}")
+                            logger.info(f"Przechodzę do strony {page}")
                             # Zachowano opóźnienie po każdej iteracji
                             time.sleep(1)
                             break
@@ -830,7 +830,7 @@ def update_inventory_v3():
     # Aktualizacja czasu ostatniej aktualizacji tylko gdy cała aktualizacja zakończyła się sukcesem
     update_last_update_time(start_time, total_data_length,
                             total_data_length_inventory, total_data_items, total_data_inventory)
-    logger.debug("Aktualizacja zakończona pomyślnie.")
+    logger.info("Aktualizacja zakończona pomyślnie.")
     return True
 
 
@@ -850,7 +850,7 @@ def update_last_update_time(start_time, total_data_length, total_data_length_inv
         connection.commit()
         cursor.close()
         connection.close()
-        logger.debug(f"Zapisano czas ostatniej aktualizacji: {start_time}")
+        logger.info(f"Zapisano czas ostatniej aktualizacji: {start_time}")
     except Exception as e:
         logger.error(
             f"Nie udało się zapisać czasu ostatniej aktualizacji: {e}")
