@@ -106,7 +106,7 @@ def import_all_by_one():
                                 break
 
                             item = response.json()
-                            logger.debug(
+                            logger.info(
                                 f"Przetworzono JSON: {json.dumps(item, indent=2)[:500]}")
                             json_decode_attempts = 0
 
@@ -210,7 +210,7 @@ def import_all_by_one():
                             if json_decode_attempts < max_json_decode_attempts:
                                 logger.error(
                                     f"Błąd dekodowania JSON dla URL: {url}. Próba {json_decode_attempts} z {max_json_decode_attempts}. Błąd: {str(e)}")
-                                logger.debug(
+                                logger.info(
                                     f"Treść odpowiedzi: {response.text[:500]}")
                                 logger.info("Ponawiam próbę po 5 sekundach...")
                                 time.sleep(5)
@@ -218,13 +218,13 @@ def import_all_by_one():
                             else:
                                 logger.error(
                                     f"Błąd dekodowania JSON dla URL: {url} po {max_json_decode_attempts} próbach. Błąd: {str(e)}")
-                                logger.debug(
+                                logger.info(
                                     f"Treść odpowiedzi: {response.text[:500]}")
                                 break
                         except Exception as e:
                             logger.error(
                                 f"Błąd podczas przetwarzania odpowiedzi dla URL: {url}. Błąd: {str(e)}")
-                            logger.debug(
+                            logger.info(
                                 f"Treść odpowiedzi: {response.text[:500]}")
                             break
                     elif 500 <= response.status_code <= 600:
@@ -479,14 +479,14 @@ def update_inventory_v3():
                                 other_colors = item.get("other_colors", [])
                                 if other_colors is None:
                                     other_colors = []
-                                logger.debug(
+                                logger.info(
                                     f"other_colors: {other_colors}")
 
                                 price = item["prices"].get("PLN", None)
 
-                                logger.debug(
+                                logger.info(
                                     f"Przetwarzam produkt ID={id}")
-                                logger.debug(
+                                logger.info(
                                     f"Szczegóły produktu: active={active}, new_collection={new_collection}, color={color}, stock_total={stock_total}, price={price}")
 
                                 # Aktualizacja tabeli products
@@ -502,7 +502,7 @@ def update_inventory_v3():
                                 try:
                                     cursor.execute(
                                         update_products_query, (active, new_collection, price, color, stock_total, id))
-                                    logger.debug(
+                                    logger.info(
                                         f"Zaktualizowano produkt ID={id} w tabeli products")
                                 except Exception as e:
                                     logger.error(
@@ -527,11 +527,11 @@ def update_inventory_v3():
                                         # Konwersja na int i walidacja
                                         set_pid = int(set_pid)
                                         if set_pid == id:
-                                            logger.debug(
+                                            logger.info(
                                                 f"Pominięto powiązanie zestawu - ten sam produkt: {id}")
                                             continue
 
-                                        logger.debug(
+                                        logger.info(
                                             f"Przetwarzam powiązanie zestawu: product_id={id}, set_product_id={set_pid}")
 
                                         # Sprawdzenie istnienia produktów w transakcji
@@ -542,7 +542,7 @@ def update_inventory_v3():
                                             if not cursor.fetchone():
                                                 cursor.execute(
                                                     "INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                                logger.debug(
+                                                logger.info(
                                                     f"Dodano placeholder dla produktu o ID={id}")
 
                                             # Sprawdzenie istnienia `set_pid` w tabeli `products`
@@ -551,7 +551,7 @@ def update_inventory_v3():
                                             if not cursor.fetchone():
                                                 cursor.execute(
                                                     "INSERT INTO products (id, name) VALUES (%s, %s)", (set_pid, "Placeholder Name"))
-                                                logger.debug(
+                                                logger.info(
                                                     f"Dodano placeholder dla produktu o ID={set_pid}")
 
                                             # Wstawienie powiązań w obu kierunkach
@@ -559,7 +559,7 @@ def update_inventory_v3():
                                                 update_product_in_set_query, (id, set_pid))
                                             cursor.execute(
                                                 update_product_in_set_query, (set_pid, id))
-                                            logger.debug(
+                                            logger.info(
                                                 f"Dodano dwukierunkowe powiązanie zestawu: {id} <-> {set_pid}")
 
                                     except ValueError as e:
@@ -583,7 +583,7 @@ def update_inventory_v3():
                                     if color_pid == id:
                                         continue
 
-                                    logger.debug(
+                                    logger.info(
                                         f"Przetwarzam powiązanie koloru: product_id={id}, color_product_id={color_pid}")
 
                                     # sprawdzanie istnienia "id" w tabeli "products"
@@ -594,7 +594,7 @@ def update_inventory_v3():
                                         # Jeśli "product_id" nie istnieje, dodaj rekord z "id" i nazwą "Placeholder Name"
                                         cursor.execute(
                                             "INSERT INTO products (id, name) VALUES (%s, %s)", (id, "Placeholder Name"))
-                                        logger.debug(
+                                        logger.info(
                                             f"Dodano placeholder dla produktu o ID={id}")
 
                                     # sprawdzanie istnienia color_pid w tabeli products
@@ -604,13 +604,13 @@ def update_inventory_v3():
                                         # jeśli 'color_product_id" nie istnieje dodaj placeholder
                                         cursor.execute(
                                             "INSERT INTO products (id, name) VALUES (%s, %s)", (color_pid, "Placeholder Name"))
-                                        logger.debug(
+                                        logger.info(
                                             f"Dodano placeholder dla produktu o ID={color_pid}")
 
                                     try:
                                         cursor.execute(
                                             update_other_colors_query, (id, color_pid))
-                                        logger.debug(
+                                        logger.info(
                                             f"Dodano powiązanie koloru: product_id={id}, color_product_id={color_pid}")
                                     except Exception as e:
                                         logger.error(
@@ -620,7 +620,7 @@ def update_inventory_v3():
                                 # Commit po każdym produkcie
                                 try:
                                     connection.commit()
-                                    logger.debug(
+                                    logger.info(
                                         f"Zatwierdzono zmiany dla produktu ID={id}")
                                 except Exception as e:
                                     logger.error(
@@ -691,7 +691,7 @@ def update_inventory_v3():
                                     ean = str(variant.get("ean", ""))
                                     product_id = int(item["id"])
 
-                                    logger.debug(
+                                    logger.info(
                                         f"Przetwarzanie wariantu UID={variant_uid}, Stock={stock}, Name={name}, Ean={ean}")
 
                                     # upewnienie się, że rekord istnieje w tabeli products
@@ -701,7 +701,7 @@ def update_inventory_v3():
                                     if not cursor.fetchone():
                                         cursor.execute(
                                             "INSERT INTO products (id, name) VALUES (%s, %s)", (product_id, "Placeholder Name"))
-                                        logger.debug(
+                                        logger.info(
                                             f"Dodano placeholder dla produktu o ID={product_id}")
 
                                     # Sprawdzanie czy rekord istnieje
@@ -1151,8 +1151,8 @@ def export_to_products(modeladmin, request, queryset):
                                         variant_id = destination_cursor.fetchone()[
                                             0]
                                         destination_cursor.execute("""
-                                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
-                                                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                                                    INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id)
+                                                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
                                                                    (variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2))
 
                                     destination_cursor.execute("""
