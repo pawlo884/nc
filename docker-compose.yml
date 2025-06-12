@@ -39,7 +39,7 @@ services:
 
   celery-import:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
-      command: ["/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q import_queue --loglevel=info --concurrency=1"]
+      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import_queue --loglevel=info --concurrency=1"]
       volumes:
         - .:/app
         - celery_data:/var/lib/celery
@@ -56,15 +56,17 @@ services:
         - CELERY_WORKER_SEND_TASK_EVENTS=true
         - CELERY_TASK_SEND_SENT_EVENT=true
       depends_on:
-        - web
-        - redis
+        redis:
+          condition: service_healthy
+        web:
+          condition: service_started
       restart: always
       networks:
         - nc_network
 
   celery-default:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
-      command: ["/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1"]
+      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1"]
       volumes:
         - .:/app
         - celery_data:/var/lib/celery
@@ -81,15 +83,17 @@ services:
         - CELERY_WORKER_SEND_TASK_EVENTS=true
         - CELERY_TASK_SEND_SENT_EVENT=true
       depends_on:
-        - web
-        - redis
+        redis:
+          condition: service_healthy
+        web:
+          condition: service_started
       restart: always
       networks:
         - nc_network
 
   celery-beat:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
-      command: ["/bin/bash", "-c", "celery -A nc.celery beat --loglevel=info"]
+      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info"]
       volumes:
         - .:/app
       env_file:
@@ -104,8 +108,10 @@ services:
         - CELERY_WORKER_SEND_TASK_EVENTS=true
         - CELERY_TASK_SEND_SENT_EVENT=true
       depends_on:
-        - web
-        - redis
+        redis:
+          condition: service_healthy
+        web:
+          condition: service_started
       restart: always
       networks:
         - nc_network
@@ -121,9 +127,10 @@ services:
       - nc_network
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-prod_password}", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   flower:
     image: ${DOCKERHUB_USERNAME}/django-app:latest
