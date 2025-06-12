@@ -97,6 +97,12 @@ services:
       environment:
         - DJANGO_SETTINGS_MODULE=nc.settings.prod
         - TZ=Europe/Warsaw
+        - C_FORCE_ROOT=true
+        - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+        - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+        - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+        - CELERY_WORKER_SEND_TASK_EVENTS=true
+        - CELERY_TASK_SEND_SENT_EVENT=true
       depends_on:
         - web
         - redis
