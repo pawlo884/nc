@@ -5,7 +5,12 @@ from django.db import connections
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from .serializers import ProductSetSerializer, ProductSetItemSerializer
 from collections import defaultdict
+from .export_to_xml import XMLExporter
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 
@@ -165,3 +170,16 @@ class ProductSetViewSet(viewsets.ModelViewSet):
         items = ProductSetItem.objects.filter(set=set)
         serializer = ProductSetItemSerializer(items, many=True)
         return Response(serializer.data)
+
+
+def export_xml(request, source_name):
+    try:
+        exporter = XMLExporter(source_name)
+        url = exporter.export_sources_to_xml()
+        if url:
+            return JsonResponse({'status': 'success', 'url': url})
+        return JsonResponse({'status': 'error', 'message': 'Nie udało się wygenerować pliku XML'}, status=500)
+    except ValueError as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

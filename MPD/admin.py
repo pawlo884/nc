@@ -214,7 +214,7 @@ class SizesAdmin(admin.ModelAdmin):
 
 @admin.register(Sources)
 class SourceAdmin(admin.ModelAdmin):
-    fields = ['name', 'location', 'type']
+    fields = ['name', 'location', 'type', 'long_name', 'short_name', 'showcase_image', 'email', 'tel', 'fax', 'www', 'street', 'zipcode', 'city', 'country', 'province']
     list_display = ['id', 'name', 'location', 'type']
     search_fields = ['name']
 

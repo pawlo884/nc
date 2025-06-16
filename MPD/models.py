@@ -95,9 +95,21 @@ class Sources(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     location = models.CharField(max_length=255, blank=True, null=True)
     type = models.CharField(max_length=255, blank=True, null=True)
+    long_name = models.CharField(max_length=255, blank=True, null=True)
+    short_name = models.CharField(max_length=100, blank=True, null=True)
+    showcase_image = models.URLField(max_length=500, blank=True, null=True)
+    email = models.EmailField(max_length=255, blank=True, null=True)
+    tel = models.CharField(max_length=50, blank=True, null=True)
+    fax = models.CharField(max_length=50, blank=True, null=True)
+    www = models.URLField(max_length=255, blank=True, null=True)
+    street = models.CharField(max_length=255, blank=True, null=True)
+    zipcode = models.CharField(max_length=20, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    country = models.CharField(max_length=100, blank=True, null=True)
+    province = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'sources'
         app_label = 'MPD'
         verbose_name = 'Source'

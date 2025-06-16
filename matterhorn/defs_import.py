@@ -342,11 +342,22 @@ def log_update_error(last_update_time_rounded, description, error_message, start
     try:
         connection = connect_to_postgresql('matterhorn')
         cursor = connection.cursor()
+        # Pobierz ostatni udany last_update
+        cursor.execute("""
+            SELECT last_update FROM update_log
+            WHERE description NOT LIKE '%Błąd%'
+            ORDER BY last_update DESC LIMIT 1
+        """)
+        last_success = cursor.fetchone()
+        if last_success and last_success[0]:
+            last_update_for_error = last_success[0]
+        else:
+            last_update_for_error = last_update_time_rounded  # fallback
+
         full_description = f"{description} (Czas aktualizacji: {start_time}, Błąd: {error_message}, page={page})"
         cursor.execute(
             "INSERT INTO update_log (last_update, description, data_items, data_inventory) VALUES (%s, %s, %s, %s)",
-            (last_update_time_rounded, full_description,
-             json.dumps([]), json.dumps([]))
+            (last_update_for_error, full_description, json.dumps([]), json.dumps([]))
         )
         connection.commit()
         cursor.close()
@@ -370,34 +381,52 @@ def update_inventory_v3():
     encoded_time = urllib.parse.quote(last_update_time_rounded.split(" ")[1])
     update_date = last_update_time_rounded.split(" ")[0]
 
-    # Sprawdzenie czy istnieje zapisana strona w description
-    connection = connect_to_postgresql('matterhorn')
-    cursor = connection.cursor()
+    # Pobierz ostatni udany last_update
+    cursor = connect_to_postgresql('matterhorn').cursor()
     cursor.execute("""
-        SELECT description FROM update_log 
-        WHERE description LIKE '%Błąd%' 
+        SELECT last_update FROM update_log
+        WHERE description NOT LIKE '%Błąd%'
         ORDER BY last_update DESC LIMIT 1
     """)
-    last_error = cursor.fetchone()
-    page = 1
-
-    if last_error and last_error[0]:
-        try:
-            # Próba wyciągnięcia numeru strony z description
-            import re
-            page_match = re.search(r'page=(\d+)', last_error[0])
-            if page_match:
-                page = int(page_match.group(1))
-                logger.info(f"Wznawiam aktualizację od strony {page}")
-        except Exception as e:
-            logger.error(f"Błąd podczas parsowania numeru strony: {e}")
-            page = 1
+    last_success = cursor.fetchone()
+    if last_success and last_success[0]:
+        warsaw_tz = pytz.timezone('Europe/Warsaw')
+        dt = last_success[0]
+        if dt.tzinfo is None:
+            dt = pytz.UTC.localize(dt)
+        dt = dt.astimezone(warsaw_tz)
+        last_update_time_for_resume = dt.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        last_update_time_for_resume = last_update_time  # fallback
+    # last_update_time_for_resume jest już stringiem w Europe/Warsaw
+    last_update_time_for_resume_local = last_update_time_for_resume
 
     total_data_length = 0
     total_data_length_inventory = 0
     total_data_items = []
     total_data_inventory = []
     connection = None
+
+    # Sprawdź, czy ostatni wpis w update_log to błąd
+    cursor.execute("""
+        SELECT description FROM update_log 
+        ORDER BY last_update DESC LIMIT 1
+    """)
+    last_desc = cursor.fetchone()
+    page = 1
+    if last_desc and last_desc[0] and 'Błąd' in last_desc[0]:
+        import re
+        page_match = re.search(r'page=(\\d+)', last_desc[0])
+        if page_match:
+            page = int(page_match.group(1))
+            logger.info(f"Wznawiam aktualizację od strony {page}")
+        else:
+            page = 1
+            logger.info(
+                "Brak informacji o stronie w opisie błędu, zaczynam od strony 1")
+    else:
+        page = 1
+        logger.info("Ostatnia aktualizacja bez błędu, zaczynam od strony 1")
 
     while True:
         attempt = 1
@@ -406,9 +435,12 @@ def update_inventory_v3():
         data_length_inventory = 0
 
         # Budowanie URL do pobrania danych z API
+        last_update_time_rounded = last_update_time_for_resume_local[:-2] + "00"
+        encoded_time = urllib.parse.quote(
+            last_update_time_rounded.split(" ")[1])
+        update_date = last_update_time_rounded.split(" ")[0]
         b_url = f"{base_url_items}?page={page}&last_update={update_date}%20{encoded_time}&limit=400"
         i_url = f"{base_url_inventory}?page={page}&last_update={update_date}%20{encoded_time}&limit=400"
-
         logger.info(
             f"PAGE={page} URL API ITEMS: {b_url}, URL API INVENTORY: {i_url}")
 
@@ -485,7 +517,7 @@ def update_inventory_v3():
 
                                 price = item["prices"].get("PLN", None)
 
-                                logger.info(
+                                logger.debug(
                                     f"Przetwarzam produkt ID={id}")
                                 logger.debug(
                                     f"Szczegóły produktu: active={active}, new_collection={new_collection}, color={color}, stock_total={stock_total}, price={price}")
@@ -630,7 +662,7 @@ def update_inventory_v3():
                                     continue
 
                             logger.info(
-                                "Zakończono przetwarzanie produktów z API ITEMS")
+                                "Zakończono przetwarzanie produktów z API ITEMS, rozpoczęto przetwarzanie danych z API INVENTORY")
 
                             # Iteracja po danych z API INVENTORY
                             for item in data_inventory:

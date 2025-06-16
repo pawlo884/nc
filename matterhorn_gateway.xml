@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-06-16 11:41:41">
+  <meta>
+    <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
+    <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
+    <showcase_image url="https://matterhorn.pl/rwd_layout/assets/images/logo-hurt-pl.png"/>
+    <email>&lt;![CDATA[info@matterhorn.pl]]&gt;</email>
+    <tel>&lt;![CDATA[+48 503 503 875]]&gt;</tel>
+    <www>&lt;![CDATA[https://matterhorn.pl]]&gt;</www>
+    <address>
+      <street>&lt;![CDATA[Katowicka 51]]&gt;</street>
+      <zipcode>&lt;![CDATA[41-400]]&gt;</zipcode>
+      <city>&lt;![CDATA[Mysłowice]]&gt;</city>
+      <country>&lt;![CDATA[Poland]]&gt;</country>
+    </address>
+    <time>
+      <offer created="2025-06-16 11:41:41"/>
+      <offer expires="2025-06-23 11:41:41"/>
+    </time>
+  </meta>
+  <full url="https://adres.pl/fulloferta.xml"/>
+  <light url="https://adres.pl/lightoferta.xml"/>
+  <categories url="https://adres.pl/categories.xml"/>
+  <sizes url="https://adres.pl/sizes.xml"/>
+  <producers url="https://adres.pl/producers.xml"/>
+  <units url="https://adres.pl/units.xml"/>
+  <parameters url="https://adres.pl/parameters.xml"/>
+  <stocks url="https://adres.pl/stocks.xml"/>
+  <series url="https://adres.pl/series.xml"/>
+  <warranties url="https://adres.pl/warranties.xml"/>
+  <preset url="https://adres.pl/preset.xml"/>
+</provider_description>

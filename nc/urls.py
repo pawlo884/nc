@@ -26,6 +26,7 @@ urlpatterns = [
 urlpatterns += i18n_patterns(
     path('admin/', admin.site.urls),
     path('matterhorn/', include('matterhorn.urls')),
+    path('mpd/', include('MPD.urls')),
     prefix_default_language=False
 )
 
