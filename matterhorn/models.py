@@ -4,13 +4,17 @@ from django import forms
 from django.utils.html import format_html
 
 # Create your models here.
+
+
 class Products(models.Model):
     id = models.AutoField(primary_key=True)
     active = models.CharField(max_length=10, blank=True, null=True)
     name = models.CharField(max_length=255, blank=True, null=True)
-    name_without_number = models.CharField(max_length=255, blank=True, null=True)
+    name_without_number = models.CharField(
+        max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    creation_date = models.CharField(max_length=40, blank=True, null=True)  # Możesz rozważyć DateField lub DateTimeField
+    # Możesz rozważyć DateField lub DateTimeField
+    creation_date = models.CharField(max_length=40, blank=True, null=True)
     color = models.CharField(max_length=50, blank=True, null=True)
     category_name = models.CharField(max_length=255, blank=True, null=True)
     category_id = models.IntegerField(blank=True, null=True)
@@ -24,7 +28,8 @@ class Products(models.Model):
     weight = models.IntegerField(blank=True, null=True)
     size_table_txt = models.TextField(blank=True, null=True)
     size_table_html = models.TextField(blank=True, null=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    price = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True)
     timestamp = models.DateTimeField()
     mapped_product_id = models.IntegerField(null=True, blank=True)
     is_mapped = models.BooleanField(default=False)
@@ -38,7 +43,8 @@ class Products(models.Model):
 
     @admin.display(description="Product Color ID's")
     def get_product_color_id(self):
-        other_colors = self.other_colors.all()  # Pobiera wszystkie powiązane rekordy z OtherColors
+        # Pobiera wszystkie powiązane rekordy z OtherColors
+        other_colors = self.other_colors.all()
         return ', '.join(str(color.color_product.id) for color in other_colors) if other_colors else ""
 
     @admin.display(description="Variant Names")
@@ -49,8 +55,8 @@ class Products(models.Model):
     @admin.display(description="Product in Series")
     def get_product_in_set(self):
         product_in_set = self.product_in_set.all()
-        return ', '.join(str(product.set_product.id) for product in product_in_set) if product_in_set else "" 
-    
+        return ', '.join(str(product.set_product.id) for product in product_in_set) if product_in_set else ""
+
     def __str__(self):
         return f"{self.id} {self.name}" or "Unnamed Product"
 
@@ -65,12 +71,14 @@ class Products(models.Model):
 class Images(models.Model):
     image_id = models.BigAutoField(primary_key=True)
     image_path = models.TextField(blank=True, null=True)
-    product = models.ForeignKey('Products', models.CASCADE, blank=True, null=True)
+    product = models.ForeignKey(
+        'Products', models.CASCADE, blank=True, null=True)
     timestamp = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = 'images'
+
 
 class ProductsProxy(Products):
     class Meta:
@@ -81,7 +89,8 @@ class ProductsProxy(Products):
 
     @admin.display(description="Product Color ID's")
     def get_product_color_id(self):
-        other_colors = self.other_colors.all()  # Pobiera wszystkie powiązane rekordy z OtherColors
+        # Pobiera wszystkie powiązane rekordy z OtherColors
+        other_colors = self.other_colors.all()
         return ', '.join(str(color.color_product.id) for color in other_colors) if other_colors else ""
 
     @admin.display(description="Variant Names")
@@ -94,7 +103,6 @@ class ProductsProxy(Products):
         product_in_set = self.product_in_set.all()
         return ', '.join(str(product.set_product.id) for product in product_in_set) if product_in_set else ""
 
-
     def __str__(self):
         return f"{self.id} {self.name} {self.color}"
 
@@ -102,7 +110,7 @@ class ProductsProxy(Products):
 class OtherColors(models.Model):
     id = models.AutoField(primary_key=True)
     product = models.ForeignKey(
-        Products, 
+        Products,
         on_delete=models.CASCADE,
         db_column='product_id',
         related_name='other_colors',
@@ -124,6 +132,7 @@ class OtherColors(models.Model):
             models.Index(fields=['product']),
             models.Index(fields=['color_product']),
         ]
+
 
 class ProductInSet(models.Model):
     id = models.AutoField(primary_key=True)
@@ -150,9 +159,10 @@ class ProductInSet(models.Model):
             models.Index(fields=['set_product']),
         ]
 
+
 class UpdateLog(models.Model):
     last_update = models.DateTimeField()
-    description = models.CharField(max_length=255, blank=True, null=True)    
+    description = models.CharField(max_length=255, blank=True, null=True)
     data_items = models.TextField(blank=True, null=True)
     data_inventory = models.TextField(blank=True, null=True)
 
@@ -160,13 +170,15 @@ class UpdateLog(models.Model):
         managed = False
         db_table = 'update_log'
 
+
 class Variants(models.Model):
     variant_uid = models.PositiveIntegerField(primary_key=True)
     name = models.CharField(max_length=50, blank=True, null=True)
     stock = models.IntegerField(blank=True, null=True)
     max_processing_time = models.IntegerField(blank=True, null=True)
     ean = models.CharField(max_length=50, blank=True, null=True)
-    product = models.ForeignKey(Products, on_delete=models.CASCADE , related_name='variants', blank=True, null=True)
+    product = models.ForeignKey(
+        Products, on_delete=models.CASCADE, related_name='variants', blank=True, null=True)
     timestamp = models.DateTimeField()
     mapped_variant_id = models.IntegerField(null=True, blank=True)
     is_mapped = models.BooleanField(default=False)
@@ -179,6 +191,7 @@ class Variants(models.Model):
         indexes = [
             models.Index(fields=['product']),
         ]
+
 
 class VariantsInLine(admin.TabularInline):
     model = Variants
@@ -196,16 +209,19 @@ class OtherColorsInline(admin.TabularInline):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "color_product":
-            obj_id = request.resolver_match.kwargs.get("object_id")  # get ID of the current object
+            obj_id = request.resolver_match.kwargs.get(
+                "object_id")  # get ID of the current object
 
             if obj_id:
                 # get related products by `OtherColors`
-                related_products = OtherColors.objects.filter(product_id=obj_id).values_list("color_product_id", flat=True)
+                related_products = OtherColors.objects.filter(
+                    product_id=obj_id).values_list("color_product_id", flat=True)
 
                 # get only related products by 'OtherColors`
-                kwargs["queryset"] = ProductsProxy.objects.filter(id__in=related_products)
+                kwargs["queryset"] = ProductsProxy.objects.filter(
+                    id__in=related_products)
             else:
-                kwargs["queryset"] = ProductsProxy.objects.none()  
+                kwargs["queryset"] = ProductsProxy.objects.none()
 
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
@@ -222,15 +238,19 @@ class ProductInSetInline(admin.TabularInline):
             obj_id = request.resolver_match.kwargs.get("object_id")
 
             if obj_id:
-                related_products = ProductInSet.objects.filter(product_id=obj_id).values_list('set_product_id', flat=True)
-                kwargs['queryset'] = Products.objects.filter(id__in=related_products)
+                related_products = ProductInSet.objects.filter(
+                    product_id=obj_id).values_list('set_product_id', flat=True)
+                kwargs['queryset'] = Products.objects.filter(
+                    id__in=related_products)
             else:
                 kwargs['queryset'] = Products.objects.none()
 
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+
 class ProductsProxyAdminForm(forms.ModelForm):
-    get_other_colors = forms.CharField(required=False, label="Other Colors", widget=forms.TextInput(attrs={'readonly': 'readonly'}))
+    get_other_colors = forms.CharField(
+        required=False, label="Other Colors", widget=forms.TextInput(attrs={'readonly': 'readonly'}))
 
     class Meta:
         managed = False
@@ -248,5 +268,34 @@ class ProductsProxyAdminForm(forms.ModelForm):
             )
 
         if self.instance:
-            self.fields['get_other_colors'].initial = ', '.join(str(color) for color in self.instance.other_colors.all())
+            self.fields['get_other_colors'].initial = ', '.join(
+                str(color) for color in self.instance.other_colors.all())
 
+
+class StockHistory(models.Model):
+    id = models.AutoField(primary_key=True)
+    variant_uid = models.PositiveIntegerField()
+    product_id = models.IntegerField()
+    product_name = models.CharField(max_length=255, blank=True, null=True)
+    variant_name = models.CharField(max_length=50, blank=True, null=True)
+    old_stock = models.IntegerField(blank=True, null=True)
+    new_stock = models.IntegerField(blank=True, null=True)
+    stock_change = models.IntegerField(
+        blank=True, null=True)  # new_stock - old_stock
+    # 'increase', 'decrease', 'no_change'
+    change_type = models.CharField(max_length=20, blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        verbose_name_plural = "Stock History"
+        db_table = 'stock_history'
+        indexes = [
+            models.Index(fields=['variant_uid']),
+            models.Index(fields=['product_id']),
+            models.Index(fields=['timestamp']),
+            models.Index(fields=['change_type']),
+        ]
+
+    def __str__(self):
+        return f"{self.product_name} - {self.variant_name}: {self.old_stock} → {self.new_stock} ({self.timestamp})"

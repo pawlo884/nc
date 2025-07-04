@@ -1,5 +1,5 @@
 from django.contrib import admin  # type: ignore
-from .models import Products, UpdateLog, Images
+from .models import Products, UpdateLog, Images, StockHistory
 from django.utils.html import format_html
 from django.http import JsonResponse
 from django.db import connections, transaction
@@ -9,6 +9,7 @@ from rapidfuzz import fuzz
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from .defs_import import get_popular_products, get_stock_trends, get_stock_statistics, clean_old_stock_history
 
 logger = logging.getLogger(__name__)
 
@@ -1444,8 +1445,103 @@ class UpdateLogAdmin(admin.ModelAdmin):
     list_per_page = 20
 
 
-'''@admin.register(LogEntry)
-class LogEntryAdmin(admin.ModelAdmin):
-    list_display = ('timestamp', 'level', 'message')
-    list_filter = ('level', 'timestamp')
-    search_fields = ('message',)'''
+@admin.register(StockHistory)
+class StockHistoryAdmin(admin.ModelAdmin):
+    list_display = ['id', 'product_id', 'product_name', 'variant_uid', 'variant_name',
+                    'old_stock', 'new_stock', 'stock_change', 'change_type', 'timestamp']
+    list_filter = ['change_type', 'timestamp']
+    readonly_fields = ['id', 'variant_uid', 'product_id', 'product_name', 'variant_name',
+                       'old_stock', 'new_stock', 'stock_change', 'change_type', 'timestamp']
+    search_fields = ['product_id', 'product_name',
+                     'variant_uid', 'variant_name']
+    list_per_page = 50
+    ordering = ['-timestamp']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return True
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).order_by('-timestamp')
+
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('popular-products/', self.admin_site.admin_view(
+                self.popular_products_view), name='popular-products'),
+            path('stock-statistics/', self.admin_site.admin_view(
+                self.stock_statistics_view), name='stock-statistics'),
+            path('clean-history/', self.admin_site.admin_view(self.clean_history_view),
+                 name='clean-history'),
+
+
+        ]
+        return custom_urls + urls
+
+    def popular_products_view(self, request):
+        from django.shortcuts import render
+        days = int(request.GET.get('days', 30))
+        popular_products = get_popular_products(days=days, limit=50)
+
+        context = {
+            'popular_products': popular_products,
+            'days': days,
+            'title': f'Najbardziej popularne produkty (ostatnie {days} dni)'
+        }
+        return render(request, 'admin/stock_history/popular_products.html', context)
+
+    def stock_statistics_view(self, request):
+        from django.shortcuts import render
+        days = int(request.GET.get('days', 30))
+        stats = get_stock_statistics(days=days)
+
+        context = {
+            'stats': stats,
+            'days': days,
+            'title': f'Statystyki stanów magazynowych (ostatnie {days} dni)'
+        }
+        return render(request, 'admin/stock_history/statistics.html', context)
+
+    def clean_history_view(self, request):
+        from django.shortcuts import redirect
+        from django.contrib import messages
+
+        if request.method == 'POST':
+            days_to_keep = int(request.POST.get('days_to_keep', 90))
+            result = clean_old_stock_history(days_to_keep)
+            messages.success(request, result)
+
+        return redirect('admin:matterhorn_stockhistory_changelist')
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['show_actions'] = True
+        extra_context['actions'] = [
+            {
+                'name': 'popular_products',
+                'url': 'popular-products/',
+                'label': 'Popularne produkty',
+                'description': 'Pokaż najbardziej popularne produkty'
+            },
+            {
+                'name': 'statistics',
+                'url': 'stock-statistics/',
+                'label': 'Statystyki',
+                'description': 'Pokaż statystyki stanów magazynowych'
+            },
+            {
+                'name': 'clean_history',
+                'url': 'clean-history/',
+                'label': 'Wyczyść historię',
+                'description': 'Usuń stare rekordy z historii'
+            },
+
+
+        ]
+        return super().changelist_view(request, extra_context)

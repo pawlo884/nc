@@ -47,6 +47,49 @@ headersMatterhorn = {
 # OK
 
 
+def track_stock_changes(connection, variant_uid, product_id, product_name, variant_name, old_stock, new_stock):
+    """
+    Śledzi zmiany stanów magazynowych i zapisuje je do tabeli stock_history
+    """
+    try:
+        cursor = connection.cursor()
+
+        # Oblicz zmianę stanu magazynowego
+        stock_change = new_stock - old_stock if old_stock is not None else 0
+
+        # Określ typ zmiany
+        if old_stock is None:
+            change_type = 'initial'
+        elif stock_change > 0:
+            change_type = 'increase'
+        elif stock_change < 0:
+            change_type = 'decrease'
+        else:
+            change_type = 'no_change'
+
+        # Zapisz do historii tylko jeśli jest zmiana lub to pierwszy wpis
+        if change_type != 'no_change' or old_stock is None:
+            # Pobierz aktualny czas w strefie Europe/Warsaw
+            warsaw_now = datetime.now(pytz.timezone('Europe/Warsaw'))
+            insert_query = """
+                INSERT INTO stock_history (variant_uid, product_id, product_name, variant_name, 
+                                         old_stock, new_stock, stock_change, change_type, timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(insert_query, (
+                variant_uid, product_id, product_name, variant_name,
+                old_stock, new_stock, stock_change, change_type, warsaw_now
+            ))
+
+            logger.debug(
+                f"Zapisano zmianę stanu magazynowego: {variant_uid} - {old_stock} → {new_stock} ({change_type}) o {warsaw_now}")
+
+        cursor.close()
+
+    except Exception as e:
+        logger.error(f"Błąd podczas śledzenia zmian stanu magazynowego: {e}")
+
+
 def get_last_id():
     connection = connect_to_postgresql('matterhorn')
     create_tables_if_not_exist(connection)
@@ -742,7 +785,14 @@ def update_inventory_v3():
                                         "SELECT stock FROM variants WHERE variant_uid = %s", (variant_uid,))
                                     record = cursor.fetchone()
 
+                                    # Pobierz nazwę produktu dla historii
+                                    cursor.execute(
+                                        "SELECT name FROM products WHERE id = %s", (product_id,))
+                                    product_name_result = cursor.fetchone()
+                                    product_name = product_name_result[0] if product_name_result else "Unknown Product"
+
                                     if record:
+                                        old_stock = record[0]
                                         # Aktualizacja istniejącego rekordu w tabeli variants
                                         update_query = """
                                         UPDATE variants
@@ -755,6 +805,10 @@ def update_inventory_v3():
                                         """
                                         cursor.execute(
                                             update_query, (stock, name, ean, max_processing_time, product_id, variant_uid))
+
+                                        # Śledź zmianę stanu magazynowego
+                                        track_stock_changes(
+                                            connection, variant_uid, product_id, product_name, name, old_stock, stock)
                                     else:
                                         # Dodanie nowego rekordu
                                         insert_query = """
@@ -763,6 +817,10 @@ def update_inventory_v3():
                                         """
                                         cursor.execute(
                                             insert_query, (variant_uid, stock, max_processing_time, name, ean, product_id))
+
+                                        # Śledź początkowy stan magazynowy
+                                        track_stock_changes(
+                                            connection, variant_uid, product_id, product_name, name, None, stock)
 
                                     # Commit po każdej iteracji, aby uniknąć utraty danych w przypadku awarii
                                     connection.commit()
@@ -1284,3 +1342,203 @@ def export_to_products(modeladmin, request, queryset):
         messages.success(request, "Eksport zakończony pomyślnie.")
     except Exception as e:
         messages.error(request, f"Błąd eksportu: {e}")
+
+
+def get_popular_products(days=30, limit=20):
+    """
+    Zwraca najbardziej popularne produkty na podstawie spadków stanów magazynowych
+    """
+    try:
+        connection = connect_to_postgresql('matterhorn')
+        cursor = connection.cursor()
+
+        query = """
+            SELECT 
+                sh.product_id,
+                sh.product_name,
+                COUNT(*) as total_decreases,
+                SUM(ABS(sh.stock_change)) as total_stock_sold,
+                AVG(ABS(sh.stock_change)) as avg_stock_sold_per_change,
+                MAX(sh.timestamp) as last_activity
+            FROM stock_history sh
+            WHERE sh.change_type = 'decrease'
+                AND sh.timestamp >= NOW() - INTERVAL '%s days'
+            GROUP BY sh.product_id, sh.product_name
+            ORDER BY total_stock_sold DESC, total_decreases DESC
+            LIMIT %s
+        """
+
+        cursor.execute(query, (days, limit))
+        results = cursor.fetchall()
+
+        popular_products = []
+        for row in results:
+            popular_products.append({
+                'product_id': row[0],
+                'product_name': row[1],
+                'total_decreases': row[2],
+                'total_stock_sold': row[3],
+                'avg_stock_sold_per_change': float(row[4]) if row[4] else 0,
+                'last_activity': row[5]
+            })
+
+        cursor.close()
+        connection.close()
+
+        return popular_products
+
+    except Exception as e:
+        logger.error(f"Błąd podczas pobierania popularnych produktów: {e}")
+        return []
+
+
+def get_stock_trends(product_id=None, variant_uid=None, days=30):
+    """
+    Zwraca trendy stanów magazynowych dla konkretnego produktu lub wariantu
+    """
+    try:
+        connection = connect_to_postgresql('matterhorn')
+        cursor = connection.cursor()
+
+        if product_id:
+            query = """
+                SELECT 
+                    sh.variant_uid,
+                    sh.variant_name,
+                    sh.old_stock,
+                    sh.new_stock,
+                    sh.stock_change,
+                    sh.change_type,
+                    sh.timestamp
+                FROM stock_history sh
+                WHERE sh.product_id = %s
+                    AND sh.timestamp >= NOW() - INTERVAL '%s days'
+                ORDER BY sh.timestamp DESC
+            """
+            cursor.execute(query, (product_id, days))
+        elif variant_uid:
+            query = """
+                SELECT 
+                    sh.variant_uid,
+                    sh.variant_name,
+                    sh.old_stock,
+                    sh.new_stock,
+                    sh.stock_change,
+                    sh.change_type,
+                    sh.timestamp
+                FROM stock_history sh
+                WHERE sh.variant_uid = %s
+                    AND sh.timestamp >= NOW() - INTERVAL '%s days'
+                ORDER BY sh.timestamp DESC
+            """
+            cursor.execute(query, (variant_uid, days))
+        else:
+            cursor.close()
+            connection.close()
+            return []
+
+        results = cursor.fetchall()
+
+        trends = []
+        for row in results:
+            trends.append({
+                'variant_uid': row[0],
+                'variant_name': row[1],
+                'old_stock': row[2],
+                'new_stock': row[3],
+                'stock_change': row[4],
+                'change_type': row[5],
+                'timestamp': row[6]
+            })
+
+        cursor.close()
+        connection.close()
+
+        return trends
+
+    except Exception as e:
+        logger.error(
+            f"Błąd podczas pobierania trendów stanów magazynowych: {e}")
+        return []
+
+
+def get_stock_statistics(days=30):
+    """
+    Zwraca ogólne statystyki stanów magazynowych
+    """
+    try:
+        connection = connect_to_postgresql('matterhorn')
+        cursor = connection.cursor()
+
+        query = """
+            SELECT 
+                COUNT(*) as total_changes,
+                COUNT(CASE WHEN change_type = 'increase' THEN 1 END) as increases,
+                COUNT(CASE WHEN change_type = 'decrease' THEN 1 END) as decreases,
+                COUNT(CASE WHEN change_type = 'no_change' THEN 1 END) as no_changes,
+                SUM(CASE WHEN change_type = 'decrease' THEN ABS(stock_change) ELSE 0 END) as total_sold,
+                SUM(CASE WHEN change_type = 'increase' THEN stock_change ELSE 0 END) as total_added,
+                AVG(CASE WHEN change_type = 'decrease' THEN ABS(stock_change) ELSE NULL END) as avg_sold_per_decrease,
+                COUNT(DISTINCT product_id) as unique_products,
+                COUNT(DISTINCT variant_uid) as unique_variants
+            FROM stock_history
+            WHERE timestamp >= NOW() - INTERVAL '%s days'
+        """
+
+        cursor.execute(query, (days,))
+        result = cursor.fetchone()
+
+        if result:
+            stats = {
+                'total_changes': result[0],
+                'increases': result[1],
+                'decreases': result[2],
+                'no_changes': result[3],
+                'total_sold': result[4] or 0,
+                'total_added': result[5] or 0,
+                'avg_sold_per_decrease': float(result[6]) if result[6] else 0,
+                'unique_products': result[7],
+                'unique_variants': result[8]
+            }
+        else:
+            stats = {}
+
+        cursor.close()
+        connection.close()
+
+        return stats
+
+    except Exception as e:
+        logger.error(
+            f"Błąd podczas pobierania statystyk stanów magazynowych: {e}")
+        return {}
+
+
+def clean_old_stock_history(days_to_keep=90):
+    """
+    Usuwa stare rekordy z historii stanów magazynowych
+    """
+    try:
+        connection = connect_to_postgresql('matterhorn')
+        cursor = connection.cursor()
+
+        delete_query = """
+            DELETE FROM stock_history
+            WHERE timestamp < NOW() - INTERVAL '%s days'
+        """
+
+        cursor.execute(delete_query, (days_to_keep,))
+        deleted_count = cursor.rowcount
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+
+        logger.info(
+            f"Usunięto {deleted_count} starych rekordów z historii stanów magazynowych")
+        return f"Usunięto {deleted_count} starych rekordów z historii stanów magazynowych"
+
+    except Exception as e:
+        logger.error(
+            f"Błąd podczas czyszczenia historii stanów magazynowych: {e}")
+        return f"Błąd podczas czyszczenia historii stanów magazynowych: {e}"
