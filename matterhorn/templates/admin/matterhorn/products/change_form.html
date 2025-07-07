@@ -249,6 +249,11 @@
                     <button type="button" onclick="updateField('description', 'mpd_description')">Zapisz</button>
                 </div>
                 <div class="form-row">
+                    <label for="mpd_short_description">Krótki opis:</label>
+                    <textarea id="mpd_short_description" name="mpd_short_description" style="height: 60px;">{{ mpd_data.short_description }}</textarea>
+                    <button type="button" onclick="updateField('short_description', 'mpd_short_description')">Zapisz</button>
+                </div>
+                <div class="form-row">
                     <label for="mpd_attributes">Atrybuty:</label>
                     <select multiple name="mpd_attributes" id="mpd_attributes" size="10" style="width: 100%;">
                         {% for attribute in mpd_attributes %}

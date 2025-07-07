@@ -374,6 +374,7 @@ class ProductsAdmin(admin.ModelAdmin):
             try:
                 name = request.POST.get('mpd_name')
                 description = request.POST.get('mpd_description')
+                short_description = request.POST.get('mpd_short_description')
                 brand = request.POST.get('mpd_brand')
                 size_category = request.POST.get('mpd_size_category')
                 main_color_id = request.POST.get('main_color_id')
@@ -451,10 +452,10 @@ class ProductsAdmin(admin.ModelAdmin):
                         brand_id = brand_result[0]
 
                         cursor.execute("""
-                            INSERT INTO products (name, description, brand_id, series_id)
-                            VALUES (%s, %s, %s, %s)
+                            INSERT INTO products (name, description, short_description, brand_id, series_id)
+                            VALUES (%s, %s, %s, %s, %s)
                             RETURNING id
-                        """, [name, description, brand_id, series_id])
+                        """, [name, description, short_description, brand_id, series_id])
                         new_product_id = cursor.fetchone()[0]
                         logger.info(
                             f"Utworzono nowy produkt w MPD z ID {new_product_id}")
@@ -1109,7 +1110,7 @@ class ProductsAdmin(admin.ModelAdmin):
             # Pobierz dane z MPD
             with connections['MPD'].cursor() as cursor:
                 cursor.execute("""
-                    SELECT p.name, p.description, b.name as brand
+                    SELECT p.name, p.description, b.name as brand, p.short_description
                     FROM products p
                     JOIN brands b ON p.brand_id = b.id
                     WHERE p.id = %s
@@ -1125,6 +1126,7 @@ class ProductsAdmin(admin.ModelAdmin):
                         'name': row[0],
                         'description': row[1],
                         'brand': row[2],
+                        'short_description': row[3] if len(row) > 3 else '',
                         'has_variants': variant_count > 0
                     }
                 else:
@@ -1132,6 +1134,7 @@ class ProductsAdmin(admin.ModelAdmin):
                     extra_context['mpd_data'] = {
                         'name': product.name,
                         'description': product.description,
+                        'short_description': getattr(product, 'short_description', ''),
                         'brand': product.brand,
                         'has_variants': False
                     }
@@ -1140,6 +1143,7 @@ class ProductsAdmin(admin.ModelAdmin):
             extra_context['mpd_data'] = {
                 'name': product.name,
                 'description': product.description,
+                'short_description': getattr(product, 'short_description', ''),
                 'brand': product.brand,
                 'has_variants': False
             }
@@ -1372,7 +1376,8 @@ class ProductsAdmin(admin.ModelAdmin):
         if request.method == 'POST':
             value = json.loads(request.body).get('value')
             # Pola z tabeli products
-            products_fields = ['name', 'description', 'brand_id', 'series_id']
+            products_fields = ['name', 'description',
+                               'short_description', 'brand_id', 'series_id']
             # Pola z tabeli product_variants
             variants_fields = ['producer_code',
                                'producer_color_id', 'color_id']

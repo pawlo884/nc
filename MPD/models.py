@@ -1,7 +1,6 @@
 from django.db import models
-from django.contrib.auth.models import User
-from django.utils import timezone
 from decimal import Decimal
+from django.contrib import admin
 
 
 # Create your models here.
@@ -12,6 +11,7 @@ class Brands(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     logo_url = models.TextField(blank=True, null=True)
     opis = models.TextField(blank=True, null=True)
+    url = models.URLField(max_length=255, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -51,6 +51,7 @@ class Products(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    short_description = models.CharField(max_length=500, blank=True, null=True)
     brand = models.ForeignKey(
         Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id')
     updated_at = models.DateTimeField(blank=True, null=True)
@@ -160,7 +161,7 @@ class ProductImage(models.Model):
         verbose_name_plural = 'Product Images'
 
     def __str__(self):
-        return self.file_path
+        return str(self.file_path)
 
 
 class ProductSet(models.Model):
@@ -225,6 +226,8 @@ class StockAndPrices(models.Model):
     source_id = models.BigIntegerField()
     stock = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    retail_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=10)
     last_updated = models.DateTimeField()
 
@@ -265,3 +268,17 @@ class Categories(models.Model):
         db_table = 'categories'
         verbose_name = 'Kategoria'
         verbose_name_plural = 'Kategorie'
+
+
+class StockAndPricesInline(admin.TabularInline):
+    model = StockAndPrices
+    product = models.ForeignKey(
+        Products, on_delete=models.CASCADE, related_name='stock_and_prices')
+    fields = ['variant_id', 'retail_price']
+    readonly_fields = ['variant_id', 'retail_price']
+    extra = 0
+    can_delete = False
+    max_num = 0
+
+    def has_add_permission(self, request, obj=None):
+        return False
