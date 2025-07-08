@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<offer xmlns:iof="http://www.iai-shop.com/developers/iof.phtml" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml" file_format="IOF" generated="2025-07-08 12:27:14" expires="2025-07-09 12:27:14" version="3.0" extensions="yes">
+    <products xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml" currency="PLN" iof_translation_generated="yes" language="pol">
+    </products>
+</offer>

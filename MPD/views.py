@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from .serializers import ProductSetSerializer, ProductSetItemSerializer
 from collections import defaultdict
 from .export_to_xml import XMLExporter
+from .export_to_full_xml import create_xml_file
 import logging
 
 logger = logging.getLogger(__name__)
@@ -183,3 +184,24 @@ def export_xml(request, source_name):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=404)
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def export_full_xml(request):
+    """Widok do eksportu pełnego XML"""
+    try:
+        file_url = create_xml_file()
+        if file_url:
+            return JsonResponse({
+                'status': 'success',
+                'message': f'Plik XML został wygenerowany i przesłany do bucketa',
+                'url': file_url
+            })
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Nie udało się wygenerować pliku XML'
+        }, status=500)
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
