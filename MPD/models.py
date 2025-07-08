@@ -282,3 +282,14 @@ class StockAndPricesInline(admin.TabularInline):
 
     def has_add_permission(self, request, obj=None):
         return False
+
+
+class ProductVariantsRetailPrice(models.Model):
+    variant_id = models.IntegerField(primary_key=True)
+    retail_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    objects = models.Manager()
+
+    class Meta:
+        managed = False
+        db_table = 'product_variants_retail_price'

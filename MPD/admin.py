@@ -1,8 +1,9 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, Categories
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, Categories, ProductVariantsRetailPrice
 from django.db import connections
+import decimal
 # Register your models here.
 
 
@@ -27,8 +28,6 @@ class ProductsAdmin(admin.ModelAdmin):
         variants = ProductVariants.objects.filter(product=obj)
         if not variants:
             return "Brak wariantów produktu"
-
-        # Grupowanie po (kolor, rozmiar, ean)
         grouped = {}
         for variant in variants:
             color_name = variant.color.name if variant.color else "-"
@@ -38,34 +37,18 @@ class ProductsAdmin(admin.ModelAdmin):
             if key not in grouped:
                 grouped[key] = []
             grouped[key].append(variant.variant_id)
-
         html = "<form method='post'>"
-        # Dodaj pole do ustawiania ceny dla wszystkich wariantów
         html += "<div style='margin-bottom:12px;'>"
         html += "<label>Ustaw cenę detaliczną dla wszystkich wariantów: </label>"
         html += "<input type='number' step='0.01' id='set_all_price' style='width:100px;'>"
         html += "<button type='button' onclick='setAllRetailPrices()' style='margin-left:8px;'>Ustaw dla wszystkich</button>"
         html += "</div>"
         html += "<table style='border-collapse:collapse; width:100%;'>"
-        html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>kolor</th><th style='border:1px solid #ccc;padding:4px 8px;'>rozmiar</th><th style='border:1px solid #ccc;padding:4px 8px;'>ean</th><th style='border:1px solid #ccc;padding:4px 8px;'>źródło</th><th style='border:1px solid #ccc;padding:4px 8px;'>cena</th></tr>"
-
+        html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>kolor</th><th style='border:1px solid #ccc;padding:4px 8px;'>rozmiar</th><th style='border:1px solid #ccc;padding:4px 8px;'>ean</th><th style='border:1px solid #ccc;padding:4px 8px;'>cena detaliczna</th></tr>"
         for (color_name, size_name, ean), variant_ids in grouped.items():
-            sources = []
-            prices = []
-            with connections['MPD'].cursor() as cursor:
-                cursor.execute("""
-                    SELECT s.name, sp.retail_price
-                    FROM stock_and_prices sp
-                    JOIN sources s ON sp.source_id = s.id
-                    WHERE sp.variant_id IN %s
-                    ORDER BY s.name
-                """, [tuple(variant_ids)])
-                for source_name, retail_price in cursor.fetchall():
-                    sources.append(source_name)
-                    if retail_price is not None:
-                        prices.append(retail_price)
-            sources_str = "<br>".join(sources) if sources else "-"
-            first_price = prices[0] if prices else "0"
+            retail_obj = ProductVariantsRetailPrice.objects.using(
+                'MPD').filter(variant_id=variant_ids[0]).first()
+            retail_price = retail_obj.retail_price if retail_obj and retail_obj.retail_price is not None else ""
             html += "<tr>"
             html += "<td style='border:1px solid #ccc;padding:4px 8px;'>{}</td>".format(
                 color_name)
@@ -73,15 +56,12 @@ class ProductsAdmin(admin.ModelAdmin):
                 size_name)
             html += "<td style='border:1px solid #ccc;padding:4px 8px;'>{}</td>".format(
                 ean)
-            html += "<td style='border:1px solid #ccc;padding:4px 8px;'>{}</td>".format(
-                sources_str)
             html += "<td style='border:1px solid #ccc;padding:4px 8px;'><input class='retail-price-input' type='number' step='0.01' name='retail_price_{}' value='{}' style='width:80px;'></td>".format(
-                variant_ids[0], first_price)
+                variant_ids[0], retail_price)
             html += "</tr>"
         html += "</table>"
         html += "<br><input type='submit' name='save_retail_prices' value='Zapisz ceny detaliczne' style='background-color:#79aec8; color:white; padding:8px 16px; border:none; border-radius:4px; cursor:pointer;'>"
         html += "</form>"
-        # Dodaj JS do masowego ustawiania cen
         html += """
         <script>
         function setAllRetailPrices() {
@@ -97,7 +77,6 @@ class ProductsAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         if 'save_retail_prices' in request.POST:
-            # Zbierz mapowanie variant_id -> (kolor, rozmiar, ean)
             variants = ProductVariants.objects.filter(product=obj)
             grouped = {}
             for variant in variants:
@@ -113,21 +92,17 @@ class ProductsAdmin(admin.ModelAdmin):
                 if field_name in request.POST:
                     value = request.POST[field_name]
                     try:
-                        retail_price = float(value) if value.strip() else None
-                        with connections['MPD'].cursor() as cursor:
-                            if retail_price is not None:
-                                cursor.execute("""
-                                    UPDATE stock_and_prices 
-                                    SET retail_price = %s 
-                                    WHERE variant_id IN %s
-                                """, [retail_price, tuple(variant_ids)])
-                            else:
-                                cursor.execute("""
-                                    UPDATE stock_and_prices 
-                                    SET retail_price = NULL 
-                                    WHERE variant_id IN %s
-                                """, [tuple(variant_ids)])
-                    except (ValueError, TypeError):
+                        retail_price = decimal.Decimal(
+                            value) if value.strip() else None
+                        for variant_id in variant_ids:
+                            obj_rp = ProductVariantsRetailPrice.objects.using(
+                                'MPD').filter(variant_id=variant_id).first()
+                            if obj_rp is None:
+                                obj_rp = ProductVariantsRetailPrice(
+                                    variant_id=variant_id)
+                            obj_rp.retail_price = retail_price
+                            obj_rp.save(using='MPD')
+                    except (ValueError, TypeError, decimal.InvalidOperation):
                         continue
             from django.contrib import messages
             messages.success(
@@ -148,7 +123,6 @@ class ProductsAdmin(admin.ModelAdmin):
         variants = ProductVariants.objects.filter(product=obj)
         if not variants:
             return "Brak wariantów"
-        # Grupowanie po (kolor, kolor producenta, rozmiar, ean)
         grouped = {}
         for v in variants:
             color = v.color.name if v.color else "-"
@@ -162,27 +136,23 @@ class ProductsAdmin(admin.ModelAdmin):
         html = "<table style='border-collapse:collapse;'>"
         html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Ceny</th><th style='border:1px solid #ccc;padding:2px 6px;'>Cena detaliczna</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
         for (color, producer_color, size, ean), variant_ids in grouped.items():
-            # Pobierz dane ze wszystkich źródeł dla tej grupy
             with connections['MPD'].cursor() as cursor:
                 cursor.execute("""
-                    SELECT s.name, SUM(sp.stock) as total_stock, sp.price, sp.retail_price, sp.currency
+                    SELECT s.name, SUM(sp.stock) as total_stock, sp.price, sp.currency
                     FROM stock_and_prices sp
                     JOIN sources s ON sp.source_id = s.id
                     WHERE sp.variant_id IN %s
-                    GROUP BY s.name, sp.price, sp.retail_price, sp.currency
+                    GROUP BY s.name, sp.price, sp.currency
                 """, [tuple(variant_ids)])
                 rows = cursor.fetchall()
-            # Suma stanów
             total_stock = sum([row[1] for row in rows]) if rows else 0
-            # Ceny
-            prices = [f"{row[2]} {row[4]}" for row in rows if row[2]
-                      is not None and row[2] > 0]
+            # Ceny z nazwą źródła
+            prices = [
+                f"{row[0]}: {row[2]} {row[3]}" for row in rows if row[2] is not None and row[2] > 0]
             prices_str = "<br>".join(prices) if prices else "-"
-            # Cena detaliczna - tylko jedna (pierwsza niepusta)
-            retail_price = next(
-                (row[3] for row in rows if row[3] is not None and row[3] > 0), None)
-            retail_price_str = f"{retail_price} PLN" if retail_price else "-"
-            # Źródła
+            retail_obj = ProductVariantsRetailPrice.objects.using(
+                'MPD').filter(variant_id=variant_ids[0]).first()
+            retail_price_str = f"{retail_obj.retail_price} PLN" if retail_obj and retail_obj.retail_price is not None else "-"
             sources_str = ", ".join(
                 [f"{row[0]}: {row[1]}" for row in rows]) if rows else "-"
             html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{prices_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{retail_price_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{ean}</td></tr>"
@@ -347,7 +317,7 @@ class BrandsAdmin(admin.ModelAdmin):
 @admin.register(Sizes)
 class SizesAdmin(admin.ModelAdmin):
     fields = ['name', 'category', 'unit', 'name_lower']
-    list_display = ['id', 'name', 'category', 'unit', 'name_lower'] 
+    list_display = ['id', 'name', 'category', 'unit', 'name_lower']
     list_filter = ['name', 'category', 'unit', 'name_lower']
 
     def get_queryset(self, request):
