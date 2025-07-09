@@ -9,7 +9,9 @@ from rapidfuzz import fuzz
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .defs_import import get_popular_products, get_stock_trends, get_stock_statistics, clean_old_stock_history
+from .defs_import import get_popular_products, get_stock_statistics, clean_old_stock_history, get_safe_variant_id
+from MPD.models import ProductvariantsSources
+
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +200,13 @@ class ProductsAdmin(admin.ModelAdmin):
                         else:
                             cursor.execute(
                                 "INSERT INTO product_series (name) VALUES (%s) RETURNING id", [series_name])
-                            series_id = cursor.fetchone()[0]
+                            row = cursor.fetchone()
+                            if row:
+                                series_id = row[0]
+                            else:
+                                logger.error(
+                                    f"Nie udało się utworzyć serii: {series_name}")
+                                raise Exception('Nie udało się utworzyć serii')
                         cursor.execute("UPDATE products SET series_id = %s WHERE id = %s", [
                                        series_id, mapped_product_id])
                     return JsonResponse({'success': True, 'message': 'Zaktualizowano serię.'})
@@ -277,8 +285,8 @@ class ProductsAdmin(admin.ModelAdmin):
 
                     # Sprawdź, czy wariant już istnieje w MPD
                     mpd_cursor.execute("""
-                        SELECT variant_id FROM product_variants WHERE variant_uid = %s AND product_id = %s AND source_id = %s
-                    """, [variant_uid, mapped_product_id, 2])
+                        SELECT variant_id FROM product_variants_sources WHERE variant_uid = %s AND source_id = %s
+                    """, [variant_uid, 2])
                     variant_result = mpd_cursor.fetchone()
                     if variant_result:
                         variant_logger.info(
@@ -286,26 +294,33 @@ class ProductsAdmin(admin.ModelAdmin):
                         skipped_existing += 1
                         continue
 
-                    # Dodaj nowy wariant
+                        # Dodaj nowy wariant
                     mpd_cursor.execute(
                         "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
-                    variant_id = mpd_cursor.fetchone()[0]
+                    row = mpd_cursor.fetchone()
+                    variant_id = row[0] if row else 1
+
                     variant_logger.info(
                         f"[add_new_variants_to_mpd] Dodaję nowy wariant {variant_uid} jako variant_id {variant_id} (product_id={mapped_product_id}, color_id={color_id}, size_id={size_id}, ean={ean}, producer_color_id={producer_color_id}, producer_code={producer_code})")
 
                     try:
                         if producer_color_id:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, ean, variant_uid, source_id, producer_code)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                            """, [variant_id, mapped_product_id, color_id, producer_color_id, size_id, ean, variant_uid, 2, producer_code])
+                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, producer_code)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, [variant_id, mapped_product_id, color_id, producer_color_id, size_id, producer_code])
                         else:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_code)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                            """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2, producer_code])
+                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, producer_code)
+                                VALUES (%s, %s, %s, %s, %s)
+                            """, [variant_id, mapped_product_id, color_id, size_id, producer_code])
+                        # Dodaj wpis do product_variants_sources
+                        mpd_cursor.execute("""
+                            INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id)
+                            VALUES (%s, %s, %s, %s)
+                        """, [variant_id, ean, variant_uid, 2])
                         variant_logger.info(
-                            f"[add_new_variants_to_mpd] Dodano wariant {variant_uid} do product_variants")
+                            f"[add_new_variants_to_mpd] Dodano wariant {variant_uid} do product_variants i product_variants_sources")
                     except Exception as e:
                         variant_logger.error(
                             f"[add_new_variants_to_mpd] Błąd podczas dodawania wariantu {variant_uid} do product_variants: {e}")
@@ -434,10 +449,15 @@ class ProductsAdmin(admin.ModelAdmin):
                         if row:
                             series_id = row[0]
                         else:
-                            # Jeśli seria nie istnieje, utwórz nową
                             cursor.execute(
                                 "INSERT INTO product_series (name) VALUES (%s) RETURNING id", [series_name])
-                            series_id = cursor.fetchone()[0]
+                            row = cursor.fetchone()
+                            if row:
+                                series_id = row[0]
+                            else:
+                                logger.error(
+                                    f"Nie udało się utworzyć serii: {series_name}")
+                                raise Exception('Nie udało się utworzyć serii')
 
                 with transaction.atomic(using='MPD'):
                     # Utwórz nowy produkt w bazie MPD
@@ -456,7 +476,14 @@ class ProductsAdmin(admin.ModelAdmin):
                             VALUES (%s, %s, %s, %s, %s)
                             RETURNING id
                         """, [name, description, short_description, brand_id, series_id])
-                        new_product_id = cursor.fetchone()[0]
+                        row = cursor.fetchone()
+                        if row:
+                            new_product_id = row[0]
+                        else:
+                            logger.error(
+                                "Nie udało się utworzyć produktu w MPD")
+                            raise Exception(
+                                'Nie udało się utworzyć produktu w MPD')
                         logger.info(
                             f"Utworzono nowy produkt w MPD z ID {new_product_id}")
 
@@ -491,7 +518,13 @@ class ProductsAdmin(admin.ModelAdmin):
                                 VALUES (%s, %s, %s)
                                 RETURNING id
                             """, [f"Zestaw {name}", f"Zestaw zawierający {name}", new_product_id])
-                            new_set_id = cursor.fetchone()[0]
+                            row = cursor.fetchone()
+                            if row:
+                                new_set_id = row[0]
+                            else:
+                                logger.error("Nie udało się utworzyć zestawu")
+                                raise Exception(
+                                    'Nie udało się utworzyć zestawu')
                             # Dodaj oba produkty do tabeli pośredniej
                             cursor.execute("""
                                 INSERT INTO product_set_items (product_set_id, product_id)
@@ -526,7 +559,7 @@ class ProductsAdmin(admin.ModelAdmin):
                         # Przypisz series_id wszystkim powiązanym produktom w MPD
                         if mapped_ids:
                             cursor.execute(
-                                f"UPDATE products SET series_id = %s WHERE id IN ({','.join(['%s']*len(mapped_ids))})", [series_id] + mapped_ids)
+                                f"UPDATE products SET series_id = %s WHERE id IN ({', '.join(['%s'] * len(mapped_ids))})", [series_id] + mapped_ids)
 
                         # Pobierz kolor produktu
                         with connections['matterhorn'].cursor() as matterhorn_cursor:
@@ -562,10 +595,14 @@ class ProductsAdmin(admin.ModelAdmin):
                                 else:
                                     cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id", [
                                                    producer_color_name, color_id])
-                                    pc_row = cursor.fetchone()
-                                    if pc_row:
-                                        producer_color_id_to_use = pc_row[0]
-
+                                    row = cursor.fetchone()
+                                    if row:
+                                        producer_color_id_to_use = row[0]
+                                    else:
+                                        logger.error(
+                                            f"Nie udało się utworzyć koloru producenta: {producer_color_name}")
+                                        raise Exception(
+                                            'Nie udało się utworzyć koloru producenta')
                             # Pobierz warianty produktu
                             matterhorn_cursor.execute("""
                                 SELECT name, stock, ean, variant_uid 
@@ -597,7 +634,7 @@ class ProductsAdmin(admin.ModelAdmin):
 
                                 cursor.execute("""
                                     SELECT variant_id 
-                                    FROM product_variants 
+                                    FROM product_variants_sources 
                                     WHERE variant_uid = %s AND source_id = %s
                                 """, [variant_uid, 2])
                                 variant_result = cursor.fetchone()
@@ -607,20 +644,23 @@ class ProductsAdmin(admin.ModelAdmin):
                                     logger.info(
                                         f"Znaleziono istniejący wariant z ID {variant_id}")
                                 else:
-                                    cursor.execute("""
-                                        SELECT COALESCE(MAX(variant_id), 0) + 1 
-                                        FROM product_variants
-                                    """)
-                                    variant_id = cursor.fetchone()[0]
+                                    # Użyj bezpiecznej funkcji do generowania ID
+                                    variant_id = get_safe_variant_id(cursor)
                                     logger.info(
                                         f"Utworzono nowy wariant z ID {variant_id}")
 
                                     # Dodaj wariant z odpowiednim producer_color_id
                                     cursor.execute("""
                                         INSERT INTO product_variants 
-                                        (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_color_id, producer_code)
-                                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                    """, [variant_id, new_product_id, color_id, size_id, ean, variant_uid, 2, producer_color_id_to_use, producer_code])
+                                        (variant_id, product_id, color_id, size_id, producer_color_id, producer_code)
+                                        VALUES (%s, %s, %s, %s, %s, %s)
+                                    """, [variant_id, new_product_id, color_id, size_id, producer_color_id_to_use, producer_code])
+                                    # Dodaj wpis do product_variants_sources
+                                    cursor.execute("""
+                                        INSERT INTO product_variants_sources 
+                                        (variant_id, ean, variant_uid, source_id)
+                                        VALUES (%s, %s, %s, %s)
+                                    """, [variant_id, ean, variant_uid, 2])
 
                                 # Sprawdź czy rekord już istnieje
                                 cursor.execute("""
@@ -669,9 +709,12 @@ class ProductsAdmin(admin.ModelAdmin):
 
                 return JsonResponse({'success': True, 'message': 'Produkt został pomyślnie zmapowany'})
             except Exception as e:
+                import traceback
+                error_details = traceback.format_exc()
                 logger.error(
                     f"Błąd podczas mapowania produktu {product_id}: {str(e)}")
-                return JsonResponse({'success': False, 'error': str(e)})
+                logger.error(f"Szczegóły błędu: {error_details}")
+                return JsonResponse({'success': False, 'error': f'Wystąpił błąd podczas tworzenia produktu MPD: {str(e)}'})
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
 
     def assign_mapping(self, request, product_id, mpd_product_id):
@@ -791,13 +834,17 @@ class ProductsAdmin(admin.ModelAdmin):
                 is_mapped = variant.is_mapped
                 border_color = 'green' if is_mapped else 'red'
                 is_mapped_label = f'<span style="color: {border_color}; font-weight: bold;">{is_mapped}</span>'
+                # Pobierz EAN z ProductvariantsSources
+                variant_source = ProductvariantsSources.objects.filter(
+                    variant_id=variant.mapped_variant_id).first()
+                ean = variant_source.ean if variant_source and variant_source.ean else "-"
                 html += f'''
                     <div style="border: 2px solid {border_color}; padding: 10px; border-radius: 5px; min-width: 200px;">
-                        <div><strong>Nazwa:</strong> {variant.name or '-'}</div>
-                        <div><strong>Stan:</strong> {variant.stock or '-'}</div>
-                        <div><strong>EAN:</strong> {variant.ean or '-'}</div>
-                        <div><strong>Czas przetwarzania:</strong> {variant.max_processing_time or '-'}</div>
-                        <div><strong>Mapped variant ID:</strong> {variant.mapped_variant_id or '-'}</div>
+                        <div><strong>Nazwa:</strong> {variant.name or '-'} </div>
+                        <div><strong>Stan:</strong> {variant.stock or '-'} </div>
+                        <div><strong>EAN:</strong> {ean}</div>
+                        <div><strong>Czas przetwarzania:</strong> {variant.max_processing_time or '-'} </div>
+                        <div><strong>Mapped variant ID:</strong> {variant.mapped_variant_id or '-'} </div>
                         <div><strong>Is mapped:</strong> {is_mapped_label}</div>
                     </div>
                 '''
@@ -1027,8 +1074,9 @@ class ProductsAdmin(admin.ModelAdmin):
         if mapped_id:
             with connections['MPD'].cursor() as cursor:
                 cursor.execute('''
-                    SELECT pv.variant_id, pv.ean, sp.stock, pv.size_id, s.name as size_name, pv.producer_code, c.name as producer_color_name
+                    SELECT pv.variant_id, pvs.ean, sp.stock, pv.size_id, s.name as size_name, pv.producer_code, c.name as producer_color_name
                     FROM product_variants pv
+                    LEFT JOIN product_variants_sources pvs ON pv.variant_id = pvs.variant_id AND pvs.source_id = 2
                     LEFT JOIN colors c ON pv.producer_color_id = c.id
                     LEFT JOIN sizes s ON pv.size_id = s.id
                     LEFT JOIN stock_and_prices sp ON pv.variant_id = sp.variant_id AND sp.source_id = 2
@@ -1266,10 +1314,8 @@ class ProductsAdmin(admin.ModelAdmin):
                                 continue
                             size_id = size_result[0]
 
-                            # Pobierz następny variant_id
-                            mpd_cursor.execute(
-                                "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
-                            variant_id = mpd_cursor.fetchone()[0]
+                            # Pobierz następny variant_id z bezpiecznym generowaniem
+                            variant_id = get_safe_variant_id(mpd_cursor)
 
                             # Pobierz producer_color_id powiązany z color_id
                             mpd_cursor.execute("""
@@ -1284,9 +1330,16 @@ class ProductsAdmin(admin.ModelAdmin):
                             # Dodaj wariant z odpowiednim producer_color_id
                             mpd_cursor.execute("""
                                 INSERT INTO product_variants 
-                                (variant_id, product_id, color_id, size_id, ean, variant_uid, source_id, producer_color_id, producer_code)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                            """, [variant_id, mapped_product_id, color_id, size_id, ean, variant_uid, 2, producer_color_id_to_use, producer_code])
+                                (variant_id, product_id, color_id, size_id, producer_color_id, producer_code)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, [variant_id, mapped_product_id, color_id, size_id, producer_color_id_to_use, producer_code])
+
+                            # Dodaj wpis do product_variants_sources
+                            mpd_cursor.execute("""
+                                INSERT INTO product_variants_sources 
+                                (variant_id, ean, variant_uid, source_id)
+                                VALUES (%s, %s, %s, %s)
+                            """, [variant_id, ean, variant_uid, 2])
 
                             # Dodaj stan magazynowy i cenę
                             mpd_cursor.execute("""
@@ -1354,7 +1407,12 @@ class ProductsAdmin(admin.ModelAdmin):
                         VALUES (%s, %s, %s)
                         RETURNING id
                     """, [set_name, f'Zestaw: {set_name}', mpd_product_id])
-                    new_set_id = cursor.fetchone()[0]
+                    row = cursor.fetchone()
+                    if row:
+                        new_set_id = row[0]
+                    else:
+                        logger.error("Nie udało się utworzyć zestawu")
+                        raise Exception('Nie udało się utworzyć zestawu')
                     # Dodaj oba produkty do tabeli pośredniej
                     cursor.execute("""
                         INSERT INTO product_set_items (product_set_id, product_id)
@@ -1409,7 +1467,14 @@ class ProductsAdmin(admin.ModelAdmin):
                                 else:
                                     cursor.execute(
                                         "INSERT INTO product_series (name) VALUES (%s) RETURNING id", [value])
-                                    series_id = cursor.fetchone()[0]
+                                    row = cursor.fetchone()
+                                    if row:
+                                        series_id = row[0]
+                                    else:
+                                        logger.error(
+                                            f"Nie udało się utworzyć serii: {value}")
+                                        raise Exception(
+                                            'Nie udało się utworzyć serii')
                             cursor.execute("UPDATE products SET series_id = %s WHERE id = %s", [
                                            series_id, product_id])
                         else:
@@ -1427,7 +1492,14 @@ class ProductsAdmin(admin.ModelAdmin):
                             else:
                                 cursor.execute(
                                     "INSERT INTO colors (name) VALUES (%s) RETURNING id", [value])
-                                color_id = cursor.fetchone()[0]
+                                row = cursor.fetchone()
+                                if row:
+                                    color_id = row[0]
+                                else:
+                                    logger.error(
+                                        f"Nie udało się utworzyć koloru: {value}")
+                                    raise Exception(
+                                        'Nie udało się utworzyć koloru')
                         cursor.execute(f"UPDATE product_variants SET {field_name} = %s WHERE product_id = %s", [
                                        color_id, product_id])
                     elif field_name in variants_fields:

@@ -118,27 +118,22 @@ class Sources(models.Model):
 
 
 class ProductVariants(models.Model):
-    id = models.BigAutoField(primary_key=True)
+    variant_id = models.IntegerField(db_column='variant_id', primary_key=True)
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id')
-    variant_id = models.IntegerField()
-    source = models.ForeignKey(
-        Sources, on_delete=models.RESTRICT, db_column='source_id', null=True, blank=True)
     color = models.ForeignKey(
         Colors, on_delete=models.CASCADE, db_column='color_id', null=True, blank=True)
     producer_color = models.ForeignKey(
         Colors, on_delete=models.CASCADE, db_column='producer_color_id', null=True, blank=True, related_name='producer_variants')
     size = models.ForeignKey(
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
-    ean = models.CharField(max_length=50, blank=True, null=True)
-    variant_uid = models.IntegerField(blank=True, null=True)
+    producer_code = models.CharField(max_length=255, blank=True, null=True)
     objects = models.Manager()
 
     class Meta:
         managed = False
         db_table = 'product_variants'
         app_label = 'MPD'
-        unique_together = ('variant_id', 'source')
         verbose_name = 'Product Variant'
         verbose_name_plural = 'Product Variants'
 
@@ -146,11 +141,29 @@ class ProductVariants(models.Model):
         return f"{self.product.name} - {self.color.name if self.color else 'Brak koloru'} - {self.size.name if self.size else 'Brak rozmiaru'}"
 
 
+class ProductvariantsSources(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    variant = models.ForeignKey(
+        ProductVariants, on_delete=models.CASCADE, db_column='variant_id', to_field='variant_id')
+    source = models.ForeignKey(
+        Sources, on_delete=models.RESTRICT, db_column='source_id', null=True, blank=True)
+    ean = models.CharField(max_length=50, blank=True, null=True)
+    variant_uid = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'product_variants_sources'
+        app_label = 'MPD'
+        verbose_name = 'Product Variant Source'
+        verbose_name_plural = 'Product Variant Sources'
+
+
 class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id', related_name='images')
-    variant_id = models.IntegerField(blank=True, null=True)
+    variant = models.ForeignKey(ProductVariants, on_delete=models.CASCADE,
+                                db_column='variant_id', null=True, blank=True, to_field='variant_id')
     file_path = models.CharField(max_length=500)
 
     class Meta:
@@ -222,12 +235,12 @@ class ProductSeries(models.Model):
 
 class StockAndPrices(models.Model):
     id = models.BigIntegerField(primary_key=True)
-    variant_id = models.BigIntegerField()
-    source_id = models.BigIntegerField()
+    variant = models.ForeignKey(
+        ProductVariants, on_delete=models.CASCADE, db_column='variant_id', to_field='variant_id')
+    source = models.ForeignKey(
+        Sources, on_delete=models.CASCADE, db_column='source_id')
     stock = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    retail_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=10)
     last_updated = models.DateTimeField()
 
@@ -274,8 +287,8 @@ class StockAndPricesInline(admin.TabularInline):
     model = StockAndPrices
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, related_name='stock_and_prices')
-    fields = ['variant_id', 'retail_price']
-    readonly_fields = ['variant_id', 'retail_price']
+    fields = ['variant_id', 'stock', 'price', 'currency']
+    readonly_fields = ['variant_id', 'stock', 'price', 'currency']
     extra = 0
     can_delete = False
     max_num = 0
@@ -285,9 +298,13 @@ class StockAndPricesInline(admin.TabularInline):
 
 
 class ProductVariantsRetailPrice(models.Model):
-    variant_id = models.IntegerField(primary_key=True)
+    variant = models.ForeignKey(ProductVariants, on_delete=models.CASCADE,
+                                db_column='variant_id', primary_key=True, to_field='variant_id')
     retail_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True)
+    vat = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=10, null=True, blank=True)
     objects = models.Manager()
 
     class Meta:

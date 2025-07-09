@@ -1,10 +1,14 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, Categories, ProductVariantsRetailPrice
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources
 from django.db import connections
 import decimal
 # Register your models here.
+
+
+# Usuwam ProductVariantsInline i wpis inlines = [ProductVariantsInline] z ProductsAdmin
+# (pozostawiam tylko show_variants jako readonly_field)
 
 
 @admin.register(Products)
@@ -32,11 +36,19 @@ class ProductsAdmin(admin.ModelAdmin):
         for variant in variants:
             color_name = variant.color.name if variant.color else "-"
             size_name = variant.size.name if variant.size else "-"
-            ean = variant.ean or "-"
+            variant_id = variant.variant_id
+            # Pobierz ean z ProductvariantsSources
+            variant_source = ProductvariantsSources.objects.filter(
+                variant__variant_id=variant_id).first()
+            ean = variant_source.ean if variant_source and variant_source.ean else "-"
+            # Pobierz cenę detaliczną
+            retail_obj = ProductVariantsRetailPrice.objects.using(
+                'MPD').filter(variant__variant_id=variant_id).first()
+            retail_price = retail_obj.retail_price if retail_obj and retail_obj.retail_price is not None else ""
             key = (color_name, size_name, ean)
             if key not in grouped:
                 grouped[key] = []
-            grouped[key].append(variant.variant_id)
+            grouped[key].append(variant_id)
         html = "<form method='post'>"
         html += "<div style='margin-bottom:12px;'>"
         html += "<label>Ustaw cenę detaliczną dla wszystkich wariantów: </label>"
@@ -47,7 +59,7 @@ class ProductsAdmin(admin.ModelAdmin):
         html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>kolor</th><th style='border:1px solid #ccc;padding:4px 8px;'>rozmiar</th><th style='border:1px solid #ccc;padding:4px 8px;'>ean</th><th style='border:1px solid #ccc;padding:4px 8px;'>cena detaliczna</th></tr>"
         for (color_name, size_name, ean), variant_ids in grouped.items():
             retail_obj = ProductVariantsRetailPrice.objects.using(
-                'MPD').filter(variant_id=variant_ids[0]).first()
+                'MPD').filter(variant__variant_id=variant_ids[0]).first()
             retail_price = retail_obj.retail_price if retail_obj and retail_obj.retail_price is not None else ""
             html += "<tr>"
             html += "<td style='border:1px solid #ccc;padding:4px 8px;'>{}</td>".format(
@@ -82,11 +94,14 @@ class ProductsAdmin(admin.ModelAdmin):
             for variant in variants:
                 color_name = variant.color.name if variant.color else "-"
                 size_name = variant.size.name if variant.size else "-"
-                ean = variant.ean or "-"
+                variant_id = variant.variant_id
+                variant_source = ProductvariantsSources.objects.filter(
+                    variant__variant_id=variant_id).first()
+                ean = variant_source.ean if variant_source and variant_source.ean else "-"
                 key = (color_name, size_name, ean)
                 if key not in grouped:
                     grouped[key] = []
-                grouped[key].append(variant.variant_id)
+                grouped[key].append(variant_id)
             for key, variant_ids in grouped.items():
                 field_name = f'retail_price_{variant_ids[0]}'
                 if field_name in request.POST:
@@ -95,11 +110,21 @@ class ProductsAdmin(admin.ModelAdmin):
                         retail_price = decimal.Decimal(
                             value) if value.strip() else None
                         for variant_id in variant_ids:
+                            # Sprawdź czy wariant istnieje w tabeli product_variants
+                            variant_exists = ProductVariants.objects.using(
+                                'MPD').filter(variant_id=variant_id).exists()
+                            if not variant_exists:
+                                continue
                             obj_rp = ProductVariantsRetailPrice.objects.using(
-                                'MPD').filter(variant_id=variant_id).first()
+                                'MPD').filter(variant__variant_id=variant_id).first()
                             if obj_rp is None:
+                                # Musimy znaleźć obiekt ProductVariants z tym variant_id
+                                variant_obj = ProductVariants.objects.using(
+                                    'MPD').filter(variant_id=variant_id).first()
+                                if not variant_obj:
+                                    continue
                                 obj_rp = ProductVariantsRetailPrice(
-                                    variant_id=variant_id)
+                                    variant=variant_obj)
                             obj_rp.retail_price = retail_price
                             obj_rp.save(using='MPD')
                     except (ValueError, TypeError, decimal.InvalidOperation):
@@ -128,14 +153,36 @@ class ProductsAdmin(admin.ModelAdmin):
             color = v.color.name if v.color else "-"
             producer_color = v.producer_color.name if v.producer_color else "-"
             size = v.size.name if v.size else "-"
-            ean = v.ean or "-"
-            key = (color, producer_color, size, ean)
+            # Pobierz wszystkie źródła i EAN-y dla wariantu
+            sources = ProductvariantsSources.objects.filter(
+                variant__variant_id=v.variant_id)
+            sources_names = []
+            eans = []
+            for s in sources:
+                stock = None
+                if s.source:
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("""
+                            SELECT stock FROM stock_and_prices
+                            WHERE variant_id = %s AND source_id = %s
+                            LIMIT 1
+                        """, [v.variant_id, s.source.id])
+                        row = cursor.fetchone()
+                        stock = row[0] if row else None
+                stock_str = f": {stock}" if stock is not None else ""
+                sources_names.append(
+                    f"{s.source.name if s.source else '-'}{stock_str}")
+                eans.append(s.ean or '-')
+            sources_display = "<br>".join(
+                sources_names) if sources_names else "-"
+            eans_display = "<br>".join(eans) if eans else "-"
+            key = (color, producer_color, size, sources_display, eans_display)
             if key not in grouped:
                 grouped[key] = []
             grouped[key].append(v.variant_id)
         html = "<table style='border-collapse:collapse;'>"
         html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Ceny</th><th style='border:1px solid #ccc;padding:2px 6px;'>Cena detaliczna</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
-        for (color, producer_color, size, ean), variant_ids in grouped.items():
+        for (color, producer_color, size, sources_display, eans_display), variant_ids in grouped.items():
             with connections['MPD'].cursor() as cursor:
                 cursor.execute("""
                     SELECT s.name, SUM(sp.stock) as total_stock, sp.price, sp.currency
@@ -146,16 +193,13 @@ class ProductsAdmin(admin.ModelAdmin):
                 """, [tuple(variant_ids)])
                 rows = cursor.fetchall()
             total_stock = sum([row[1] for row in rows]) if rows else 0
-            # Ceny z nazwą źródła
             prices = [
                 f"{row[0]}: {row[2]} {row[3]}" for row in rows if row[2] is not None and row[2] > 0]
             prices_str = "<br>".join(prices) if prices else "-"
             retail_obj = ProductVariantsRetailPrice.objects.using(
-                'MPD').filter(variant_id=variant_ids[0]).first()
+                'MPD').filter(variant__variant_id=variant_ids[0]).first()
             retail_price_str = f"{retail_obj.retail_price} PLN" if retail_obj and retail_obj.retail_price is not None else "-"
-            sources_str = ", ".join(
-                [f"{row[0]}: {row[1]}" for row in rows]) if rows else "-"
-            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{prices_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{retail_price_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{ean}</td></tr>"
+            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{prices_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{retail_price_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_display}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{eans_display}</td></tr>"
         html += "</table>"
         return mark_safe(html)
 
@@ -376,8 +420,8 @@ class ColorsAdmin(admin.ModelAdmin):
     list_filter = ['name']
 
 
-@admin.register(Categories)
-class CategoriesAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name', 'path', 'parent_id']
-    search_fields = ['name', 'path']
-    list_filter = ['name']
+# @admin.register(Categories)
+# class CategoriesAdmin(admin.ModelAdmin):
+#     list_display = ['id', 'name', 'path', 'parent_id']
+#     search_fields = ['name', 'path']
+#     list_filter = ['name']
