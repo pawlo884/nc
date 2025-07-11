@@ -1,73 +1,261 @@
+import os
+from matterhorn.defs_db import s3_client, DO_SPACES_BUCKET, DO_SPACES_REGION
+import logging
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import requests
 from datetime import datetime
 from django.utils import timezone
 from .models import Sources
-from matterhorn.defs_db import s3_client, DO_SPACES_BUCKET, DO_SPACES_REGION
-import logging
 
 logger = logging.getLogger(__name__)
 
 
-class XMLExporter:
+class BaseXMLExporter:
+    def __init__(self, filename):
+        self.filename = filename
+
+    def generate_xml(self):
+        raise NotImplementedError
+
+    def save_local(self, xml_content):
+        local_dir = 'MPD_test/xml/'
+        os.makedirs(local_dir, exist_ok=True)
+        local_path = os.path.join(local_dir, self.filename)
+        with open(local_path, 'w', encoding='utf-8') as f:
+            f.write(xml_content)
+        return local_path
+
+    def save_to_bucket(self, xml_content):
+        try:
+            temp_file = self.filename
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                f.write(xml_content)
+            bucket_path = f"MPD_test/xml/{temp_file}"
+            with open(temp_file, 'rb') as f:
+                file_data = f.read()
+            s3_client.put_object(
+                Bucket=DO_SPACES_BUCKET,
+                Key=bucket_path,
+                Body=file_data,
+                ContentType='application/xml',
+                ACL='public-read'
+            )
+            file_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/{bucket_path}"
+            logger.info(
+                f"Plik XML został pomyślnie przesłany do bucketa: {file_url}")
+            return file_url
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas przesyłania pliku XML do bucketa: {str(e)}")
+            return None
+
+    def export(self):
+        xml_content = self.generate_xml()
+        local_path = self.save_local(xml_content)
+        bucket_url = self.save_to_bucket(xml_content)
+        if bucket_url:
+            print('✅ Eksport XML zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        else:
+            print('❌ Błąd podczas eksportu XML')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        return {'bucket_url': bucket_url, 'local_path': local_path}
+
+
+class FullXMLExporter(BaseXMLExporter):
+    def __init__(self):
+        super().__init__('export_full.xml')
+
+    def generate_xml(self):
+        from django.utils.html import escape
+        from .models import Products, ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths
+        from datetime import datetime, timedelta
+        from .models import Vat
+        now = datetime.now()
+        expires = now + timedelta(days=1)
+        xml = []
+        xml.append('<?xml version="1.0" encoding="utf-8"?>')
+        xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes">'.format(
+            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+        xml.append('  <products currency="PLN" language="pol">')
+        products = Products.objects.using('MPD').all().select_related('brand')
+        for product in products:
+            # Pobierz pierwszy wariant produktu
+            variants = ProductVariants.objects.using('MPD').filter(
+                product=product).select_related('size', 'color')
+            currency = ''
+            vat_rate = ''
+            for variant in variants:
+                pvrp = ProductVariantsRetailPrice.objects.using(
+                    'MPD').filter(variant=variant).first()
+                if pvrp:
+                    currency = pvrp.currency or ''
+                    if pvrp.vat:
+                        vat_obj = Vat.objects.using(
+                            'MPD').filter(id=pvrp.vat).first()
+                        if vat_obj:
+                            vat_rate = str(vat_obj.vat_rate)
+                        else:
+                            vat_rate = str(pvrp.vat)
+                    break
+            xml.append(
+                f'    <product id="{product.id}" currency="{currency}" type="regular" vat="{vat_rate}" site="1">')
+            if product.brand:
+                xml.append(
+                    f'      <producer id="{product.brand.id}" name="{escape(product.brand.name) if product.brand.name else ""}"/>')
+            # Dodaj wszystkie kategorie (category) powiązane z produktem
+            product_paths = ProductPaths.objects.using(
+                'MPD').filter(product_id=product.id)
+            for product_path in product_paths:
+                path_obj = Paths.objects.using('MPD').filter(
+                    id=product_path.path_id).first()
+                if path_obj:
+                    xml.append(
+                        f'      <category id="{path_obj.id}" name="{escape(path_obj.path)}"/>')
+            if product.name:
+                xml.append('      <description>')
+                xml.append(f'        <name>{escape(product.name)}</name>')
+                if product.short_description:
+                    xml.append(
+                        f'        <short_desc><![CDATA[{product.short_description}]]></short_desc>')
+                if product.description:
+                    xml.append(
+                        f'        <long_desc><![CDATA[{product.description}]]></long_desc>')
+                xml.append('      </description>')
+            variants = ProductVariants.objects.using('MPD').filter(
+                product=product).select_related('size', 'color')
+            if variants:
+                xml.append('      <sizes>')
+                for variant in variants:
+                    size_name = variant.size.name if variant.size else ""
+                    color_name = variant.color.name if variant.color else ""
+                    xml.append(
+                        f'        <size id="{variant.size.id if variant.size else ''}" name="{escape(size_name)}" panel_name="{escape(color_name)}">')
+                    stock_price = StockAndPrices.objects.using(
+                        'MPD').filter(variant=variant).first()
+                    if stock_price:
+                        xml.append(
+                            f'          <price gross="{stock_price.price}"/>')
+                        source = Sources.objects.filter(
+                            id=stock_price.source_id).first()
+                        stock_id = ""
+                        if source and source.type == 'Magazyn główny':
+                            stock_id = "1"
+                        elif source and source.type == 'Magazyn obcy':
+                            stock_id = "0"
+                        elif source and source.type == 'Magazyn wymiany':
+                            stock_id = "3"
+                        elif source and source.type == 'Magazyn pomocniczy':
+                            stock_id = "2"
+                        xml.append(
+                            f'          <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
+                    xml.append('        </size>')
+                xml.append('      </sizes>')
+            images = ProductImage.objects.using('MPD').filter(product=product)
+            if images:
+                xml.append('      <images>')
+                xml.append('        <large>')
+                for img in images:
+                    xml.append(
+                        f'          <image url="{escape(img.file_path)}"/>')
+                xml.append('        </large>')
+                xml.append('      </images>')
+            xml.append('    </product>')
+        xml.append('  </products>')
+        xml.append('</offer>')
+        return '\n'.join(xml)
+
+
+class LightXMLExporter(BaseXMLExporter):
+    def __init__(self):
+        super().__init__('lightoferta.xml')
+
+    def generate_xml(self):
+        from django.utils.html import escape
+        from .models import Products, ProductVariants, StockAndPrices
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        expires = now + timedelta(days=1)
+        xml = []
+        xml.append('<?xml version="1.0" encoding="utf-8"?>')
+        xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="no">'.format(
+            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+        xml.append('  <products currency="PLN" language="pol">')
+        products = Products.objects.using('MPD').all()
+        for product in products:
+            xml.append(f'    <product id="{product.id}">')
+            variants = ProductVariants.objects.using(
+                'MPD').filter(product=product)
+            if variants:
+                xml.append('      <sizes>')
+                for variant in variants:
+                    size_name = variant.size.name if variant.size else ""
+                    xml.append(
+                        f'        <size id="{variant.size.id if variant.size else ''}" name="{escape(size_name)}">')
+                    stock_price = StockAndPrices.objects.using(
+                        'MPD').filter(variant=variant).first()
+                    if stock_price:
+                        xml.append(
+                            f'          <price gross="{stock_price.price}"/>')
+                        xml.append(
+                            f'          <stock id="{variant.variant_id}" quantity="{stock_price.stock}"/>')
+                    xml.append('        </size>')
+                xml.append('      </sizes>')
+            xml.append('    </product>')
+        xml.append('  </products>')
+        xml.append('</offer>')
+        return '\n'.join(xml)
+
+
+class GatewayXMLExporter(BaseXMLExporter):
     def __init__(self, source_name):
         self.source_name = source_name
+        super().__init__(f'{source_name.lower()}_gateway.xml')
         self.source = Sources.objects.filter(name=source_name).first()
         if not self.source:
             raise ValueError(f"Nie znaleziono źródła o nazwie: {source_name}")
 
     def _create_meta_element(self, root):
         meta = ET.SubElement(root, "meta")
-
         long_name = ET.SubElement(meta, "long_name")
         long_name.text = f"<![CDATA[{self.source.long_name}]]>" if self.source.long_name else ""
-
         short_name = ET.SubElement(meta, "short_name")
         short_name.text = f"<![CDATA[{self.source.short_name}]]>" if self.source.short_name else ""
-
         if self.source.showcase_image:
             showcase_image = ET.SubElement(meta, "showcase_image")
             showcase_image.set("url", self.source.showcase_image)
-
         if self.source.email:
             email = ET.SubElement(meta, "email")
             email.text = f"<![CDATA[{self.source.email}]]>"
-
         if self.source.tel:
             tel = ET.SubElement(meta, "tel")
             tel.text = f"<![CDATA[{self.source.tel}]]>"
-
         if self.source.www:
             www = ET.SubElement(meta, "www")
             www.text = f"<![CDATA[{self.source.www}]]>"
-
         if any([self.source.street, self.source.zipcode, self.source.city, self.source.country]):
             address = ET.SubElement(meta, "address")
-
             if self.source.street:
                 street = ET.SubElement(address, "street")
                 street.text = f"<![CDATA[{self.source.street}]]>"
-
             if self.source.zipcode:
                 zipcode = ET.SubElement(address, "zipcode")
                 zipcode.text = f"<![CDATA[{self.source.zipcode}]]>"
-
             if self.source.city:
                 city = ET.SubElement(address, "city")
                 city.text = f"<![CDATA[{self.source.city}]]>"
-
             if self.source.country:
                 country = ET.SubElement(address, "country")
                 country.text = f"<![CDATA[{self.source.country}]]>"
-
         time = ET.SubElement(meta, "time")
         offer_created = ET.SubElement(time, "offer")
         offer_created.set(
             "created", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-
         offer_expires = ET.SubElement(time, "offer")
-        offer_expires.set("expires", (datetime.now() +
-                          timezone.timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"))
+        offer_expires.set("expires", (datetime.now(
+        ) + timezone.timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"))
 
     def _create_url_elements(self, root):
         elements = {
@@ -83,50 +271,119 @@ class XMLExporter:
             "warranties": "warranties.xml",
             "preset": "preset.xml"
         }
-
+        bucket_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/"
         for element_name, file_name in elements.items():
             element = ET.SubElement(root, element_name)
-            element.set("url", f"https://adres.pl/{file_name}")
+            url = bucket_url + file_name
+            element.set("url", url)
+            try:
+                response = requests.get(url)
+                if response.status_code == 200:
+                    import hashlib
+                    md5_hash = hashlib.md5(response.content).hexdigest()
+                    changed = response.headers.get('Last-Modified')
+                    if changed:
+                        try:
+                            changed_dt = datetime.strptime(
+                                changed, '%a, %d %b %Y %H:%M:%S %Z')
+                            changed_str = changed_dt.strftime(
+                                '%Y-%m-%d %H:%M:%S')
+                        except Exception:
+                            changed_str = changed
+                        element.set("changed", changed_str)
+                    else:
+                        element.set("changed", "")
+                    element.set("hash", md5_hash)
+                else:
+                    element.set("hash", "")
+                    element.set("changed", "")
+            except Exception:
+                element.set("hash", "")
+                element.set("changed", "")
 
-    def export_sources_to_xml(self):
+    def generate_xml(self):
         root = ET.Element("provider_description")
         root.set("file_format", "IOF")
         root.set("version", "3.0")
         root.set("generated_by", "nc")
         root.set("generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-
         self._create_meta_element(root)
         self._create_url_elements(root)
-
         xmlstr = minidom.parseString(
             ET.tostring(root, encoding="utf-8")
         ).toprettyxml(indent="  ", encoding="utf-8")
+        return xmlstr.decode("utf-8")
 
-        temp_file = f"{self.source_name.lower()}_gateway.xml"
-        with open(temp_file, "wb") as f:
-            f.write(xmlstr)
 
-        try:
-            bucket_path = f"MPD_test/xml/{temp_file}"
+class ProducersXMLExporter(BaseXMLExporter):
+    def __init__(self):
+        super().__init__('producers.xml')
 
-            with open(temp_file, 'rb') as f:
-                file_data = f.read()
+    def generate_xml(self):
+        from django.utils.html import escape
+        from .models import Brands
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        expires = now + timedelta(days=1)
+        xml = []
+        xml.append('<?xml version="1.0" encoding="utf-8"?>')
+        xml.append('<producers file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="{}" expires="{}">'.format(
+            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+        brands = Brands.objects.using('MPD').all()
+        for brand in brands:
+            # id: string, bez spacji, tylko a-z, A-Z, _, -
+            brand_id = str(brand.id) if brand.id is not None else ''
+            brand_id = brand_id.replace(' ', '_')
+            name = escape(brand.name) if brand.name else ''
+            xml.append(f'  <producer id="{brand_id}" name="{name}"/>')
+        xml.append('</producers>')
+        return '\n'.join(xml)
 
-            s3_client.put_object(
-                Bucket=DO_SPACES_BUCKET,
-                Key=bucket_path,
-                Body=file_data,
-                ContentType='application/xml',
-                ACL='public-read'
-            )
 
-            file_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/{bucket_path}"
-            logger.info(
-                f"Plik XML został pomyślnie przesłany do bucketa: {file_url}")
+class StocksXMLExporter(BaseXMLExporter):
+    def __init__(self):
+        super().__init__('stocks.xml')
 
-            return file_url
+    def generate_xml(self):
+        from django.utils.html import escape
+        from .models import StockAndPrices, ProductVariants, Products
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        expires = now + timedelta(days=1)
+        xml = []
+        xml.append('<?xml version="1.0" encoding="utf-8"?>')
+        xml.append('<stocks file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="{}" expires="{}">'.format(
+            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+        stocks = StockAndPrices.objects.using(
+            'MPD').all().select_related('variant__product')
+        for stock in stocks:
+            variant = stock.variant
+            product = variant.product if variant else None
+            stock_id = str(variant.variant_id) if variant else ''
+            stock_id = stock_id.replace(' ', '_')
+            name = escape(product.name) if product and product.name else ''
+            xml.append(f'  <stock id="{stock_id}" name="{name}"/>')
+        xml.append('</stocks>')
+        return '\n'.join(xml)
 
-        except Exception as e:
-            logger.error(
-                f"Błąd podczas przesyłania pliku XML do bucketa: {str(e)}")
-            return None
+
+class UnitsXMLExporter(BaseXMLExporter):
+    def __init__(self):
+        super().__init__('units.xml')
+
+    def generate_xml(self):
+        from django.utils.html import escape
+        from .models import Units
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        expires = now + timedelta(days=1)
+        xml = []
+        xml.append('<?xml version="1.0" encoding="utf-8"?>')
+        xml.append('<units file_format="IOF" version="3.0" generated="{}" expires="{}" language="pol">'.format(
+            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+        units = Units.objects.using('MPD').all()
+        for unit in units:
+            xml.append(
+                f'  <unit id="{unit.unit_id}" name="{escape(unit.name) if unit.name else ''}"/>')
+        xml.append('</units>')
+        return '\n'.join(xml)

@@ -397,8 +397,9 @@ class ProductsAdmin(admin.ModelAdmin):
                 series_name = request.POST.get('series_name')
                 producer_color_name = request.POST.get('producer_color_name')
                 product_set_id = request.POST.get('product_set')
+                unit_id = request.POST.get('unit_id')
                 variant_logger.info(
-                    f"[mpd_create] POST data: name={name}, description={description}, brand={brand}, size_category={size_category}, main_color_id={main_color_id}, producer_code={producer_code}, series_name={series_name}, producer_color_name={producer_color_name}, product_set_id={product_set_id}")
+                    f"[mpd_create] POST data: name={name}, description={description}, brand={brand}, size_category={size_category}, main_color_id={main_color_id}, producer_code={producer_code}, series_name={series_name}, producer_color_name={producer_color_name}, product_set_id={product_set_id}, unit_id={unit_id}")
 
                 if not size_category:
                     variant_logger.warning(
@@ -470,12 +471,14 @@ class ProductsAdmin(admin.ModelAdmin):
                                 f"Nie znaleziono marki {brand} w bazie MPD")
                             raise Exception('Marka nie istnieje w bazie MPD')
                         brand_id = brand_result[0]
-
+                        # Dodaj obsługę unit_id
+                        unit_id_int = int(
+                            unit_id) if unit_id and unit_id.isdigit() else None
                         cursor.execute("""
-                            INSERT INTO products (name, description, short_description, brand_id, series_id)
-                            VALUES (%s, %s, %s, %s, %s)
+                            INSERT INTO products (name, description, short_description, brand_id, series_id, unit)
+                            VALUES (%s, %s, %s, %s, %s, %s)
                             RETURNING id
-                        """, [name, description, short_description, brand_id, series_id])
+                        """, [name, description, short_description, brand_id, series_id, unit_id_int])
                         row = cursor.fetchone()
                         if row:
                             new_product_id = row[0]
@@ -1237,6 +1240,27 @@ class ProductsAdmin(admin.ModelAdmin):
                     series_name = row[0] or ''
         extra_context['producer_code'] = producer_code
         extra_context['series_name'] = series_name
+
+        # Pobierz dostępne jednostki z MPD
+        try:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute("SELECT unit_id, name FROM units ORDER BY name")
+                units = [{'id': row[0], 'name': row[1]}
+                         for row in cursor.fetchall()]
+            extra_context['units'] = units
+        except Exception as e:
+            logger.error(f"Błąd pobierania jednostek z MPD: {e}")
+            extra_context['units'] = []
+        # Pobierz wybraną jednostkę jeśli istnieje
+        selected_unit_id = None
+        if mapped_id:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute(
+                    "SELECT unit FROM products WHERE id = %s", [mapped_id])
+                row = cursor.fetchone()
+                if row:
+                    selected_unit_id = row[0]
+        extra_context['selected_unit_id'] = selected_unit_id
 
         return super().change_view(request, object_id, form_url, extra_context)
 

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="http://www.idosell.com/developers/iof/xml.xsd"/>
+	<xs:annotation>
+		<xs:documentation>
+			Internet Offer Format 3.0 (https://www.idosell.com/pl/shop/developers/formats/iof/internet-offer-format-iof). 
+			Describes the units.xml file. 
+			Holds information about a units list. 
+			Each product is associated with a unit by units.unit@id attribute.
+			@id can be passed as a string, but must be unique in its scope and only a-z,A-Z,_,- range chars can be used (e.g. no blanks/spaces allowed)
+      		Official XML Schema Validator for units.xml file. Date modification: 2018-05-28 16:00:00  			
+		</xs:documentation>
+	</xs:annotation>
+	<xs:element name="units">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element maxOccurs="unbounded" minOccurs="0" ref="unit"/>
+			</xs:sequence>
+            <xs:attribute name="file_format" use="optional">
+                <xs:annotation>
+                    <xs:documentation>Format: IOF</xs:documentation>
+                </xs:annotation>
+                <xs:simpleType>
+                    <xs:restriction base="xs:NMTOKEN">
+                        <xs:enumeration value="IOF"/>
+                    </xs:restriction>
+                </xs:simpleType>                 
+            </xs:attribute>
+            <xs:attribute name="version" use="optional">
+                <xs:annotation>
+                    <xs:documentation>IOF version: major.minor</xs:documentation>
+                </xs:annotation>
+                <xs:simpleType>
+                    <xs:restriction base="xs:decimal">
+                        <xs:enumeration value="3.0"/>                                              
+                    </xs:restriction>
+                </xs:simpleType>                  
+            </xs:attribute>
+            <xs:attribute name="generated_by" type="xs:string" use="optional"/>
+            <xs:attribute name="language" use="optional">
+                <xs:simpleType>
+                    <xs:restriction base="xs:NMTOKEN">
+                        <xs:pattern value="[a-z]{3,3}"/>
+                    </xs:restriction>
+                </xs:simpleType> 
+            </xs:attribute>                                                    
+            <xs:attribute name="generated" use="optional">
+                <xs:annotation>
+                    <xs:documentation>Date generated: YYYY-MM-DD 00:00:00</xs:documentation>
+                </xs:annotation>
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:pattern value="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"/>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute>      
+            <xs:attribute name="expires" use="optional">
+                <xs:annotation>
+                    <xs:documentation>Date expire offer: YYYY-MM-DD 00:00:00</xs:documentation>
+                </xs:annotation>
+                <xs:simpleType>
+                    <xs:restriction base="xs:string">
+                        <xs:pattern value="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"/>
+                    </xs:restriction>
+                </xs:simpleType>
+            </xs:attribute> 
+		</xs:complexType>
+	</xs:element>
+	<xs:element name="unit">
+		<xs:complexType>
+			<xs:sequence>
+                <xs:choice maxOccurs="unbounded" minOccurs="0">				
+					<xs:element maxOccurs="unbounded" minOccurs="0" ref="name"/>
+                </xs:choice>					
+			</xs:sequence>
+			<xs:attribute name="id" type="xs:string" use="optional"/>
+			<xs:attribute name="name" type="xs:string" use="optional"/>
+			<xs:attribute name="precision" type="xs:unsignedByte" use="optional"/>
+		</xs:complexType>
+	</xs:element>
+	<xs:element name="name">
+		<xs:complexType mixed="true">
+			<xs:simpleContent>
+				<xs:extension base="xs:string">
+					<xs:attribute ref="xml:lang" use="optional"/>
+				</xs:extension>
+			</xs:simpleContent>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+     <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="http://www.idosell.com/developers/iof/xml.xsd"/>
+     <xs:annotation>
+          <xs:documentation>
+               Internet Offer Format 3.0 (https://www.idosell.com/pl/shop/developers/formats/iof/internet-offer-format-iof). 
+               Describes the parameters.xml file. 
+               Holds information about parameters group tree.    
+               Each parameters group holds one or more parameter. 
+               Each product is associated with a parameter by parameters.parameters.paremeter@id attribute.
+               @id can be passed as a string, but must be unique in its scope and only a-z,A-Z,_,- range chars can be used (e.g. no blanks/spaces allowed)
+               Official XML Schema Validator for parameters.xml file. Date modification: 2018-05-28 16:00:00              
+         </xs:documentation>
+     </xs:annotation>
+     <xs:element name="parameters">
+          <xs:complexType>
+               <xs:choice maxOccurs="unbounded" minOccurs="0">
+                    <xs:element maxOccurs="1" minOccurs="0" name="sections">
+                         <xs:complexType>
+                              <xs:sequence>
+                                   <xs:element maxOccurs="unbounded" minOccurs="0" ref="section"/>
+                              </xs:sequence>
+                         </xs:complexType>
+                    </xs:element>
+                    <xs:element maxOccurs="1" minOccurs="0" name="parameters">
+                         <xs:complexType>
+                              <xs:sequence>
+                                   <xs:element maxOccurs="unbounded" minOccurs="0" ref="parameter"/>
+                              </xs:sequence>
+                         </xs:complexType>
+                    </xs:element>
+                    <xs:element maxOccurs="1" minOccurs="0" name="values">
+                         <xs:complexType>
+                              <xs:sequence>
+                                   <xs:element maxOccurs="unbounded" minOccurs="0" ref="value"/>
+                              </xs:sequence>
+                         </xs:complexType>
+                    </xs:element>
+               </xs:choice>
+               <xs:attribute name="file_format" use="optional">
+                    <xs:annotation>
+                         <xs:documentation>Format: IOF</xs:documentation>
+                    </xs:annotation>
+                    <xs:simpleType>
+                         <xs:restriction base="xs:NMTOKEN">
+                              <xs:enumeration value="IOF"/>
+                         </xs:restriction>
+                    </xs:simpleType>
+               </xs:attribute>
+               <xs:attribute name="version" use="optional">
+                    <xs:annotation>
+                         <xs:documentation>IOF version: major.minor</xs:documentation>
+                    </xs:annotation>
+                    <xs:simpleType>
+                         <xs:restriction base="xs:decimal">
+                              <xs:enumeration value="3.0"/>
+                         </xs:restriction>
+                    </xs:simpleType>
+               </xs:attribute>
+               <xs:attribute name="generated_by" type="xs:string" use="optional"/>
+               <xs:attribute name="language" use="optional">
+                    <xs:simpleType>
+                         <xs:restriction base="xs:NMTOKEN">
+                              <xs:pattern value="[a-z]{3,3}"/>
+                         </xs:restriction>
+                    </xs:simpleType>
+               </xs:attribute>
+               <xs:attribute name="generated" use="optional">
+                    <xs:annotation>
+                         <xs:documentation>Date generated: YYYY-MM-DD 00:00:00</xs:documentation>
+                    </xs:annotation>
+                    <xs:simpleType>
+                         <xs:restriction base="xs:string">
+                              <xs:pattern value="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"/>
+                         </xs:restriction>
+                    </xs:simpleType>
+               </xs:attribute>
+               <xs:attribute name="expires" use="optional">
+                    <xs:annotation>
+                         <xs:documentation>Date expire offer: YYYY-MM-DD 00:00:00</xs:documentation>
+                    </xs:annotation>
+                    <xs:simpleType>
+                         <xs:restriction base="xs:string">
+                              <xs:pattern value="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"/>
+                         </xs:restriction>
+                    </xs:simpleType>
+               </xs:attribute>
+          </xs:complexType>
+     </xs:element>
+     <xs:element name="section">
+          <xs:complexType>
+               <xs:sequence>
+                    <xs:element maxOccurs="unbounded" ref="name"/>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" ref="description"/>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" ref="icons"/>
+               </xs:sequence>
+               <xs:attribute name="id" type="xs:string" use="required"/>
+               <xs:attribute name="name" type="xs:string" use="required"/>
+          </xs:complexType>
+     </xs:element>
+     <xs:element name="parameter">
+          <xs:complexType>
+               <xs:sequence>
+                    <xs:element maxOccurs="unbounded" ref="name"/>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" ref="description"/>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" ref="icons"/>
+               </xs:sequence>
+               <xs:attribute name="id" type="xs:string" use="required"/>
+               <xs:attribute name="name" type="xs:string" use="required"/>
+          </xs:complexType>
+     </xs:element>
+     <xs:element name="value">
+          <xs:complexType>
+               <xs:sequence>
+                    <xs:element maxOccurs="unbounded" ref="name"/>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" ref="description"/>
+                    <xs:element maxOccurs="unbounded" minOccurs="0" ref="icons"/>
+               </xs:sequence>
+               <xs:attribute name="id" type="xs:string" use="required"/>
+               <xs:attribute name="name" type="xs:string" use="required"/>
+          </xs:complexType>
+     </xs:element>
+     <xs:element name="name">
+          <xs:complexType mixed="true">
+               <xs:attribute ref="xml:lang" use="optional"/>
+          </xs:complexType>
+     </xs:element>
+     <xs:element name="description">
+          <xs:complexType mixed="true">
+               <xs:attribute ref="xml:lang" use="optional"/>
+          </xs:complexType>
+     </xs:element>
+     <xs:element name="icons">
+          <xs:complexType>
+               <xs:sequence>
+                    <xs:choice maxOccurs="unbounded" minOccurs="0">
+                         <xs:element name="card">
+                              <xs:complexType>
+                                   <xs:attribute ref="xml:lang"/>
+                                   <xs:attribute name="url" type="xs:string" use="required"/>
+                              </xs:complexType>
+                         </xs:element>
+                         <xs:element name="list">
+                              <xs:complexType>
+                                   <xs:attribute ref="xml:lang" use="required"/>
+                                   <xs:attribute name="url" type="xs:string" use="required"/>
+                              </xs:complexType>
+                         </xs:element>
+                    </xs:choice>
+               </xs:sequence>
+          </xs:complexType>
+     </xs:element>
+</xs:schema>

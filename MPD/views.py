@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .models import Products, Brands, ProductSet, ProductSetItem
+from .models import Products, ProductSet, ProductSetItem
 from django.http import JsonResponse
 from django.db import connections
 from rest_framework import viewsets, status
@@ -7,9 +7,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .serializers import ProductSetSerializer, ProductSetItemSerializer
 from collections import defaultdict
-from .export_to_xml import XMLExporter
-from .export_to_full_xml import create_xml_file
+from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter, ProducersXMLExporter, StocksXMLExporter
 import logging
+from django.http import HttpResponse
+import requests
+from matterhorn.defs_db import DO_SPACES_BUCKET, DO_SPACES_REGION
+from django.urls import reverse
+from .models import Sources
+from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +140,7 @@ class ProductSetViewSet(viewsets.ModelViewSet):
 
         try:
             product = Products.objects.get(id=product_id)
-            item = ProductSetItem.objects.create(
+            ProductSetItem.objects.create(
                 set=set,
                 mapped_product=product,
                 quantity=quantity
@@ -175,10 +180,10 @@ class ProductSetViewSet(viewsets.ModelViewSet):
 
 def export_xml(request, source_name):
     try:
-        exporter = XMLExporter(source_name)
-        url = exporter.export_sources_to_xml()
-        if url:
-            return JsonResponse({'status': 'success', 'url': url})
+        exporter = GatewayXMLExporter(source_name)
+        result = exporter.export()
+        if result['bucket_url']:
+            return JsonResponse({'status': 'success', 'url': result['bucket_url']})
         return JsonResponse({'status': 'error', 'message': 'Nie udało się wygenerować pliku XML'}, status=500)
     except ValueError as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=404)
@@ -188,20 +193,143 @@ def export_xml(request, source_name):
 
 def export_full_xml(request):
     """Widok do eksportu pełnego XML"""
+    return JsonResponse({'status': 'error', 'message': 'Ten endpoint nie jest już obsługiwany. Użyj /generate-full-xml/.'}, status=410)
+
+
+XML_FILES = [
+    "full", "light", "categories", "sizes", "producers", "units", "parameters", "stocks", "series", "warranties", "preset"
+]
+
+BUCKET_URL = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/"
+XML_FILE_MAP = {
+    "full": "fulloferta.xml",
+    "light": "lightoferta.xml",
+    "categories": "categories.xml",
+    "sizes": "sizes.xml",
+    "producers": "producers.xml",
+    "units": "units.xml",
+    "parameters": "parameters.xml",
+    "stocks": "stocks.xml",
+    "series": "series.xml",
+    "warranties": "warranties.xml",
+    "preset": "preset.xml"
+}
+
+
+def get_xml_file(request, xml_type):
+    if xml_type not in XML_FILE_MAP:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy typ XML'}, status=404)
+    file_url = BUCKET_URL + XML_FILE_MAP[xml_type]
     try:
-        file_url = create_xml_file()
-        if file_url:
-            return JsonResponse({
-                'status': 'success',
-                'message': f'Plik XML został wygenerowany i przesłany do bucketa',
-                'url': file_url
-            })
-        return JsonResponse({
-            'status': 'error',
-            'message': 'Nie udało się wygenerować pliku XML'
-        }, status=500)
+        resp = requests.get(file_url)
+        if resp.status_code == 200:
+            response = HttpResponse(
+                resp.content, content_type='application/xml')
+            response['Content-Disposition'] = f'attachment; filename="{XML_FILE_MAP[xml_type]}"'
+            return response
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Nie znaleziono pliku XML'}, status=404)
     except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=500)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def get_gateway_xml(request):
+    source_name = request.GET.get('source')
+    if not source_name:
+        return JsonResponse({'status': 'error', 'message': 'Brak parametru source'}, status=400)
+    file_url = BUCKET_URL + f"{source_name.lower()}_gateway.xml"
+    try:
+        resp = requests.get(file_url)
+        if resp.status_code == 200:
+            response = HttpResponse(
+                resp.content, content_type='application/xml')
+            response['Content-Disposition'] = f'attachment; filename="{source_name.lower()}_gateway.xml"'
+            return response
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Nie znaleziono pliku XML'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@csrf_exempt
+def generate_full_xml(request):
+    exporter = FullXMLExporter()
+    exporter_result = exporter.export()
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def generate_gateway_xml(request, source_name):
+    try:
+        exporter = GatewayXMLExporter(source_name)
+        exporter_result = exporter.export()
+        # Pobierz wygenerowany plik lokalny i zwróć jako XML
+        with open(exporter_result['local_path'], 'rb') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/xml')
+    except Exception:
+        return HttpResponse('<empty/>', content_type='application/xml')
+
+
+@csrf_exempt
+def generate_light_xml(request):
+    exporter = LightXMLExporter()
+    exporter_result = exporter.export()
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def generate_producers_xml(request):
+    exporter = ProducersXMLExporter()
+    exporter_result = exporter.export()
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def generate_stocks_xml(request):
+    exporter = StocksXMLExporter()
+    exporter_result = exporter.export()
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def empty_xml(request):
+    return HttpResponse('<empty/>', content_type='application/xml')
+
+
+def xml_links(request):
+    links = []
+    # full.xml
+    url = reverse('generate_full_xml')
+    links.append(('full', url))
+    # light.xml
+    url = reverse('generate_light_xml')
+    links.append(('light', url))
+    # producers.xml
+    url = reverse('generate_producers_xml')
+    links.append(('producers', url))
+    # stocks.xml
+    url = reverse('generate_stocks_xml')
+    links.append(('stocks', url))
+    # gateway dla każdego źródła
+    sources = Sources.objects.all()
+    for source in sources:
+        gateway_url = reverse('generate_gateway_xml', args=[source.name])
+        links.append((f'gateway ({source.name})', gateway_url))
+    # pozostałe typy (puste)
+    for xml_type in [k for k in XML_FILE_MAP if k not in ['full', 'light', 'producers', 'stocks']]:
+        url = reverse('empty_xml') + f'?type={xml_type}'
+        links.append((xml_type, url))
+    html = '<h2>Dostępne pliki XML:</h2><ul>'
+    for xml_type, url in links:
+        html += f'<li><a href="{url}" target="_blank">{xml_type}</a></li>'
+    html += '</ul>'
+    return HttpResponse(html)

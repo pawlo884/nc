@@ -57,6 +57,8 @@ class Products(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
     series = models.ForeignKey('ProductSeries', db_column='series_id',
                                on_delete=models.DO_NOTHING, blank=True, null=True)
+    unit = models.ForeignKey(
+        'Units', on_delete=models.CASCADE, db_column='unit', to_field='unit_id', null=True, blank=True)
     objects = models.Manager()
 
     class Meta:
@@ -149,6 +151,14 @@ class ProductvariantsSources(models.Model):
         Sources, on_delete=models.RESTRICT, db_column='source_id', null=True, blank=True)
     ean = models.CharField(max_length=50, blank=True, null=True)
     variant_uid = models.IntegerField(blank=True, null=True)
+    gtin14 = models.CharField(max_length=50, blank=True, null=True)
+    gtin13 = models.CharField(max_length=50, blank=True, null=True)
+    gtin12 = models.CharField(max_length=50, blank=True, null=True)
+    isbn10 = models.CharField(max_length=50, blank=True, null=True)
+    gtin8 = models.CharField(max_length=50, blank=True, null=True)
+    upce = models.CharField(max_length=50, blank=True, null=True)
+    mpn = models.CharField(max_length=50, blank=True, null=True)
+    other = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -298,8 +308,8 @@ class StockAndPricesInline(admin.TabularInline):
 
 
 class ProductVariantsRetailPrice(models.Model):
-    variant = models.ForeignKey(ProductVariants, on_delete=models.CASCADE,
-                                db_column='variant_id', primary_key=True, to_field='variant_id')
+    variant = models.OneToOneField(ProductVariants, on_delete=models.CASCADE,
+                                   db_column='variant_id', primary_key=True, to_field='variant_id')
     retail_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True)
     vat = models.DecimalField(
@@ -310,3 +320,50 @@ class ProductVariantsRetailPrice(models.Model):
     class Meta:
         managed = False
         db_table = 'product_variants_retail_price'
+
+
+class Vat(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    vat_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'vat'
+
+
+class Paths(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=255, blank=True, null=True)
+    path = models.CharField(max_length=255, blank=True, null=True)
+    parent_id = models.BigIntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'path'
+        verbose_name = 'Ścieżka'
+        verbose_name_plural = 'Ścieżki'
+
+
+class ProductPaths(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    product_id = models.IntegerField()
+    path_id = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'product_path'
+        verbose_name = 'Ścieżka produktu'
+        unique_together = ('product_id', 'path_id')
+
+
+class Units(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    unit_id = models.IntegerField(unique=True)
+    name = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'units'
+        verbose_name = 'Jednostka'
+        verbose_name_plural = 'Jednostki'

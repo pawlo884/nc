@@ -1,0 +1,872 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema
+  elementFormDefault="qualified"
+  xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml"
+  xmlns:xs="http://www.w3.org/2001/XMLSchema" >
+  <xs:import namespace="http://www.iai-shop.com/developers/iof/extensions.phtml" schemaLocation="http://www.idosell.com/developers/iof/extensions.xsd"/>
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="http://www.idosell.com/developers/iof/xml.xsd"/>
+  <xs:element name="offer">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="1" minOccurs="1" ref="products"/>
+      </xs:sequence>
+      <xs:attribute name="file_format" use="required">
+        <xs:simpleType>
+          <xs:restriction base="xs:NMTOKEN">
+            <xs:enumeration value="IOF"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="version" use="required">
+        <xs:simpleType>
+          <xs:restriction base="xs:decimal">
+            <xs:enumeration value="3.0"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="generated" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:pattern value="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="expires" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:pattern value="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="generated_by" use="optional"/>
+      <xs:attribute name="extensions" use="required">
+        <xs:simpleType>
+          <xs:restriction base="xs:NMTOKEN">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="products">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" minOccurs="0" ref="product"/>
+      </xs:sequence>
+      <xs:attribute name="currency" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:NMTOKEN">
+            <xs:pattern value="[A-Z]{3,3}"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="language" use="required">
+        <xs:simpleType>
+          <xs:restriction base="xs:NMTOKEN">
+            <xs:pattern value="[a-z]{3,3}"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="iof_translation_generated" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="product">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice maxOccurs="unbounded" minOccurs="0">
+          <xs:element maxOccurs="1" minOccurs="0" ref="producer"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="category"/>
+          <xs:element maxOccurs="unbounded" minOccurs="0" ref="iaiext:category_translation"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="category_idosell"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:iai_category"/>
+          <xs:element maxOccurs="unbounded" minOccurs="0" ref="iaiext:iai_category_translation"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="unit"/>
+          <xs:element maxOccurs="unbounded" minOccurs="0" ref="iaiext:unit_translation"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="series"/>
+          <xs:element maxOccurs="unbounded" minOccurs="0" ref="iaiext:series_translation"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="card"/>
+          <xs:element maxOccurs="unbounded" minOccurs="0" ref="iaiext:card_translation"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="description"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="price"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="srp"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="strikethrough_retail_price"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="strikethrough_wholesale_price"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:strikethrough_wholesale_price"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="promotion"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="sizes"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="images"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="warranty"/>
+          <xs:element maxOccurs="unbounded" minOccurs="0" ref="iaiext:warranty_translation"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="parameters"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="attachments"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="group"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="bundled"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:meta_title"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:sell_by"/>
+		  <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:sold_by"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:inwrapper"/>
+		  <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:sold_in_carton"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:availability_management"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:prices_configuration_for_shops"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:prices_config"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:price_retail"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:price_wholesale"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:price_minimal"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:price_automatic_calculation"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:pricecomparator_price"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:auction_price"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:pos_prices_config"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:enable_in_pos"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:price_pos"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:hotspots"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:loyalty_program"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:taxcode"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:delivery_time"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:sum_in_basket"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:visibility"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:navigation"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:priority"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:availability"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:last_purchase_price"/>		  
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:average_purchase_price"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:pricecomparator_name"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:associated_products"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:availability_profile"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:advance"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:size_chart"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:note"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:deliverer"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="iaiext:srp"/>
+        </xs:choice>
+      </xs:sequence>
+      <xs:attribute name="type" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="regular"/>
+            <xs:enumeration value="packaging"/>
+            <xs:enumeration value="virtual"/>
+            <xs:enumeration value="bundle"/>
+            <xs:enumeration value="collection"/>
+            <xs:enumeration value="service"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute name="code_on_card" type="xs:string" use="optional"/>
+      <xs:attribute name="producer_code_standard" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="AUTO"/>
+            <xs:enumeration value="GTIN14"/>
+            <xs:enumeration value="GTIN13"/>
+            <xs:enumeration value="GTIN12"/>
+            <xs:enumeration value="GTIN8"/>
+            <xs:enumeration value="ISBN13"/>
+            <xs:enumeration value="ISBN10"/>
+            <xs:enumeration value="UPCE"/>
+            <xs:enumeration value="MPN"/>
+            <xs:enumeration value="OTHER"/>
+            <xs:enumeration value="auto"/>
+            <xs:enumeration value="gtin14"/>
+            <xs:enumeration value="gtin13"/>
+            <xs:enumeration value="gtin12"/>
+            <xs:enumeration value="gtin8"/>
+            <xs:enumeration value="isbn13"/>
+            <xs:enumeration value="isbn10"/>
+            <xs:enumeration value="upce"/>
+            <xs:enumeration value="mpn"/>
+            <xs:enumeration value="other"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="vat" type="xs:decimal" use="optional"/>
+      <xs:attribute name="currency" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:NMTOKEN">
+            <xs:pattern value="[A-Z]{3,3}"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute ref="iaiext:product_free" use="optional"/>
+      <xs:attribute ref="iaiext:product_shipment_profile_id" use="optional"/>
+      <xs:attribute ref="iaiext:save_serial_numbers" use="optional"/>
+      <xs:attribute ref="iaiext:rebate" use="optional"/>
+      <xs:attribute ref="iaiext:site" use="optional"/>
+      <xs:attribute name="site" type="xs:int" use="optional"/>
+      <xs:attribute name="removed" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:NMTOKEN">
+            <xs:enumeration value="yes"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="producer">
+    <xs:complexType>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="category">
+    <xs:complexType>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="category_idosell">
+    <xs:complexType>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="path" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="unit">
+    <xs:complexType>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="name" type="xs:NCName" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="series">
+    <xs:complexType>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="card">
+    <xs:complexType>
+      <xs:attribute name="url" type="xs:anyURI" use="required"/>
+      <xs:attribute name="url_mobile" type="xs:anyURI" use="optional"/>
+      <xs:attribute ref="iaiext:url_mobile" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="description">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice maxOccurs="unbounded" minOccurs="0">
+          <xs:element maxOccurs="unbounded" ref="name"/>
+          <xs:element ref="iaiext:auction_name"/>
+          <xs:element ref="version"/>
+          <xs:element maxOccurs="unbounded" ref="short_desc"/>
+          <xs:element maxOccurs="unbounded" ref="long_desc"/>
+          <xs:element ref="iaiext:auction_long_desc"/>
+          <xs:element ref="iaiext:meta_title"/>
+          <xs:element ref="iaiext:meta_description"/>
+          <xs:element ref="iaiext:meta_keywords"/>
+		  <xs:element ref="iaiext:search_keywords"/> 
+        </xs:choice>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="version">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="name"/>
+      </xs:sequence>
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="short_desc">
+    <xs:complexType mixed="true">
+      <xs:attribute ref="xml:lang" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="long_desc">
+    <xs:complexType mixed="true">
+      <xs:attribute ref="xml:lang" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="promotion">
+    <xs:complexType>
+      <xs:all>
+        <xs:element maxOccurs="1" minOccurs="1" ref="price"/>
+        <xs:element maxOccurs="1" minOccurs="1" ref="shown_in_the_zone"/>
+      </xs:all>
+      <xs:attribute name="name" use="required"/>
+      <xs:attribute name="start_date" type="xs:NMTOKEN" use="optional"/>
+      <xs:attribute name="ending_date" type="xs:NMTOKEN" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="shown_in_the_zone">
+    <xs:complexType>
+      <xs:attribute name="promotion" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="discount" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="distinguished" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="special" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="bestseller" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="newproduct" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="sizes">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="size"/>
+      </xs:sequence>
+      <xs:attribute ref="iaiext:group_id" use="optional"/>
+      <xs:attribute ref="iaiext:group_name" use="optional"/>
+      <xs:attribute ref="iaiext:sizeList" use="optional"/>	  
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="size">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice maxOccurs="unbounded" minOccurs="0">
+          <xs:element maxOccurs="1" minOccurs="0" ref="price"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="srp"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="strikethrough_retail_price"/>
+          <xs:element maxOccurs="1" minOccurs="0" ref="strikethrough_wholesale_price"/>
+          <xs:element maxOccurs="unbounded" minOccurs="0" ref="stock"/>
+        </xs:choice>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:string" use="optional"/>
+      <xs:attribute name="name" type="xs:string" use="optional"/>
+      <xs:attribute name="panel_name" type="xs:string" use="optional"/>
+      <xs:attribute name="code" type="xs:NMTOKEN" use="optional"/>
+      <xs:attribute name="code_producer" type="xs:string" use="optional"/>
+      <xs:attribute ref="iaiext:code_external" use="optional"/>
+      <xs:attribute name="weight" type="xs:float" use="optional"/>
+	  <xs:attribute ref="iaiext:weight_net" use="optional"/>
+      <xs:attribute ref="iaiext:min_weight" use="optional"/>
+      <xs:attribute ref="iaiext:max_weight" use="optional"/>
+	  <xs:attribute ref="iaiext:priority" use="optional"/>
+	  <xs:attribute ref="iaiext:code" use="optional"/>
+	  <xs:attribute ref="iaiext:code_producer" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="stock">
+    <xs:complexType>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute name="location_id" type="xs:string"/>
+      <xs:attribute name="location_text_id" type="xs:string"/>
+      <xs:attribute ref="iaiext:location_id" use="optional"/>
+      <xs:attribute ref="iaiext:location_text_id" use="optional"/>
+      <xs:attribute name="quantity" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:float">
+            <xs:pattern value="(-1(.[0]+)?)|(\d+([\.,]\d+)?)"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="available_stock_quantity" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:float"/>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="stock_quantity" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:float"/>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="images">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice maxOccurs="unbounded" minOccurs="0">
+          <xs:element ref="large"/>
+          <xs:element ref="icons"/>
+        </xs:choice>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="large">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="image"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="image">
+    <xs:complexType>
+	  <xs:attribute ref="iaiext:priority" use="optional"/>
+      <xs:attribute name="url" type="xs:anyURI" use="required"/>
+      <xs:attribute name="changed" type="xs:string" use="optional"/>
+      <xs:attribute name="hash" type="xs:string" use="optional"/>
+      <xs:attribute name="width" type="xs:string" use="optional"/>
+      <xs:attribute name="height" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="icons">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice maxOccurs="unbounded" minOccurs="0">
+          <xs:element ref="icon"/>
+          <xs:element ref="auction_icon"/>
+          <xs:element ref="group_icon"/>
+        </xs:choice>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="icon">
+    <xs:complexType>
+      <xs:attribute name="url" type="xs:anyURI" use="required"/>
+      <xs:attribute name="changed" type="xs:string" use="optional"/>
+      <xs:attribute name="hash" type="xs:string" use="optional"/>
+      <xs:attribute name="width" type="xs:string" use="optional"/>
+      <xs:attribute name="height" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="auction_icon">
+    <xs:complexType>
+      <xs:attribute name="url" type="xs:anyURI" use="required"/>
+      <xs:attribute name="changed" type="xs:string" use="optional"/>
+      <xs:attribute name="hash" type="xs:string" use="optional"/>
+      <xs:attribute name="width" type="xs:string" use="optional"/>
+      <xs:attribute name="height" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="group_icon">
+    <xs:complexType>
+      <xs:attribute name="url" type="xs:anyURI" use="required"/>
+      <xs:attribute name="changed" type="xs:string" use="optional"/>
+      <xs:attribute name="hash" type="xs:string" use="optional"/>
+      <xs:attribute name="width" type="xs:string" use="optional"/>
+      <xs:attribute name="height" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="warranty">
+    <xs:complexType>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute name="type" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="seller"/>
+            <xs:enumeration value="producer"/>
+            <xs:enumeration value="none"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="period" type="xs:integer" use="optional"/>
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="parameters">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice maxOccurs="unbounded" minOccurs="0">
+          <xs:element maxOccurs="unbounded" ref="section"/>
+          <xs:element maxOccurs="unbounded" ref="parameter"/>
+        </xs:choice>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="section">
+    <xs:complexType>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="name" type="xs:string" use="required"/>
+      <xs:attribute name="priority" type="xs:int" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="parameter">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" minOccurs="0" ref="value"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="name" use="required"/>
+      <xs:attribute name="type" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="section"/>
+            <xs:enumeration value="parameter"/>
+            <xs:enumeration value="value"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="priority" type="xs:string" use="optional"/>
+      <xs:attribute name="distinction" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="group_distinction" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="hide" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="auction_template_hide" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="yes"/>
+            <xs:enumeration value="no"/>
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute ref="iaiext:context_id" use="optional"/>
+      <xs:attribute name="context_id" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="CONTEXT_STD_UNIT_LENGTH_CM"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_LENGTH"/>
+            <xs:enumeration value="CONTEXT_MOVIE_RELEASE_DATE"/>
+            <xs:enumeration value="CONTEXT_MOVIE_ORIGINAL_TITLE"/>
+            <xs:enumeration value="CONTEXT_AGE_GROUP"/>
+            <xs:enumeration value="CONTEXT_ENERGY_EFFICIENCY_CLASS"/>
+            <xs:enumeration value="CONTEXT_COLOR"/>
+            <xs:enumeration value="CONTEXT_BOOK_AUTHOR"/>
+            <xs:enumeration value="CONTEXT_BOOK_PUBLICATION_DATE"/>
+            <xs:enumeration value="CONTEXT_BOOK_PAGES_NUMBER"/>
+            <xs:enumeration value="CONTEXT_BOOK_PUBLICATION_LANGUAGE"/>
+            <xs:enumeration value="CONTEXT_PRESCRIPTION_MEDICINE"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_QUANTITY_PACKAGE"/>
+            <xs:enumeration value="CONTEXT_MAX_SIZE_QUANTITY_PER_RETAIL_ORDER"/>
+            <xs:enumeration value="CONTEXT_MAX_SIZE_QUANTITY_PER_WHOLESALE_ORDER"/>
+            <xs:enumeration value="CONTEXT_MAX_QUANTITY_PER_RETAIL_ORDER"/>
+            <xs:enumeration value="CONTEXT_MAX_QUANTITY_PER_WHOLESALE_ORDER"/>
+            <xs:enumeration value="CONTEXT_MIN_SIZE_QUANTITY_PER_RETAIL_ORDER"/>
+            <xs:enumeration value="CONTEXT_MIN_SIZE_QUANTITY_PER_WHOLESALE_ORDER"/>
+            <xs:enumeration value="CONTEXT_MIN_QUANTITY_PER_RETAIL_ORDER"/>
+            <xs:enumeration value="CONTEXT_MIN_QUANTITY_PER_WHOLESALE_ORDER"/>
+            <xs:enumeration value="CONTEXT_MODEL"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_VOLUME_SI"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_VOLUME_M3"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_VOLUME"/>
+            <xs:enumeration value="CONTEXT_DOCUMENTS_JPK_VAT"/>
+            <xs:enumeration value="CONTEXT_SEX"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_AREA_M2"/>
+			<xs:enumeration value="CONTEXT_SEASON"/>
+			<xs:enumeration value="CONTEXT_STATE"/>
+			<xs:enumeration value="CONTEXT_STD_UNIT_WIDTH_CM"/>
+            <xs:enumeration value="CONTEXT_ONLY_ADULTS"/>
+			<xs:enumeration value="CONTEXT_STD_OVERHEAD_WEIGHT"/>
+			<xs:enumeration value="CONTEXT_WEIGHT_NET"/>
+			<xs:enumeration value="CONTEXT_WEIGHT_PACKAGING"/>			
+            <xs:enumeration value="CONTEXT_STD_UNIT_WEIGHT"/>
+			<xs:enumeration value="CONTEXT_STD_UNIT_WEIGHT_SI"/>
+			<xs:enumeration value="CONTEXT_STD_UNIT_HEIGHT_CM"/>
+			<xs:enumeration value="CONTEXT_HEEL_HEIGHT"/>
+			<xs:enumeration value="HEEL_HEIGHT"/>			
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="value">
+    <xs:complexType>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="name" type="xs:string" use="required"/>
+      <xs:attribute name="priority" type="xs:string" use="optional"/>
+      <xs:attribute name="context_id" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="CONTEXT_AGE_GROUP_ADULT"/>
+            <xs:enumeration value="CONTEXT_AGE_GROUP_MINOR"/>
+            <xs:enumeration value="CONTEXT_PRESCRIPTION_MEDICINE_YES"/>
+            <xs:enumeration value="CONTEXT_PRESCRIPTION_MEDICINE_NO"/>
+            <xs:enumeration value="CONTEXT_SEX_MAN"/>
+            <xs:enumeration value="CONTEXT_SEX_WOMAN"/>
+            <xs:enumeration value="CONTEXT_SEX_UNISEX"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_DEFAULT"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_WHOLE"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_TENS"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_HUNDREDS"/>
+            <xs:enumeration value="CONTEXT_STD_UNIT_ONES"/>
+            <xs:enumeration value="CONTEXT_SEASON_SPRING"/>
+            <xs:enumeration value="CONTEXT_SEASON_SUMMER"/>
+            <xs:enumeration value="CONTEXT_SEASON_FALL"/>
+            <xs:enumeration value="CONTEXT_SEASON_WINTER"/>
+            <xs:enumeration value="CONTEXT_SEASON_SPRING_SUMMER"/>
+            <xs:enumeration value="CONTEXT_SEASON_FALL_WINTER"/>
+            <xs:enumeration value="CONTEXT_STATE_NEW"/>
+            <xs:enumeration value="CONTEXT_STATE_NEW_OTHERS"/>
+            <xs:enumeration value="CONTEXT_STATE_NEW_WITH_DEFECTS"/>
+            <xs:enumeration value="CONTEXT_STATE_USED"/>
+            <xs:enumeration value="CONTEXT_STATE_REFURBISHED_BY_PRODUCER"/>
+            <xs:enumeration value="CONTEXT_STATE_REFURBISHED_BY_SELLER"/>
+            <xs:enumeration value="CONTEXT_STATE_FOR_PARTS_OR_BROKEN"/>
+            <xs:enumeration value="CONTEXT_ONLY_ADULTS_YES"/>
+            <xs:enumeration value="CONTEXT_ONLY_ADULTS_NO"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute ref="iaiext:context_id" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="attachments">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" minOccurs="0" ref="file"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="file">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="name"/>
+        <xs:element minOccurs="0" ref="limitation"/>
+      </xs:sequence>
+      <xs:attribute name="name" type="xs:string" use="optional"/>
+      <xs:attribute name="version" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="full"/>
+            <xs:enumeration value="sample"/>
+            <xs:enumeration value="demo"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="url" type="xs:anyURI" use="required"/>
+      <xs:attribute name="priority" type="xs:string" use="optional"/>
+      <xs:attribute name="enable" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="all"/>
+			<xs:enumeration value="only_logged"/>
+            <xs:enumeration value="ordered"/>
+            <xs:enumeration value="wholesaler"/>
+            <xs:enumeration value="wholesaler_or_orderer"/>
+            <xs:enumeration value="wholesaler_and_ordered"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="attachment_file_type" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="image"/>
+            <xs:enumeration value="audio"/>
+            <xs:enumeration value="video"/>
+            <xs:enumeration value="doc"/>
+            <xs:enumeration value="document"/>
+            <xs:enumeration value="other"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="attachment_file_extension" type="xs:string" use="optional"/>
+      <xs:attribute name="download_log" use="optional">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="y"/>
+            <xs:enumeration value="n"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute ref="iaiext:enable" use="optional"/>
+      <xs:attribute ref="iaiext:attachment_file_type" use="optional"/>
+      <xs:attribute ref="iaiext:attachment_file_extension" use="optional"/>
+      <xs:attribute ref="iaiext:download_log" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="limitation">
+    <xs:complexType>
+      <xs:attribute name="downloads" type="xs:int" use="optional"/>
+      <xs:attribute name="days" type="xs:int" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="bundled">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice maxOccurs="unbounded" minOccurs="0">
+          <xs:element minOccurs="1" name="product">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:choice maxOccurs="unbounded" minOccurs="0">
+                  <xs:choice maxOccurs="unbounded" minOccurs="0">
+                    <xs:element minOccurs="1" ref="sizes"/>
+                  </xs:choice>
+                </xs:choice>
+              </xs:sequence>
+              <xs:attribute name="id" type="xs:string" use="required"/>
+              <xs:attribute name="quantity" use="required">
+                <xs:simpleType>
+                  <xs:restriction base="xs:float">
+                    <xs:pattern value="(-1(.[0]+)?)|(\d+([\.,]\d+)?)"/>
+                  </xs:restriction>
+                </xs:simpleType>
+              </xs:attribute>
+              <xs:attribute name="type" use="required">
+                <xs:simpleType>
+                  <xs:restriction base="xs:token">
+                    <xs:enumeration value="client_chooses_size"/>
+                    <xs:enumeration value="client_chooses_variant"/>
+                    <xs:enumeration value="client_chooses_defined_size"/>
+					<xs:enumeration value="client_chooses_defined_size_as_separate_items"/>
+                  </xs:restriction>
+                </xs:simpleType>
+              </xs:attribute>
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:sequence>
+	  <xs:attribute name="type" use="required">
+		<xs:simpleType>
+		  <xs:restriction base="xs:token">
+			<xs:enumeration value="specified"/>
+			<xs:enumeration value="unspecified"/>
+		  </xs:restriction>
+		</xs:simpleType>
+	  </xs:attribute>	  
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="group">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="group_by_parameter"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:string" use="required"/>
+      <xs:attribute name="first_product_id" type="xs:string" use="optional"/>
+      <xs:attribute ref="iaiext:code_external" use="optional"/>
+      <xs:attribute ref="iaiext:first_product_id" use="optional"/>
+      <xs:attribute ref="iaiext:first_product_code_producer" use="optional"/>	  
+      <xs:attribute ref="iaiext:first_product_code_external" use="optional"/>
+      <xs:attribute ref="iaiext:first_product_code_iai" use="optional"/>	  
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="group_by_parameter">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice maxOccurs="unbounded" minOccurs="0">
+          <xs:element maxOccurs="unbounded" ref="name"/>
+          <xs:element ref="product_value"/>
+        </xs:choice>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="product_value">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice maxOccurs="unbounded" minOccurs="0">
+          <xs:element maxOccurs="unbounded" ref="name"/>
+        </xs:choice>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="name">
+    <xs:complexType mixed="true">
+      <xs:attribute ref="xml:lang" use="optional"/>
+      <xs:attribute name="type" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="price">
+    <xs:complexType>
+      <xs:sequence minOccurs="0">
+        <xs:element ref="normal_retail_price"/>
+        <xs:element ref="normal_wholesale_price" minOccurs="0"/>
+      </xs:sequence>
+      <xs:attribute name="gross" type="xs:decimal" use="optional"/>
+      <xs:attribute name="net" type="xs:decimal" use="optional"/>
+      <xs:attribute name="vat" type="xs:decimal" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="normal_retail_price">
+    <xs:complexType>
+      <xs:attribute name="gross" type="xs:decimal" use="optional"/>
+      <xs:attribute name="net" type="xs:decimal" use="required"/>
+      <xs:attribute name="vat" type="xs:decimal" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="normal_wholesale_price">
+    <xs:complexType>
+      <xs:attribute name="gross" type="xs:decimal" use="optional"/>
+      <xs:attribute name="net" type="xs:decimal" use="required"/>
+      <xs:attribute name="vat" type="xs:decimal" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="srp">
+    <xs:complexType>
+      <xs:attribute name="gross" type="xs:decimal" use="optional"/>
+      <xs:attribute name="net" type="xs:decimal" use="required"/>
+      <xs:attribute name="vat" type="xs:decimal" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="strikethrough_retail_price">
+    <xs:complexType>
+      <xs:attribute name="gross" type="xs:decimal" use="optional"/>
+      <xs:attribute name="net" type="xs:decimal" use="required"/>
+      <xs:attribute name="vat" type="xs:decimal" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="strikethrough_wholesale_price">
+    <xs:complexType>
+      <xs:attribute name="gross" type="xs:decimal" use="optional"/>
+      <xs:attribute name="net" type="xs:decimal" use="required"/>
+      <xs:attribute name="vat" type="xs:decimal" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

@@ -1,21 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-07-10 11:36:36">
+<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-07-10 11:36:56">
   <meta>
-    <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
-    <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
-    <showcase_image url="https://matterhorn.pl/rwd_layout/assets/images/logo-hurt-pl.png"/>
-    <email>&lt;![CDATA[info@matterhorn.pl]]&gt;</email>
-    <tel>&lt;![CDATA[+48 503 503 875]]&gt;</tel>
-    <www>&lt;![CDATA[https://matterhorn.pl]]&gt;</www>
-    <address>
-      <street>&lt;![CDATA[Katowicka 51]]&gt;</street>
-      <zipcode>&lt;![CDATA[41-400]]&gt;</zipcode>
-      <city>&lt;![CDATA[Mysłowice]]&gt;</city>
-      <country>&lt;![CDATA[Poland]]&gt;</country>
-    </address>
+    <long_name/>
+    <short_name/>
     <time>
-      <offer created="2025-07-10 11:36:36"/>
-      <offer expires="2025-07-17 11:36:36"/>
+      <offer created="2025-07-10 11:36:56"/>
+      <offer expires="2025-07-17 11:36:56"/>
     </time>
   </meta>
   <full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/fulloferta.xml" hash="" changed=""/>
