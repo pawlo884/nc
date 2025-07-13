@@ -1,0 +1,28 @@
+{% extends "admin/change_form.html" %}
+{% block content %}
+  {{ block.super }}
+  <h3>Aktualne drzewo ścieżek</h3>
+  <div style="background:#f8f8f8; border:1px solid #ccc; padding:10px; margin-top:20px;">
+    <style>
+      .toggle-btn { margin-right: 4px; }
+      ul { margin-bottom: 0; }
+    </style>
+    {{ paths_tree|safe }}
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.toggle-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var target = document.getElementById(btn.dataset.target);
+            if (target.style.display === 'none') {
+              target.style.display = '';
+              btn.textContent = '[-]';
+            } else {
+              target.style.display = 'none';
+              btn.textContent = '[+]';
+            }
+          });
+        });
+      });
+    </script>
+  </div>
+{% endblock %} 

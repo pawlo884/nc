@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<offer file_format="IOF" version="3.0" generated="2025-07-13 00:06:11" expires="2025-07-14 00:06:11" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+<offer file_format="IOF" version="3.0" generated="2025-07-13 21:05:10" expires="2025-07-14 21:05:10" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
   <products currency="PLN" language="pol">
     <product id="470" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Wave Bralet</name>
         <long_desc><![CDATA[Wzory przypominające paski zebry zestawione z klasycznym krojem są idealnym wyborem na plażę lub basen. Biustonosz kąpielowy Wave to model, który łączy w sobie funkcjonalność i wyrafinowany design inspirowany dziką naturą. Biustonosz bikini w formie braletki na fiszbinach. Idealnie prezentują się w nim średnie oraz większe biusty. Miękkie miseczki z pionowym cięciem wykonane z dzianiny w pięknych kolorach. Konstrukcja biustonosza zapewnia pełen komfort noszenia oraz doskonałe podtrzymanie biustu. Biustonosz wiązany na szyi i zapinany na plecach.]]></long_desc>
@@ -15,7 +16,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="80" name="65E" panel_name="niebieski">
           <price gross="134.90"/>
           <stock id="0" quantity="5"/>
@@ -67,6 +68,7 @@
     <product id="418" currency="" type="regular" vat="" site="1">
       <producer id="57" name="Ewlon"/>
       <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Kostium kąpielowy Eva</name>
         <long_desc><![CDATA[Stylowy, dwuczęściowy kostium kąpielowy zaprojektowany z myślą o kobietach, które chcą podkreślić swoją sylwetkę i czuć się pewnie na plaży. Biustonosz typu push-up z usztywnianymi miseczkami i dolnymi fiszbinami skutecznie unosi i modeluje biust, zbierając piersi z boków do środka dekoltu. Mały, niewyjmowany push-up zapewnia naturalny efekt powiększenia, idealny dla małych i średnich biustów. Biustonosz wiązany na szyi i zapinany na plecach umożliwia wygodne dopasowanie do sylwetki. W zestawie znajdują się majtki z ozdobnym paskiem oraz szorty, które dają możliwość stylowej zmiany stylizacji w zależności od potrzeb. Połyskujący materiał pięknie podkreśla opaleniznę, a całość pakowana jest w praktyczny woreczek foliowy, idealny na każdy wyjazd.]]></long_desc>
@@ -78,7 +80,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="niebieski">
           <price gross="66.90"/>
           <stock id="0" quantity="37"/>
@@ -104,6 +106,7 @@
     <product id="479" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi 2 Kąpielowe Model Eden Multicolor - Lupo Line</name>
         <short_desc><![CDATA[Figi 2 Eden to majtki od bikini o niskim stanie, wyciętym kroju i wiązaniach na biodrach, które umożliwiają regulację i idealne dopasowanie do sylwetki.]]></short_desc>
@@ -116,7 +119,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="211" name="38" panel_name="wielokolorowy">
           <price gross="84.90"/>
           <stock id="0" quantity="0"/>
@@ -140,6 +143,7 @@
     <product id="415" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Wave Kopa</name>
         <long_desc><![CDATA[Wzory przypominające paski zebry zestawione z klasycznym krojam są idealnym wyborem na plażę lub basen. Biustonosz kąpielowy Wave to model, który łączy w sobie funkcjonalność i wyrafinowany design inspirowany dziką naturą. Miski z żelową wkładką push-up na fiszbinie świetnie zbierają i uwydatniają biust. Miedzy miseczkami subtelna ozdoba. Ramiączka nieodpinane, regulowane. Model stworzony z myślą o mniejszych i średnich biustach.]]></long_desc>
@@ -151,7 +155,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="135" name="85B" panel_name="niebieski">
           <price gross="143.90"/>
           <stock id="0" quantity="5"/>
@@ -219,6 +223,7 @@
     <product id="471" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Wave</name>
         <long_desc><![CDATA[Figi 2 Wave to fason z niskim stanem, który świetnie sprawdzi się dla  miłośniczek opalania. Klasyczny krój optycznie wydłuża nogi, podkreśla  kobiece kształty i idealnie dopasowuje się do sylwetki. To propozycja  dla kobiet, które cenią najwyższą jakość materiałów, komfort użytkowania  oraz stylową elegancję w minimalistycznym wydaniu.]]></long_desc>
@@ -230,7 +235,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="niebieski">
           <price gross="89.90"/>
           <stock id="0" quantity="5"/>
@@ -258,6 +263,7 @@
     <product id="419" currency="" type="regular" vat="" site="1">
       <producer id="57" name="Ewlon"/>
       <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Kostium kąpielowy Flowers</name>
         <long_desc><![CDATA[Dwuczęściowy kostium kąpielowy stworzony z myślą o miłośniczkach słońca i stylowego plażowania. Biustonosz wiązany na plecach i szyi pozwala na idealne dopasowanie i subtelne podkreślenie sylwetki. Doskonały wybór dla posiadaczek małego i średniego biustu, zapewnia komfort i swobodę ruchów, jednocześnie eksponując atuty figury. Miseczki posiadają wyjmowane wkładki, a regulowany obwód umożliwia indywidualne dopasowanie. Gładkie majteczki o niskim kroju zostały ozdobione delikatną lamówką, która dodaje całości elegancji. Przód na podszewce zapewnia komfort noszenia, a połyskująca dzianina pięknie podkreśla opaleniznę. Model pakowany w praktyczny woreczek foliowy, idealny na wyjazdy i plażowe przygody.]]></long_desc>
@@ -269,7 +275,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="zielony">
           <price gross="60.90"/>
           <stock id="0" quantity="18"/>
@@ -299,6 +305,7 @@
     <product id="417" currency="" type="regular" vat="" site="1">
       <producer id="57" name="Ewlon"/>
       <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Kostium kąpielowy Flowers</name>
         <long_desc><![CDATA[Dwuczęściowy kostium kąpielowy stworzony z myślą o miłośniczkach słońca i stylowego plażowania. Biustonosz wiązany na plecach i szyi pozwala na idealne dopasowanie i subtelne podkreślenie sylwetki. Doskonały wybór dla posiadaczek małego i średniego biustu, zapewnia komfort i swobodę ruchów, jednocześnie eksponując atuty figury. Miseczki posiadają wyjmowane wkładki, a regulowany obwód umożliwia indywidualne dopasowanie. Gładkie majteczki o niskim kroju zostały ozdobione delikatną lamówką, która dodaje całości elegancji. Przód na podszewce zapewnia komfort noszenia, a połyskująca dzianina pięknie podkreśla opaleniznę. Model pakowany w praktyczny woreczek foliowy, idealny na wyjazdy i plażowe przygody.]]></long_desc>
@@ -310,7 +317,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="zielony">
           <price gross="60.90"/>
           <stock id="0" quantity="25"/>
@@ -340,6 +347,7 @@
     <product id="422" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Aqua Kopa</name>
         <long_desc><![CDATA[Poczuj letnią swobodę z biustonoszem kąpielowym AQUA! Ten wyjątkowy model łączy modny design z komfortem noszenia idealny na plażę, basen lub egzotyczne wakacje. Biustonosz z usztywnianymi miseczkami zapewnia doskonałe podtrzymanie i modeluje biust, model przeznaczony dla kobiet z małym i średnim biustem. Biustonosz wiązany na szyi i zapinany na plecach. Turkusowy wzór inspirowany morskimi falami dodaje świeżości i wyróżnia się na tle klasycznych bikini.]]></long_desc>
@@ -351,7 +359,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="106" name="75A" panel_name="niebieski">
           <price gross="144.90"/>
           <stock id="0" quantity="5"/>
@@ -419,6 +427,7 @@
     <product id="426" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Amelia Kopa</name>
         <long_desc><![CDATA[Poczuj letnią swobodę z biustonoszem kąpielowym Amelia! Ten wyjątkowy model łączy modny design z komfortem noszenia idealny na plażę, basen lub egzotyczne wakacje. Biustonosz wykonany z dzianiny z kolorowym motywem w soczystych kolorach na białym tle. Miski z żelową wkładką push-up na fiszbinie świetnie zbierają i uwydatniają biust. Miedzy miseczkami subtelna ozdoba. Ramiączka nieodpinane, regulowane. Model stworzony z myślą o mniejszych i średnich biustach.]]></long_desc>
@@ -430,7 +439,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="81" name="65F" panel_name="wielokolorowy">
           <price gross="143.90"/>
           <stock id="0" quantity="5"/>
@@ -494,6 +503,7 @@
     <product id="424" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Amelia</name>
         <long_desc><![CDATA[Klasyczne figi bikini wiązane po bokach, w pięknej, wakacyjnej kolorystyce. Jest to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania. Klasyczny krój optycznie wydłuża nogi, podkreśla kobiece kształty i idealnie dopasowuje się do sylwetki.]]></long_desc>
@@ -505,7 +515,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="wielokolorowy">
           <price gross="85.90"/>
           <stock id="0" quantity="5"/>
@@ -529,6 +539,7 @@
     <product id="434" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Sofia</name>
         <short_desc><![CDATA[Klasyczne figi bikini w czarnym kolorze, góra ozdobiona lamówką z motywem panterki.]]></short_desc>
@@ -541,7 +552,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="211" name="38" panel_name="czarny">
           <price gross="84.90"/>
           <stock id="0" quantity="0"/>
@@ -565,6 +576,7 @@
     <product id="428" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Ana</name>
         <long_desc><![CDATA[Figi Ana to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania. Klasyczny krój optycznie wydłuża nogi, podkreśla kobiece kształty i idealnie dopasowuje się do sylwetki. To propozycja dla kobiet, które cenią najwyższą jakość materiałów, komfort użytkowania oraz stylową elegancję w minimalistycznym wydaniu.]]></long_desc>
@@ -576,7 +588,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="różowy">
           <price gross="71.90"/>
           <stock id="0" quantity="5"/>
@@ -604,6 +616,7 @@
     <product id="432" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Coral Big</name>
         <short_desc><![CDATA[Klasyczne figi, z motywem rafy koralowej w pięknych i ciepłych kolorach lata.]]></short_desc>
@@ -616,7 +629,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="211" name="38" panel_name="wielokolorowy">
           <price gross="92.90"/>
           <stock id="0" quantity="5"/>
@@ -644,6 +657,7 @@
     <product id="431" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Mirage Big</name>
         <long_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z ozdobnym pasem to doskonałe połączenie stylu i komfortu. Pas z kolorowymi, poziomymi paskami  nie tylko zdobi, ale także maskuje ewentualne mankamenty figury, optycznie modelując sylwetkę. Figi mają wyższy stan, co zapewnia komfort noszenia i dodatkowe podparcie dla brzucha, a pełny tył gwarantuje elegancję i dyskrecję.]]></long_desc>
@@ -655,7 +669,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="czarny">
           <price gross="85.90"/>
           <stock id="0" quantity="5"/>
@@ -687,6 +701,7 @@
     <product id="427" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Amelia</name>
         <long_desc><![CDATA[Biustonosz bikini w formie braletki na fiszbinach. Wykonany z dzianiny z motywem w  soczystych kolorach na białym tle. Miseczki miękkie z pionowym cięciem doskonale podtrzymują średnie i duże biusty. Biustonosz wiązany na szyi i zapinany na plecach.]]></long_desc>
@@ -698,7 +713,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="82" name="65G" panel_name="wielokolorowy">
           <price gross="136.90"/>
           <stock id="0" quantity="5"/>
@@ -774,6 +789,7 @@
     <product id="425" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Amelia Big</name>
         <long_desc><![CDATA[Poczuj letnią swobodę z biustonoszem kąpielowym Amelia Big! Ten wyjątkowy model łączy modny design z komfortem noszenia idealny na plażę, basen lub egzotyczne wakacje. Biustonosz posiada miękkie miseczki z modelującymi cięciami oraz jest usztywniony fiszbinami, dzięki czemu doskonale podtrzymuje średnie i duże biusty. Ramiączka regulowane, nieodpinane. Szerokość ramiączek i typ zapięcia dopasowany do rozmiaru biustonosza. Miedzy miseczkami delikatna ozdoba dodająca uroku całości. Idealna propozycja dla kobiet o pełniejszych kształtach.]]></long_desc>
@@ -785,7 +801,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="136" name="85C" panel_name="wielokolorowy">
           <price gross="163.90"/>
           <stock id="0" quantity="5"/>
@@ -921,6 +937,7 @@
     <product id="438" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Coral Kopa</name>
         <short_desc><![CDATA[Zachwyć się letnią energią dzięki temu efektownemu, biustonoszowi kąpielowemu.]]></short_desc>
@@ -933,7 +950,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="78" name="65C" panel_name="wielokolorowy">
           <price gross="143.90"/>
           <stock id="0" quantity="5"/>
@@ -985,6 +1002,7 @@
     <product id="423" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Amelia Big</name>
         <long_desc><![CDATA[Klasyczne figi, z kolorowym motywem. Fason stworzony dla miłośniczek bardziej zabudowanych majteczek. Figi mają ściągane sznureczki po obu bokach, dzięki którym możesz regulować ich krój i wysokość majtek, przez co każda kobieta czuje się w nich komfortowo oraz elegancko.]]></long_desc>
@@ -996,7 +1014,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="wielokolorowy">
           <price gross="96.90"/>
           <stock id="0" quantity="5"/>
@@ -1028,6 +1046,7 @@
     <product id="430" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Wave Big</name>
         <long_desc><![CDATA[Biustonosz Wave to model stworzony z myślą o kobietach z pełniejszym biustem, które pragną połączyć komfort z modnym, odważnym wzorem. Egzotyczny, zwierzęcy motyw inspirowany dzikimii krajobrazami wprowadza do stylizacji nutę niepowtarzalnego charakteru. Dzięki połączeniu klasycznej elegancji z egzotycznym printem, ten biustonosz doskonale podkreśla kobiecą siłę i indywidualność, przyciągając spojrzenia na każdej plaży. Biustonosz posiada miękkie miseczki z modelującymi cięciami oraz jest usztywniony fiszbinami, dzięki czemu doskonale podtrzymuje średnie i duże biusty. Ramiączka regulowane, nieodpinane. Szerokość ramiączek i typ zapięcia dopasowany do rozmiaru biustonosza. Miedzy miseczkami delikatna ozdoba dodająca uroku całości.]]></long_desc>
@@ -1039,7 +1058,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="86" name="65K" panel_name="niebieski">
           <price gross="163.90"/>
           <stock id="0" quantity="5"/>
@@ -1175,6 +1194,7 @@
     <product id="437" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Sofia Big</name>
         <short_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z wyższym ozdobnym pasem to doskonałe połączenie stylu i komfortu.]]></short_desc>
@@ -1187,7 +1207,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="czarny">
           <price gross="100.90"/>
           <stock id="0" quantity="5"/>
@@ -1226,6 +1246,7 @@
     <product id="429" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Mirage Big</name>
         <long_desc><![CDATA[Figi Mirage w poziome paski w ciepłych kolorach lata, z wyższym stanem, który optycznie spłaszcza brzuch, ukrywając niedoskonałości sylwetki. Figi mają ściągane sznureczki po obu bokach, dzięki którym możesz regulować ich krój i wysokość majtek, przez co każda kobieta czuje się w nich komfortowo oraz elegancko.]]></long_desc>
@@ -1237,7 +1258,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="wielokolorowy">
           <price gross="96.90"/>
           <stock id="0" quantity="5"/>
@@ -1269,6 +1290,7 @@
     <product id="441" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Coral Big</name>
         <short_desc><![CDATA[Zachwyć się letnią energią dzięki temu efektownemu, biustonoszowi kąpielowemu.]]></short_desc>
@@ -1281,7 +1303,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="82" name="65G" panel_name="wielokolorowy">
           <price gross="163.90"/>
           <stock id="0" quantity="5"/>
@@ -1425,6 +1447,7 @@
     <product id="442" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Ana Kopa</name>
         <short_desc><![CDATA[Model Anna inspirowany kobiecą siłą i subtelnością.]]></short_desc>
@@ -1437,7 +1460,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="78" name="65C" panel_name="różowy">
           <price gross="141.90"/>
           <stock id="0" quantity="5"/>
@@ -1517,6 +1540,7 @@
     <product id="443" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Mirage Big</name>
         <short_desc><![CDATA[Biustonosz kąpielowy Mirage wyróżnia się energetycznym wzorem w kolorowe poziome paski, który podkreśla wakacyjny klimat i świetnie prezentuje się na plaży i przy basenie.]]></short_desc>
@@ -1529,7 +1553,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="97" name="70F" panel_name="wielokolorowy">
           <price gross="163.90"/>
           <stock id="0" quantity="5"/>
@@ -1633,6 +1657,7 @@
     <product id="445" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Sofia Kopa</name>
         <short_desc><![CDATA[Wzór panterki, zestawiony z klasycznym krojem są idealnym wyborem na plażę lub basen.]]></short_desc>
@@ -1645,7 +1670,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="78" name="65C" panel_name="wielokolorowy">
           <price gross="143.90"/>
           <stock id="0" quantity="5"/>
@@ -1685,6 +1710,7 @@
     <product id="436" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Coral</name>
         <short_desc><![CDATA[Figi Coral to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania.]]></short_desc>
@@ -1697,7 +1723,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="wielokolorowy">
           <price gross="85.90"/>
           <stock id="0" quantity="5"/>
@@ -1725,6 +1751,7 @@
     <product id="440" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Coral Bralet</name>
         <short_desc><![CDATA[Zachwyć się letnią energią dzięki temu efektownemu, biustonoszowi kąpielowemu.]]></short_desc>
@@ -1737,7 +1764,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="81" name="65F" panel_name="wielokolorowy">
           <price gross="136.90"/>
           <stock id="0" quantity="5"/>
@@ -1801,6 +1828,7 @@
     <product id="435" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="7" name="Moda damska\Bielizna\Stroje kąpielowe\Jednoczęściowe"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Kostium Jednoczęściowy Sofia Big</name>
         <short_desc><![CDATA[Odkryj piękno natury z naszym kostiumem Sofia, zachowanym w intensywnej kolorystyce dodatkowo zwierzęcy motyw inspirowany dzikimi krajobrazami wprowadza do stylizacji nutę niepowtarzalnego charakteru.]]></short_desc>
@@ -1813,7 +1841,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="98" name="70G" panel_name="wielokolorowy">
           <price gross="218.90"/>
           <stock id="0" quantity="5"/>
@@ -1893,6 +1921,7 @@
     <product id="416" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="1" name="Moda damska"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Eden Kopa</name>
         <long_desc><![CDATA[Biustonosz Eden to propozycja dla kobiet, które pragną połączyć wygodę z egzotycznym stylem inspirowanym tropikalną przyrodą. Zachwyca wyrazistym wzorem, który wprowadza świeżość i energię do letnich stylizacji. Wprowadź odrobinę egzotycznej świeżości do swojej letniej garderoby. Biustonosz wykonany z dzianiny z motywem egzotycznych liści w soczystych kolorach na czarnym tle. Miski z żelową wkładką push-up na fiszbinie świetnie zbierają i uwydatniają biust. Miedzy miseczkami subtelna ozdoba. Ramiączka nieodpinane, regulowane. Model stworzony z myślą o mniejszych i średnich biustach.]]></long_desc>
@@ -1904,7 +1933,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="80" name="65E" panel_name="wielokolorowy">
           <price gross="143.90"/>
           <stock id="0" quantity="5"/>
@@ -1964,6 +1993,7 @@
     <product id="444" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Sofia Bralet</name>
         <short_desc><![CDATA[Biustonosz Sofia inspirowany kobiecą siłą i subtelnością.]]></short_desc>
@@ -1976,7 +2006,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="79" name="65D" panel_name="wielokolorowy">
           <price gross="136.90"/>
           <stock id="0" quantity="5"/>
@@ -2064,6 +2094,7 @@
     <product id="446" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Sofia Big</name>
         <short_desc><![CDATA[Biustonosz kąpielowy Sofia big panterka, to model dla kobiet lubiących podkreślić swój temperament i charakter.]]></short_desc>
@@ -2076,7 +2107,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="102" name="70K" panel_name="wielokolorowy">
           <price gross="163.90"/>
           <stock id="0" quantity="5"/>
@@ -2236,6 +2267,7 @@
     <product id="464" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Kostium dwuczęściowy Figi 1 Kąpielowe Model Wave Big Blue - Lupo Line </name>
         <long_desc><![CDATA[Figi 1 Wave z motywem zwierzęcym, z wyższym stanem, który optycznie spłaszcza brzuch, ukrywając niedoskonałości sylwetki. Majtki zachowane w różnych odcieniach błękitu z motywem panterki.]]></long_desc>
@@ -2247,7 +2279,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="niebieski">
           <price gross="90.90"/>
           <stock id="0" quantity="5"/>
@@ -2279,6 +2311,7 @@
     <product id="439" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowy Sofia Big</name>
         <short_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z ozdobnym pasem  to doskonałe połączenie stylu i komfortu. ]]></short_desc>
@@ -2291,7 +2324,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="czarny">
           <price gross="85.90"/>
           <stock id="0" quantity="5"/>
@@ -2331,6 +2364,7 @@
     <product id="421" currency="" type="regular" vat="" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Eden Bralet</name>
         <long_desc><![CDATA[Biustonosz kąpielowy to propozycja dla kobiet, które pragną połączyć wygodę z egzotycznym stylem inspirowanym tropikalną przyrodą. Zachwyca wyrazistym wzorem, który wprowadza świeżość i energię do letnich stylizacji. Biustonosz Eden to propozycja dla kobiet, które pragną połączyć wygodę z egzotycznym stylem inspirowanym tropikalną przyrodą. Biustonosz bikini w formie braletki na fiszbinach. Idealnie prezentują się w nim średnie oraz większe biusty. Miękkie miseczki z pionowym cięciem. Konstrukcja biustonosza zapewnia pełen komfort noszenia oraz doskonałe podtrzymanie biustu. Biustonosz wiązany na szyi i zapinany na plecach.]]></long_desc>
@@ -2342,7 +2376,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="80" name="65E" panel_name="wielokolorowy">
           <price gross="134.90"/>
           <stock id="0" quantity="5"/>
@@ -2406,6 +2440,7 @@
     <product id="482" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Eden Big</name>
         <short_desc><![CDATA[Figi kąpielowe czarne z kolorowym pasem.]]></short_desc>
@@ -2418,7 +2453,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="czarny">
           <price gross="83.90"/>
           <stock id="0" quantity="0"/>
@@ -2446,6 +2481,7 @@
     <product id="465" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="7" name="Moda damska\Bielizna\Stroje kąpielowe\Jednoczęściowe"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Kostium dwuczęściowy Biustonosz Kąpielowy Model Paloma Kopa Multicolor - Lupo Line</name>
         <short_desc><![CDATA[ii]]></short_desc>
@@ -2458,7 +2494,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="79" name="65D" panel_name="wielokolorowy">
           <price gross="144.90"/>
           <stock id="0" quantity="5"/>
@@ -2534,6 +2570,7 @@
     <product id="469" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Eden Big</name>
         <short_desc><![CDATA[Biustonosz kąpielowy Eden to propozycja dla kobiet, które pragną połączyć wygodę z egzotycznym stylem inspirowanym tropikalną przyrodą.]]></short_desc>
@@ -2546,7 +2583,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="117" name="75K" panel_name="wielokolorowy">
           <price gross="163.90"/>
           <stock id="0" quantity="5"/>
@@ -2693,6 +2730,7 @@
       <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
       <category id="7" name="Moda damska\Bielizna\Stroje kąpielowe\Jednoczęściowe"/>
+      <unit id="0" name="szt."/>
       <description>
         <name>Kostium dwuczęściowy Figi 1 Kąpielowe Model Eden Big Multicolor - Lupo Line</name>
         <short_desc><![CDATA[66]]></short_desc>
@@ -2708,7 +2746,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
         <size id="210" name="36" panel_name="wielokolorowy">
           <price gross="95.90"/>
           <stock id="0" quantity="5"/>

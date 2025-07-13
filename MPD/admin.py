@@ -1,7 +1,7 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths
 import decimal
 # Register your models here.
 
@@ -434,6 +434,49 @@ class ColorsAdmin(admin.ModelAdmin):
     search_fields = ['name', 'hex_code']
     list_filter = ['name']
 
+
+class PathsAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'path', 'parent_id')
+    search_fields = ('name', 'path')
+    list_filter = ('parent_id',)
+    change_form_template = 'admin/MPD/products/change_form.html'
+
+    def get_tree(self):
+        paths = list(Paths.objects.all())
+        tree = {}
+        by_id = {p.id: p for p in paths}
+        for p in paths:
+            parent = p.parent_id
+            if parent and parent in by_id:
+                tree.setdefault(parent, []).append(p)
+            else:
+                tree.setdefault(None, []).append(p)
+
+        def build_html(parent=None):
+            html = ''
+            children = tree.get(parent, [])
+            if children:
+                html += '<ul style="list-style:none; margin:0; padding-left:18px">'
+                for p in children:
+                    has_children = p.id in tree
+                    node_id = f'path-node-{p.id}'
+                    html += f'<li id="{node_id}">' \
+                        + (f'<span class="toggle-btn" data-target="{node_id}-children" style="cursor:pointer; font-weight:bold;">[-]</span> ' if has_children else '') \
+                        + f'{p.name or "(brak nazwy)"} [{p.path or "-"}] [id={p.id}]'
+                    if has_children:
+                        html += f'<div id="{node_id}-children">' + \
+                            build_html(p.id) + '</div>'
+                    html += '</li>'
+                html += '</ul>'
+            return html
+        return build_html()
+
+    def render_change_form(self, request, context, *args, **kwargs):
+        context['paths_tree'] = self.get_tree()
+        return super().render_change_form(request, context, *args, **kwargs)
+
+
+admin.site.register(Paths, PathsAdmin)
 
 # @admin.register(Categories)
 # class CategoriesAdmin(admin.ModelAdmin):

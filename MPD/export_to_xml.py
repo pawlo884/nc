@@ -66,7 +66,28 @@ class BaseXMLExporter:
 
 class FullXMLExporter(BaseXMLExporter):
     def __init__(self):
-        super().__init__('export_full.xml')
+        super().__init__('full.xml')
+
+    def generate_navigation_xml(self, product_id):
+        from .models import Paths, ProductPaths
+        from django.utils.html import escape
+        xml = []
+        xml.append('      <iaiext:navigation>')
+        xml.append('        <iaiext:site id="1">')
+        xml.append('          <iaiext:menu id="1">')
+        product_paths = ProductPaths.objects.using(
+            'MPD').filter(product_id=product_id)
+        path_ids = set(pp.path_id for pp in product_paths)
+        paths = list(Paths.objects.using('MPD').filter(
+            id__in=path_ids).order_by('id'))
+        for idx, path in enumerate(paths, 1):
+            textid = escape(path.path) if path.path else ''
+            xml.append(
+                f'            <iaiext:item id="{path.id}" menu_id="1" textid="{textid}" iaiext:priority_menu="{idx}"/>')
+        xml.append('          </iaiext:menu>')
+        xml.append('        </iaiext:site>')
+        xml.append('      </iaiext:navigation>')
+        return '\n'.join(xml)
 
     def generate_xml(self):
         from django.utils.html import escape
@@ -77,7 +98,7 @@ class FullXMLExporter(BaseXMLExporter):
         expires = now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
-        xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes">'.format(
+        xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
             now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products currency="PLN" language="pol">')
         products = Products.objects.using('MPD').all().select_related('brand')
@@ -114,6 +135,10 @@ class FullXMLExporter(BaseXMLExporter):
                 if path_obj:
                     xml.append(
                         f'      <category id="{path_obj.id}" name="{escape(path_obj.path)}"/>')
+            # Dodaj jednostkę, jeśli jest przypisana
+            if product.unit:
+                xml.append(
+                    f'      <unit id="{product.unit.unit_id}" name="{escape(product.unit.name) if product.unit.name else ""}"/>')
             if product.name:
                 xml.append('      <description>')
                 xml.append(f'        <name>{escape(product.name)}</name>')
@@ -124,10 +149,19 @@ class FullXMLExporter(BaseXMLExporter):
                     xml.append(
                         f'        <long_desc><![CDATA[{product.description}]]></long_desc>')
                 xml.append('      </description>')
+            # Dodaj sekcję nawigacyjną dla tego produktu (po description, przed sizes)
+            xml.append(self.generate_navigation_xml(product.id))
             variants = ProductVariants.objects.using('MPD').filter(
                 product=product).select_related('size', 'color')
+            # Pobierz group_name z category pierwszego rozmiaru
+            group_name = ''
+            for variant in variants:
+                if variant.size and variant.size.category:
+                    group_name = variant.size.category
+                    break
             if variants:
-                xml.append('      <sizes>')
+                xml.append(
+                    f'      <sizes iaiext:group_name="{group_name}" iaiext:group_id="1" iaiext:sizeList="full">')
                 for variant in variants:
                     size_name = variant.size.name if variant.size else ""
                     color_name = variant.color.name if variant.color else ""

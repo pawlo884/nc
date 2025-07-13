@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .serializers import ProductSetSerializer, ProductSetItemSerializer
 from collections import defaultdict
-from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter, ProducersXMLExporter, StocksXMLExporter
+from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter, ProducersXMLExporter, StocksXMLExporter, UnitsXMLExporter
 import logging
 from django.http import HttpResponse
 import requests
@@ -301,6 +301,15 @@ def generate_stocks_xml(request):
 
 
 @csrf_exempt
+def generate_units_xml(request):
+    exporter = UnitsXMLExporter()
+    exporter_result = exporter.export()
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
 def empty_xml(request):
     return HttpResponse('<empty/>', content_type='application/xml')
 
@@ -319,13 +328,16 @@ def xml_links(request):
     # stocks.xml
     url = reverse('generate_stocks_xml')
     links.append(('stocks', url))
+    # units.xml
+    url = reverse('generate_units_xml')
+    links.append(('units', url))
     # gateway dla każdego źródła
     sources = Sources.objects.all()
     for source in sources:
         gateway_url = reverse('generate_gateway_xml', args=[source.name])
         links.append((f'gateway ({source.name})', gateway_url))
     # pozostałe typy (puste)
-    for xml_type in [k for k in XML_FILE_MAP if k not in ['full', 'light', 'producers', 'stocks']]:
+    for xml_type in [k for k in XML_FILE_MAP if k not in ['full', 'light', 'producers', 'stocks', 'units']]:
         url = reverse('empty_xml') + f'?type={xml_type}'
         links.append((xml_type, url))
     html = '<h2>Dostępne pliki XML:</h2><ul>'

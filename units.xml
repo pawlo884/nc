@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<units file_format="IOF" version="3.0" generated="2025-07-12 22:47:04" expires="2025-07-13 22:47:04" language="pol">
+  <unit id="0" name="szt."/>
+  <unit id="1" name="para"/>
+  <unit id="2" name="komplet"/>
+  <unit id="3" name="opakowanie"/>
+  <unit id="4" name="butelka"/>
+  <unit id="5" name="kilogram"/>
+  <unit id="6" name="metr kwadratowy"/>
+  <unit id="8" name="metr"/>
+  <unit id="9" name="gram"/>
+  <unit id="10" name="litr"/>
+  <unit id="256" name="usługa"/>
+</units>
