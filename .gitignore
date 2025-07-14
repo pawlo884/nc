@@ -18,5 +18,4 @@ __pycache__/
 .env.dev
 .env.prod
 .vscode/
-logs/
 celerybeat-schedule
