@@ -165,24 +165,61 @@ class FullXMLExporter(BaseXMLExporter):
                 for variant in variants:
                     size_name = variant.size.name if variant.size else ""
                     color_name = variant.color.name if variant.color else ""
+                    # panel_name: size_name + '_' + group_name
+                    panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
+                    # code: product_id-size_id
+                    code = f'{product.id}-{variant.size.id}' if variant.size else f'{product.id}-'
+                    # code_producer: z kolumny producer_code w product_variants
+                    code_producer = variant.producer_code if hasattr(
+                        variant, 'producer_code') and variant.producer_code else ''
+                    # Buduj atrybuty do węzła <size>
+                    size_attrs = [
+                        f'id="{variant.size.id if variant.size else ''}"',
+                        f'name="{escape(size_name)}"',
+                        f'panel_name="{escape(panel_name)}"',
+                        f'code="{code}"'
+                    ]
+                    if code_producer:
+                        size_attrs.append(
+                            f'code_producer="{escape(code_producer)}"')
                     xml.append(
-                        f'        <size id="{variant.size.id if variant.size else ''}" name="{escape(size_name)}" panel_name="{escape(color_name)}">')
+                        f'        <size {' '.join(size_attrs)}>'
+                    )
                     stock_price = StockAndPrices.objects.using(
                         'MPD').filter(variant=variant).first()
                     if stock_price:
-                        xml.append(
-                            f'          <price gross="{stock_price.price}"/>')
+                        # Pobierz ceny detaliczne z product_variants_retail_price
+                        retail_price_obj = None
+                        try:
+                            from .models import ProductVariantsRetailPrice
+                            retail_price_obj = ProductVariantsRetailPrice.objects.using(
+                                'MPD').filter(variant=variant).first()
+                        except Exception:
+                            pass
+                        gross = retail_price_obj.retail_price if retail_price_obj and hasattr(
+                            retail_price_obj, 'retail_price') else ''
+                        net = retail_price_obj.net_price if retail_price_obj and hasattr(
+                            retail_price_obj, 'net_price') else ''
+                        if gross or net:
+                            price_attrs = []
+                            if gross:
+                                price_attrs.append(f'gross="{gross}"')
+                            if net:
+                                price_attrs.append(f'net="{net}"')
+                            xml.append(
+                                f'          <price {' '.join(price_attrs)}/>')
                         source = Sources.objects.filter(
-                            id=stock_price.source_id).first()
+                            id=stock_price.source_id).first() if hasattr(stock_price, 'source_id') else None
                         stock_id = ""
-                        if source and source.type == 'Magazyn główny':
-                            stock_id = "1"
-                        elif source and source.type == 'Magazyn obcy':
-                            stock_id = "0"
-                        elif source and source.type == 'Magazyn wymiany':
-                            stock_id = "3"
-                        elif source and source.type == 'Magazyn pomocniczy':
-                            stock_id = "2"
+                        if source and hasattr(source, 'type'):
+                            if source.type == 'Magazyn główny':
+                                stock_id = "1"
+                            elif source.type == 'Magazyn obcy':
+                                stock_id = "0"
+                            elif source.type == 'Magazyn wymiany':
+                                stock_id = "3"
+                            elif source.type == 'Magazyn pomocniczy':
+                                stock_id = "2"
                         xml.append(
                             f'          <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
                     xml.append('        </size>')

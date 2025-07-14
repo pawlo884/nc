@@ -168,6 +168,23 @@ class ProductvariantsSources(models.Model):
         verbose_name_plural = 'Product Variant Sources'
 
 
+class ProductVariantsRetailPrice(models.Model):
+    variant = models.OneToOneField(ProductVariants, on_delete=models.CASCADE,
+                                   db_column='variant_id', primary_key=True, to_field='variant_id')
+    retail_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    vat = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=10, null=True, blank=True)
+    net_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    objects = models.Manager()
+
+    class Meta:
+        managed = False
+        db_table = 'product_variants_retail_price'
+
+
 class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
@@ -305,21 +322,6 @@ class StockAndPricesInline(admin.TabularInline):
 
     def has_add_permission(self, request, obj=None):
         return False
-
-
-class ProductVariantsRetailPrice(models.Model):
-    variant = models.OneToOneField(ProductVariants, on_delete=models.CASCADE,
-                                   db_column='variant_id', primary_key=True, to_field='variant_id')
-    retail_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True)
-    vat = models.DecimalField(
-        max_digits=5, decimal_places=2, null=True, blank=True)
-    currency = models.CharField(max_length=10, null=True, blank=True)
-    objects = models.Manager()
-
-    class Meta:
-        managed = False
-        db_table = 'product_variants_retail_price'
 
 
 class Vat(models.Model):
