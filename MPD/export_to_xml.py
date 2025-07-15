@@ -149,6 +149,19 @@ class FullXMLExporter(BaseXMLExporter):
                     xml.append(
                         f'        <long_desc><![CDATA[{product.description}]]></long_desc>')
                 xml.append('      </description>')
+            # Dodaj parametry produktu (wszystkie kolory z wariantów)
+            unique_colors = {}
+            for v in variants:
+                if v.color and v.color.id not in unique_colors:
+                    unique_colors[v.color.id] = v.color.name
+            if unique_colors:
+                xml.append('      <parameters>')
+                xml.append('        <parameter id="color" name="Kolor">')
+                for color_id, color_name in unique_colors.items():
+                    xml.append(
+                        f'          <value id="{color_id}" name="{escape(color_name)}"/>')
+                xml.append('        </parameter>')
+                xml.append('      </parameters>')
             # Dodaj sekcję nawigacyjną dla tego produktu (po description, przed sizes)
             xml.append(self.generate_navigation_xml(product.id))
             variants = ProductVariants.objects.using('MPD').filter(
@@ -164,7 +177,6 @@ class FullXMLExporter(BaseXMLExporter):
                     f'      <sizes iaiext:group_name="{group_name}" iaiext:group_id="1" iaiext:sizeList="full">')
                 for variant in variants:
                     size_name = variant.size.name if variant.size else ""
-                    color_name = variant.color.name if variant.color else ""
                     # panel_name: size_name + '_' + group_name
                     panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
                     # code: product_id-size_id
@@ -200,16 +212,16 @@ class FullXMLExporter(BaseXMLExporter):
                             retail_price_obj, 'retail_price') else ''
                         net = retail_price_obj.net_price if retail_price_obj and hasattr(
                             retail_price_obj, 'net_price') else ''
+                        price_attrs = []
                         if gross or net:
-                            price_attrs = []
                             if gross:
                                 price_attrs.append(f'gross="{gross}"')
                             if net:
                                 price_attrs.append(f'net="{net}"')
-                            xml.append(
-                                f'          <price {' '.join(price_attrs)}/>')
+                        xml.append(
+                            f'          <price {' '.join(price_attrs)}/>')
                         source = Sources.objects.filter(
-                            id=stock_price.source_id).first() if hasattr(stock_price, 'source_id') else None
+                            id=stock_price.source.id).first() if stock_price and stock_price.source else None
                         stock_id = ""
                         if source and hasattr(source, 'type'):
                             if source.type == 'Magazyn główny':
@@ -417,7 +429,7 @@ class StocksXMLExporter(BaseXMLExporter):
 
     def generate_xml(self):
         from django.utils.html import escape
-        from .models import StockAndPrices, ProductVariants, Products
+        from .models import StockAndPrices
         from datetime import datetime, timedelta
         now = datetime.now()
         expires = now + timedelta(days=1)

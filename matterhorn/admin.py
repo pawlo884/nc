@@ -710,6 +710,30 @@ class ProductsAdmin(admin.ModelAdmin):
                             logger.info(
                                 f"Zaktualizowano produkt {product_id} w bazie Matterhorn")
 
+                        # Nowe pola dla materiałów
+                        fabric_components = request.POST.getlist(
+                            'fabric_component[]')
+                        fabric_percentages = request.POST.getlist(
+                            'fabric_percentage[]')
+                        print('FABRICS:', fabric_components, fabric_percentages)
+                        variant_logger.info(
+                            f"FABRICS: {fabric_components} {fabric_percentages}")
+                        # --- DODAJ: zapis materiałów (fabric) ---
+                        if fabric_components and fabric_percentages:
+                            for comp_id, perc in zip(fabric_components, fabric_percentages):
+                                try:
+                                    comp_id_int = int(comp_id)
+                                    perc_int = int(perc)
+                                    if perc_int > 0:
+                                        cursor.execute(
+                                            "INSERT INTO product_fabric (product_id, component_id, percentage) VALUES (%s, %s, %s)",
+                                            [new_product_id, comp_id_int, perc_int]
+                                        )
+                                except Exception as e:
+                                    logger.error(
+                                        f"Błąd zapisu materiału: {comp_id}, {perc}: {e}")
+                        # --- KONIEC ZAPISU MATERIAŁÓW ---
+
                 return JsonResponse({'success': True, 'message': 'Produkt został pomyślnie zmapowany'})
             except Exception as e:
                 import traceback
@@ -1123,16 +1147,28 @@ class ProductsAdmin(admin.ModelAdmin):
         extra_context['producer_color_name'] = producer_color_name
 
         # Dodaj sugerowane produkty z fuzzy search (RapidFuzz po stronie Pythona)
+        def is_barontex_or_self_collection(name):
+            return name and name.strip().lower() in ["barontex", "self collection"]
+
         suggested_products = []
         if product:
             try:
                 with connections['MPD'].cursor() as cursor:
-                    cursor.execute("""
-                        SELECT p.id, p.name, b.name as brand
-                        FROM products p
-                        JOIN brands b ON p.brand_id = b.id
-                        WHERE b.name = %s
-                    """, [product.brand])
+                    # Pobierz wszystkie produkty z MPD, które mają markę Barontex lub Self Collection, jeśli produkt.brand to jedna z nich
+                    if is_barontex_or_self_collection(product.brand):
+                        cursor.execute("""
+                            SELECT p.id, p.name, b.name as brand
+                            FROM products p
+                            JOIN brands b ON p.brand_id = b.id
+                            WHERE LOWER(b.name) IN ('barontex', 'self collection')
+                        """)
+                    else:
+                        cursor.execute("""
+                            SELECT p.id, p.name, b.name as brand
+                            FROM products p
+                            JOIN brands b ON p.brand_id = b.id
+                            WHERE b.name = %s
+                        """, [product.brand])
                     all_products = cursor.fetchall()
                     # all_products: [(id, name, brand), ...]
                     scored = []
@@ -1261,6 +1297,18 @@ class ProductsAdmin(admin.ModelAdmin):
                 if row:
                     selected_unit_id = row[0]
         extra_context['selected_unit_id'] = selected_unit_id
+
+        # Pobierz dostępne komponenty materiałów (FabricComponent)
+        try:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, name FROM fabric_component ORDER BY name")
+                fabric_components = [{'id': row[0], 'name': row[1]}
+                                     for row in cursor.fetchall()]
+            extra_context['fabric_components'] = fabric_components
+        except Exception as e:
+            logger.error(f"Błąd pobierania materiałów z MPD: {e}")
+            extra_context['fabric_components'] = []
 
         return super().change_view(request, object_id, form_url, extra_context)
 

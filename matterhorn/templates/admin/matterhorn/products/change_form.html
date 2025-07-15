@@ -357,6 +357,45 @@
                         {% endfor %}
                     </select>
                 </div>
+                <!-- SKŁAD (MATERIAŁY) -->
+                <div class="form-row" id="fabric-section">
+                    <label>Skład (materiały):</label>
+                    <div id="fabric-list">
+                        <div class="fabric-row" style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
+                            <select name="fabric_component[]">
+                                <option value="">-- wybierz materiał --</option>
+                                {% for fabric in fabric_components %}
+                                    <option value="{{ fabric.id }}">{{ fabric.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="number" name="fabric_percentage[]" min="0" max="100" placeholder="%" style="width:60px;" />
+                            <button type="button" onclick="removeFabricRow(this)">Usuń</button>
+                        </div>
+                        <pre>DEBUG: {{ fabric_components|safe }}</pre>
+                    </div>
+                    <button type="button" onclick="addFabricRow()" style="margin-top:5px;">Dodaj materiał</button>
+                </div>
+                <script>
+                function addFabricRow() {
+                    var row = document.createElement('div');
+                    row.className = 'fabric-row';
+                    row.style = 'display:flex; gap:10px; align-items:center; margin-bottom:5px;';
+                    row.innerHTML = `
+                        <select name="fabric_component[]">
+                            <option value="">-- wybierz materiał --</option>
+                            {% for fabric in fabric_components %}
+                                <option value="{{ fabric.id }}">{{ fabric.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" name="fabric_percentage[]" min="0" max="100" placeholder="%" style="width:60px;" />
+                        <button type="button" onclick="removeFabricRow(this)">Usuń</button>
+                    `;
+                    document.getElementById('fabric-list').appendChild(row);
+                }
+                function removeFabricRow(btn) {
+                    btn.parentElement.remove();
+                }
+                </script>
                 <div class="form-row" style="margin-bottom: 10px;">
                     <b>ID w MPD:</b> {{ original.mapped_product_id|default:'-' }}
                     <pre style="font-size:12px; color:#888;">DEBUG: {{ product_sets|safe }}</pre>

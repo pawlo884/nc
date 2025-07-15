@@ -369,3 +369,27 @@ class Units(models.Model):
         db_table = 'units'
         verbose_name = 'Jednostka'
         verbose_name_plural = 'Jednostki'
+
+
+class FabricComponent(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        db_table = 'fabric_component'
+
+    def __str__(self):
+        return self.name
+
+
+class ProductFabric(models.Model):
+    product = models.ForeignKey(
+        Products, on_delete=models.CASCADE, related_name='fabrics')
+    component = models.ForeignKey(FabricComponent, on_delete=models.CASCADE)
+    percentage = models.PositiveSmallIntegerField()
+
+    class Meta:
+        db_table = 'product_fabric'
+        unique_together = ('product', 'component')
+
+    def __str__(self):
+        return f"{self.component.name} {self.percentage}%"
