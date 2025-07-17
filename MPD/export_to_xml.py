@@ -179,8 +179,8 @@ class FullXMLExporter(BaseXMLExporter):
                     size_name = variant.size.name if variant.size else ""
                     # panel_name: size_name + '_' + group_name
                     panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
-                    # code: product_id-size_id
-                    code = f'{product.id}-{variant.size.id}' if variant.size else f'{product.id}-'
+                    # code: product_id-variant_id-size_id
+                    code = f'{product.id}-{variant.variant_id}-{variant.size.id}' if variant.size else f'{product.id}-{variant.variant_id}-'
                     # code_producer: z kolumny producer_code w product_variants
                     code_producer = variant.producer_code if hasattr(
                         variant, 'producer_code') and variant.producer_code else ''
