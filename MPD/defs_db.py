@@ -124,6 +124,7 @@ def create_tables_if_not_exist(conn):
             id BIGSERIAL PRIMARY KEY,
             product_id BIGINT NOT NULL,
             variant_id INT,
+            iai_product_id INT,
             file_path VARCHAR(500) NOT NULL,
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         )

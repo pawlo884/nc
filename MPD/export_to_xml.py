@@ -101,11 +101,30 @@ class FullXMLExporter(BaseXMLExporter):
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
             now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products currency="PLN" language="pol">')
-        products = Products.objects.using('MPD').all().select_related('brand')
-        for product in products:
-            # Pobierz pierwszy wariant produktu
-            variants = ProductVariants.objects.using('MPD').filter(
-                product=product).select_related('size', 'color')
+
+        # Pobierz wszystkie warianty z iai_product_id
+        variants_with_iai = ProductVariants.objects.using('MPD').filter(
+            iai_product_id__isnull=False
+        ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+
+        # Grupuj warianty po iai_product_id
+        grouped_variants = {}
+        for variant in variants_with_iai:
+            iai_id = variant.iai_product_id
+            if iai_id not in grouped_variants:
+                grouped_variants[iai_id] = []
+            grouped_variants[iai_id].append(variant)
+
+        # Iteruj po unikalnych iai_product_id
+        for iai_product_id, variants in grouped_variants.items():
+            if not variants:
+                continue
+
+            # Pobierz pierwszy wariant do uzyskania danych produktu
+            first_variant = variants[0]
+            product = first_variant.product
+
+            # Pobierz dane waluty i VAT z pierwszego wariantu
             currency = ''
             vat_rate = ''
             for variant in variants:
@@ -121,11 +140,14 @@ class FullXMLExporter(BaseXMLExporter):
                         else:
                             vat_rate = str(pvrp.vat)
                     break
+
             xml.append(
-                f'    <product id="{product.id}" currency="{currency}" type="regular" vat="{vat_rate}" site="1">')
+                f'    <product id="{iai_product_id}" currency="{currency}" type="regular" vat="{vat_rate}" site="1">')
+
             if product.brand:
                 xml.append(
                     f'      <producer id="{product.brand.id}" name="{escape(product.brand.name) if product.brand.name else ""}"/>')
+
             # Dodaj wszystkie kategorie (category) powiązane z produktem
             product_paths = ProductPaths.objects.using(
                 'MPD').filter(product_id=product.id)
@@ -135,10 +157,12 @@ class FullXMLExporter(BaseXMLExporter):
                 if path_obj:
                     xml.append(
                         f'      <category id="{path_obj.id}" name="{escape(path_obj.path)}"/>')
+
             # Dodaj jednostkę, jeśli jest przypisana
             if product.unit:
                 xml.append(
                     f'      <unit id="{product.unit.unit_id}" name="{escape(product.unit.name) if product.unit.name else ""}"/>')
+
             if product.name:
                 xml.append('      <description>')
                 xml.append(f'        <name>{escape(product.name)}</name>')
@@ -149,29 +173,47 @@ class FullXMLExporter(BaseXMLExporter):
                     xml.append(
                         f'        <long_desc><![CDATA[{product.description}]]></long_desc>')
                 xml.append('      </description>')
-            # Dodaj parametry produktu (wszystkie kolory z wariantów)
-            unique_colors = {}
-            for v in variants:
-                if v.color and v.color.id not in unique_colors:
-                    unique_colors[v.color.id] = v.color.name
-            if unique_colors:
+
+            # Dodaj parametry produktu (kolor dla tego wariantu)
+            if first_variant.color:
                 xml.append('      <parameters>')
-                xml.append('        <parameter id="color" name="Kolor">')
-                for color_id, color_name in unique_colors.items():
-                    xml.append(
-                        f'          <value id="{color_id}" name="{escape(color_name)}"/>')
+                xml.append(
+                    '        <parameter type="parameter" id="26" name="Kolor">')
+                xml.append(
+                    f'          <value id="{first_variant.color.id}" name="{escape(first_variant.color.name)}"/>')
                 xml.append('        </parameter>')
                 xml.append('      </parameters>')
+
+            # Dodaj cenę na poziomie produktu (pierwsza cena z pierwszego wariantu)
+            first_stock_price = StockAndPrices.objects.using(
+                'MPD').filter(variant=first_variant).first()
+            if first_stock_price:
+                retail_price_obj = ProductVariantsRetailPrice.objects.using(
+                    'MPD').filter(variant=first_variant).first()
+                if retail_price_obj:
+                    gross = retail_price_obj.retail_price if hasattr(
+                        retail_price_obj, 'retail_price') else ''
+                    net = retail_price_obj.net_price if hasattr(
+                        retail_price_obj, 'net_price') else ''
+                    price_attrs = []
+                    if gross or net:
+                        if gross:
+                            price_attrs.append(f'gross="{gross}"')
+                        if net:
+                            price_attrs.append(f'net="{net}"')
+                    if price_attrs:
+                        xml.append(f'      <price {" ".join(price_attrs)}/>')
+
             # Dodaj sekcję nawigacyjną dla tego produktu (po description, przed sizes)
             xml.append(self.generate_navigation_xml(product.id))
-            variants = ProductVariants.objects.using('MPD').filter(
-                product=product).select_related('size', 'color')
+
             # Pobierz group_name z category pierwszego rozmiaru
             group_name = ''
             for variant in variants:
                 if variant.size and variant.size.category:
                     group_name = variant.size.category
                     break
+
             if variants:
                 xml.append(
                     f'      <sizes iaiext:group_name="{group_name}" iaiext:group_id="1" iaiext:sizeList="full">')
@@ -179,17 +221,31 @@ class FullXMLExporter(BaseXMLExporter):
                     size_name = variant.size.name if variant.size else ""
                     # panel_name: size_name + '_' + group_name
                     panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
-                    # code: product_id-variant_id-size_id
-                    code = f'{product.id}-{variant.variant_id}-{variant.size.id}' if variant.size else f'{product.id}-{variant.variant_id}-'
-                    # code_producer: z kolumny producer_code w product_variants
-                    code_producer = variant.producer_code if hasattr(
-                        variant, 'producer_code') and variant.producer_code else ''
+                    # code_external: product_id-variant_id (variant_id jest unikalny dla każdego wariantu)
+                    code_external = f'{product.id}-{variant.variant_id}'
+                    # code_producer: z tabeli product_variants_sources (ean, gtin14, gtin13, other)
+                    from .models import ProductvariantsSources
+                    variant_source = ProductvariantsSources.objects.using(
+                        'MPD').filter(variant=variant).first()
+                    code_producer = ''
+                    if variant_source:
+                        # Sprawdź kolejno: ean, gtin14, gtin13, other
+                        if variant_source.ean:
+                            code_producer = variant_source.ean
+                        elif variant_source.gtin14:
+                            code_producer = variant_source.gtin14
+                        elif variant_source.gtin13:
+                            code_producer = variant_source.gtin13
+                        elif variant_source.other:
+                            code_producer = variant_source.other
+
                     # Buduj atrybuty do węzła <size>
+                    size_id = variant.size.iai_size_id if variant.size and variant.size.iai_size_id else ''
                     size_attrs = [
-                        f'id="{variant.size.id if variant.size else ''}"',
+                        f'id="{size_id}"',
                         f'name="{escape(size_name)}"',
                         f'panel_name="{escape(panel_name)}"',
-                        f'code="{code}"'
+                        f'iaiext:code_external="{code_external}"'
                     ]
                     if code_producer:
                         size_attrs.append(
@@ -236,7 +292,12 @@ class FullXMLExporter(BaseXMLExporter):
                             f'          <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
                     xml.append('        </size>')
                 xml.append('      </sizes>')
-            images = ProductImage.objects.using('MPD').filter(product=product)
+
+            # Dodaj obrazy produktu (obrazy przypisane do tego iai_product_id)
+            images = ProductImage.objects.using('MPD').filter(
+                product=product,
+                iai_product_id=iai_product_id
+            )
             if images:
                 xml.append('      <images>')
                 xml.append('        <large>')
@@ -245,7 +306,9 @@ class FullXMLExporter(BaseXMLExporter):
                         f'          <image url="{escape(img.file_path)}"/>')
                 xml.append('        </large>')
                 xml.append('      </images>')
+
             xml.append('    </product>')
+
         xml.append('  </products>')
         xml.append('</offer>')
         return '\n'.join(xml)

@@ -81,6 +81,7 @@ class Sizes(models.Model):
     category = models.CharField(max_length=255, blank=True, null=True)
     unit = models.CharField(max_length=255, blank=True, null=True)
     name_lower = models.CharField(max_length=255, blank=True, null=True)
+    iai_size_id = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -130,6 +131,7 @@ class ProductVariants(models.Model):
     size = models.ForeignKey(
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
     producer_code = models.CharField(max_length=255, blank=True, null=True)
+    iai_product_id = models.IntegerField(blank=True, null=True)
     objects = models.Manager()
 
     class Meta:
@@ -189,8 +191,9 @@ class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id', related_name='images')
-    variant = models.ForeignKey(ProductVariants, on_delete=models.CASCADE,
-                                db_column='variant_id', null=True, blank=True, to_field='variant_id')
+    # variant = models.ForeignKey(ProductVariants, on_delete=models.CASCADE,
+    #                             db_column='variant_id', null=True, blank=True, to_field='variant_id')
+    iai_product_id = models.IntegerField(blank=True, null=True)
     file_path = models.CharField(max_length=500)
 
     class Meta:

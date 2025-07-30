@@ -376,7 +376,8 @@ class BrandsAdmin(admin.ModelAdmin):
 @admin.register(Sizes)
 class SizesAdmin(admin.ModelAdmin):
     fields = ['name', 'category', 'unit', 'name_lower']
-    list_display = ['id', 'name', 'category', 'unit', 'name_lower']
+    list_display = ['id', 'name', 'category',
+                    'unit', 'name_lower', 'iai_size_id']
     list_filter = ['name', 'category', 'unit', 'name_lower']
 
     def get_queryset(self, request):

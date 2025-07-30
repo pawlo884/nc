@@ -258,6 +258,14 @@ class ProductsAdmin(admin.ModelAdmin):
                 variant_logger.info(
                     f"[add_new_variants_to_mpd] ID koloru w MPD: {color_id}")
 
+                # Generuj nowy iai_product_id dla tego koloru produktu
+                mpd_cursor.execute(
+                    "SELECT COALESCE(MAX(iai_product_id), 0) + 1 FROM product_variants")
+                iai_product_id_result = mpd_cursor.fetchone()
+                iai_product_id = iai_product_id_result[0] if iai_product_id_result else 1
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] Wygenerowano nowy iai_product_id: {iai_product_id} dla koloru {product_color}")
+
                 # Pobierz warianty produktu z Matterhorna
                 matterhorn_cursor.execute("""
                     SELECT name, stock, ean, variant_uid FROM variants WHERE product_id = %s
@@ -306,14 +314,14 @@ class ProductsAdmin(admin.ModelAdmin):
                     try:
                         if producer_color_id:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, producer_code)
-                                VALUES (%s, %s, %s, %s, %s, %s)
-                            """, [variant_id, mapped_product_id, color_id, producer_color_id, size_id, producer_code])
+                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """, [variant_id, mapped_product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id])
                         else:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, producer_code)
-                                VALUES (%s, %s, %s, %s, %s)
-                            """, [variant_id, mapped_product_id, color_id, size_id, producer_code])
+                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, producer_code, iai_product_id)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, [variant_id, mapped_product_id, color_id, size_id, producer_code, iai_product_id])
                         # Dodaj wpis do product_variants_sources
                         mpd_cursor.execute("""
                             INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id)
@@ -372,12 +380,13 @@ class ProductsAdmin(admin.ModelAdmin):
                     'skipped_existing': skipped_existing,
                     'missing_sizes': missing_sizes,
                     'missing_color': missing_colors,
-                    'total': total_variants
+                    'total': total_variants,
+                    'iai_product_id': iai_product_id
                 }
         except Exception as e:
             variant_logger.error(
                 f"[add_new_variants_to_mpd] Błąd podczas dodawania nowych wariantów do MPD: {str(e)}")
-            return {'added': added_variants, 'skipped_existing': skipped_existing, 'missing_sizes': missing_sizes, 'missing_color': missing_colors, 'total': total_variants}
+            return {'added': added_variants, 'skipped_existing': skipped_existing, 'missing_sizes': missing_sizes, 'missing_color': missing_colors, 'total': total_variants, 'iai_product_id': None}
         finally:
             variant_logger.info(
                 f"[add_new_variants_to_mpd] END: product_id={product_id}, mapped_product_id={mapped_product_id}, size_category={size_category}, producer_color_id={producer_color_id}, producer_code={producer_code}")
@@ -541,24 +550,6 @@ class ProductsAdmin(admin.ModelAdmin):
                             """, [new_set_id, product_set_id])
                         # --- KONIEC LOGIKI ZESTAWÓW ---
 
-                        # Prześlij zdjęcia do bucketu i zaktualizuj ścieżki
-                        with connections['matterhorn'].cursor() as matterhorn_cursor:
-                            matterhorn_cursor.execute("""
-                                SELECT image_path FROM images WHERE product_id = %s
-                            """, [product_id])
-                            images = matterhorn_cursor.fetchall()
-
-                            for idx, image_path in enumerate(images, start=1):
-                                if image_path[0]:
-                                    from matterhorn.defs_db import upload_image_to_bucket_and_get_url
-                                    new_image_path = upload_image_to_bucket_and_get_url(
-                                        image_path[0], new_product_id, producer_color_name, image_number=idx)
-                                    if new_image_path:
-                                        cursor.execute("""
-                                            INSERT INTO product_images (product_id, file_path)
-                                            VALUES (%s, %s)
-                                        """, [new_product_id, new_image_path])
-
                         # Przypisz series_id wszystkim powiązanym produktom w MPD
                         if mapped_ids:
                             cursor.execute(
@@ -621,6 +612,14 @@ class ProductsAdmin(admin.ModelAdmin):
                                     f"Brak wariantów dla produktu {product_id}")
                                 raise Exception('Brak wariantów dla produktu')
 
+                            # Generuj unikalny iai_product_id dla wszystkich wariantów tego produktu
+                            cursor.execute(
+                                "SELECT COALESCE(MAX(iai_product_id), 0) + 1 FROM product_variants")
+                            iai_product_id_result = cursor.fetchone()
+                            iai_product_id = iai_product_id_result[0] if iai_product_id_result else 1
+                            logger.info(
+                                f"Wygenerowano iai_product_id: {iai_product_id} dla produktu {new_product_id}")
+
                             # Dodaj warianty do MPD tylko z wybranej kategorii rozmiarowej
                             for size_name, stock, ean, variant_uid in variants:
                                 logger.info(
@@ -652,12 +651,12 @@ class ProductsAdmin(admin.ModelAdmin):
                                     logger.info(
                                         f"Utworzono nowy wariant z ID {variant_id}")
 
-                                    # Dodaj wariant z odpowiednim producer_color_id
+                                    # Dodaj wariant z odpowiednim producer_color_id i iai_product_id
                                     cursor.execute("""
                                         INSERT INTO product_variants 
-                                        (variant_id, product_id, color_id, size_id, producer_color_id, producer_code)
-                                        VALUES (%s, %s, %s, %s, %s, %s)
-                                    """, [variant_id, new_product_id, color_id, size_id, producer_color_id_to_use, producer_code])
+                                        (variant_id, product_id, color_id, size_id, producer_color_id, producer_code, iai_product_id)
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                    """, [variant_id, new_product_id, color_id, size_id, producer_color_id_to_use, producer_code, iai_product_id])
                                     # Dodaj wpis do product_variants_sources
                                     cursor.execute("""
                                         INSERT INTO product_variants_sources 
@@ -698,6 +697,25 @@ class ProductsAdmin(admin.ModelAdmin):
                                     """, [variant_id, variant_uid])
                             connections['matterhorn'].commit()
 
+                        # Dodaj zdjęcia do product_images z iai_product_id
+                        # Prześlij zdjęcia do bucketu i zaktualizuj ścieżki z iai_product_id
+                        with connections['matterhorn'].cursor() as matterhorn_cursor:
+                            matterhorn_cursor.execute("""
+                                SELECT image_path FROM images WHERE product_id = %s
+                            """, [product_id])
+                            images = matterhorn_cursor.fetchall()
+
+                            for idx, image_path in enumerate(images, start=1):
+                                if image_path[0]:
+                                    from matterhorn.defs_db import upload_image_to_bucket_and_get_url
+                                    new_image_path = upload_image_to_bucket_and_get_url(
+                                        image_path[0], new_product_id, producer_color_name, image_number=idx)
+                                    if new_image_path:
+                                        cursor.execute("""
+                                            INSERT INTO product_images (product_id, iai_product_id, file_path)
+                                            VALUES (%s, %s, %s)
+                                        """, [new_product_id, iai_product_id, new_image_path])
+
                         with connections['matterhorn'].cursor() as matterhorn_cursor:
                             matterhorn_cursor.execute("""
                                 UPDATE products 
@@ -722,16 +740,22 @@ class ProductsAdmin(admin.ModelAdmin):
                         if fabric_components and fabric_percentages:
                             for comp_id, perc in zip(fabric_components, fabric_percentages):
                                 try:
-                                    comp_id_int = int(comp_id)
-                                    perc_int = int(perc)
-                                    if perc_int > 0:
-                                        cursor.execute(
-                                            "INSERT INTO product_fabric (product_id, component_id, percentage) VALUES (%s, %s, %s)",
-                                            [new_product_id, comp_id_int, perc_int]
-                                        )
-                                except Exception as e:
+                                    # Sprawdź czy wartości nie są puste
+                                    if comp_id and perc and comp_id.strip() and perc.strip():
+                                        comp_id_int = int(comp_id)
+                                        perc_int = int(perc)
+                                        if perc_int > 0:
+                                            cursor.execute(
+                                                "INSERT INTO product_fabric (product_id, component_id, percentage) VALUES (%s, %s, %s)",
+                                                [new_product_id,
+                                                    comp_id_int, perc_int]
+                                            )
+                                except (ValueError, TypeError) as e:
                                     logger.error(
                                         f"Błąd zapisu materiału: {comp_id}, {perc}: {e}")
+                                except Exception as e:
+                                    logger.error(
+                                        f"Nieoczekiwany błąd zapisu materiału: {comp_id}, {perc}: {e}")
                         # --- KONIEC ZAPISU MATERIAŁÓW ---
 
                 return JsonResponse({'success': True, 'message': 'Produkt został pomyślnie zmapowany'})
@@ -807,7 +831,7 @@ class ProductsAdmin(admin.ModelAdmin):
                     variant_logger.info(
                         f"[assign_mapping] Wynik add_new_variants_to_mpd: {mapping_info}")
 
-                    # --- DODAJ: upload zdjęć do bucketa i zapis do bazy MPD (jak w mpd_create) ---
+                    # --- DODAJ: upload zdjęć do bucketa i zapis do bazy MPD z iai_product_id ---
                     from matterhorn.defs_db import upload_image_to_bucket_and_get_url
                     with connections['matterhorn'].cursor() as matterhorn_cursor, connections['MPD'].cursor() as mpd_cursor:
                         matterhorn_cursor.execute(
@@ -819,10 +843,10 @@ class ProductsAdmin(admin.ModelAdmin):
                                     image_path[0], mpd_product_id, producer_color_name, image_number=idx)
                                 if new_image_path:
                                     mpd_cursor.execute("""
-                                        INSERT INTO product_images (product_id, file_path)
-                                        VALUES (%s, %s)
+                                        INSERT INTO product_images (product_id, iai_product_id, file_path)
+                                        VALUES (%s, %s, %s)
                                         ON CONFLICT (product_id, file_path) DO NOTHING
-                                    """, [mpd_product_id, new_image_path])
+                                    """, [mpd_product_id, mapping_info.get('iai_product_id'), new_image_path])
                         connections['MPD'].commit()
                     # --- KONIEC DODATKU ---
                 else:
