@@ -154,7 +154,7 @@ class ProductsAdmin(admin.ModelAdmin):
                 if 'mpd_name' in request.POST and len(request.POST) == 1:
                     name = request.POST.get('mpd_name')
                     with connections['MPD'].cursor() as cursor:
-                        cursor.execute("UPDATE products SET name = %s WHERE id = %s", [
+                        cursor.execute("UPDATE products SET name = %s, updated_at = NOW() WHERE id = %s", [
                                        name, mapped_product_id])
                     return JsonResponse({'success': True, 'message': 'Zaktualizowano nazwę.'})
 
@@ -162,7 +162,7 @@ class ProductsAdmin(admin.ModelAdmin):
                 if 'mpd_description' in request.POST and len(request.POST) == 1:
                     description = request.POST.get('mpd_description')
                     with connections['MPD'].cursor() as cursor:
-                        cursor.execute("UPDATE products SET description = %s WHERE id = %s", [
+                        cursor.execute("UPDATE products SET description = %s, updated_at = NOW() WHERE id = %s", [
                                        description, mapped_product_id])
                     return JsonResponse({'success': True, 'message': 'Zaktualizowano opis.'})
 
@@ -176,7 +176,7 @@ class ProductsAdmin(admin.ModelAdmin):
                         if not brand_result:
                             return JsonResponse({'success': False, 'error': 'Nie znaleziono marki w bazie MPD'})
                         brand_id = brand_result[0]
-                        cursor.execute("UPDATE products SET brand_id = %s WHERE id = %s", [
+                        cursor.execute("UPDATE products SET brand_id = %s, updated_at = NOW() WHERE id = %s", [
                                        brand_id, mapped_product_id])
                     return JsonResponse({'success': True, 'message': 'Zaktualizowano markę.'})
 
@@ -184,7 +184,7 @@ class ProductsAdmin(admin.ModelAdmin):
                 if 'producer_code' in request.POST and len(request.POST) == 1:
                     producer_code = request.POST.get('producer_code')
                     with connections['MPD'].cursor() as cursor:
-                        cursor.execute("UPDATE products SET producer_code = %s WHERE id = %s", [
+                        cursor.execute("UPDATE products SET producer_code = %s, updated_at = NOW() WHERE id = %s", [
                                        producer_code, mapped_product_id])
                     return JsonResponse({'success': True, 'message': 'Zaktualizowano kod producenta.'})
 
@@ -207,7 +207,7 @@ class ProductsAdmin(admin.ModelAdmin):
                                 logger.error(
                                     f"Nie udało się utworzyć serii: {series_name}")
                                 raise Exception('Nie udało się utworzyć serii')
-                        cursor.execute("UPDATE products SET series_id = %s WHERE id = %s", [
+                        cursor.execute("UPDATE products SET series_id = %s, updated_at = NOW() WHERE id = %s", [
                                        series_id, mapped_product_id])
                     return JsonResponse({'success': True, 'message': 'Zaktualizowano serię.'})
 
@@ -314,13 +314,13 @@ class ProductsAdmin(admin.ModelAdmin):
                     try:
                         if producer_color_id:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
                             """, [variant_id, mapped_product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id])
                         else:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, producer_code, iai_product_id)
-                                VALUES (%s, %s, %s, %s, %s, %s)
+                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, producer_code, iai_product_id, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, NOW())
                             """, [variant_id, mapped_product_id, color_id, size_id, producer_code, iai_product_id])
                         # Dodaj wpis do product_variants_sources
                         mpd_cursor.execute("""
@@ -484,8 +484,8 @@ class ProductsAdmin(admin.ModelAdmin):
                         unit_id_int = int(
                             unit_id) if unit_id and unit_id.isdigit() else None
                         cursor.execute("""
-                            INSERT INTO products (name, description, short_description, brand_id, series_id, unit)
-                            VALUES (%s, %s, %s, %s, %s, %s)
+                            INSERT INTO products (name, description, short_description, brand_id, series_id, unit, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, NOW())
                             RETURNING id
                         """, [name, description, short_description, brand_id, series_id, unit_id_int])
                         row = cursor.fetchone()
@@ -553,7 +553,7 @@ class ProductsAdmin(admin.ModelAdmin):
                         # Przypisz series_id wszystkim powiązanym produktom w MPD
                         if mapped_ids:
                             cursor.execute(
-                                f"UPDATE products SET series_id = %s WHERE id IN ({', '.join(['%s'] * len(mapped_ids))})", [series_id] + mapped_ids)
+                                f"UPDATE products SET series_id = %s, updated_at = NOW() WHERE id IN ({', '.join(['%s'] * len(mapped_ids))})", [series_id] + mapped_ids)
 
                         # Pobierz kolor produktu
                         with connections['matterhorn'].cursor() as matterhorn_cursor:
@@ -645,6 +645,12 @@ class ProductsAdmin(admin.ModelAdmin):
                                     variant_id = variant_result[0]
                                     logger.info(
                                         f"Znaleziono istniejący wariant z ID {variant_id}")
+                                    # Aktualizuj updated_at dla istniejącego wariantu
+                                    cursor.execute("""
+                                        UPDATE product_variants 
+                                        SET updated_at = NOW()
+                                        WHERE variant_id = %s
+                                    """, [variant_id])
                                 else:
                                     # Użyj bezpiecznej funkcji do generowania ID
                                     variant_id = get_safe_variant_id(cursor)
@@ -654,8 +660,8 @@ class ProductsAdmin(admin.ModelAdmin):
                                     # Dodaj wariant z odpowiednim producer_color_id i iai_product_id
                                     cursor.execute("""
                                         INSERT INTO product_variants 
-                                        (variant_id, product_id, color_id, size_id, producer_color_id, producer_code, iai_product_id)
-                                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                        (variant_id, product_id, color_id, size_id, producer_color_id, producer_code, iai_product_id, updated_at)
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
                                     """, [variant_id, new_product_id, color_id, size_id, producer_color_id_to_use, producer_code, iai_product_id])
                                     # Dodaj wpis do product_variants_sources
                                     cursor.execute("""
@@ -1426,8 +1432,8 @@ class ProductsAdmin(admin.ModelAdmin):
                             # Dodaj wariant z odpowiednim producer_color_id
                             mpd_cursor.execute("""
                                 INSERT INTO product_variants 
-                                (variant_id, product_id, color_id, size_id, producer_color_id, producer_code)
-                                VALUES (%s, %s, %s, %s, %s, %s)
+                                (variant_id, product_id, color_id, size_id, producer_color_id, producer_code, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, NOW())
                             """, [variant_id, mapped_product_id, color_id, size_id, producer_color_id_to_use, producer_code])
 
                             # Dodaj wpis do product_variants_sources
@@ -1549,7 +1555,7 @@ class ProductsAdmin(admin.ModelAdmin):
                                     if not row:
                                         return JsonResponse({'success': False, 'error': f'Nie znaleziono marki o nazwie {value}'})
                                     brand_id = row[0]
-                            cursor.execute("UPDATE products SET brand_id = %s WHERE id = %s", [
+                            cursor.execute("UPDATE products SET brand_id = %s, updated_at = NOW() WHERE id = %s", [
                                            brand_id, product_id])
                         elif field_name == 'series_id':
                             try:
@@ -1571,10 +1577,10 @@ class ProductsAdmin(admin.ModelAdmin):
                                             f"Nie udało się utworzyć serii: {value}")
                                         raise Exception(
                                             'Nie udało się utworzyć serii')
-                            cursor.execute("UPDATE products SET series_id = %s WHERE id = %s", [
+                            cursor.execute("UPDATE products SET series_id = %s, updated_at = NOW() WHERE id = %s", [
                                            series_id, product_id])
                         else:
-                            cursor.execute(f"UPDATE products SET {field_name} = %s WHERE id = %s", [
+                            cursor.execute(f"UPDATE products SET {field_name} = %s, updated_at = NOW() WHERE id = %s", [
                                            value, product_id])
                     elif field_name in ['producer_color_id', 'color_id']:
                         try:
@@ -1596,10 +1602,10 @@ class ProductsAdmin(admin.ModelAdmin):
                                         f"Nie udało się utworzyć koloru: {value}")
                                     raise Exception(
                                         'Nie udało się utworzyć koloru')
-                        cursor.execute(f"UPDATE product_variants SET {field_name} = %s WHERE product_id = %s", [
+                        cursor.execute(f"UPDATE product_variants SET {field_name} = %s, updated_at = NOW() WHERE product_id = %s", [
                                        color_id, product_id])
                     elif field_name in variants_fields:
-                        cursor.execute(f"UPDATE product_variants SET {field_name} = %s WHERE product_id = %s", [
+                        cursor.execute(f"UPDATE product_variants SET {field_name} = %s, updated_at = NOW() WHERE product_id = %s", [
                                        value, product_id])
                     else:
                         return JsonResponse({'success': False, 'error': 'Nieprawidłowe pole'})

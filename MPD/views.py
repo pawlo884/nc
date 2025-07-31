@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .serializers import ProductSetSerializer, ProductSetItemSerializer
 from collections import defaultdict
-from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter, ProducersXMLExporter, StocksXMLExporter, UnitsXMLExporter
+from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter, ProducersXMLExporter, StocksXMLExporter, UnitsXMLExporter, FullChangeXMLExporter
 import logging
 from django.http import HttpResponse
 import requests
@@ -197,12 +197,13 @@ def export_full_xml(request):
 
 
 XML_FILES = [
-    "full", "light", "categories", "sizes", "producers", "units", "parameters", "stocks", "series", "warranties", "preset"
+    "full", "full_change", "light", "categories", "sizes", "producers", "units", "parameters", "stocks", "series", "warranties", "preset"
 ]
 
 BUCKET_URL = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/"
 XML_FILE_MAP = {
     "full": "fulloferta.xml",
+    "full_change": "full_change.xml",
     "light": "lightoferta.xml",
     "categories": "categories.xml",
     "sizes": "sizes.xml",
@@ -254,6 +255,15 @@ def get_gateway_xml(request):
 @csrf_exempt
 def generate_full_xml(request):
     exporter = FullXMLExporter()
+    exporter_result = exporter.export()
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def generate_full_change_xml(request):
+    exporter = FullChangeXMLExporter()
     exporter_result = exporter.export()
     with open(exporter_result['local_path'], 'rb') as f:
         content = f.read()
@@ -319,6 +329,9 @@ def xml_links(request):
     # full.xml
     url = reverse('generate_full_xml')
     links.append(('full', url))
+    # full_change.xml
+    url = reverse('generate_full_change_xml')
+    links.append(('full_change', url))
     # light.xml
     url = reverse('generate_light_xml')
     links.append(('light', url))
@@ -337,7 +350,7 @@ def xml_links(request):
         gateway_url = reverse('generate_gateway_xml', args=[source.name])
         links.append((f'gateway ({source.name})', gateway_url))
     # pozostałe typy (puste)
-    for xml_type in [k for k in XML_FILE_MAP if k not in ['full', 'light', 'producers', 'stocks', 'units']]:
+    for xml_type in [k for k in XML_FILE_MAP if k not in ['full', 'full_change', 'light', 'producers', 'stocks', 'units']]:
         url = reverse('empty_xml') + f'?type={xml_type}'
         links.append((xml_type, url))
     html = '<h2>Dostępne pliki XML:</h2><ul>'

@@ -82,6 +82,9 @@ class ProductsAdmin(admin.ModelAdmin):
         return mark_safe(html)
 
     def save_model(self, request, obj, form, change):
+        # Aktualizuj updated_at przed zapisaniem
+        from django.utils import timezone
+        obj.updated_at = timezone.now()
         super().save_model(request, obj, form, change)
         if 'save_retail_prices' in request.POST:
             variants = ProductVariants.objects.filter(product=obj)
@@ -131,6 +134,7 @@ class ProductsAdmin(admin.ModelAdmin):
                             obj_rp.retail_price = retail_price
                             obj_rp.vat = vat
                             obj_rp.currency = currency
+                            obj_rp.updated_at = timezone.now()
                             obj_rp.save(using='MPD')
                     except (ValueError, TypeError, decimal.InvalidOperation):
                         continue

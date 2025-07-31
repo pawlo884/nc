@@ -132,6 +132,7 @@ class ProductVariants(models.Model):
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
     producer_code = models.CharField(max_length=255, blank=True, null=True)
     iai_product_id = models.IntegerField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
     objects = models.Manager()
 
     class Meta:
@@ -180,6 +181,7 @@ class ProductVariantsRetailPrice(models.Model):
     currency = models.CharField(max_length=10, null=True, blank=True)
     net_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
     objects = models.Manager()
 
     class Meta:

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<offer file_format="IOF" version="3.0" generated="2025-07-31 12:27:10" expires="2025-08-01 12:27:10" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+  <products currency="PLN" language="pol">
+    <product id="1" currency="" type="regular" vat="" site="1">
+      <producer id="20" name="Lupo Line"/>
+      <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Biustonosz kąpielowy Eden</name>
+        <short_desc><![CDATA[Biustonosz kąpielowy to propozycja dla kobiet, które pragną połączyć wygodę z egzotycznym stylem inspirowanym tropikalną przyrodą. ]]></short_desc>
+        <long_desc><![CDATA[Biustonosz kąpielowy to propozycja dla kobiet, które pragną połączyć wygodę z egzotycznym stylem inspirowanym tropikalną przyrodą. Zachwyca wyrazistym wzorem, który wprowadza świeżość i energię do letnich stylizacji. Biustonosz Eden to propozycja dla kobiet, które pragną połączyć wygodę z egzotycznym stylem inspirowanym tropikalną przyrodą. Biustonosz bikini w formie braletki na fiszbinach. Idealnie prezentują się w nim średnie oraz większe biusty. Miękkie miseczki z pionowym cięciem. Konstrukcja biustonosza zapewnia pełen komfort noszenia oraz doskonałe podtrzymanie biustu. Biustonosz wiązany na szyi i zapinany na plecach.]]></long_desc>
+        <iaiext:search_keywords><![CDATA[]]></iaiext:search_keywords>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="11" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:price_automatic_calculation>no</iaiext:price_automatic_calculation>
+      <iaiext:last_purchase_price gross="0" net="0"/>
+      <iaiext:average_purchase_price gross="0" net="0"/>
+      <iaiext:sold_by>piece</iaiext:sold_by>
+      <iaiext:sold_in_carton>1</iaiext:sold_in_carton>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="4" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+        <size id="88" name="65E" panel_name="65E_bielizna" iaiext:code_external="497-1" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-1" code_producer="5905220672370" iaiext:code_producer="5905220672370">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="89" name="65F" panel_name="65F_bielizna" iaiext:code_external="497-2" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-2" code_producer="5905220672387" iaiext:code_producer="5905220672387">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="90" name="65G" panel_name="65G_bielizna" iaiext:code_external="497-3" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-3" code_producer="5905220672394" iaiext:code_producer="5905220672394">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="137" name="70E" panel_name="70E_bielizna" iaiext:code_external="497-4" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-4" code_producer="5905220672448" iaiext:code_producer="5905220672448">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="138" name="70F" panel_name="70F_bielizna" iaiext:code_external="497-5" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-5" code_producer="5905220672455" iaiext:code_producer="5905220672455">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="139" name="70G" panel_name="70G_bielizna" iaiext:code_external="497-6" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-6" code_producer="5905220672462" iaiext:code_producer="5905220672462">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="150" name="75D" panel_name="75D_bielizna" iaiext:code_external="497-7" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-7" code_producer="5905220672509" iaiext:code_producer="5905220672509">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="153" name="75F" panel_name="75F_bielizna" iaiext:code_external="497-8" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-8" code_producer="5905220672523" iaiext:code_producer="5905220672523">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="162" name="80B" panel_name="80B_bielizna" iaiext:code_external="497-9" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-9" code_producer="5905220672530" iaiext:code_producer="5905220672530">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="A" name="80C" panel_name="80C_bielizna" iaiext:code_external="497-10" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-10" code_producer="5905220672547" iaiext:code_producer="5905220672547">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="164" name="80D" panel_name="80D_bielizna" iaiext:code_external="497-11" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-11" code_producer="5905220672554" iaiext:code_producer="5905220672554">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="165" name="80E" panel_name="80E_bielizna" iaiext:code_external="497-12" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-12" code_producer="5905220672561" iaiext:code_producer="5905220672561">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="G" name="65D" panel_name="65D_bielizna" iaiext:code_external="497-13" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="497-13" code_producer="5905220672363" iaiext:code_producer="5905220672363">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/497/497_1_Multicolor.jpg" iaiext:priority="1"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/497/497_2_Multicolor.jpg" iaiext:priority="1"/>
+        </large>
+      </images>
+    </product>
+    <product id="3" currency="" type="regular" vat="" site="1">
+      <producer id="18" name="Marko"/>
+      <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Kostium kąpielowy Ada</name>
+        <short_desc><![CDATA[Zmysłowy i kobiecy, ten kostium kąpielowy został stworzony z myślą o kobietach, które chcą czuć się pewnie i stylowo na plaży.]]></short_desc>
+        <long_desc><![CDATA[Zmysłowy i kobiecy, ten kostium kąpielowy został stworzony z myślą o kobietach, które chcą czuć się pewnie i stylowo na plaży. Biustonosz z usztywnianymi miseczkami, dolnymi fiszbinami i dekoltem w kształcie serca pięknie eksponuje biust, unosząc go i zaokrąglając. W zestawie znajduje się duży push-up (dostępny w rozmiarach S, M, L, XL), który można łatwo wyjąć, dla pełnej swobody dopasowania. Zapinany na plecach, z odpinanymi i regulowanymi ramiączkami, zapewnia maksymalny komfort i indywidualne dopasowanie. Majteczki z niskim stanem, na podszewce i z efektownym wiązaniem po bokach, subtelnie podkreślają biodra i talię. Glamour zdobienia dodają całości luksusowego charakteru, idealnego na plażowe sesje zdjęciowe lub wyjątkowe wakacyjne chwile. Pakowany w praktyczny woreczek foliowy, gotowy na podróż. Wskazówka: zamów rozmiar większy niż zazwyczaj, model ma dopasowany krój.]]></long_desc>
+        <iaiext:search_keywords><![CDATA[]]></iaiext:search_keywords>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="9" name="pomarańczowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:price_automatic_calculation>no</iaiext:price_automatic_calculation>
+      <iaiext:last_purchase_price gross="0" net="0"/>
+      <iaiext:average_purchase_price gross="0" net="0"/>
+      <iaiext:sold_by>piece</iaiext:sold_by>
+      <iaiext:sold_in_carton>1</iaiext:sold_in_carton>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="5" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+        <size id="231" name="S" panel_name="S_bielizna" iaiext:code_external="498-19" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-19" code_producer="5900748230552" iaiext:code_producer="5900748230552">
+          <price />
+          <stock id="0" quantity="10"/>
+        </size>
+        <size id="233" name="XL" panel_name="XL_bielizna" iaiext:code_external="498-20" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-20" code_producer="5900748230583" iaiext:code_producer="5900748230583">
+          <price />
+          <stock id="0" quantity="10"/>
+        </size>
+        <size id="234" name="XXL" panel_name="XXL_bielizna" iaiext:code_external="498-21" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-21" code_producer="5900748230590" iaiext:code_producer="5900748230590">
+          <price />
+          <stock id="0" quantity="10"/>
+        </size>
+        <size id="232" name="L" panel_name="L_bielizna" iaiext:code_external="498-22" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-22" code_producer="5900748230576" iaiext:code_producer="5900748230576">
+          <price />
+          <stock id="0" quantity="8"/>
+        </size>
+        <size id="I" name="M" panel_name="M_bielizna" iaiext:code_external="498-23" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-23" code_producer="5900748230569" iaiext:code_producer="5900748230569">
+          <price />
+          <stock id="0" quantity="10"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/498/498_1_Orange.jpg" iaiext:priority="1"/>
+        </large>
+      </images>
+    </product>
+    <product id="2" currency="" type="regular" vat="" site="1">
+      <producer id="18" name="Marko"/>
+      <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Kostium kąpielowy Ada</name>
+        <short_desc><![CDATA[Zmysłowy i kobiecy, ten kostium kąpielowy został stworzony z myślą o kobietach, które chcą czuć się pewnie i stylowo na plaży.]]></short_desc>
+        <long_desc><![CDATA[Zmysłowy i kobiecy, ten kostium kąpielowy został stworzony z myślą o kobietach, które chcą czuć się pewnie i stylowo na plaży. Biustonosz z usztywnianymi miseczkami, dolnymi fiszbinami i dekoltem w kształcie serca pięknie eksponuje biust, unosząc go i zaokrąglając. W zestawie znajduje się duży push-up (dostępny w rozmiarach S, M, L, XL), który można łatwo wyjąć, dla pełnej swobody dopasowania. Zapinany na plecach, z odpinanymi i regulowanymi ramiączkami, zapewnia maksymalny komfort i indywidualne dopasowanie. Majteczki z niskim stanem, na podszewce i z efektownym wiązaniem po bokach, subtelnie podkreślają biodra i talię. Glamour zdobienia dodają całości luksusowego charakteru, idealnego na plażowe sesje zdjęciowe lub wyjątkowe wakacyjne chwile. Pakowany w praktyczny woreczek foliowy, gotowy na podróż. Wskazówka: zamów rozmiar większy niż zazwyczaj, model ma dopasowany krój.]]></long_desc>
+        <iaiext:search_keywords><![CDATA[]]></iaiext:search_keywords>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="3" name="fioletowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:price_automatic_calculation>no</iaiext:price_automatic_calculation>
+      <iaiext:last_purchase_price gross="0" net="0"/>
+      <iaiext:average_purchase_price gross="0" net="0"/>
+      <iaiext:sold_by>piece</iaiext:sold_by>
+      <iaiext:sold_in_carton>1</iaiext:sold_in_carton>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="5" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+        <size id="232" name="L" panel_name="L_bielizna" iaiext:code_external="498-18" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-18" code_producer="5900748230521" iaiext:code_producer="5900748230521">
+          <price />
+          <stock id="0" quantity="9"/>
+        </size>
+        <size id="231" name="S" panel_name="S_bielizna" iaiext:code_external="498-17" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-17" code_producer="5900748230507" iaiext:code_producer="5900748230507">
+          <price />
+          <stock id="0" quantity="8"/>
+        </size>
+        <size id="233" name="XL" panel_name="XL_bielizna" iaiext:code_external="498-16" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-16" code_producer="5900748230538" iaiext:code_producer="5900748230538">
+          <price />
+          <stock id="0" quantity="9"/>
+        </size>
+        <size id="234" name="XXL" panel_name="XXL_bielizna" iaiext:code_external="498-15" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-15" code_producer="5900748230545" iaiext:code_producer="5900748230545">
+          <price />
+          <stock id="0" quantity="2"/>
+        </size>
+        <size id="I" name="M" panel_name="M_bielizna" iaiext:code_external="498-14" iaiext:weight_net="0" iaiext:priority="1" iaiext:code="498-14" code_producer="5900748230514" iaiext:code_producer="5900748230514">
+          <price />
+          <stock id="0" quantity="4"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/498/498_1_Lilia.jpg" iaiext:priority="1"/>
+        </large>
+      </images>
+    </product>
+  </products>
+</offer>
