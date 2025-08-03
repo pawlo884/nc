@@ -19,20 +19,17 @@ class BaseXMLExporter:
         raise NotImplementedError
 
     def save_local(self, xml_content):
-        local_dir = 'MPD_test/xml/'
+        local_dir = 'MPD_test/xml/matterhorn/'
         os.makedirs(local_dir, exist_ok=True)
         local_path = os.path.join(local_dir, self.filename)
         with open(local_path, 'w', encoding='utf-8') as f:
             f.write(xml_content)
         return local_path
 
-    def save_to_bucket(self, xml_content):
+    def save_to_bucket(self, local_file_path):
         try:
-            temp_file = self.filename
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                f.write(xml_content)
-            bucket_path = f"MPD_test/xml/{temp_file}"
-            with open(temp_file, 'rb') as f:
+            bucket_path = f"MPD_test/xml/matterhorn/{self.filename}"
+            with open(local_file_path, 'rb') as f:
                 file_data = f.read()
             s3_client.put_object(
                 Bucket=DO_SPACES_BUCKET,
@@ -53,7 +50,7 @@ class BaseXMLExporter:
     def export(self):
         xml_content = self.generate_xml()
         local_path = self.save_local(xml_content)
-        bucket_url = self.save_to_bucket(xml_content)
+        bucket_url = self.save_to_bucket(local_path)
         if bucket_url:
             print('✅ Eksport XML zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
@@ -356,12 +353,14 @@ class LightXMLExporter(BaseXMLExporter):
 
 
 class GatewayXMLExporter(BaseXMLExporter):
-    def __init__(self, source_name):
-        self.source_name = source_name
-        super().__init__(f'{source_name.lower()}_gateway.xml')
-        self.source = Sources.objects.filter(name=source_name).first()
-        if not self.source:
-            raise ValueError(f"Nie znaleziono źródła o nazwie: {source_name}")
+    def __init__(self, source_name=None):
+        # Zawsze używaj Matterhorn (id=2), ignoruj source_name
+        super().__init__('gateway.xml')
+        try:
+            self.source = Sources.objects.get(id=2)  # Tylko Matterhorn
+            self.source_name = self.source.name
+        except Sources.DoesNotExist:
+            raise ValueError("Nie znaleziono źródła Matterhorn (id=2)")
 
     def _create_meta_element(self, root):
         meta = ET.SubElement(root, "meta")
@@ -405,7 +404,8 @@ class GatewayXMLExporter(BaseXMLExporter):
 
     def _create_url_elements(self, root):
         elements = {
-            "full": "fulloferta.xml",
+            "full": "full.xml",
+            "full_change": "full_change.xml",
             "light": "lightoferta.xml",
             "categories": "categories.xml",
             "sizes": "sizes.xml",
@@ -417,35 +417,65 @@ class GatewayXMLExporter(BaseXMLExporter):
             "warranties": "warranties.xml",
             "preset": "preset.xml"
         }
-        bucket_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/"
+        bucket_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/matterhorn/"
+        
         for element_name, file_name in elements.items():
             element = ET.SubElement(root, element_name)
             url = bucket_url + file_name
             element.set("url", url)
-            try:
-                response = requests.get(url)
-                if response.status_code == 200:
+            
+            # Najpierw sprawdź lokalny plik
+            local_path = os.path.join('MPD_test/xml/matterhorn/', file_name)
+            hash_value = ""
+            changed_value = ""
+            
+            if os.path.exists(local_path):
+                try:
+                    # Oblicz hash z lokalnego pliku
                     import hashlib
-                    md5_hash = hashlib.md5(response.content).hexdigest()
-                    changed = response.headers.get('Last-Modified')
-                    if changed:
-                        try:
-                            changed_dt = datetime.strptime(
-                                changed, '%a, %d %b %Y %H:%M:%S %Z')
-                            changed_str = changed_dt.strftime(
-                                '%Y-%m-%d %H:%M:%S')
-                        except Exception:
-                            changed_str = changed
-                        element.set("changed", changed_str)
-                    else:
-                        element.set("changed", "")
-                    element.set("hash", md5_hash)
-                else:
-                    element.set("hash", "")
-                    element.set("changed", "")
-            except Exception:
-                element.set("hash", "")
-                element.set("changed", "")
+                    with open(local_path, 'rb') as f:
+                        file_content = f.read()
+                        hash_value = hashlib.md5(file_content).hexdigest()
+                    
+                    # Pobierz datę modyfikacji z systemu plików
+                    import time
+                    mtime = os.path.getmtime(local_path)
+                    changed_dt = datetime.fromtimestamp(mtime)
+                    changed_value = changed_dt.strftime('%Y-%m-%d %H:%M:%S')
+                    
+                except Exception as e:
+                    logger.warning(f"Błąd podczas obliczania hash/changed dla {file_name}: {str(e)}")
+                    hash_value = ""
+                    changed_value = ""
+            else:
+                # Fallback: sprawdź zdalny plik
+                try:
+                    response = requests.get(url, timeout=10)
+                    if response.status_code == 200:
+                        import hashlib
+                        hash_value = hashlib.md5(response.content).hexdigest()
+                        
+                        # Spróbuj pobrać datę z nagłówków
+                        last_modified = response.headers.get('Last-Modified')
+                        if last_modified:
+                            try:
+                                # Różne formaty dat w nagłówkach HTTP
+                                for fmt in ['%a, %d %b %Y %H:%M:%S %Z', '%a, %d %b %Y %H:%M:%S GMT']:
+                                    try:
+                                        changed_dt = datetime.strptime(last_modified, fmt)
+                                        changed_value = changed_dt.strftime('%Y-%m-%d %H:%M:%S')
+                                        break
+                                    except ValueError:
+                                        continue
+                            except Exception:
+                                changed_value = ""
+                except Exception as e:
+                    logger.warning(f"Błąd podczas pobierania zdalnego pliku {file_name}: {str(e)}")
+                    hash_value = ""
+                    changed_value = ""
+            
+            element.set("hash", hash_value)
+            element.set("changed", changed_value)
 
     def generate_xml(self):
         root = ET.Element("provider_description")
