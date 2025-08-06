@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.utils.timezone import localtime
 import logging
-from celery.signals import worker_ready
+# from celery.signals import worker_ready
 
 logger = logging.getLogger(__name__)
 
@@ -93,3 +93,59 @@ def track_recent_stock_changes():
     logger.info(
         f"Zakończenie zadania track_recent_stock_changes: {localtime(end_time)}")
     logger.info(f"Czas wykonania zadania: {execution_time}")
+
+
+@shared_task(name='generate_daily_full_xml')
+def generate_daily_full_xml():
+    """
+    Zadanie Celery do codziennego generowania pliku full.xml
+    Można dodać w panelu admina jako zadanie okresowe (raz na dobę)
+    """
+    from .export_to_xml import FullXMLExporter
+    from .views import update_all_gateways
+
+    start_time = timezone.now()
+    logger.info("Rozpoczęcie zadania generate_daily_full_xml: %s",
+                localtime(start_time))
+
+    try:
+        # Generuj full.xml
+        exporter = FullXMLExporter()
+        result = exporter.export()
+
+        if result['bucket_url']:
+            logger.info("✅ Pomyślnie wygenerowano full.xml: %s",
+                        result['bucket_url'])
+            logger.info("📁 Lokalny plik: %s", result['local_path'])
+
+            # Automatycznie zaktualizuj gateway.xml
+            update_all_gateways()
+            logger.info("✅ Zaktualizowano gateway.xml")
+
+            end_time = timezone.now()
+            execution_time = end_time - start_time
+            logger.info(
+                "Zakończenie zadania generate_daily_full_xml: %s", localtime(end_time))
+            logger.info("Czas wykonania: %s", execution_time)
+
+            return {
+                'status': 'success',
+                'bucket_url': result['bucket_url'],
+                'local_path': result['local_path'],
+                'execution_time': str(execution_time)
+            }
+        else:
+            logger.error(
+                "❌ Błąd podczas generowania full.xml - brak URL bucketa")
+            return {
+                'status': 'error',
+                'message': 'Nie udało się przesłać pliku do bucketa'
+            }
+
+    except Exception as e:
+        logger.error(
+            "❌ Błąd podczas wykonywania zadania generate_daily_full_xml: %s", str(e))
+        return {
+            'status': 'error',
+            'message': str(e)
+        }

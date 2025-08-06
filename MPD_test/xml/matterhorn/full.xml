@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<offer file_format="IOF" version="3.0" generated="2025-08-03 14:51:21" expires="2025-08-04 14:51:21" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+<offer file_format="IOF" version="3.0" generated="2025-08-05 09:34:24" expires="2025-08-06 09:34:24" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
   <products currency="PLN" language="pol">
     <product id="5" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
@@ -411,6 +411,68 @@
       <images>
         <large>
           <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/498/498_1_Orange.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="8" currency="PLN" type="regular" vat="23.00" site="1">
+      <producer id="24" name="Self Collection"/>
+      <category id="5" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Kostium dwuczęściowy Monte Carlo 3</name>
+        <short_desc><![CDATA[Monte Carlo 3 to wyjątkowy kostium kąpielowy stworzony z myślą o kobietach ceniących połączenie elegancji, wygody i funkcjonalności.]]></short_desc>
+        <long_desc><![CDATA[Monte Carlo 3 to wyjątkowy kostium kąpielowy stworzony z myślą o kobietach ceniących połączenie elegancji, wygody i funkcjonalności. Uszyty z wysokogatunkowych materiałów, doskonale podkreślają atuty sylwetki. Model wyposażono w usztywniane miseczki z fiszbinami, zapewniające solidne podtrzymanie oraz efektowne wymodelowanie biustu. W wybranych rozmiarach (38C, 40C) zastosowano dodatkowe wkładki push-up, pozwalające subtelnie zwiększyć objętość biustu i wyeksponować kobiece kształty. Dzięki regulowanym ramiączkom oraz zapięciu z możliwością dopasowania obwodu, kostium gwarantuje indywidualne dopasowanie i komfort noszenia przez cały dzień. Monte Carlo 3 doskonale sprawdzi się zarówno na plaży, jak i przy basenie, zapewniając nie tylko stylowy wygląd, ale także pełną swobodę ruchów. To idealny wybór dla kobiet, które chcą czuć się pięknie i swobodnie w każdej wakacyjnej sytuacji.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="12" name="zielony"/>
+        </parameter>
+      </parameters>
+      <price gross="180.00" net="146.34"/>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="5" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+        <size id="213" name="40C" panel_name="40C_bielizna" iaiext:code_external="503-76">
+          <price gross="180.00" net="146.34"/>
+          <stock id="0" quantity="1"/>
+        </size>
+        <size id="214" name="40D" panel_name="40D_bielizna" iaiext:code_external="503-77">
+          <price gross="180.00" net="146.34"/>
+          <stock id="0" quantity="1"/>
+        </size>
+        <size id="220" name="44D" panel_name="44D_bielizna" iaiext:code_external="503-78">
+          <price gross="180.00" net="146.34"/>
+          <stock id="0" quantity="1"/>
+        </size>
+        <size id="221" name="46C" panel_name="46C_bielizna" iaiext:code_external="503-81">
+          <price gross="180.00" net="146.34"/>
+          <stock id="0" quantity="1"/>
+        </size>
+        <size id="227" name="46D" panel_name="46D_bielizna" iaiext:code_external="503-82">
+          <price gross="180.00" net="146.34"/>
+          <stock id="0" quantity="1"/>
+        </size>
+        <size id="245" name="44F" panel_name="44F_bielizna" iaiext:code_external="503-79">
+          <price gross="180.00" net="146.34"/>
+          <stock id="0" quantity="1"/>
+        </size>
+        <size id="250" name="46E" panel_name="46E_bielizna" iaiext:code_external="503-83">
+          <price gross="180.00" net="146.34"/>
+          <stock id="0" quantity="1"/>
+        </size>
+        <size id="253" name="44G" panel_name="44G_bielizna" iaiext:code_external="503-80">
+          <price gross="180.00" net="146.34"/>
+          <stock id="0" quantity="1"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/503/503_1_Green.jpg"/>
         </large>
       </images>
     </product>
