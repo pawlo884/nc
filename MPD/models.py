@@ -412,11 +412,9 @@ class ExportTracking(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'export_tracking'
+        db_table = 'xml_export_tracking'
         verbose_name = 'Status eksportu'
         verbose_name_plural = 'Statusy eksportu'
 
     def __str__(self):
         return f"{self.export_type} - {self.export_status}"
-    
-    

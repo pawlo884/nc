@@ -99,22 +99,23 @@ def track_recent_stock_changes():
 def generate_daily_full_xml():
     """
     Zadanie Celery do codziennego generowania pliku full.xml
+    Używa eksportu przyrostowego - tylko nowe produkty od ostatniego eksportu
     Można dodać w panelu admina jako zadanie okresowe (raz na dobę)
     """
     from .export_to_xml import FullXMLExporter
     from .views import update_all_gateways
 
     start_time = timezone.now()
-    logger.info("Rozpoczęcie zadania generate_daily_full_xml: %s",
+    logger.info("Rozpoczęcie zadania generate_daily_full_xml (przyrostowy): %s",
                 localtime(start_time))
 
     try:
-        # Generuj full.xml
+        # Generuj full.xml z eksportem przyrostowym
         exporter = FullXMLExporter()
-        result = exporter.export()
+        result = exporter.export_incremental()
 
         if result['bucket_url']:
-            logger.info("✅ Pomyślnie wygenerowano full.xml: %s",
+            logger.info("✅ Pomyślnie wygenerowano full.xml (przyrostowy): %s",
                         result['bucket_url'])
             logger.info("📁 Lokalny plik: %s", result['local_path'])
 
@@ -132,7 +133,8 @@ def generate_daily_full_xml():
                 'status': 'success',
                 'bucket_url': result['bucket_url'],
                 'local_path': result['local_path'],
-                'execution_time': str(execution_time)
+                'execution_time': str(execution_time),
+                'export_type': 'incremental'
             }
         else:
             logger.error(

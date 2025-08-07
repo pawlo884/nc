@@ -86,11 +86,27 @@ class FullXMLExporter(BaseXMLExporter):
         xml.append('      </iaiext:navigation>')
         return '\n'.join(xml)
 
-    def generate_xml(self):
+    def get_or_create_tracking(self):
+        """Pobierz lub utwórz tracking dla full.xml"""
+        from .models import ExportTracking
+        tracking, created = ExportTracking.objects.using('MPD').get_or_create(
+            export_type='full.xml',
+            defaults={
+                'last_exported_product_id': 0,
+                'last_exported_timestamp': timezone.now(),
+                'total_products_exported': 0,
+                'export_status': 'success'
+            }
+        )
+        return tracking
+
+    def generate_xml(self, incremental=True):
         from django.utils.html import escape
-        from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths
+        from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths, ExportTracking, Vat
         from datetime import datetime, timedelta
-        from .models import Vat
+        from django.utils import timezone
+        from django.db import models
+
         now = datetime.now()
         expires = now + timedelta(days=1)
         xml = []
@@ -99,10 +115,25 @@ class FullXMLExporter(BaseXMLExporter):
             now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products currency="PLN" language="pol">')
 
-        # Pobierz wszystkie warianty z iai_product_id
-        variants_with_iai = ProductVariants.objects.using('MPD').filter(
-            iai_product_id__isnull=False
-        ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+        # Pobierz tracking
+        tracking = self.get_or_create_tracking()
+        last_exported_id = tracking.last_exported_product_id or 0
+
+        # Pobierz warianty z iai_product_id, od ostatniego wyeksportowanego
+        if incremental and last_exported_id > 0:
+            # Eksport przyrostowy - tylko nowe produkty
+            variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                iai_product_id__isnull=False,
+                iai_product_id__gt=last_exported_id
+            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+            logger.info(
+                f"Eksport przyrostowy full.xml - od iai_product_id: {last_exported_id}")
+        else:
+            # Pełny eksport - wszystkie produkty
+            variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                iai_product_id__isnull=False
+            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+            logger.info("Pełny eksport full.xml - wszystkie produkty")
 
         # Grupuj warianty po iai_product_id
         grouped_variants = {}
@@ -308,7 +339,40 @@ class FullXMLExporter(BaseXMLExporter):
 
         xml.append('  </products>')
         xml.append('</offer>')
+
+        # Aktualizuj tracking po udanym eksporcie
+        if variants_with_iai.exists():
+            max_iai_id = variants_with_iai.aggregate(
+                max_id=models.Max('iai_product_id')
+            )['max_id']
+            if max_iai_id:
+                tracking.last_exported_product_id = max_iai_id
+                tracking.last_exported_timestamp = timezone.now()
+                tracking.total_products_exported += variants_with_iai.count()
+                tracking.export_status = 'success'
+                tracking.save()
+                logger.info(
+                    f"Zaktualizowano tracking - ostatni iai_product_id: {max_iai_id}")
+
         return '\n'.join(xml)
+
+    def export_incremental(self):
+        """Eksport przyrostowy - tylko nowe produkty"""
+        return self.export()
+
+    def export_full(self):
+        """Eksport pełny - wszystkie produkty"""
+        xml_content = self.generate_xml(incremental=False)
+        local_path = self.save_local(xml_content)
+        bucket_url = self.save_to_bucket(local_path)
+        if bucket_url:
+            print('✅ Pełny eksport XML zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        else:
+            print('❌ Błąd podczas pełnego eksportu XML')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        return {'bucket_url': bucket_url, 'local_path': local_path}
 
 
 class LightXMLExporter(BaseXMLExporter):

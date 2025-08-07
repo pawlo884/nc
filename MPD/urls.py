@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ProductSetViewSet, products, test_connection, test_table_structure, export_xml, export_full_xml, get_xml_file, xml_links, get_gateway_xml, generate_full_xml, generate_full_change_xml, generate_gateway_xml, empty_xml, generate_light_xml, generate_producers_xml, generate_stocks_xml, generate_units_xml
+from .views import ProductSetViewSet, products, test_connection, test_table_structure, export_xml, export_full_xml, get_xml_file, xml_links, get_gateway_xml, generate_full_xml, generate_full_change_xml, generate_gateway_xml, empty_xml, generate_light_xml, generate_producers_xml, generate_stocks_xml, generate_units_xml, reset_full_xml_export
 
 router = DefaultRouter()
 router.register(r'product-sets', ProductSetViewSet)
@@ -26,4 +26,6 @@ urlpatterns = [
     path('get-gateway-xml/', get_gateway_xml, name='get_gateway_xml'),
     path('xml-links/', xml_links, name='xml_links'),
     path('generate-units-xml/', generate_units_xml, name='generate_units_xml'),
+    path('reset-full-xml-export/', reset_full_xml_export,
+         name='reset_full_xml_export'),
 ]
