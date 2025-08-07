@@ -418,17 +418,17 @@ class GatewayXMLExporter(BaseXMLExporter):
             "preset": "preset.xml"
         }
         bucket_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/matterhorn/"
-        
+
         for element_name, file_name in elements.items():
             element = ET.SubElement(root, element_name)
             url = bucket_url + file_name
             element.set("url", url)
-            
+
             # Najpierw sprawdź lokalny plik
             local_path = os.path.join('MPD_test/xml/matterhorn/', file_name)
             hash_value = ""
             changed_value = ""
-            
+
             if os.path.exists(local_path):
                 try:
                     # Oblicz hash z lokalnego pliku
@@ -436,15 +436,16 @@ class GatewayXMLExporter(BaseXMLExporter):
                     with open(local_path, 'rb') as f:
                         file_content = f.read()
                         hash_value = hashlib.md5(file_content).hexdigest()
-                    
+
                     # Pobierz datę modyfikacji z systemu plików
                     import time
                     mtime = os.path.getmtime(local_path)
                     changed_dt = datetime.fromtimestamp(mtime)
                     changed_value = changed_dt.strftime('%Y-%m-%d %H:%M:%S')
-                    
+
                 except Exception as e:
-                    logger.warning(f"Błąd podczas obliczania hash/changed dla {file_name}: {str(e)}")
+                    logger.warning(
+                        f"Błąd podczas obliczania hash/changed dla {file_name}: {str(e)}")
                     hash_value = ""
                     changed_value = ""
             else:
@@ -454,7 +455,7 @@ class GatewayXMLExporter(BaseXMLExporter):
                     if response.status_code == 200:
                         import hashlib
                         hash_value = hashlib.md5(response.content).hexdigest()
-                        
+
                         # Spróbuj pobrać datę z nagłówków
                         last_modified = response.headers.get('Last-Modified')
                         if last_modified:
@@ -462,18 +463,21 @@ class GatewayXMLExporter(BaseXMLExporter):
                                 # Różne formaty dat w nagłówkach HTTP
                                 for fmt in ['%a, %d %b %Y %H:%M:%S %Z', '%a, %d %b %Y %H:%M:%S GMT']:
                                     try:
-                                        changed_dt = datetime.strptime(last_modified, fmt)
-                                        changed_value = changed_dt.strftime('%Y-%m-%d %H:%M:%S')
+                                        changed_dt = datetime.strptime(
+                                            last_modified, fmt)
+                                        changed_value = changed_dt.strftime(
+                                            '%Y-%m-%d %H:%M:%S')
                                         break
                                     except ValueError:
                                         continue
                             except Exception:
                                 changed_value = ""
                 except Exception as e:
-                    logger.warning(f"Błąd podczas pobierania zdalnego pliku {file_name}: {str(e)}")
+                    logger.warning(
+                        f"Błąd podczas pobierania zdalnego pliku {file_name}: {str(e)}")
                     hash_value = ""
                     changed_value = ""
-            
+
             element.set("hash", hash_value)
             element.set("changed", changed_value)
 

@@ -267,10 +267,10 @@ def update_all_gateways():
 def generate_full_xml(request):
     exporter = FullXMLExporter()
     exporter_result = exporter.export()
-    
+
     # Automatycznie zaktualizuj wszystkie gateway.xml
     update_all_gateways()
-    
+
     with open(exporter_result['local_path'], 'rb') as f:
         content = f.read()
     return HttpResponse(content, content_type='application/xml')
@@ -280,10 +280,10 @@ def generate_full_xml(request):
 def generate_full_change_xml(request):
     exporter = FullChangeXMLExporter()
     exporter_result = exporter.export()
-    
+
     # Automatycznie zaktualizuj wszystkie gateway.xml
     update_all_gateways()
-    
+
     with open(exporter_result['local_path'], 'rb') as f:
         content = f.read()
     return HttpResponse(content, content_type='application/xml')
@@ -307,10 +307,10 @@ def generate_gateway_xml(request, source_name):
 def generate_light_xml(request):
     exporter = LightXMLExporter()
     exporter_result = exporter.export()
-    
+
     # Automatycznie zaktualizuj wszystkie gateway.xml
     update_all_gateways()
-    
+
     with open(exporter_result['local_path'], 'rb') as f:
         content = f.read()
     return HttpResponse(content, content_type='application/xml')
@@ -320,10 +320,10 @@ def generate_light_xml(request):
 def generate_producers_xml(request):
     exporter = ProducersXMLExporter()
     exporter_result = exporter.export()
-    
+
     # Automatycznie zaktualizuj wszystkie gateway.xml
     update_all_gateways()
-    
+
     with open(exporter_result['local_path'], 'rb') as f:
         content = f.read()
     return HttpResponse(content, content_type='application/xml')
@@ -333,10 +333,10 @@ def generate_producers_xml(request):
 def generate_stocks_xml(request):
     exporter = StocksXMLExporter()
     exporter_result = exporter.export()
-    
+
     # Automatycznie zaktualizuj wszystkie gateway.xml
     update_all_gateways()
-    
+
     with open(exporter_result['local_path'], 'rb') as f:
         content = f.read()
     return HttpResponse(content, content_type='application/xml')
@@ -346,10 +346,10 @@ def generate_stocks_xml(request):
 def generate_units_xml(request):
     exporter = UnitsXMLExporter()
     exporter_result = exporter.export()
-    
+
     # Automatycznie zaktualizuj wszystkie gateway.xml
     update_all_gateways()
-    
+
     with open(exporter_result['local_path'], 'rb') as f:
         content = f.read()
     return HttpResponse(content, content_type='application/xml')
