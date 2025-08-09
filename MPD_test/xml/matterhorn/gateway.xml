@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-05 12:03:00">
+<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-10 00:52:04">
   <meta>
     <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
     <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
@@ -14,13 +14,13 @@
       <country>&lt;![CDATA[Poland]]&gt;</country>
     </address>
     <time>
-      <offer created="2025-08-05 12:03:00"/>
-      <offer expires="2025-08-12 12:03:00"/>
+      <offer created="2025-08-10 00:52:04"/>
+      <offer expires="2025-08-17 00:52:04"/>
     </time>
   </meta>
-  <full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full.xml" hash="eb06455e427ce6281096bc4dc806f7cb" changed="2025-08-05 09:31:26"/>
-  <full_change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change.xml" hash="97061e72b93fb7e96847e0dcec0df6a3" changed="2025-07-31 12:24:07"/>
-  <light url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/lightoferta.xml" hash="d31d958ad7ec82b23495f92cdfdf8c68" changed="2025-08-02 20:20:41"/>
+  <full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full.xml" hash="863c633cebc5211254879f6ffaa003d1" changed="2025-08-10 00:36:14"/>
+  <full_change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change.xml" hash="d3b6605f07de2576b513500fbbd57dcc" changed="2025-08-10 00:41:35"/>
+  <light url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/light.xml" hash="b932930140166594b93bd7c117347e45" changed="2025-08-10 00:48:55"/>
   <categories url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/categories.xml" hash="" changed=""/>
   <sizes url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/sizes.xml" hash="" changed=""/>
   <producers url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/producers.xml" hash="737ffaf7012e108c14fccda6f6d60164" changed="2025-07-10 11:36:57"/>

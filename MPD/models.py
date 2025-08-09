@@ -193,10 +193,9 @@ class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id', related_name='images')
-    # variant = models.ForeignKey(ProductVariants, on_delete=models.CASCADE,
-    #                             db_column='variant_id', null=True, blank=True, to_field='variant_id')
     iai_product_id = models.IntegerField(blank=True, null=True)
     file_path = models.CharField(max_length=500)
+    updated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False

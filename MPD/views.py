@@ -287,7 +287,7 @@ def reset_full_xml_export(request):
     try:
         # Reset tracking dla full.xml
         tracking, created = ExportTracking.objects.using('MPD').get_or_create(
-            export_type='full',
+            export_type='full.xml',
             defaults={
                 'last_exported_product_id': 0,
                 'last_exported_timestamp': timezone.now(),
