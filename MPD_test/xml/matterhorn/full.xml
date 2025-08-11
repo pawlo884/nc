@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<offer file_format="IOF" version="3.0" generated="2025-08-10 00:39:01" expires="2025-08-11 00:39:01" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+<offer file_format="IOF" version="3.0" generated="2025-08-11 09:41:47" expires="2025-08-12 09:41:47" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
   <products currency="PLN" language="pol">
     <product id="4" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
@@ -26,7 +26,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="148" name="75B" panel_name="75B_bielizna" iaiext:code_external="499-28" code_producer="5905220675241">
           <price gross="182.00" net="147.97"/>
           <stock id="0" quantity="5"/>
@@ -104,7 +104,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="140" name="70H" panel_name="70H_bielizna" iaiext:code_external="500-35" code_producer="5905220666140">
           <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="5"/>
@@ -262,7 +262,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="88" name="65E" panel_name="65E_bielizna" iaiext:code_external="497-1" code_producer="5905220672370">
           <price gross="177.00" net="143.90"/>
           <stock id="0" quantity="5"/>
@@ -348,7 +348,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="231" name="S" panel_name="S_bielizna" iaiext:code_external="498-19" code_producer="5900748230552">
           <price gross="133.00" net="108.13"/>
           <stock id="0" quantity="10"/>
@@ -401,7 +401,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="232" name="L" panel_name="L_bielizna" iaiext:code_external="498-18" code_producer="5900748230521">
           <price gross="133.00" net="108.13"/>
           <stock id="0" quantity="9"/>
@@ -454,7 +454,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="239" name="44" panel_name="44_bielizna" iaiext:code_external="501-66" code_producer="5905220660377">
           <price gross="144.00" net="117.07"/>
           <stock id="0" quantity="5"/>
@@ -508,7 +508,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="235" name="36" panel_name="36_bielizna" iaiext:code_external="502-71" code_producer="5905220673889">
           <price gross="129.00" net="104.88"/>
           <stock id="0" quantity="5"/>
@@ -562,7 +562,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="213" name="40C" panel_name="40C_bielizna" iaiext:code_external="503-76">
           <price gross="180.00" net="146.34"/>
           <stock id="0" quantity="1"/>
@@ -627,7 +627,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="94" name="65K" panel_name="65K_bielizna" iaiext:code_external="504-84" code_producer="5905220675715">
           <price gross="201.00" net="163.41"/>
           <stock id="0" quantity="5"/>
@@ -785,7 +785,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="235" name="36" panel_name="36_bielizna" iaiext:code_external="505-115" code_producer="5905220660605">
           <price gross="131.00" net="106.50"/>
           <stock id="0" quantity="5"/>
@@ -830,7 +830,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="235" name="36" panel_name="36_bielizna" iaiext:code_external="506-118" code_producer="5905220681327">
           <price />
           <stock id="0" quantity="5"/>
@@ -855,13 +855,13 @@
         </large>
       </images>
     </product>
-    <product id="12" currency="" type="regular" vat="" site="1">
+    <product id="12" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="20" name="Lupo Line"/>
       <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
       <unit id="0" name="szt."/>
       <description>
         <name>Figi kąpielowe Coral</name>
-        <short_desc><![CDATA[Figi 2 Coral to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania. ]]></short_desc>
+        <short_desc><![CDATA[Figi 2 Coral to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania.]]></short_desc>
         <long_desc><![CDATA[Figi 2 Coral to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania. Klasyczny krój optycznie wydłuża nogi, podkreśla kobiece kształty i idealnie dopasowuje się do sylwetki. To propozycja dla kobiet, które cenią najwyższą jakość materiałów, komfort użytkowania oraz stylową elegancję w minimalistycznym wydaniu.]]></long_desc>
       </description>
       <parameters>
@@ -869,8 +869,9 @@
           <value id="11" name="wielokolorowy"/>
         </parameter>
       </parameters>
+      <price gross="140.00" net="113.82"/>
       <iaiext:visibility>
-        <iaiext:site visible="no"/>
+        <iaiext:site visible="yes"/>
       </iaiext:visibility>
       <iaiext:navigation>
         <iaiext:site id="1">
@@ -879,21 +880,21 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="235" name="36" panel_name="36_bielizna" iaiext:code_external="507-122" code_producer="5905220656608">
-          <price />
+          <price gross="140.00" net="113.82"/>
           <stock id="0" quantity="5"/>
         </size>
         <size id="236" name="38" panel_name="38_bielizna" iaiext:code_external="507-123" code_producer="5905220656615">
-          <price />
+          <price gross="140.00" net="113.82"/>
           <stock id="0" quantity="5"/>
         </size>
         <size id="240" name="40" panel_name="40_bielizna" iaiext:code_external="507-124" code_producer="5905220656622">
-          <price />
+          <price gross="140.00" net="113.82"/>
           <stock id="0" quantity="5"/>
         </size>
         <size id="241" name="42" panel_name="42_bielizna" iaiext:code_external="507-125" code_producer="5905220656639">
-          <price />
+          <price gross="140.00" net="113.82"/>
           <stock id="0" quantity="5"/>
         </size>
       </sizes>
@@ -901,66 +902,6 @@
         <large>
           <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/507/507_1_Multicolor.jpg"/>
           <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/507/507_2_Multicolor.jpg"/>
-        </large>
-      </images>
-    </product>
-    <product id="13" currency="" type="regular" vat="" site="1">
-      <producer id="20" name="Lupo Line"/>
-      <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
-      <unit id="0" name="szt."/>
-      <description>
-        <name>Figi kąpielowe Sofia Big</name>
-        <short_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z wyższym ozdobnym pasem to doskonałe połączenie stylu i komfortu.]]></short_desc>
-        <long_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z wyższym ozdobnym pasem to doskonałe połączenie stylu i komfortu. Pas w pomarańczowy kolorze, w panterkę nie tylko zdobi, ale także maskuje ewentualne mankamenty figury, optycznie modelując sylwetkę. Figi mają wyższy stan, co zapewnia komfort noszenia i dodatkowe podparcie dla brzucha, a pełny tył gwarantuje elegancję i dyskrecję.]]></long_desc>
-      </description>
-      <parameters>
-        <parameter type="parameter" id="26" name="Kolor">
-          <value id="10" name="czarny"/>
-        </parameter>
-      </parameters>
-      <iaiext:visibility>
-        <iaiext:site visible="no"/>
-      </iaiext:visibility>
-      <iaiext:navigation>
-        <iaiext:site id="1">
-          <iaiext:menu id="1">
-            <iaiext:item id="6" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
-          </iaiext:menu>
-        </iaiext:site>
-      </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
-        <size id="235" name="36" panel_name="36_bielizna" iaiext:code_external="508-126" code_producer="5905220652495">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="236" name="38" panel_name="38_bielizna" iaiext:code_external="508-127" code_producer="5905220652501">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="240" name="40" panel_name="40_bielizna" iaiext:code_external="508-128" code_producer="5905220652518">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="241" name="42" panel_name="42_bielizna" iaiext:code_external="508-129" code_producer="5905220652525">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="239" name="44" panel_name="44_bielizna" iaiext:code_external="508-130" code_producer="5905220652532">
-          <price />
-          <stock id="0" quantity="0"/>
-        </size>
-        <size id="242" name="46" panel_name="46_bielizna" iaiext:code_external="508-131" code_producer="5905220652549">
-          <price />
-          <stock id="0" quantity="0"/>
-        </size>
-        <size id="238" name="48" panel_name="48_bielizna" iaiext:code_external="508-132" code_producer="5905220652556">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-      </sizes>
-      <images>
-        <large>
-          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/508/508_1_Black.jpg"/>
         </large>
       </images>
     </product>
@@ -989,7 +930,7 @@
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="170" name="80J" panel_name="80J_bielizna" iaiext:code_external="509-133" code_producer="5905220656103">
           <price gross="202.00" net="164.23"/>
           <stock id="0" quantity="5"/>
@@ -1127,67 +1068,6 @@
         <large>
           <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/509/509_1_Multicolor.jpg"/>
           <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/509/509_2_Multicolor.jpg"/>
-        </large>
-      </images>
-    </product>
-    <product id="15" currency="" type="regular" vat="" site="1">
-      <producer id="20" name="Lupo Line"/>
-      <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
-      <unit id="0" name="szt."/>
-      <description>
-        <name>Figi kąpielowy Sofia Big</name>
-        <short_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z ozdobnym pasem  to doskonałe połączenie stylu i komfortu.]]></short_desc>
-        <long_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z ozdobnym pasem  to doskonałe połączenie stylu i komfortu. Pas w pomarańczowy kolorze, w  panterkę nie tylko zdobi, ale także maskuje ewentualne mankamenty  figury, optycznie modelując sylwetkę. Figi mają wyższy stan, co zapewnia  komfort noszenia i dodatkowe podparcie dla brzucha, a pełny tył  gwarantuje elegancję i dyskrecję.]]></long_desc>
-      </description>
-      <parameters>
-        <parameter type="parameter" id="26" name="Kolor">
-          <value id="10" name="czarny"/>
-        </parameter>
-      </parameters>
-      <iaiext:visibility>
-        <iaiext:site visible="no"/>
-      </iaiext:visibility>
-      <iaiext:navigation>
-        <iaiext:site id="1">
-          <iaiext:menu id="1">
-            <iaiext:item id="6" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
-          </iaiext:menu>
-        </iaiext:site>
-      </iaiext:navigation>
-      <sizes iaiext:group_name="bielizna" iaiext:group_id="1" iaiext:sizeList="full">
-        <size id="235" name="36" panel_name="36_bielizna" iaiext:code_external="510-166" code_producer="5905220652426">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="236" name="38" panel_name="38_bielizna" iaiext:code_external="510-167" code_producer="5905220652433">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="240" name="40" panel_name="40_bielizna" iaiext:code_external="510-168" code_producer="5905220652440">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="241" name="42" panel_name="42_bielizna" iaiext:code_external="510-169" code_producer="5905220652457">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="239" name="44" panel_name="44_bielizna" iaiext:code_external="510-170" code_producer="5905220652464">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="242" name="46" panel_name="46_bielizna" iaiext:code_external="510-171" code_producer="5905220652471">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="238" name="48" panel_name="48_bielizna" iaiext:code_external="510-172" code_producer="5905220652488">
-          <price />
-          <stock id="0" quantity="5"/>
-        </size>
-      </sizes>
-      <images>
-        <large>
-          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/510/510_1_Black.jpg"/>
-          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/510/510_2_Black.jpg"/>
         </large>
       </images>
     </product>

@@ -275,7 +275,7 @@ class FullXMLExporter(BaseXMLExporter):
 
             if variants:
                 xml.append(
-                    f'      <sizes iaiext:group_name="{group_name}" iaiext:group_id="1" iaiext:sizeList="full">')
+                    f'      <sizes iaiext:group_name="{group_name}" iaiext:group_id="1098261181" iaiext:sizeList="full">')
                 for variant in variants:
                     size_name = variant.size.name if variant.size else ""
                     # panel_name: size_name + '_' + group_name
