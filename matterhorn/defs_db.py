@@ -148,6 +148,22 @@ def create_tables_if_not_exist(conn):
         )
     '''
 
+    # Create stock history table if it doesn't exist
+    create_stock_history_table_query = '''
+        CREATE TABLE IF NOT EXISTS stock_history (
+            id SERIAL PRIMARY KEY,
+            variant_uid INTEGER NOT NULL,
+            product_id INTEGER NOT NULL,
+            product_name VARCHAR(255),
+            variant_name VARCHAR(50),
+            old_stock INTEGER,
+            new_stock INTEGER,
+            stock_change INTEGER,
+            change_type VARCHAR(20),
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT (NOW() AT TIME ZONE 'Europe/Warsaw')
+        )
+    '''
+
     # Execute the table creation queries
     cursor.execute(create_products_table_query)
     cursor.execute(create_images_table_query)
@@ -155,6 +171,15 @@ def create_tables_if_not_exist(conn):
     cursor.execute(create_other_colors_table_query)
     cursor.execute(create_product_in_set_table_query)
     cursor.execute(create_update_log_table_query)
+    cursor.execute(create_stock_history_table_query)
+
+    # Dodanie indeksów do tabeli stock_history
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_stock_history_variant_uid ON stock_history(variant_uid);
+        CREATE INDEX IF NOT EXISTS idx_stock_history_product_id ON stock_history(product_id);
+        CREATE INDEX IF NOT EXISTS idx_stock_history_timestamp ON stock_history(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_stock_history_change_type ON stock_history(change_type);
+    """)
 
     # Dodanie ograniczenia UNIQUE do tabeli product_in_set jeśli nie istnieje
     cursor.execute("""

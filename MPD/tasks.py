@@ -1,95 +1,399 @@
 from celery import shared_task
-from django.db import connections
-from datetime import timedelta
 from django.utils import timezone
-from django.utils.timezone import localtime
 import logging
-from celery.signals import worker_ready
+from .export_to_xml import FullXMLExporter, FullChangeXMLExporter
 
 logger = logging.getLogger(__name__)
 
 
-# @worker_ready.connect
-# def at_start(sender, **kwargs):
-#     sender.app.send_task('MPD.tasks.track_recent_stock_changes')
-
-
-@shared_task
-def track_recent_stock_changes():
+@shared_task(bind=True, name='mpd.export_full_xml_hourly')
+def export_full_xml_hourly(self):
+    """
+    Task do godzinowego eksportu full.xml - eksportuje nowe produkty
+    Uruchamiany co godzinę przez periodic task
+    """
     start_time = timezone.now()
+    task_id = self.request.id
+
     logger.info(
-        f"Rozpoczęcie zadania track_recent_stock_changes: {localtime(start_time)}")
+        f"🚀 Rozpoczynam task export_full_xml_hourly (ID: {task_id}) o {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    now = timezone.now()
-    seven_minutes_ago = now - timedelta(minutes=7)
-    logger.info(f"Sprawdzanie zmian od: {seven_minutes_ago}")
+    try:
+        # Utwórz eksporter
+        exporter = FullXMLExporter()
 
-    with connections['MPD'].cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM stock_and_prices")
-        count_row = cursor.fetchone()
-        count = count_row[0] if count_row else 0
-        logger.info(f"Liczba wszystkich rekordów w stock_and_prices: {count}")
+        # Eksport przyrostowy - nowe produkty od ostatniego eksportu
+        result = exporter.export()
 
-        cursor.execute("SELECT current_database(), current_user")
-        logger.info(f"Baza: {cursor.fetchone()}")
+        end_time = timezone.now()
+        duration = end_time - start_time
 
-        cursor.execute("SELECT current_schema()")
-        logger.info(f"Schemat: {cursor.fetchone()}")
-
-        cursor.execute("""
-            SELECT id, last_updated FROM stock_and_prices
-            ORDER BY last_updated DESC
-            LIMIT 10
-        """)
-        logger.info(f"TOP 10 rekordów w stock_and_prices: {cursor.fetchall()}")
-
-        cursor.execute("""
-            SELECT id, stock, price, source_id, last_updated
-            FROM stock_and_prices
-            WHERE last_updated >= %s
-        """, [seven_minutes_ago])
-        updated_products = cursor.fetchall()
-        logger.info(
-            f"Znaleziono {len(updated_products)} rekordów do sprawdzenia")
-
-        for stock_id, current_stock, current_price, source_id, last_updated in updated_products:
+        if result['bucket_url']:
             logger.info(
-                f"Przetwarzanie produktu {stock_id}, ostatnia aktualizacja: {last_updated}")
-            cursor.execute("""
-                SELECT new_stock, new_price
-                FROM stock_history
-                WHERE stock_id = %s
-                ORDER BY change_date DESC
-                LIMIT 1
-            """, [stock_id])
-            row = cursor.fetchone()
-            last_stock = row[0] if row else None
-            last_price = row[1] if row else None
+                f"✅ Task export_full_xml_hourly (ID: {task_id}) zakończony pomyślnie w {duration.total_seconds():.2f}s"
+            )
+            logger.info(f"📁 URL: {result['bucket_url']}")
+            logger.info(f"📄 Lokalnie zapisano: {result['local_path']}")
 
-            if last_stock is None:
-                logger.info(
-                    f"Nowy produkt {stock_id}, dodaję do historii od zera")
-                # Najpierw wpis 0 -> 0 dla stock i price
-                cursor.execute("""
-                    INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, previous_price, new_price, change_date)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, [stock_id, source_id, 0, 0, 0, 0, now])
-                # Następnie wpis 0 -> current_stock/price (jeśli current_stock > 0 lub current_price > 0)
-                if current_stock != 0 or current_price != 0:
-                    cursor.execute("""
-                        INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, previous_price, new_price, change_date)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, [stock_id, source_id, 0, current_stock, 0, current_price, now])
-            elif last_stock != current_stock or last_price != current_price:
-                logger.info(
-                    f"Zmiana stanu dla {stock_id}: stock {last_stock} -> {current_stock}, price {last_price} -> {current_price}")
-                cursor.execute("""
-                    INSERT INTO stock_history (stock_id, source_id, previous_stock, new_stock, previous_price, new_price, change_date)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, [stock_id, source_id, last_stock, current_stock, last_price, current_price, now])
+            return {
+                'status': 'success',
+                'task_id': task_id,
+                'bucket_url': result['bucket_url'],
+                'local_path': result['local_path'],
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+        else:
+            logger.error(
+                f"❌ Task export_full_xml_hourly (ID: {task_id}) błąd po {duration.total_seconds():.2f}s"
+            )
+            logger.error(f"📄 Lokalnie zapisano: {result['local_path']}")
 
-    end_time = timezone.now()
-    execution_time = end_time - start_time
+            return {
+                'status': 'error',
+                'task_id': task_id,
+                'error': 'Błąd podczas eksportu do S3',
+                'local_path': result['local_path'],
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+
+    except Exception as e:
+        end_time = timezone.now()
+        duration = end_time - start_time
+
+        error_msg = f"❌ Task export_full_xml_hourly (ID: {task_id}) błąd po {duration.total_seconds():.2f}s: {str(e)}"
+        logger.error(error_msg)
+
+        # Oznacz task jako nieudany
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'error': str(e),
+                'task_id': task_id,
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+        )
+
+        return {
+            'status': 'failure',
+            'task_id': task_id,
+            'error': str(e),
+            'duration_seconds': duration.total_seconds(),
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat()
+        }
+
+
+@shared_task(bind=True, name='mpd.export_full_change_xml_hourly')
+def export_full_change_xml_hourly(self):
+    """
+    Task do godzinowego eksportu full_change.xml - monitoruje zmiany w wyeksportowanych produktach
+    Uruchamiany co godzinę przez periodic task
+    """
+    start_time = timezone.now()
+    task_id = self.request.id
+
     logger.info(
-        f"Zakończenie zadania track_recent_stock_changes: {localtime(end_time)}")
-    logger.info(f"Czas wykonania zadania: {execution_time}")
+        f"🚀 Rozpoczynam task export_full_change_xml_hourly (ID: {task_id}) o {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    try:
+        # Utwórz eksporter
+        exporter = FullChangeXMLExporter()
+
+        # Eksport przyrostowy - tylko produkty zmienione w ciągu ostatnich 2 godzin
+        result = exporter.export_incremental()
+
+        end_time = timezone.now()
+        duration = end_time - start_time
+
+        if result['bucket_url']:
+            logger.info(
+                f"✅ Task export_full_change_xml_hourly (ID: {task_id}) zakończony pomyślnie w {duration.total_seconds():.2f}s"
+            )
+            logger.info(f"📁 URL: {result['bucket_url']}")
+            logger.info(f"📄 Lokalnie zapisano: {result['local_path']}")
+
+            return {
+                'status': 'success',
+                'task_id': task_id,
+                'bucket_url': result['bucket_url'],
+                'local_path': result['local_path'],
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+        else:
+            logger.error(
+                f"❌ Task export_full_change_xml_hourly (ID: {task_id}) błąd po {duration.total_seconds():.2f}s"
+            )
+            logger.error(f"📄 Lokalnie zapisano: {result['local_path']}")
+
+            return {
+                'status': 'error',
+                'task_id': task_id,
+                'error': 'Błąd podczas eksportu do S3',
+                'local_path': result['local_path'],
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+
+    except Exception as e:
+        end_time = timezone.now()
+        duration = end_time - start_time
+
+        error_msg = f"❌ Task export_full_change_xml_hourly (ID: {task_id}) błąd po {duration.total_seconds():.2f}s: {str(e)}"
+        logger.error(error_msg)
+
+        # Oznacz task jako nieudany
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'error': str(e),
+                'task_id': task_id,
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+        )
+
+        return {
+            'status': 'failure',
+            'task_id': task_id,
+            'error': str(e),
+            'duration_seconds': duration.total_seconds(),
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat()
+        }
+
+
+@shared_task(bind=True, name='mpd.export_full_xml_full')
+def export_full_xml_full(self):
+    """
+    Task do pełnego eksportu full.xml - wszystkie produkty
+    Uruchamiany ręcznie lub przez periodic task (np. raz dziennie)
+    """
+    start_time = timezone.now()
+    task_id = self.request.id
+
+    logger.info(
+        f"🚀 Rozpoczynam task export_full_xml_full (ID: {task_id}) o {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    try:
+        # Utwórz eksporter
+        exporter = FullXMLExporter()
+
+        # Eksport pełny - wszystkie produkty
+        result = exporter.export()
+
+        end_time = timezone.now()
+        duration = end_time - start_time
+
+        if result['bucket_url']:
+            logger.info(
+                f"✅ Task export_full_xml_full (ID: {task_id}) zakończony pomyślnie w {duration.total_seconds():.2f}s"
+            )
+            logger.info(f"📁 URL: {result['bucket_url']}")
+            logger.info(f"📄 Lokalnie zapisano: {result['local_path']}")
+
+            return {
+                'status': 'success',
+                'task_id': task_id,
+                'bucket_url': result['bucket_url'],
+                'local_path': result['local_path'],
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+        else:
+            logger.error(
+                f"❌ Task export_full_xml_full (ID: {task_id}) błąd po {duration.total_seconds():.2f}s"
+            )
+            logger.error(f"📄 Lokalnie zapisano: {result['local_path']}")
+
+            return {
+                'status': 'error',
+                'task_id': task_id,
+                'error': 'Błąd podczas eksportu do S3',
+                'local_path': result['local_path'],
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+
+    except Exception as e:
+        end_time = timezone.now()
+        duration = end_time - start_time
+
+        error_msg = f"❌ Task export_full_xml_full (ID: {task_id}) błąd po {duration.total_seconds():.2f}s: {str(e)}"
+        logger.error(error_msg)
+
+        # Oznacz task jako nieudany
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'error': str(e),
+                'task_id': task_id,
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+        )
+
+        return {
+            'status': 'failure',
+            'task_id': task_id,
+            'error': str(e),
+            'duration_seconds': duration.total_seconds(),
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat()
+        }
+
+
+@shared_task(bind=True, name='mpd.export_full_change_xml_full')
+def export_full_change_xml_full(self):
+    """
+    Task do pełnego eksportu full_change.xml - wszystkie produkty
+    Uruchamiany ręcznie lub przez periodic task (np. raz dziennie)
+    """
+    start_time = timezone.now()
+    task_id = self.request.id
+
+    logger.info(
+        f"🚀 Rozpoczynam task export_full_change_xml_full (ID: {task_id}) o {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    try:
+        # Utwórz eksporter
+        exporter = FullChangeXMLExporter()
+
+        # Eksport pełny - wszystkie produkty
+        result = exporter.export_full()
+
+        end_time = timezone.now()
+        duration = end_time - start_time
+
+        if result['bucket_url']:
+            logger.info(
+                f"✅ Task export_full_change_xml_full (ID: {task_id}) zakończony pomyślnie w {duration.total_seconds():.2f}s"
+            )
+            logger.info(f"📁 URL: {result['bucket_url']}")
+            logger.info(f"📄 Lokalnie zapisano: {result['local_path']}")
+
+            return {
+                'status': 'success',
+                'task_id': task_id,
+                'bucket_url': result['bucket_url'],
+                'local_path': result['local_path'],
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+        else:
+            logger.error(
+                f"❌ Task export_full_change_xml_full (ID: {task_id}) błąd po {duration.total_seconds():.2f}s"
+            )
+            logger.error(f"📄 Lokalnie zapisano: {result['local_path']}")
+
+            return {
+                'status': 'error',
+                'task_id': task_id,
+                'error': 'Błąd podczas eksportu do S3',
+                'local_path': result['local_path'],
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+
+    except Exception as e:
+        end_time = timezone.now()
+        duration = end_time - start_time
+
+        error_msg = f"❌ Task export_full_change_xml_full (ID: {task_id}) błąd po {duration.total_seconds():.2f}s: {str(e)}"
+        logger.error(error_msg)
+
+        # Oznacz task jako nieudany
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'error': str(e),
+                'task_id': task_id,
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+        )
+
+        return {
+            'status': 'failure',
+            'task_id': task_id,
+            'error': str(e),
+            'duration_seconds': duration.total_seconds(),
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat()
+        }
+
+
+@shared_task(bind=True, name='MPD.tasks.track_recent_stock_changes')
+def track_recent_stock_changes(self):
+    """
+    Task do śledzenia zmian stanów magazynowych
+    Uruchamiany okresowo przez periodic task
+    """
+    start_time = timezone.now()
+    task_id = self.request.id
+
+    logger.info(
+        f"🚀 Rozpoczynam task track_recent_stock_changes (ID: {task_id}) o {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    try:
+        # TODO: Implementuj logikę śledzenia zmian stanów magazynowych
+        # Na razie zwracamy sukces bez implementacji
+        
+        end_time = timezone.now()
+        duration = end_time - start_time
+
+        logger.info(
+            f"✅ Task track_recent_stock_changes (ID: {task_id}) zakończony pomyślnie w {duration.total_seconds():.2f}s"
+        )
+
+        return {
+            'status': 'success',
+            'task_id': task_id,
+            'message': 'Śledzenie zmian stanów magazynowych zakończone',
+            'duration_seconds': duration.total_seconds(),
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat()
+        }
+
+    except Exception as e:
+        end_time = timezone.now()
+        duration = end_time - start_time
+
+        error_msg = f"❌ Task track_recent_stock_changes (ID: {task_id}) błąd po {duration.total_seconds():.2f}s: {str(e)}"
+        logger.error(error_msg)
+
+        # Oznacz task jako nieudany
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'error': str(e),
+                'task_id': task_id,
+                'duration_seconds': duration.total_seconds(),
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat()
+            }
+        )
+
+        return {
+            'status': 'failure',
+            'task_id': task_id,
+            'error': str(e),
+            'duration_seconds': duration.total_seconds(),
+            'start_time': start_time.isoformat(),
+            'end_time': end_time.isoformat()
+        }

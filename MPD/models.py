@@ -1,7 +1,6 @@
 from django.db import models
-from django.contrib.auth.models import User
-from django.utils import timezone
 from decimal import Decimal
+from django.contrib import admin
 
 
 # Create your models here.
@@ -12,6 +11,7 @@ class Brands(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     logo_url = models.TextField(blank=True, null=True)
     opis = models.TextField(blank=True, null=True)
+    url = models.URLField(max_length=255, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -51,11 +51,14 @@ class Products(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    short_description = models.CharField(max_length=500, blank=True, null=True)
     brand = models.ForeignKey(
         Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id')
     updated_at = models.DateTimeField(blank=True, null=True)
     series = models.ForeignKey('ProductSeries', db_column='series_id',
                                on_delete=models.DO_NOTHING, blank=True, null=True)
+    unit = models.ForeignKey(
+        'Units', on_delete=models.CASCADE, db_column='unit', to_field='unit_id', null=True, blank=True)
     objects = models.Manager()
 
     class Meta:
@@ -78,6 +81,7 @@ class Sizes(models.Model):
     category = models.CharField(max_length=255, blank=True, null=True)
     unit = models.CharField(max_length=255, blank=True, null=True)
     name_lower = models.CharField(max_length=255, blank=True, null=True)
+    iai_size_id = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -95,9 +99,21 @@ class Sources(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     location = models.CharField(max_length=255, blank=True, null=True)
     type = models.CharField(max_length=255, blank=True, null=True)
+    long_name = models.CharField(max_length=255, blank=True, null=True)
+    short_name = models.CharField(max_length=100, blank=True, null=True)
+    showcase_image = models.URLField(max_length=500, blank=True, null=True)
+    email = models.EmailField(max_length=255, blank=True, null=True)
+    tel = models.CharField(max_length=50, blank=True, null=True)
+    fax = models.CharField(max_length=50, blank=True, null=True)
+    www = models.URLField(max_length=255, blank=True, null=True)
+    street = models.CharField(max_length=255, blank=True, null=True)
+    zipcode = models.CharField(max_length=20, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    country = models.CharField(max_length=100, blank=True, null=True)
+    province = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'sources'
         app_label = 'MPD'
         verbose_name = 'Source'
@@ -105,27 +121,24 @@ class Sources(models.Model):
 
 
 class ProductVariants(models.Model):
-    id = models.BigAutoField(primary_key=True)
+    variant_id = models.IntegerField(db_column='variant_id', primary_key=True)
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id')
-    variant_id = models.IntegerField()
-    source = models.ForeignKey(
-        Sources, on_delete=models.RESTRICT, db_column='source_id', null=True, blank=True)
     color = models.ForeignKey(
         Colors, on_delete=models.CASCADE, db_column='color_id', null=True, blank=True)
     producer_color = models.ForeignKey(
         Colors, on_delete=models.CASCADE, db_column='producer_color_id', null=True, blank=True, related_name='producer_variants')
     size = models.ForeignKey(
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
-    ean = models.CharField(max_length=50, blank=True, null=True)
-    variant_uid = models.IntegerField(blank=True, null=True)
+    producer_code = models.CharField(max_length=255, blank=True, null=True)
+    iai_product_id = models.IntegerField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
     objects = models.Manager()
 
     class Meta:
         managed = False
         db_table = 'product_variants'
         app_label = 'MPD'
-        unique_together = ('variant_id', 'source')
         verbose_name = 'Product Variant'
         verbose_name_plural = 'Product Variants'
 
@@ -133,12 +146,56 @@ class ProductVariants(models.Model):
         return f"{self.product.name} - {self.color.name if self.color else 'Brak koloru'} - {self.size.name if self.size else 'Brak rozmiaru'}"
 
 
+class ProductvariantsSources(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    variant = models.ForeignKey(
+        ProductVariants, on_delete=models.CASCADE, db_column='variant_id', to_field='variant_id')
+    source = models.ForeignKey(
+        Sources, on_delete=models.RESTRICT, db_column='source_id', null=True, blank=True)
+    ean = models.CharField(max_length=50, blank=True, null=True)
+    variant_uid = models.IntegerField(blank=True, null=True)
+    gtin14 = models.CharField(max_length=50, blank=True, null=True)
+    gtin13 = models.CharField(max_length=50, blank=True, null=True)
+    gtin12 = models.CharField(max_length=50, blank=True, null=True)
+    isbn10 = models.CharField(max_length=50, blank=True, null=True)
+    gtin8 = models.CharField(max_length=50, blank=True, null=True)
+    upce = models.CharField(max_length=50, blank=True, null=True)
+    mpn = models.CharField(max_length=50, blank=True, null=True)
+    other = models.CharField(max_length=50, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'product_variants_sources'
+        app_label = 'MPD'
+        verbose_name = 'Product Variant Source'
+        verbose_name_plural = 'Product Variant Sources'
+
+
+class ProductVariantsRetailPrice(models.Model):
+    variant = models.OneToOneField(ProductVariants, on_delete=models.CASCADE,
+                                   db_column='variant_id', primary_key=True, to_field='variant_id')
+    retail_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    vat = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=10, null=True, blank=True)
+    net_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+    objects = models.Manager()
+
+    class Meta:
+        managed = False
+        db_table = 'product_variants_retail_price'
+
+
 class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id', related_name='images')
-    variant_id = models.IntegerField(blank=True, null=True)
+    iai_product_id = models.IntegerField(blank=True, null=True)
     file_path = models.CharField(max_length=500)
+    updated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -148,7 +205,7 @@ class ProductImage(models.Model):
         verbose_name_plural = 'Product Images'
 
     def __str__(self):
-        return self.file_path
+        return str(self.file_path)
 
 
 class ProductSet(models.Model):
@@ -209,8 +266,10 @@ class ProductSeries(models.Model):
 
 class StockAndPrices(models.Model):
     id = models.BigIntegerField(primary_key=True)
-    variant_id = models.BigIntegerField()
-    source_id = models.BigIntegerField()
+    variant = models.ForeignKey(
+        ProductVariants, on_delete=models.CASCADE, db_column='variant_id', to_field='variant_id')
+    source = models.ForeignKey(
+        Sources, on_delete=models.CASCADE, db_column='source_id')
     stock = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=10)
@@ -253,3 +312,108 @@ class Categories(models.Model):
         db_table = 'categories'
         verbose_name = 'Kategoria'
         verbose_name_plural = 'Kategorie'
+
+
+class StockAndPricesInline(admin.TabularInline):
+    model = StockAndPrices
+    product = models.ForeignKey(
+        Products, on_delete=models.CASCADE, related_name='stock_and_prices')
+    fields = ['variant_id', 'stock', 'price', 'currency']
+    readonly_fields = ['variant_id', 'stock', 'price', 'currency']
+    extra = 0
+    can_delete = False
+    max_num = 0
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class Vat(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    vat_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'vat'
+
+
+class Paths(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=255, blank=True, null=True)
+    path = models.CharField(max_length=255, blank=True, null=True)
+    parent_id = models.BigIntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'path'
+        verbose_name = 'Ścieżka'
+        verbose_name_plural = 'Ścieżki'
+
+
+class ProductPaths(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    product_id = models.IntegerField()
+    path_id = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'product_path'
+        verbose_name = 'Ścieżka produktu'
+        unique_together = ('product_id', 'path_id')
+
+
+class Units(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    unit_id = models.IntegerField(unique=True)
+    name = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'units'
+        verbose_name = 'Jednostka'
+        verbose_name_plural = 'Jednostki'
+
+
+class FabricComponent(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        db_table = 'fabric_component'
+
+    def __str__(self):
+        return self.name
+
+
+class ProductFabric(models.Model):
+    product = models.ForeignKey(
+        Products, on_delete=models.CASCADE, related_name='fabrics')
+    component = models.ForeignKey(FabricComponent, on_delete=models.CASCADE)
+    percentage = models.PositiveSmallIntegerField()
+
+    class Meta:
+        db_table = 'product_fabric'
+        unique_together = ('product', 'component')
+
+    def __str__(self):
+        return f"{self.component.name} {self.percentage}%"
+
+
+class ExportTracking(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    export_type = models.CharField(max_length=255)
+    last_exported_product_id = models.BigIntegerField()
+    last_exported_timestamp = models.DateTimeField()
+    total_products_exported = models.BigIntegerField()
+    export_status = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'xml_export_tracking'
+        verbose_name = 'Status eksportu'
+        verbose_name_plural = 'Statusy eksportu'
+
+    def __str__(self):
+        return f"{self.export_type} - {self.export_status}"

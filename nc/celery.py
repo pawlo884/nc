@@ -89,11 +89,21 @@ app.conf.worker_enable_remote_control = True
 app.conf.worker_send_task_events = True
 app.conf.task_send_sent_event = True
 
-# Konfiguracja heartbeatów
-app.conf.broker_heartbeat = 10
-app.conf.broker_connection_timeout = 30
+# Konfiguracja heartbeatów i połączenia
+app.conf.broker_heartbeat = 60  # Zwiększony interwał heartbeat do 60 sekund
+app.conf.broker_connection_timeout = 120  # Zwiększony timeout do 120 sekund
 app.conf.broker_connection_retry = True
-app.conf.broker_connection_max_retries = 10
+app.conf.broker_connection_max_retries = 30  # Zwiększona liczba prób
 app.conf.broker_connection_retry_on_startup = True
+app.conf.broker_pool_limit = 20  # Zwiększony limit połączeń w puli
+app.conf.broker_transport_options = {
+    'visibility_timeout': 3600,  # 1 godzina
+    'socket_timeout': 60,
+    'socket_connect_timeout': 60,
+    'socket_keepalive': True,
+    'health_check_interval': 30,
+    'heartbeat_interval': 60,
+    'heartbeat_timeout': 120,
+}
 
 app.autodiscover_tasks()

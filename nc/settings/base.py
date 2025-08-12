@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     'main',
     'matterhorn',
     'MPD',
+    'web_agent',
 ]
 
 MIDDLEWARE = [

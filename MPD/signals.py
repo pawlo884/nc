@@ -1,7 +1,7 @@
 from django.dispatch import receiver
-from django.db.models.signals import post_delete, pre_delete
+from django.db.models.signals import post_delete, pre_delete, pre_save
 from django.db import connections
-from .models import Products
+from .models import Products, ProductVariants, ProductVariantsRetailPrice
 import logging
 import traceback
 from matterhorn.defs_db import delete_product_folder_from_bucket
@@ -132,3 +132,27 @@ def product_post_delete(sender, instance, **kwargs):
     except Exception as e:
         logger.error(
             f"Błąd podczas usuwania folderu z bucketa dla produktu {instance.id}: {e}")
+
+
+@receiver(pre_save, sender=Products)
+def update_product_timestamp(sender, instance, using, **kwargs):
+    """Automatycznie aktualizuje updated_at przy każdym zapisie produktu"""
+    if using == 'MPD':
+        from django.utils import timezone
+        instance.updated_at = timezone.now()
+
+
+@receiver(pre_save, sender=ProductVariants)
+def update_product_variant_timestamp(sender, instance, using, **kwargs):
+    """Automatycznie aktualizuje updated_at przy każdym zapisie wariantu produktu"""
+    if using == 'MPD':
+        from django.utils import timezone
+        instance.updated_at = timezone.now()
+
+
+@receiver(pre_save, sender=ProductVariantsRetailPrice)
+def update_retail_price_timestamp(sender, instance, using, **kwargs):
+    """Automatycznie aktualizuje updated_at przy każdym zapisie ceny detalicznej"""
+    if using == 'MPD':
+        from django.utils import timezone
+        instance.updated_at = timezone.now()

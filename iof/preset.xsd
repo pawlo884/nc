@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:annotation>
+    <xs:documentation>
+      Internet Offer Format 3.0 (https://www.idosell.com/pl/shop/developers/formats/iof/internet-offer-format-iof). 
+      Describes the preset.xml file. 
+      Holds information about multiple supplier settings, that can be read by application with every offer import and synchronization. 
+    </xs:documentation>
+  </xs:annotation>	
+	<xs:element name="preset">
+		<xs:complexType>
+			<xs:all>
+				<xs:element name="long_name" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="short_name" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="showcase_image_url" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="description" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="email" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="tel" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="fax" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="www" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="address_street" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="address_zipcode" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="address_city" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="address_country" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="currency" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="url" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="full" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="light" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="categories" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="sizes" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="categories_auto_mapping" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="selected" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="remote_gateway" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="fully_configured" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="external_program" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="external_program_xml_path" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="producers" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="units" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="parameters" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="stocks" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="series" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="traits" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="sizes_auto_mapping" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="series_auto_mapping" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="units_auto_mapping" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="size_code_prefix" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="old_size_code_prefix" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="size_code_producer_prefix" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="old_size_code_producer_prefix" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="iai_shop_deliverer_id" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="plugin_id" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="size_code_auto" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="size_code_code_size" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_name" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_short_description" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_long_description" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_version_name" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_series" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_producer" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_category" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_unit" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_price" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_icon" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_images" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_quantities" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="products_allowed_operations" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_code_producer" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_deliverer" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="version_mode" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="debug_product_import" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="debug_product_update" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="debug_product_always_import" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="debug_product_always_update" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="gatewayGeneratedOn" type="xs:dateTime" minOccurs="0" maxOccurs="1" />
+				<xs:element name="full_lastModified" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="light_lastModified" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="categories_lastModified" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="sizes_lastModified" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="producers_lastModified" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="units_lastModified" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="series_lastModified" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="warranties_lastModified" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="providerImageLastModified" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="imageHash" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="offerCreated" type="xs:dateTime" minOccurs="0" maxOccurs="1" />
+				<xs:element name="offerExpires" type="xs:dateTime" minOccurs="0" maxOccurs="1" />
+				<xs:element name="categories_xml_generated" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="producers_xml_generated" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="series_xml_generated" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="sizes_xml_generated" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="units_xml_generated" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="warranties_xml_generated" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="full_xml_generated" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="light_xml_generated" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="warranties" type="xs:string" minOccurs="0" maxOccurs="1" />
+				<xs:element name="clonedProductsMode" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="updateExtSysCodePending" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="overwrite_products" type="xs:boolean" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_weight" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="update_visibility" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="SRP_price" type="xs:int" minOccurs="0" maxOccurs="1" /> 
+				<xs:element name="STP_price" type="xs:int" minOccurs="0" maxOccurs="1" /> 	
+				<xs:element name="offer_from_bridge" type="xs:int" minOccurs="0" maxOccurs="1" /> 
+				<xs:element name="update_size" type="xs:int" minOccurs="0" maxOccurs="1" />
+				<xs:element name="culture_info" type="xs:string" minOccurs="0" maxOccurs="1" />
+			</xs:all> 
+        	<xs:attribute name="file_format" type="xs:NMTOKEN" use="optional">
+            	<xs:annotation>
+            		<xs:documentation>Format: IOF</xs:documentation>
+            	</xs:annotation>
+        	</xs:attribute>             
+        	<xs:attribute name="version" type="xs:decimal" use="optional">
+        		<xs:annotation>
+            		<xs:documentation>IOF version: major.minor</xs:documentation>
+            	</xs:annotation>
+        	</xs:attribute>
+        	<xs:attribute name="generated" use="optional">
+        		<xs:annotation>
+            		<xs:documentation>Date generated: YYYY-MM-DD 00:00:00</xs:documentation>
+            	</xs:annotation>
+            	<xs:simpleType>
+            		<xs:restriction base="xs:string">
+                		<xs:pattern value="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"/>
+            		</xs:restriction>
+            	</xs:simpleType>
+        	</xs:attribute>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>

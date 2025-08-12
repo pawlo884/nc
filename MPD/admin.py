@@ -1,49 +1,224 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, Categories
-from django.db import connections
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths
+import decimal
 # Register your models here.
+
+
+# Usuwam ProductVariantsInline i wpis inlines = [ProductVariantsInline] z ProductsAdmin
+# (pozostawiam tylko show_variants jako readonly_field)
 
 
 @admin.register(Products)
 class ProductsAdmin(admin.ModelAdmin):
     show_full_result_count = False
     list_per_page = 30
-    fields = ['name', 'description', 'brand', 'show_variants',
-              'show_images', 'show_related_products']
-    list_display = ['id', 'name', 'description', 'brand', 'updated_at']
+    fields = ['name', 'short_description', 'description', 'brand', 'show_variants',
+              'show_images', 'show_related_products', 'edit_retail_prices']  # karta produktu
+    list_display = ['id', 'name', 'description',
+                    'brand', 'updated_at']  # widok listy produktów
     list_filter = ['brand']
     search_fields = ['id', 'name', 'description', 'brand__name']
-    readonly_fields = ['show_variants', 'show_images', 'show_related_products']
+    readonly_fields = ['show_variants', 'show_images',
+                       'show_related_products', 'edit_retail_prices']
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
 
+    @admin.display(description="Edycja cen detalicznych")
+    def edit_retail_prices(self, obj):
+        variants = list(ProductVariants.objects.filter(product=obj))
+        if not variants:
+            return "Brak wariantów produktu"
+        variant_ids = [v.variant_id for v in variants]
+        # Pobierz EANy i ceny detaliczne jednym zapytaniem
+        sources_map = {s.variant.variant_id: s.ean for s in ProductvariantsSources.objects.filter(
+            variant__variant_id__in=variant_ids)}
+        retail_map = {r.variant.variant_id: r.retail_price for r in ProductVariantsRetailPrice.objects.using(
+            'MPD').filter(variant__variant_id__in=variant_ids)}
+        grouped = {}
+        for variant in variants:
+            color_name = variant.color.name if variant.color else "-"
+            size_name = variant.size.name if variant.size else "-"
+            variant_id = variant.variant_id
+            ean = sources_map.get(variant_id, "-")
+            retail_price = retail_map.get(variant_id, "")
+            key = (color_name, size_name, ean)
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(variant_id)
+        html = "<form method='post'>"
+        html += "<div style='margin-bottom:12px;'>"
+        html += "<label>Ustaw cenę detaliczną dla wszystkich wariantów: </label>"
+        html += "<input type='number' step='0.01' id='set_all_price' style='width:100px;'>"
+        html += "<button type='button' onclick='setAllRetailPrices()' style='margin-left:8px;'>Ustaw dla wszystkich</button>"
+        html += "</div>"
+        html += "<table style='border-collapse:collapse; width:100%;'>"
+        html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>kolor</th><th style='border:1px solid #ccc;padding:4px 8px;'>rozmiar</th><th style='border:1px solid #ccc;padding:4px 8px;'>ean</th><th style='border:1px solid #ccc;padding:4px 8px;'>cena detaliczna</th><th style='border:1px solid #ccc;padding:4px 8px;'>VAT</th><th style='border:1px solid #ccc;padding:4px 8px;'>waluta</th></tr>"
+        for (color_name, size_name, ean), variant_ids in grouped.items():
+            retail_price = retail_map.get(variant_ids[0], "")
+            html += "<tr>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{color_name}</td>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{size_name}</td>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{ean}</td>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'><input class='retail-price-input' type='number' step='0.01' name='retail_price_{variant_ids[0]}' value='{retail_price}' style='width:80px;'></td>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'><input type='text' name='vat_{variant_ids[0]}' value='' style='width:60px;'></td>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'><input type='text' name='currency_{variant_ids[0]}' value='' style='width:60px;'></td>"
+            html += "</tr>"
+        html += "</table>"
+        html += "<br><input type='submit' name='save_retail_prices' value='Zapisz ceny detaliczne' style='background-color:#79aec8; color:white; padding:8px 16px; border:none; border-radius:4px; cursor:pointer;'>"
+        html += "</form>"
+        html += """
+        <script>
+        function setAllRetailPrices() {
+            var value = document.getElementById('set_all_price').value;
+            document.querySelectorAll('.retail-price-input').forEach(function(input) {
+                input.value = value;
+            });
+        }
+        </script>
+        """
+        return mark_safe(html)
+
+    def save_model(self, request, obj, form, change):
+        # Aktualizuj updated_at przed zapisaniem
+        from django.utils import timezone
+        obj.updated_at = timezone.now()
+        super().save_model(request, obj, form, change)
+        if 'save_retail_prices' in request.POST:
+            variants = ProductVariants.objects.filter(product=obj)
+            grouped = {}
+            for variant in variants:
+                color_name = variant.color.name if variant.color else "-"
+                size_name = variant.size.name if variant.size else "-"
+                variant_id = variant.variant_id
+                variant_source = ProductvariantsSources.objects.filter(
+                    variant__variant_id=variant_id).first()
+                ean = variant_source.ean if variant_source and variant_source.ean else "-"
+                key = (color_name, size_name, ean)
+                if key not in grouped:
+                    grouped[key] = []
+                grouped[key].append(variant_id)
+            for key, variant_ids in grouped.items():
+                field_name = f'retail_price_{variant_ids[0]}'
+                vat_field = f'vat_{variant_ids[0]}'
+                currency_field = f'currency_{variant_ids[0]}'
+                if field_name in request.POST:
+                    value = request.POST[field_name]
+                    vat_value = request.POST.get(vat_field, '').strip()
+                    currency_value = request.POST.get(
+                        currency_field, '').strip()
+                    try:
+                        retail_price = decimal.Decimal(
+                            value) if value.strip() else None
+                        vat = decimal.Decimal(
+                            vat_value) if vat_value else decimal.Decimal('1')
+                        currency = currency_value if currency_value else 'PLN'
+                        for variant_id in variant_ids:
+                            # Sprawdź czy wariant istnieje w tabeli product_variants
+                            variant_exists = ProductVariants.objects.using(
+                                'MPD').filter(variant_id=variant_id).exists()
+                            if not variant_exists:
+                                continue
+                            obj_rp = ProductVariantsRetailPrice.objects.using(
+                                'MPD').filter(variant__variant_id=variant_id).first()
+                            if obj_rp is None:
+                                # Musimy znaleźć obiekt ProductVariants z tym variant_id
+                                variant_obj = ProductVariants.objects.using(
+                                    'MPD').filter(variant_id=variant_id).first()
+                                if not variant_obj:
+                                    continue
+                                obj_rp = ProductVariantsRetailPrice(
+                                    variant=variant_obj)
+                            obj_rp.retail_price = retail_price
+                            obj_rp.vat = vat
+                            obj_rp.currency = currency
+                            obj_rp.updated_at = timezone.now()
+                            obj_rp.save(using='MPD')
+                    except (ValueError, TypeError, decimal.InvalidOperation):
+                        continue
+            from django.contrib import messages
+            messages.success(
+                request, 'Ceny detaliczne zostały zapisane pomyślnie!')
+            request.session['retail_prices_saved'] = True
+
+    def response_change(self, request, obj):
+        # Sprawdź czy ceny detaliczne zostały zapisane
+        if request.session.get('retail_prices_saved'):
+            del request.session['retail_prices_saved']
+            from django.http import HttpResponseRedirect
+            from django.urls import reverse
+            return HttpResponseRedirect(reverse('admin:MPD_products_change', args=[obj.pk]))
+        return super().response_change(request, obj)
+
     @admin.display(description="Warianty produktu")
     def show_variants(self, obj):
-        variants = ProductVariants.objects.filter(product=obj)
+        variants = list(ProductVariants.objects.filter(product=obj))
         if not variants:
             return "Brak wariantów"
-        html = "<table style='border-collapse:collapse;'>"
-        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
+        variant_ids = [v.variant_id for v in variants]
+        # Pobierz źródła, EANy i ceny detaliczne dla wszystkich wariantów jednym zapytaniem
+        sources_qs = ProductvariantsSources.objects.filter(
+            variant__variant_id__in=variant_ids)
+        sources_map = {}
+        for s in sources_qs:
+            sources_map.setdefault(s.variant.variant_id, []).append(s)
+        retail_map = {r.variant.variant_id: r.retail_price for r in ProductVariantsRetailPrice.objects.using(
+            'MPD').filter(variant__variant_id__in=variant_ids)}
+        # Pobierz stock_and_prices dla wszystkich variant_id i source_id
+        from django.db import connections
+        with connections['MPD'].cursor() as cursor:
+            cursor.execute("""
+                SELECT variant_id, source_id, stock, price, currency FROM stock_and_prices WHERE variant_id IN %s
+            """, [tuple(variant_ids)])
+            stock_rows = cursor.fetchall()
+        stock_map = {}
+        for variant_id, source_id, stock, price, currency in stock_rows:
+            stock_map[(variant_id, source_id)] = (stock, price, currency)
+        grouped = {}
         for v in variants:
-            size_name = v.size.name if v.size else ""
-            producer_color_name = v.producer_color.name if v.producer_color else "-"
-            with connections['MPD'].cursor() as cursor:
-                cursor.execute("""
-                    SELECT s.name, SUM(sp.stock) as total_stock
-                    FROM stock_and_prices sp
-                    JOIN sources s ON sp.source_id = s.id
-                    WHERE sp.variant_id = %s
-                    GROUP BY s.name
-                """, [v.variant_id])
-                stock_data = cursor.fetchall()
-            total_stock = sum([row[1]
-                              for row in stock_data]) if stock_data else 0
-            sources_str = ", ".join(
-                [f"{row[0]}: {row[1]}" for row in stock_data]) if stock_data else "-"
-            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{v.color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color_name}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size_name}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{v.ean}</td></tr>"
+            color = v.color.name if v.color else "-"
+            producer_color = v.producer_color.name if v.producer_color else "-"
+            size = v.size.name if v.size else "-"
+            sources = sources_map.get(v.variant_id, [])
+            sources_names = []
+            eans = []
+            for s in sources:
+                stock = None
+                if s.source:
+                    stock_info = stock_map.get((v.variant_id, s.source.id))
+                    stock = stock_info[0] if stock_info else None
+                stock_str = f": {stock}" if stock is not None else ""
+                sources_names.append(
+                    f"{s.source.name if s.source else '-'}{stock_str}")
+                eans.append(s.ean or '-')
+            sources_display = "<br>".join(
+                sources_names) if sources_names else "-"
+            eans_display = "<br>".join(eans) if eans else "-"
+            key = (color, producer_color, size, sources_display, eans_display)
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(v.variant_id)
+        html = "<table style='border-collapse:collapse;'>"
+        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Ceny</th><th style='border:1px solid #ccc;padding:2px 6px;'>Cena detaliczna</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
+        for (color, producer_color, size, sources_display, eans_display), variant_ids in grouped.items():
+            # Zsumuj stock i pobierz ceny dla wszystkich variant_id
+            total_stock = 0
+            prices = []
+            for variant_id in variant_ids:
+                for s in sources_map.get(variant_id, []):
+                    stock_info = stock_map.get(
+                        (variant_id, s.source.id)) if s.source else None
+                    if stock_info:
+                        total_stock += stock_info[0] or 0
+                        if stock_info[1] is not None and stock_info[1] > 0:
+                            prices.append(
+                                f"{s.source.name}: {stock_info[1]} {stock_info[2]}")
+            prices_str = "<br>".join(prices) if prices else "-"
+            retail_price_str = f"{retail_map.get(variant_ids[0], '-')} PLN" if retail_map.get(
+                variant_ids[0]) is not None else "-"
+            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{prices_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{retail_price_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_display}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{eans_display}</td></tr>"
         html += "</table>"
         return mark_safe(html)
 
@@ -194,8 +369,8 @@ class ProductsAdmin(admin.ModelAdmin):
 
 @admin.register(Brands)
 class BrandsAdmin(admin.ModelAdmin):
-    fields = ['name', 'logo_url', 'opis']
-    list_display = ['id', 'name']
+    fields = ['name', 'logo_url', 'opis', 'url']
+    list_display = ['id', 'name', 'url']
     search_fields = ['name']
 
     def get_queryset(self, request):
@@ -205,7 +380,8 @@ class BrandsAdmin(admin.ModelAdmin):
 @admin.register(Sizes)
 class SizesAdmin(admin.ModelAdmin):
     fields = ['name', 'category', 'unit', 'name_lower']
-    list_display = ['id', 'name', 'category', 'unit', 'name_lower']
+    list_display = ['id', 'name', 'category',
+                    'unit', 'name_lower', 'iai_size_id']
     list_filter = ['name', 'category', 'unit', 'name_lower']
 
     def get_queryset(self, request):
@@ -214,7 +390,8 @@ class SizesAdmin(admin.ModelAdmin):
 
 @admin.register(Sources)
 class SourceAdmin(admin.ModelAdmin):
-    fields = ['name', 'location', 'type']
+    fields = ['name', 'location', 'type', 'long_name', 'short_name', 'showcase_image',
+              'email', 'tel', 'fax', 'www', 'street', 'zipcode', 'city', 'country', 'province']
     list_display = ['id', 'name', 'location', 'type']
     search_fields = ['name']
 
@@ -263,8 +440,51 @@ class ColorsAdmin(admin.ModelAdmin):
     list_filter = ['name']
 
 
-@admin.register(Categories)
-class CategoriesAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name', 'path', 'parent_id']
-    search_fields = ['name', 'path']
-    list_filter = ['name']
+class PathsAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'path', 'parent_id')
+    search_fields = ('name', 'path')
+    list_filter = ('parent_id',)
+    change_form_template = 'admin/MPD/products/change_form.html'
+
+    def get_tree(self):
+        paths = list(Paths.objects.all())
+        tree = {}
+        by_id = {p.id: p for p in paths}
+        for p in paths:
+            parent = p.parent_id
+            if parent and parent in by_id:
+                tree.setdefault(parent, []).append(p)
+            else:
+                tree.setdefault(None, []).append(p)
+
+        def build_html(parent=None):
+            html = ''
+            children = tree.get(parent, [])
+            if children:
+                html += '<ul style="list-style:none; margin:0; padding-left:18px">'
+                for p in children:
+                    has_children = p.id in tree
+                    node_id = f'path-node-{p.id}'
+                    html += f'<li id="{node_id}">' \
+                        + (f'<span class="toggle-btn" data-target="{node_id}-children" style="cursor:pointer; font-weight:bold;">[-]</span> ' if has_children else '') \
+                        + f'{p.name or "(brak nazwy)"} [{p.path or "-"}] [id={p.id}]'
+                    if has_children:
+                        html += f'<div id="{node_id}-children">' + \
+                            build_html(p.id) + '</div>'
+                    html += '</li>'
+                html += '</ul>'
+            return html
+        return build_html()
+
+    def render_change_form(self, request, context, *args, **kwargs):
+        context['paths_tree'] = self.get_tree()
+        return super().render_change_form(request, context, *args, **kwargs)
+
+
+admin.site.register(Paths, PathsAdmin)
+
+# @admin.register(Categories)
+# class CategoriesAdmin(admin.ModelAdmin):
+#     list_display = ['id', 'name', 'path', 'parent_id']
+#     search_fields = ['name', 'path']
+#     list_filter = ['name']

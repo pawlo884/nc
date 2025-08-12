@@ -1,11 +1,23 @@
 from django.shortcuts import render
-from .models import Products, Brands, ProductSet, ProductSetItem
+from .models import Products, ProductSet, ProductSetItem
 from django.http import JsonResponse
 from django.db import connections
+from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from .serializers import ProductSetSerializer, ProductSetItemSerializer
 from collections import defaultdict
+from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter, ProducersXMLExporter, StocksXMLExporter, UnitsXMLExporter, FullChangeXMLExporter
+import logging
+from django.http import HttpResponse
+import requests
+from matterhorn.defs_db import DO_SPACES_BUCKET, DO_SPACES_REGION
+from django.urls import reverse
+from .models import Sources
+from django.views.decorators.csrf import csrf_exempt
+
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 
@@ -129,7 +141,7 @@ class ProductSetViewSet(viewsets.ModelViewSet):
 
         try:
             product = Products.objects.get(id=product_id)
-            item = ProductSetItem.objects.create(
+            ProductSetItem.objects.create(
                 set=set,
                 mapped_product=product,
                 quantity=quantity
@@ -165,3 +177,269 @@ class ProductSetViewSet(viewsets.ModelViewSet):
         items = ProductSetItem.objects.filter(set=set)
         serializer = ProductSetItemSerializer(items, many=True)
         return Response(serializer.data)
+
+
+def export_xml(request, source_name):
+    try:
+        # Zawsze używa Matterhorn (id=2), ignoruje source_name
+        exporter = GatewayXMLExporter()
+        result = exporter.export()
+        if result['bucket_url']:
+            return JsonResponse({'status': 'success', 'url': result['bucket_url']})
+        return JsonResponse({'status': 'error', 'message': 'Nie udało się wygenerować pliku XML'}, status=500)
+    except ValueError as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def export_full_xml(request):
+    """Widok do eksportu pełnego XML"""
+    return JsonResponse({'status': 'error', 'message': 'Ten endpoint nie jest już obsługiwany. Użyj /generate-full-xml/.'}, status=410)
+
+
+XML_FILES = [
+    "full", "full_change", "light", "categories", "sizes", "producers", "units", "parameters", "stocks", "series", "warranties", "preset"
+]
+
+BUCKET_URL = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/matterhorn/"
+XML_FILE_MAP = {
+    "full": "full.xml",
+    "full_change": "full_change.xml",
+    "light": "lightoferta.xml",
+    "categories": "categories.xml",
+    "sizes": "sizes.xml",
+    "producers": "producers.xml",
+    "units": "units.xml",
+    "parameters": "parameters.xml",
+    "stocks": "stocks.xml",
+    "series": "series.xml",
+    "warranties": "warranties.xml",
+    "preset": "preset.xml"
+}
+
+
+def get_xml_file(request, xml_type):
+    if xml_type not in XML_FILE_MAP:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy typ XML'}, status=404)
+    file_url = BUCKET_URL + XML_FILE_MAP[xml_type]
+    try:
+        resp = requests.get(file_url)
+        if resp.status_code == 200:
+            response = HttpResponse(
+                resp.content, content_type='application/xml')
+            response['Content-Disposition'] = f'attachment; filename="{XML_FILE_MAP[xml_type]}"'
+            return response
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Nie znaleziono pliku XML'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def get_gateway_xml(request):
+    source_name = request.GET.get('source')
+    if not source_name:
+        return JsonResponse({'status': 'error', 'message': 'Brak parametru source'}, status=400)
+    file_url = BUCKET_URL + "gateway.xml"
+    try:
+        resp = requests.get(file_url)
+        if resp.status_code == 200:
+            response = HttpResponse(
+                resp.content, content_type='application/xml')
+            response['Content-Disposition'] = 'attachment; filename="gateway.xml"'
+            return response
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Nie znaleziono pliku XML'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def update_all_gateways():
+    """Automatycznie aktualizuje plik gateway.xml dla Matterhorn (id=2)"""
+    try:
+        gateway_exporter = GatewayXMLExporter()
+        gateway_exporter.export()
+        logger.info("Zaktualizowano gateway.xml dla Matterhorn")
+    except Exception as e:
+        logger.warning(f"Błąd aktualizacji gateway.xml: {str(e)}")
+
+
+@csrf_exempt
+def generate_full_xml(request):
+    exporter = FullXMLExporter()
+    exporter_result = exporter.export()
+
+    # Automatycznie zaktualizuj wszystkie gateway.xml
+    update_all_gateways()
+
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def reset_full_xml_export(request):
+    """
+    Reset eksportu full.xml - wymusza pełny eksport wszystkich produktów
+    """
+    from .models import ExportTracking
+
+    try:
+        # Reset tracking dla full.xml
+        tracking, created = ExportTracking.objects.using('MPD').get_or_create(
+            export_type='full.xml',
+            defaults={
+                'last_exported_product_id': 0,
+                'last_exported_timestamp': timezone.now(),
+                'total_products_exported': 0,
+                'export_status': 'reset'
+            }
+        )
+
+        if not created:
+            tracking.last_exported_product_id = 0
+            tracking.total_products_exported = 0
+            tracking.export_status = 'reset'
+            tracking.save()
+
+        # Wykonaj pełny eksport
+        exporter = FullXMLExporter()
+        exporter_result = exporter.export_full()
+
+        # Automatycznie zaktualizuj wszystkie gateway.xml
+        update_all_gateways()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Reset eksportu full.xml zakończony pomyślnie',
+            'bucket_url': exporter_result.get('bucket_url'),
+            'local_path': exporter_result.get('local_path')
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Błąd podczas resetu eksportu: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+def generate_full_change_xml(request):
+    exporter = FullChangeXMLExporter()
+    exporter_result = exporter.export()
+
+    # Automatycznie zaktualizuj wszystkie gateway.xml
+    update_all_gateways()
+
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def generate_gateway_xml(request, source_name):
+    try:
+        # Zawsze używa Matterhorn (id=2), ignoruje source_name
+        exporter = GatewayXMLExporter()
+        exporter_result = exporter.export()
+        # Pobierz wygenerowany plik lokalny i zwróć jako XML
+        with open(exporter_result['local_path'], 'rb') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/xml')
+    except Exception:
+        return HttpResponse('<empty/>', content_type='application/xml')
+
+
+@csrf_exempt
+def generate_light_xml(request):
+    exporter = LightXMLExporter()
+    exporter_result = exporter.export()
+
+    # Automatycznie zaktualizuj wszystkie gateway.xml
+    update_all_gateways()
+
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def generate_producers_xml(request):
+    exporter = ProducersXMLExporter()
+    exporter_result = exporter.export()
+
+    # Automatycznie zaktualizuj wszystkie gateway.xml
+    update_all_gateways()
+
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def generate_stocks_xml(request):
+    exporter = StocksXMLExporter()
+    exporter_result = exporter.export()
+
+    # Automatycznie zaktualizuj wszystkie gateway.xml
+    update_all_gateways()
+
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def generate_units_xml(request):
+    exporter = UnitsXMLExporter()
+    exporter_result = exporter.export()
+
+    # Automatycznie zaktualizuj wszystkie gateway.xml
+    update_all_gateways()
+
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
+
+
+@csrf_exempt
+def empty_xml(request):
+    return HttpResponse('<empty/>', content_type='application/xml')
+
+
+def xml_links(request):
+    links = []
+    # full.xml
+    url = reverse('generate_full_xml')
+    links.append(('full', url))
+    # full_change.xml
+    url = reverse('generate_full_change_xml')
+    links.append(('full_change', url))
+    # light.xml
+    url = reverse('generate_light_xml')
+    links.append(('light', url))
+    # producers.xml
+    url = reverse('generate_producers_xml')
+    links.append(('producers', url))
+    # stocks.xml
+    url = reverse('generate_stocks_xml')
+    links.append(('stocks', url))
+    # units.xml
+    url = reverse('generate_units_xml')
+    links.append(('units', url))
+    # gateway.xml (tylko dla Matterhorn id=2)
+    try:
+        # Użyj dowolnej nazwy dla URL-a, GatewayXMLExporter i tak użyje id=2
+        gateway_url = reverse('generate_gateway_xml', args=['matterhorn'])
+        links.append(('gateway', gateway_url))
+    except Exception:
+        pass  # Brak linku w przypadku błędu
+    # pozostałe typy (puste)
+    for xml_type in [k for k in XML_FILE_MAP if k not in ['full', 'full_change', 'light', 'producers', 'stocks', 'units']]:
+        url = reverse('empty_xml') + f'?type={xml_type}'
+        links.append((xml_type, url))
+    html = '<h2>Dostępne pliki XML:</h2><ul>'
+    for xml_type, url in links:
+        html += f'<li><a href="{url}" target="_blank">{xml_type}</a></li>'
+    html += '</ul>'
+    return HttpResponse(html)

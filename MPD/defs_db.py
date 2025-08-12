@@ -124,6 +124,7 @@ def create_tables_if_not_exist(conn):
             id BIGSERIAL PRIMARY KEY,
             product_id BIGINT NOT NULL,
             variant_id INT,
+            iai_product_id INT,
             file_path VARCHAR(500) NOT NULL,
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         )
@@ -227,7 +228,7 @@ def create_tables_if_not_exist(conn):
             currency VARCHAR(10),
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
-            FOREIGN KEY (variant_id, source_id) REFERENCES product_variants(variant_id, source_id) ON DELETE CASCADE
+            FOREIGN KEY (variant_id, source_id) REFERENCES product_variants_sources(variant_id, source_id) ON DELETE CASCADE
         )
     """
 
