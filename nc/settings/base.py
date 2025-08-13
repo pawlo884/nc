@@ -5,9 +5,6 @@ Base Django settings for nc project.
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-import tempfile
-import logging
-from logging.handlers import RotatingFileHandler
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -116,6 +113,7 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
+        'CONN_MAX_AGE': 600,  # 10 minut
     },
     'matterhorn': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -124,6 +122,7 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN_DB_HOST'),
         'PORT': os.getenv('MATTERHORN_DB_PORT'),
+        'CONN_MAX_AGE': 600,  # 10 minut
     },
     'MPD': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -132,6 +131,7 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
+        'CONN_MAX_AGE': 600,  # 10 minut
     }
 }
 
@@ -197,6 +197,41 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Warsaw'
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_TRACK_STARTED = True
+
+# Cache Configuration - Redis
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://:dev_password@redis:6379/1',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'retry_on_timeout': True,
+            },
+        },
+        'KEY_PREFIX': 'nc_cache',
+        'TIMEOUT': 300,  # 5 minut domyślnie
+    }
+}
+
+# Session Cache
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+
+# Query Optimization
+DATABASE_OPTIMIZATION = {
+    'QUERY_TIMEOUT': 30,  # sekundy
+    'MAX_QUERY_RESULTS': 10000,  # maksymalna liczba wyników w jednym zapytaniu
+    'BATCH_SIZE': 1000,  # rozmiar batch dla bulk operations
+}
+
+# Memory Management
+MEMORY_OPTIMIZATION = {
+    'ENABLE_QUERY_LOGGING': False,  # wyłącz w produkcji
+    'ENABLE_SQL_LOGGING': False,    # wyłącz w produkcji
+    'MAX_MEMORY_USAGE': 0.8,        # maksymalne użycie RAM (80%)
+}
 
 # Celery Beat Configuration
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'

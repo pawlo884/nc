@@ -20,5 +20,5 @@ RUN mkdir -p /app/static /app/staticfiles /app/logs/matterhorn /var/lib/celery &
     chmod +x /app/docker-entrypoint.sh && \
     ln -s /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Zbierz statyczne pliki
-RUN python manage.py collectstatic --noinput
+# Ustaw domyślny command
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

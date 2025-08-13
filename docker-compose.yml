@@ -1,6 +1,6 @@
 services:
   web:
-    image: ${DOCKERHUB_USERNAME}/django-app:latest
+    build: .
     command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --max-requests 1000"]
     ports:
       - "8000:8000"
@@ -9,7 +9,7 @@ services:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     env_file:
-      - .env.${ENVIRONMENT:-prod}
+      - .env.prod
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw
@@ -38,13 +38,13 @@ services:
       - nc_network
 
   celery-import:
-      image: ${DOCKERHUB_USERNAME}/django-app:latest
+      build: .
       command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import_queue --loglevel=info --concurrency=1"]
       volumes:
         - .:/app
         - celery_data:/var/lib/celery
       env_file:
-        - .env.${ENVIRONMENT:-prod}
+        - .env.prod
       environment:
         - DJANGO_SETTINGS_MODULE=nc.settings.prod
         - CELERY_STATE_DB=/var/lib/celery/worker_state_import
@@ -65,13 +65,13 @@ services:
         - nc_network
 
   celery-default:
-      image: ${DOCKERHUB_USERNAME}/django-app:latest
+      build: .
       command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1"]
       volumes:
         - .:/app
         - celery_data:/var/lib/celery
       env_file:
-        - .env.${ENVIRONMENT:-prod}
+        - .env.prod
       environment:
         - DJANGO_SETTINGS_MODULE=nc.settings.prod
         - CELERY_STATE_DB=/var/lib/celery/worker_state_default
@@ -92,12 +92,12 @@ services:
         - nc_network
 
   celery-beat:
-      image: ${DOCKERHUB_USERNAME}/django-app:latest
+      build: .
       command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info"]
       volumes:
         - .:/app
       env_file:
-        - .env.${ENVIRONMENT:-prod}
+        - .env.prod
       environment:
         - DJANGO_SETTINGS_MODULE=nc.settings.prod
         - TZ=Europe/Warsaw
@@ -133,7 +133,7 @@ services:
       start_period: 10s
 
   flower:
-    image: ${DOCKERHUB_USERNAME}/django-app:latest
+    build: .
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0"]
     ports:
       - "5555:5555"
@@ -141,7 +141,7 @@ services:
       - .:/app
       - flower_data:/var/lib/flower
     env_file:
-      - .env.${ENVIRONMENT:-prod}
+      - .env.prod
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw

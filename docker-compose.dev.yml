@@ -127,7 +127,7 @@ services:
       - app_network
 
   redis:
-    image: redis:latest
+    image: redis:7.2-alpine
     ports:
       - "6379:6379"
     environment:

@@ -6,6 +6,8 @@ import django
 import requests
 import json
 import importlib
+import gc
+from django.conf import settings
 
 # Dodaj katalog główny projektu do sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -23,8 +25,10 @@ django.setup()
 # Dynamic import - odporne na auto-organizację importów przez IDE
 mpd_models = importlib.import_module('MPD.models')
 Sizes = mpd_models.Sizes
+
 # URL API
 url = "https://demo177-pl.yourtechnicaldomain.com/api/admin/v6/sizes/sizes"
+
 
 # Headers
 headers = {
@@ -33,8 +37,131 @@ headers = {
     "X-API-KEY": "YXBwbGljYXRpb24xOk5Sbm5TekI1Zk1mR2swcjlIVGM0TGp1ZlA4d2VQRzRDZlZpc2xmSUFGVC9mK0s4ZUwxbkhoeTI1YjdXQVJPMnU="
 }
 
+
+def process_sizes_batch(sizes_batch, batch_number, total_batches):
+    """Przetwarza batch rozmiarów z optymalizacją pamięci"""
+    print(f"\n=== Przetwarzanie batch {batch_number}/{total_batches} ===")
+
+    for index, size in enumerate(sizes_batch, 1):
+        print(f"--- Przetwarzanie {index}/{len(sizes_batch)}: {size.name} ---")
+
+        # Przygotuj JSON dla pojedynczego rozmiaru
+        size_data = {
+            "group_id": 1098261181,
+            "name": f"{size.name}_bielizna",
+            "lang_data": [
+                {
+                    "lang_id": "pol",
+                    "name": size.name
+                }
+            ],
+            "operation": "add"
+        }
+
+        # Payload dla pojedynczego rozmiaru
+        payload = {
+            "params": {
+                "sizes": [size_data]  # Tylko jeden rozmiar w tablicy
+            }
+        }
+
+        print("JSON do wysłania:")
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+
+        # Wysłanie PUT request dla tego rozmiaru
+        try:
+            response = requests.put(
+                url, json=payload, headers=headers, timeout=30)
+            print(f"PUT Status: {response.status_code}")
+            print(f"PUT Response: {response.text}")
+
+            if response.status_code == 200:
+                print(f"✅ PUT Sukces dla rozmiaru: {size.name}")
+
+                # Po udanym PUT wykonaj GET żeby pobrać size_id
+                print("Wykonuję GET request żeby pobrać size_id...")
+                print("Czekam 2 sekundy na synchronizację...")
+                import time
+                time.sleep(2)
+
+                try:
+                    get_response = requests.get(
+                        url, headers=headers, timeout=30)
+                    print(f"GET Status: {get_response.status_code}")
+
+                    if get_response.status_code == 200:
+                        get_data = get_response.json()
+
+                        # Szukaj dodanego rozmiaru w odpowiedzi
+                        expected_name = f"{size.name}_bielizna"
+                        found_size_id = None
+                        print(f"🔍 Szukam rozmiaru: {expected_name}")
+
+                        # Przeszukaj size_groups w odpowiedzi
+                        if 'size_groups' in get_data:
+                            print(
+                                f"📋 Znaleziono {len(get_data['size_groups'])} grup rozmiarów")
+                            for group in get_data['size_groups']:
+                                group_name = group.get(
+                                    'group_name', 'brak nazwy')
+                                print(f"🔍 Sprawdzam grupę: {group_name}")
+
+                                if 'sizes' in group:
+                                    for api_size in group['sizes']:
+                                        size_name = api_size.get(
+                                            'size_name')
+                                        if size_name == expected_name:
+                                            found_size_id = api_size.get(
+                                                'size_id')
+                                            print(
+                                                f"🎯 Znaleziono size_id: {found_size_id} dla {expected_name} w grupie {group_name}")
+                                            break
+                                    if found_size_id:
+                                        break
+
+                        # Aktualizuj bazę danych jeśli znaleziono size_id
+                        if found_size_id:
+                            size.iai_size_id = found_size_id
+                            size.save()
+                            print(
+                                f"💾 Zapisano iai_size_id={found_size_id} dla rozmiaru {size.name}")
+                        else:
+                            print(
+                                f"⚠️ Nie znaleziono size_id dla {expected_name} w odpowiedzi GET")
+                            print("GET Response fragment:",
+                                  json.dumps(get_data, indent=2)[:500])
+                    else:
+                        print(
+                            f"❌ GET request failed: {get_response.status_code}")
+
+                except requests.RequestException as e:
+                    print(f"❌ Błąd GET request: {e}")
+                except json.JSONDecodeError as e:
+                    print(f"❌ Błąd parsowania JSON z GET: {e}")
+
+            else:
+                print(f"❌ PUT Błąd dla rozmiaru: {size.name}")
+
+        except requests.RequestException as e:
+            print(f"❌ Błąd HTTP dla rozmiaru {size.name}: {e}")
+            continue
+
+        print("-" * 50)
+
+        # Czyszczenie pamięci po każdym rozmiarze
+        if index % 10 == 0:  # co 10 rozmiarów
+            gc.collect()
+
+    # Czyszczenie pamięci po batch
+    gc.collect()
+
+
 try:
-    # Pobranie sizes z bazy danych przez model Django
+    # Pobranie sizes z bazy danych przez model Django z optymalizacją
+    batch_size = getattr(settings, 'DATABASE_OPTIMIZATION',
+                         {}).get('BATCH_SIZE', 100)
+
+    # Użyj iterator() aby nie ładować wszystkich obiektów do pamięci
     sizes_queryset = Sizes.objects.filter(
         category='bielizna'
     ).filter(
@@ -42,123 +169,52 @@ try:
     ) | Sizes.objects.filter(
         category='bielizna',
         iai_size_id=''
-    )
+    ).iterator(chunk_size=batch_size)
 
-    total_sizes = sizes_queryset.count()
+    # Przelicz całkowitą liczbę rozmiarów
+    total_sizes = Sizes.objects.filter(
+        category='bielizna'
+    ).filter(
+        iai_size_id__isnull=True
+    ).count() + Sizes.objects.filter(
+        category='bielizna',
+        iai_size_id=''
+    ).count()
+
     print(f"Znaleziono {total_sizes} rozmiarów do wysłania")
 
     if total_sizes == 0:
         print("Brak danych do wysłania")
     else:
-        # Iteruj po każdym rozmiarze osobno
-        for index, size in enumerate(sizes_queryset, 1):
-            print(
-                f"\n--- Przetwarzanie {index}/{total_sizes}: {size.name} ---")
+        # Przetwarzaj w batch'ach
+        processed_count = 0
+        batch_number = 1
+        total_batches = (total_sizes + batch_size - 1) // batch_size
 
-            # Przygotuj JSON dla pojedynczego rozmiaru
-            size_data = {
-                "group_id": 1098261181,
-                "name": f"{size.name}_bielizna",
-                "lang_data": [
-                    {
-                        "lang_id": "pol",
-                        "name": size.name
-                    }
-                ],
-                "operation": "add"
-            }
+        current_batch = []
 
-            # Payload dla pojedynczego rozmiaru
-            payload = {
-                "params": {
-                    "sizes": [size_data]  # Tylko jeden rozmiar w tablicy
-                }
-            }
+        for size in sizes_queryset:
+            current_batch.append(size)
 
-            print("JSON do wysłania:")
-            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            if len(current_batch) >= batch_size:
+                process_sizes_batch(current_batch, batch_number, total_batches)
+                processed_count += len(current_batch)
+                current_batch = []
+                batch_number += 1
 
-            # Wysłanie PUT request dla tego rozmiaru
-            try:
-                response = requests.put(
-                    url, json=payload, headers=headers, timeout=30)
-                print(f"PUT Status: {response.status_code}")
-                print(f"PUT Response: {response.text}")
+                # Dodatkowe czyszczenie pamięci między batch'ami
+                gc.collect()
 
-                if response.status_code == 200:
-                    print(f"✅ PUT Sukces dla rozmiaru: {size.name}")
+        # Przetwórz ostatni niepełny batch
+        if current_batch:
+            process_sizes_batch(current_batch, batch_number, total_batches)
+            processed_count += len(current_batch)
 
-                    # Po udanym PUT wykonaj GET żeby pobrać size_id
-                    print("Wykonuję GET request żeby pobrać size_id...")
-                    print("Czekam 2 sekundy na synchronizację...")
-                    import time
-                    time.sleep(2)
-
-                    try:
-                        get_response = requests.get(
-                            url, headers=headers, timeout=30)
-                        print(f"GET Status: {get_response.status_code}")
-
-                        if get_response.status_code == 200:
-                            get_data = get_response.json()
-
-                            # Szukaj dodanego rozmiaru w odpowiedzi
-                            expected_name = f"{size.name}_bielizna"
-                            found_size_id = None
-                            print(f"🔍 Szukam rozmiaru: {expected_name}")
-
-                            # Przeszukaj size_groups w odpowiedzi
-                            if 'size_groups' in get_data:
-                                print(
-                                    f"📋 Znaleziono {len(get_data['size_groups'])} grup rozmiarów")
-                                for group in get_data['size_groups']:
-                                    group_name = group.get(
-                                        'group_name', 'brak nazwy')
-                                    print(f"🔍 Sprawdzam grupę: {group_name}")
-
-                                    if 'sizes' in group:
-                                        for api_size in group['sizes']:
-                                            size_name = api_size.get(
-                                                'size_name')
-                                            if size_name == expected_name:
-                                                found_size_id = api_size.get(
-                                                    'size_id')
-                                                print(
-                                                    f"🎯 Znaleziono size_id: {found_size_id} dla {expected_name} w grupie {group_name}")
-                                                break
-                                        if found_size_id:
-                                            break
-
-                            # Aktualizuj bazę danych jeśli znaleziono size_id
-                            if found_size_id:
-                                size.iai_size_id = found_size_id
-                                size.save()
-                                print(
-                                    f"💾 Zapisano iai_size_id={found_size_id} dla rozmiaru {size.name}")
-                            else:
-                                print(
-                                    f"⚠️ Nie znaleziono size_id dla {expected_name} w odpowiedzi GET")
-                                print("GET Response fragment:",
-                                      json.dumps(get_data, indent=2)[:500])
-                        else:
-                            print(
-                                f"❌ GET request failed: {get_response.status_code}")
-
-                    except requests.RequestException as e:
-                        print(f"❌ Błąd GET request: {e}")
-                    except json.JSONDecodeError as e:
-                        print(f"❌ Błąd parsowania JSON z GET: {e}")
-
-                else:
-                    print(f"❌ PUT Błąd dla rozmiaru: {size.name}")
-
-            except requests.RequestException as e:
-                print(f"❌ Błąd HTTP dla rozmiaru {size.name}: {e}")
-                continue
-
-            print("-" * 50)
-
-            # TESTOWE: Wykonaj tylko raz - usuń break żeby przetwarzać wszystkie
+        print(
+            f"\n=== Zakończono przetwarzanie {processed_count} rozmiarów ===")
 
 except Exception as e:
     print(f"Błąd: {e}")
+finally:
+    # Finalne czyszczenie pamięci
+    gc.collect()
