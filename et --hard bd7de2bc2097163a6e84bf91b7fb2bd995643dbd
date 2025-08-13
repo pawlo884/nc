@@ -1,0 +1,10 @@
+[33macaa4f4[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m fix: naprawa db connections
+[33m1df6241[m fix: naprawa redis
+[33m30b7cea[m Merge branch 'fix-optimization'
+[33mef085a4[m[33m ([m[1;32mfix-optimization[m[33m)[m optymalizacja-narpaw user-password
+[33mc8df411[m Merge pull request #3 from pawlo884/fix-optimization
+[33m5efacf5[m[33m ([m[1;31morigin/fix-optimization[m[33m)[m optymalizacja
+[33mbd7de2b[m Merge pull request #2 from pawlo884/xml-export
+[33m88ff827[m[33m ([m[1;31morigin/xml-export[m[33m, [m[1;32mxml-export[m[33m)[m zabawa z xml dalej
+[33md0510b8[m xml, light, full, change
+[33md78c774[m full przyrostowe
