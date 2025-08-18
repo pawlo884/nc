@@ -5,6 +5,17 @@ from django.contrib import admin
 
 # Create your models here.
 
+class Attributes(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'attributes'
+        app_label = 'MPD'
+        verbose_name = 'Attribute'
+        verbose_name_plural = 'Attributes'
+
 
 class Brands(models.Model):
     id = models.BigAutoField(primary_key=True)

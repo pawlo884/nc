@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .models import Products, ProductSet, ProductSetItem
+from .models import Products, ProductSet, ProductSetItem, ProductPaths
 from django.http import JsonResponse
 from django.db import connections
 from django.utils import timezone
@@ -16,6 +16,7 @@ from matterhorn.defs_db import DO_SPACES_BUCKET, DO_SPACES_REGION
 from django.urls import reverse
 from .models import Sources
 from django.views.decorators.csrf import csrf_exempt
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -443,3 +444,68 @@ def xml_links(request):
         html += f'<li><a href="{url}" target="_blank">{xml_type}</a></li>'
     html += '</ul>'
     return HttpResponse(html)
+
+
+@csrf_exempt
+def manage_product_paths(request):
+    """
+    Endpoint do zarządzania przypisaniami ścieżek do produktów
+    Obsługuje przypisywanie i usuwanie przypisań ścieżek
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        path_id = data.get('path_id')
+        action = data.get('action')  # 'assign' lub 'unassign'
+
+        if not all([product_id, path_id, action]):
+            return JsonResponse({'status': 'error', 'message': 'Brak wymaganych parametrów'}, status=400)
+
+        if action not in ['assign', 'unassign']:
+            return JsonResponse({'status': 'error', 'message': 'Nieprawidłowa akcja'}, status=400)
+
+        # Sprawdź czy produkt istnieje
+        try:
+            product = Products.objects.using('MPD').get(id=product_id)
+        except Products.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Produkt nie istnieje'}, status=404)
+
+        if action == 'assign':
+            # Przypisz ścieżkę do produktu (jeśli jeszcze nie jest przypisana)
+            product_path, created = ProductPaths.objects.using('MPD').get_or_create(
+                product_id=product_id,
+                path_id=path_id
+            )
+            if created:
+                message = f'Ścieżka {path_id} została przypisana do produktu {product.name}'
+            else:
+                message = f'Ścieżka {path_id} była już przypisana do produktu {product.name}'
+
+        elif action == 'unassign':
+            # Usuń przypisanie ścieżki do produktu
+            deleted_count, _ = ProductPaths.objects.using('MPD').filter(
+                product_id=product_id,
+                path_id=path_id
+            ).delete()
+            if deleted_count > 0:
+                message = f'Ścieżka {path_id} została odłączona od produktu {product.name}'
+            else:
+                message = f'Ścieżka {path_id} nie była przypisana do produktu {product.name}'
+
+        logger.info(f"Zarządzanie ścieżkami produktu: {message}")
+
+        return JsonResponse({
+            'status': 'success',
+            'message': message,
+            'product_id': product_id,
+            'path_id': path_id,
+            'action': action
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Błąd podczas zarządzania ścieżkami produktu: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)

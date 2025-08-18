@@ -1,7 +1,7 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths
 import decimal
 # Register your models here.
 
@@ -22,6 +22,7 @@ class ProductsAdmin(admin.ModelAdmin):
     search_fields = ['id', 'name', 'description', 'brand__name']
     readonly_fields = ['show_variants', 'show_images',
                        'show_related_products', 'edit_retail_prices']
+    change_form_template = 'admin/MPD/products/change_form.html'
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
@@ -365,6 +366,61 @@ class ProductsAdmin(admin.ModelAdmin):
         if not html:
             html = "Brak powiązanych produktów"
         return mark_safe(html)
+
+    def get_tree(self, product_id=None):
+        """Generuje drzewo ścieżek w formacie HTML z wyróżnieniem przypisanych do produktu"""
+        paths = list(Paths.objects.using('MPD').all())
+
+        # Pobierz ścieżki przypisane do produktu
+        assigned_path_ids = set()
+        if product_id:
+            product_paths = ProductPaths.objects.using(
+                'MPD').filter(product_id=product_id)
+            assigned_path_ids = set(pp.path_id for pp in product_paths)
+        tree = {}
+        by_id = {p.id: p for p in paths}
+        for p in paths:
+            parent = p.parent_id
+            if parent and parent in by_id:
+                tree.setdefault(parent, []).append(p)
+            else:
+                tree.setdefault(None, []).append(p)
+
+        def build_html(parent=None):
+            html = ''
+            children = tree.get(parent, [])
+            if children:
+                html += '<ul style="list-style:none; margin:0; padding-left:18px">'
+                for p in children:
+                    has_children = p.id in tree
+                    node_id = f'path-node-{p.id}'
+                    is_assigned = p.id in assigned_path_ids
+
+                    # Style dla przypisanych ścieżek
+                    style = 'background-color: #d4edda; border: 1px solid #c3e6cb; padding: 2px 5px; border-radius: 3px; margin: 1px 0;' if is_assigned else ''
+                    checked_attr = 'checked' if is_assigned else ''
+
+                    # Checkbox do zarządzania przypisaniem
+                    checkbox_html = f'<input type="checkbox" class="path-checkbox" data-path-id="{p.id}" {checked_attr} style="margin-right: 8px;">'
+
+                    html += f'<li id="{node_id}" style="{style}">' \
+                        + (f'<span class="toggle-btn" data-target="{node_id}-children" style="cursor:pointer; font-weight:bold;">[-]</span> ' if has_children else '') \
+                        + checkbox_html \
+                        + f'{p.name or "(brak nazwy)"} [{p.path or "-"}] [id={p.id}]'
+                    if has_children:
+                        html += f'<div id="{node_id}-children">' + \
+                            build_html(p.id) + '</div>'
+                    html += '</li>'
+                html += '</ul>'
+            return html
+        return build_html()
+
+    def render_change_form(self, request, context, *args, **kwargs):
+        """Dodaje drzewo ścieżek do kontekstu formularza edycji produktu"""
+        obj = kwargs.get('obj')
+        product_id = obj.id if obj else None
+        context['paths_tree'] = self.get_tree(product_id)
+        return super().render_change_form(request, context, *args, **kwargs)
 
 
 @admin.register(Brands)
