@@ -521,6 +521,8 @@ class ProductEditor:
             filtered_words.extend(product_types_to_move)
 
         result = " ".join(filtered_words).strip()
+        # Trimuj nadmiarowe spacje (usuwaj podwójne spacje)
+        result = " ".join(result.split())
         return result
 
     def _extract_model_name(self, text):
@@ -569,6 +571,8 @@ class ProductEditor:
         if not result:
             return ""
 
+        # Trimuj nadmiarowe spacje (usuwaj podwójne spacje)
+        result = " ".join(result.split())
         return result
 
     def _is_figi_swimsuit(self, text):
@@ -650,14 +654,18 @@ class ProductEditor:
         """Optymalizuje tytuły szortów kąpielowych"""
         model_name = self._extract_model_name_for_title(main_part)
         if model_name:
-            return f"Szorty kąpielowe {model_name}"
+            # Trimuj nadmiarowe spacje
+            clean_model_name = " ".join(model_name.split())
+            return f"Szorty kąpielowe {clean_model_name}"
         return None
 
     def _optimize_figi_title(self, main_part):
         """Optymalizuje tytuły figów kąpielowych"""
         model_name = self._extract_model_name_for_title(main_part)
         if model_name:
-            return f"Figi kąpielowe {model_name}"
+            # Trimuj nadmiarowe spacje
+            clean_model_name = " ".join(model_name.split())
+            return f"Figi kąpielowe {clean_model_name}"
         return None
 
     def _optimize_top_title(self, main_part):
@@ -668,20 +676,30 @@ class ProductEditor:
             if "Bralet" in model_name:
                 # Usuń "Bralet" z nazwy modelu i dodaj jako typ
                 clean_model = model_name.replace("Bralet", "").strip()
+                # Trimuj nadmiarowe spacje
+                clean_model = " ".join(clean_model.split())
                 return f"Biustonosz kąpielowy {clean_model} Bralet"
             elif "Kopa" in model_name:
                 # Usuń "Kopa" z nazwy modelu i dodaj jako typ
                 clean_model = model_name.replace("Kopa", "").strip()
+                # Trimuj nadmiarowe spacje
+                clean_model = " ".join(clean_model.split())
                 return f"Biustonosz kąpielowy {clean_model} Kopa"
             elif "Big" in model_name:
                 # Zachowaj "Big" na końcu
                 if not model_name.endswith("Big"):
                     clean_model = model_name.replace("Big", "").strip()
+                    # Trimuj nadmiarowe spacje
+                    clean_model = " ".join(clean_model.split())
                     return f"Biustonosz kąpielowy {clean_model} Big"
                 else:
-                    return f"Biustonosz kąpielowy {model_name}"
+                    # Trimuj nadmiarowe spacje w całej nazwie
+                    clean_model_name = " ".join(model_name.split())
+                    return f"Biustonosz kąpielowy {clean_model_name}"
             else:
-                return f"Biustonosz kąpielowy {model_name}"
+                # Trimuj nadmiarowe spacje
+                clean_model_name = " ".join(model_name.split())
+                return f"Biustonosz kąpielowy {clean_model_name}"
         return None
 
     def test_ai_optimization(self):
@@ -692,7 +710,9 @@ class ProductEditor:
             "Kostium dwuczęściowy Góra Model Coral Bralet - Lupo Line",
             "Kostium dwuczęściowy Góra Model Paradise Kopa - Lupo Line",
             "Kostium dwuczęściowy Góra Model Summer Big - Lupo Line",
-            "Kostium dwuczęściowy Góra Model Sunset - Lupo Line"
+            "Kostium dwuczęściowy Góra Model Sunset - Lupo Line",
+            # Test z podwójnymi spacjami (sprawdzenie trimowania)
+            "Kostium dwuczęściowy Figi  Kąpielowe  Model  Ocean    Wave  Big - Lupo Line"
         ]
 
         print("🧪 Testowanie AI optymalizacji dla kostiumów dwuczęściowych:")
