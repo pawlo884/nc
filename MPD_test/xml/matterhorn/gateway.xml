@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-11 09:42:06">
+<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-19 13:25:18">
   <meta>
     <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
     <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
@@ -14,19 +14,19 @@
       <country>&lt;![CDATA[Poland]]&gt;</country>
     </address>
     <time>
-      <offer created="2025-08-11 09:42:06"/>
-      <offer expires="2025-08-18 09:42:06"/>
+      <offer created="2025-08-19 13:25:18"/>
+      <offer expires="2025-08-26 13:25:18"/>
     </time>
   </meta>
-  <full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full.xml" hash="2c537b4da0d4533eb0e011f5b2829845" changed="2025-08-11 09:38:54"/>
-  <full_change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change.xml" hash="d3b6605f07de2576b513500fbbd57dcc" changed="2025-08-10 00:41:35"/>
-  <light url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/light.xml" hash="b932930140166594b93bd7c117347e45" changed="2025-08-10 00:48:55"/>
+  <full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full.xml" hash="c15bb888213134a07b148b8fedfb56ac" changed="2025-08-19 12:01:31"/>
+  <full_change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change.xml" hash="1bcc555ac84e8f779dc36b03b697ef8c" changed="2025-08-12 23:12:44"/>
+  <light url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/light.xml" hash="0b6a48b0f793d1e52e9fbaea9ac21773" changed="2025-08-19 13:22:01"/>
   <categories url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/categories.xml" hash="" changed=""/>
   <sizes url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/sizes.xml" hash="" changed=""/>
-  <producers url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/producers.xml" hash="737ffaf7012e108c14fccda6f6d60164" changed="2025-07-10 11:36:57"/>
-  <units url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/units.xml" hash="5800ba47ff1450130a58c5f8e8f9f2df" changed="2025-07-12 22:44:11"/>
+  <producers url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/producers.xml" hash="1c878b7ff77a26917ac76cd4dfcbf602" changed="2025-08-12 23:12:44"/>
+  <units url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/units.xml" hash="30e9bc1f74daf9a14991f05d8c12fdb6" changed="2025-08-12 23:12:44"/>
   <parameters url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/parameters.xml" hash="" changed=""/>
-  <stocks url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/stocks.xml" hash="9e36664d751f6edc5c49dba93a81fa84" changed="2025-07-10 12:34:00"/>
+  <stocks url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/stocks.xml" hash="d862bee013e3b84273be6e64018906dc" changed="2025-08-12 23:12:44"/>
   <series url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/series.xml" hash="" changed=""/>
   <warranties url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/warranties.xml" hash="" changed=""/>
   <preset url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/preset.xml" hash="" changed=""/>

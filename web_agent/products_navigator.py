@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 from admin_login import AdminLoginAgent
 from lupo_line_knowledge_base import lupo_knowledge
+from skip_products_list import should_skip_product, print_skip_list_status
 
 # Próba importu OpenAI
 try:
@@ -199,6 +200,71 @@ class ProductsNavigator:
             print(f"⚠️ Nie można sprawdzić produktów na stronie: {str(e)}")
             return 0
 
+    def _skip_first_product_and_try_next(self):
+        """
+        Pomija pierwszy produkt i próbuje kliknąć w następny dostępny produkt
+        Sprawdza do 10 produktów na stronie
+
+        Returns:
+            bool: True jeśli udało się kliknąć w jakiś produkt
+        """
+        try:
+            driver = self.login_agent.get_driver()
+            max_products_to_check = 10  # Sprawdź maksymalnie 10 produktów
+
+            # Sprawdzaj kolejne produkty (zaczynając od drugiego)
+            for i in range(2, max_products_to_check + 2):  # 2-11 (drugi do jedenastego)
+                try:
+                    product_link = driver.find_element(
+                        By.CSS_SELECTOR,
+                        f"#result_list tbody tr:nth-child({i}) th.field-id a"
+                    )
+
+                    product_id = product_link.text
+                    print(f"🔍 Sprawdzam produkt #{i} (ID: {product_id})")
+
+                    # Sprawdź czy ten produkt nie jest na liście pomijanych
+                    if should_skip_product(product_id):
+                        print(
+                            f"⏭️ Produkt ID {product_id} też jest na liście pomijanych")
+                        continue  # Sprawdź następny produkt
+
+                    # Znaleziono produkt który nie jest pomijany
+                    print(f"🎯 Klikam w produkt #{i} (ID: {product_id})")
+                    product_link.click()
+
+                    # Poczekaj na załadowanie strony szczegółów produktu
+                    time.sleep(3)
+
+                    # Sprawdź czy przeszliśmy do strony szczegółów produktu
+                    new_url = driver.current_url
+                    if "/change/" in new_url or "/add/" in new_url:
+                        print(
+                            f"✅ Pomyślnie przeszedłem do szczegółów produktu #{i}!")
+                        return True
+                    else:
+                        print(
+                            f"❌ Nie udało się przejść do szczegółów produktu #{i}")
+                        continue  # Sprawdź następny produkt
+
+                except Exception as e:
+                    # Nie można znaleźć produktu o tym indeksie - prawdopodobnie koniec listy
+                    if "no such element" in str(e).lower() or "unable to locate element" in str(e).lower():
+                        print(
+                            f"📄 Nie ma więcej produktów na stronie (sprawdzono do #{i})")
+                        break
+                    else:
+                        print(
+                            f"⚠️ Błąd przy sprawdzaniu produktu #{i}: {str(e)}")
+                        continue
+
+            print("❌ Wszystkie dostępne produkty na stronie są na liście pomijanych")
+            return False
+
+        except Exception as e:
+            print(f"❌ Błąd podczas pomijania pierwszego produktu: {str(e)}")
+            return False
+
     def click_first_product(self):
         """Kliknie w pierwszy produkt na liście"""
         try:
@@ -229,6 +295,14 @@ class ProductsNavigator:
                 )
 
                 product_id = first_product_link.text
+                print(f"🔍 Sprawdzam pierwszy produkt (ID: {product_id})")
+
+                # Sprawdź czy produkt nie jest na liście pomijanych
+                if should_skip_product(product_id):
+                    print(
+                        f"⏭️ Pomijam produkt ID {product_id} - jest na liście pomijanych")
+                    return self._skip_first_product_and_try_next()
+
                 print(f"🎯 Klikam w pierwszy produkt (ID: {product_id})")
 
                 # Kliknij w link
@@ -489,18 +563,21 @@ class ProductEditor:
         if " - Lupo Line" in model_part:
             model_part = model_part.split(" - Lupo Line")[0]
 
-        # Lista kolorów do usunięcia (z wariantami literówek)
-        colors_to_remove = [
+        # Lista elementów do usunięcia z nazwy produktu (kolory, typy produktów, itp.)
+        elements_to_remove = [
             # Kolory angielskie
             "Multicolor", "Multcolor",  # literówka bez "i"
             "Black", "White", "Red", "Blue", "Green", "Pink", "Coral",
-            "Yellow", "Orange", "Purple", "Brown", "Gray", "Grey",
+            "Yellow", "Orange", "Purple", "Brown", "Gray", "Grey", "Navy",
             # Kolory polskie
             "Turkus", "Czarny", "Biały", "Czerwony", "Niebieski", "Zielony",
-            "Różowy", "Żółty", "Pomarańczowy", "Fioletowy", "Brązowy", "Szary"
+            "Różowy", "Żółty", "Pomarańczowy", "Fioletowy", "Brązowy", "Szary", "Granatowy",
+            # Typy produktów do usunięcia
+            "Kostium", "Bikini", "Strój", "Jednoczęściowy", "Dwuczęściowy",
+            "Kąpielowy", "Kąpielowe", "Kąpielowa"
         ]
 
-        # Podziel na słowa i usuń tylko kolory
+        # Podziel na słowa i usuń niepotrzebne elementy
         words = model_part.split()
         filtered_words = []
 
@@ -509,7 +586,7 @@ class ProductEditor:
             if word == "Coral" and i == 0:
                 # Zachowaj "Coral" jako nazwę modelu
                 filtered_words.append(word)
-            elif word not in colors_to_remove:
+            elif word not in elements_to_remove:
                 # Jeśli to typ produktu który ma być przeniesiony na koniec, nie dodawaj go tutaj
                 if word in product_types_to_move:
                     continue  # Pomiń - zostanie dodany na końcu
@@ -542,10 +619,10 @@ class ProductEditor:
             # Kolory angielskie (z wariantami literówek)
             "Multicolor", "Multcolor",  # literówka bez "i"
             "Black", "White", "Red", "Blue", "Green", "Pink", "Coral",
-            "Yellow", "Orange", "Purple", "Brown", "Gray", "Grey",
+            "Yellow", "Orange", "Purple", "Brown", "Gray", "Grey", "Navy",
             # Kolory polskie
             "Turkus", "Czarny", "Biały", "Czerwony", "Niebieski", "Zielony",
-            "Różowy", "Żółty", "Pomarańczowy", "Fioletowy", "Brązowy", "Szary",
+            "Różowy", "Żółty", "Pomarańczowy", "Fioletowy", "Brązowy", "Szary", "Granatowy",
             # Rozmiary (usuwane z serii!)
             "Big", "Small",
             # Typy produktów
@@ -712,7 +789,11 @@ class ProductEditor:
             "Kostium dwuczęściowy Góra Model Summer Big - Lupo Line",
             "Kostium dwuczęściowy Góra Model Sunset - Lupo Line",
             # Test z podwójnymi spacjami (sprawdzenie trimowania)
-            "Kostium dwuczęściowy Figi  Kąpielowe  Model  Ocean    Wave  Big - Lupo Line"
+            "Kostium dwuczęściowy Figi  Kąpielowe  Model  Ocean    Wave  Big - Lupo Line",
+            # Test z kolorem Navy (powinien zostać usunięty z nazwy)
+            "Kostium dwuczęściowy Figi Kąpielowe Model Sailor Big Navy - Lupo Line",
+            # Test ze słowem "Kostium" w nazwie modelu (powinno zostać usunięte)
+            "Kostium dwuczęściowy Góra Model Elena Kostium Bralet - Lupo Line"
         ]
 
         print("🧪 Testowanie AI optymalizacji dla kostiumów dwuczęściowych:")
@@ -3062,6 +3143,9 @@ def run_product_name_agent():
     print("🔧 Pola MPD: Kategoria, kolory, seria, ścieżki, jednostka, materiał")
     print("💾 Zapisanie: Automatyczne kliknięcie 'Utwórz nowy produkt w MPD'")
     print("🔄 Pętla: Agent pracuje aż zabraknie produktów na stronie")
+
+    # Wyświetl status listy pomijanych produktów
+    print_skip_list_status()
 
     if not OPENAI_AVAILABLE:
         print("⚠️  WYMAGANE: pip install openai")
