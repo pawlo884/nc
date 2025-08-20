@@ -2,6 +2,12 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../career-guide"
+		},
+		{
+			"path": "../datascientist"
 		}
 	],
 	"settings": {

@@ -5,7 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 from admin_login import AdminLoginAgent
 from lupo_line_knowledge_base import lupo_knowledge
-from skip_products_list import should_skip_product, print_skip_list_status
+from skip_products_list import should_skip_product, print_skip_list_status, add_product_to_skip_file
 
 # Próba importu OpenAI
 try:
@@ -566,7 +566,7 @@ class ProductEditor:
         # Lista elementów do usunięcia z nazwy produktu (kolory, typy produktów, itp.)
         elements_to_remove = [
             # Kolory angielskie
-            "Multicolor", "Multcolor",  # literówka bez "i"
+            "Multicolor", "Multcolor", "MUlticolor",  # literówka bez "i"
             "Black", "White", "Red", "Blue", "Green", "Pink", "Coral",
             "Yellow", "Orange", "Purple", "Brown", "Gray", "Grey", "Navy",
             # Kolory polskie
@@ -602,6 +602,40 @@ class ProductEditor:
         result = " ".join(result.split())
         return result
 
+    def _clean_model_name_from_colors(self, model_name):
+        """Usuwa kolory z nazwy modelu (pozostawia główną nazwę)"""
+        # Lista kolorów do usunięcia (pojedyncze i kombinacje)
+        colors_to_remove = [
+            # Kolory angielskie
+            "Multicolor", "Multcolor", "MUlticolor",  # literówka bez "i"
+            "Black", "White", "Red", "Blue", "Green", "Pink", "Coral",
+            "Yellow", "Orange", "Purple", "Brown", "Gray", "Grey", "Navy",
+            # Kolory polskie
+            "Turkus", "Czarny", "Biały", "Czerwony", "Niebieski", "Zielony",
+            "Różowy", "Żółty", "Pomarańczowy", "Fioletowy", "Brązowy", "Szary", "Granatowy",
+            # Kombinacje kolorów (często występujące)
+            "Black/White", "White/Black", "Navy/White", "White/Navy",
+            "Red/White", "White/Red", "Blue/White", "White/Blue"
+        ]
+
+        # Podziel na słowa
+        words = model_name.split()
+        filtered_words = []
+
+        for word in words:
+            # Sprawdź czy to nie jest kolor do usunięcia
+            is_color = False
+            for color in colors_to_remove:
+                if word == color:
+                    is_color = True
+                    break
+
+            if not is_color:
+                filtered_words.append(word)
+
+        result = " ".join(filtered_words).strip()
+        return result
+
     def _extract_model_name(self, text):
         """Wyciąga nazwę modelu dla serii (usuwa kolory, Big/Small, typy produktu)"""
         if "Model " not in text:
@@ -617,12 +651,15 @@ class ProductEditor:
         # Lista wszystkich elementów do usunięcia z nazwy serii
         elements_to_remove = [
             # Kolory angielskie (z wariantami literówek)
-            "Multicolor", "Multcolor",  # literówka bez "i"
+            "Multicolor", "Multcolor", "MUlticolor",  # literówka bez "i" i z "MUlticolor"
             "Black", "White", "Red", "Blue", "Green", "Pink", "Coral",
             "Yellow", "Orange", "Purple", "Brown", "Gray", "Grey", "Navy",
             # Kolory polskie
             "Turkus", "Czarny", "Biały", "Czerwony", "Niebieski", "Zielony",
             "Różowy", "Żółty", "Pomarańczowy", "Fioletowy", "Brązowy", "Szary", "Granatowy",
+            # Kombinacje kolorów (często występujące)
+            "Black/White", "White/Black", "Navy/White", "White/Navy",
+            "Red/White", "White/Red", "Blue/White", "White/Blue",
             # Rozmiary (usuwane z serii!)
             "Big", "Small",
             # Typy produktów
@@ -742,6 +779,15 @@ class ProductEditor:
         if model_name:
             # Trimuj nadmiarowe spacje
             clean_model_name = " ".join(model_name.split())
+
+            # Specjalna logika dla słowa "Big" - powinno być na końcu
+            words = clean_model_name.split()
+            if "Big" in words and not clean_model_name.endswith("Big"):
+                # Przenieś "Big" na koniec
+                words_without_big = [word for word in words if word != "Big"]
+                words_without_big.append("Big")
+                clean_model_name = " ".join(words_without_big)
+
             return f"Figi kąpielowe {clean_model_name}"
         return None
 
@@ -751,31 +797,40 @@ class ProductEditor:
         if model_name:
             # Sprawdź typ biustonosza na podstawie nazwy modelu lub opisu
             if "Bralet" in model_name:
-                # Usuń "Bralet" z nazwy modelu i dodaj jako typ
-                clean_model = model_name.replace("Bralet", "").strip()
+                # Usuń kolory i "Bralet" z nazwy modelu, dodaj "Bralet" jako typ
+                clean_model = self._clean_model_name_from_colors(model_name)
+                clean_model = clean_model.replace("Bralet", "").strip()
                 # Trimuj nadmiarowe spacje
                 clean_model = " ".join(clean_model.split())
                 return f"Biustonosz kąpielowy {clean_model} Bralet"
             elif "Kopa" in model_name:
-                # Usuń "Kopa" z nazwy modelu i dodaj jako typ
-                clean_model = model_name.replace("Kopa", "").strip()
+                # Usuń kolory i "Kopa" z nazwy modelu, dodaj "Kopa" jako typ
+                clean_model = self._clean_model_name_from_colors(model_name)
+                clean_model = clean_model.replace("Kopa", "").strip()
                 # Trimuj nadmiarowe spacje
                 clean_model = " ".join(clean_model.split())
                 return f"Biustonosz kąpielowy {clean_model} Kopa"
             elif "Big" in model_name:
-                # Zachowaj "Big" na końcu
-                if not model_name.endswith("Big"):
-                    clean_model = model_name.replace("Big", "").strip()
-                    # Trimuj nadmiarowe spacje
-                    clean_model = " ".join(clean_model.split())
-                    return f"Biustonosz kąpielowy {clean_model} Big"
-                else:
-                    # Trimuj nadmiarowe spacje w całej nazwie
-                    clean_model_name = " ".join(model_name.split())
-                    return f"Biustonosz kąpielowy {clean_model_name}"
-            else:
+                # Specjalna logika dla słowa "Big" - usuń kolory i przenieś "Big" na koniec
+                clean_model = self._clean_model_name_from_colors(model_name)
+
+                # Przenieś "Big" na koniec jeśli nie jest już na końcu
+                words = clean_model.split()
+                if "Big" in words and not clean_model.endswith("Big"):
+                    words_without_big = [
+                        word for word in words if word != "Big"]
+                    words_without_big.append("Big")
+                    clean_model = " ".join(words_without_big)
+
                 # Trimuj nadmiarowe spacje
-                clean_model_name = " ".join(model_name.split())
+                clean_model = " ".join(clean_model.split())
+                return f"Biustonosz kąpielowy {clean_model}"
+            else:
+                # Usuń kolory z nazwy modelu
+                clean_model_name = self._clean_model_name_from_colors(
+                    model_name)
+                # Trimuj nadmiarowe spacje
+                clean_model_name = " ".join(clean_model_name.split())
                 return f"Biustonosz kąpielowy {clean_model_name}"
         return None
 
@@ -793,7 +848,9 @@ class ProductEditor:
             # Test z kolorem Navy (powinien zostać usunięty z nazwy)
             "Kostium dwuczęściowy Figi Kąpielowe Model Sailor Big Navy - Lupo Line",
             # Test ze słowem "Kostium" w nazwie modelu (powinno zostać usunięte)
-            "Kostium dwuczęściowy Góra Model Elena Kostium Bralet - Lupo Line"
+            "Kostium dwuczęściowy Góra Model Elena Kostium Bralet - Lupo Line",
+            # Test z "Big" w środku nazwy (powinno zostać przeniesione na koniec)
+            "Kostium dwuczęściowy Figi 1 Kąpielowe Model Big Elba - Lupo Line"
         ]
 
         print("🧪 Testowanie AI optymalizacji dla kostiumów dwuczęściowych:")
@@ -2371,6 +2428,7 @@ WAŻNE:
     def save_mpd_product(self):
         """
         Klika przycisk 'Utwórz nowy produkt w MPD' aby zapisać zmiany
+        Automatycznie dodaje produkty z błędami duplikatów do listy pomijanych
 
         Returns:
             bool: True jeśli operacja się powiodła
@@ -2379,6 +2437,20 @@ WAŻNE:
             driver = self.navigator.login_agent.get_driver()
 
             print(f"💾 Zapisuję produkt MPD...")
+
+            # Pobierz ID produktu z URL dla potrzeb logowania błędów
+            current_url = driver.current_url
+            product_id = None
+            if "/change/" in current_url:
+                try:
+                    # Wyodrębnij ID z URL typu: /admin/matterhorn/products/214962/change/
+                    import re
+                    match = re.search(r'/products/(\d+)/change/', current_url)
+                    if match:
+                        product_id = match.group(1)
+                        print(f"🔍 ID produktu: {product_id}")
+                except:
+                    pass
 
             # Znajdź przycisk "Utwórz nowy produkt w MPD"
             save_button = driver.find_element(By.ID, "create-mpd-product-btn")
@@ -2398,17 +2470,53 @@ WAŻNE:
 
             # Poczekaj na przetworzenie (może być komunikat lub przekierowanie)
             import time
-            time.sleep(2)
+            time.sleep(3)  # Zwiększone z 2 do 3 sekund dla pewności
 
             # Sprawdź czy nie ma komunikatów błędów
             try:
                 error_elements = driver.find_elements(
-                    By.CSS_SELECTOR, ".error, .alert-danger, .django-error")
+                    By.CSS_SELECTOR, ".error, .alert-danger, .django-error, .errorlist")
                 if error_elements:
                     error_text = error_elements[0].text.strip()
                     print(f"⚠️ Komunikat błędu: {error_text}")
+
+                    # Sprawdź czy to błąd związany z duplikatem klucza (kolor, seria, itp.)
+                    duplicate_keywords = [
+                        "duplicate key value violates unique constraint",
+                        "already exists",
+                        "UNIQUE constraint failed",
+                        "IntegrityError",
+                        "klucz już istnieje"
+                    ]
+
+                    is_duplicate_error = any(keyword.lower() in error_text.lower()
+                                             for keyword in duplicate_keywords)
+
+                    if is_duplicate_error and product_id:
+                        print(
+                            f"🚨 Wykryto błąd duplikatu - dodaję produkt {product_id} do listy pomijanych")
+
+                        # Skróć komunikat błędu dla komentarza (max 100 znaków)
+                        short_error = error_text[:100] + \
+                            "..." if len(error_text) > 100 else error_text
+                        short_error = short_error.replace(
+                            '\n', ' ').replace('\r', ' ')
+
+                        # Dodaj do listy pomijanych z zapisem do pliku
+                        success = add_product_to_skip_file(
+                            product_id, f"duplikat: {short_error}")
+
+                        if success:
+                            print(
+                                f"✅ Produkt {product_id} dodany do listy pomijanych")
+                        else:
+                            print(
+                                f"⚠️ Nie udało się dodać produktu {product_id} do listy pomijanych")
+
                     return False
-            except:
+            except Exception as check_error:
+                print(
+                    f"⚠️ Błąd podczas sprawdzania komunikatów błędów: {str(check_error)}")
                 pass
 
             # Sprawdź czy nie ma komunikatów sukcesu
@@ -2418,15 +2526,193 @@ WAŻNE:
                 if success_elements:
                     success_text = success_elements[0].text.strip()
                     print(f"✅ Komunikat sukcesu: {success_text}")
+                    print(f"✅ Produkt MPD został pomyślnie zapisany")
+                    return True
             except:
                 pass
 
-            print(f"✅ Produkt MPD został zapisany")
+            # Jeśli nie ma ani błędów ani komunikatów sukcesu,
+            # sprawdź czy nastąpiło przekierowanie (oznaka sukcesu)
+            try:
+                time.sleep(1)
+                new_url = driver.current_url
+                if new_url != current_url:
+                    print(f"✅ Nastąpiło przekierowanie - prawdopodobnie sukces")
+                    print(f"✅ Produkt MPD został zapisany")
+                    return True
+            except:
+                pass
+
+            print(f"✅ Produkt MPD został zapisany (brak komunikatów błędów)")
             return True
 
         except Exception as e:
             print(f"❌ Błąd podczas zapisywania produktu MPD: {str(e)}")
             return False
+
+    def save_mpd_product_with_error_info(self):
+        """
+        Klika przycisk 'Utwórz nowy produkt w MPD' i zwraca szczegółowe informacje o błędach
+
+        Returns:
+            dict: {
+                "success": bool,
+                "is_duplicate_error": bool,
+                "error_message": str,
+                "product_id": str
+            }
+        """
+        try:
+            driver = self.navigator.login_agent.get_driver()
+
+            print(f"💾 Zapisuję produkt MPD...")
+
+            # Pobierz ID produktu z URL dla potrzeb logowania błędów
+            current_url = driver.current_url
+            product_id = None
+            if "/change/" in current_url:
+                try:
+                    # Wyodrębnij ID z URL typu: /admin/matterhorn/products/214962/change/
+                    import re
+                    match = re.search(r'/products/(\d+)/change/', current_url)
+                    if match:
+                        product_id = match.group(1)
+                        print(f"🔍 ID produktu: {product_id}")
+                except:
+                    pass
+
+            # Znajdź przycisk "Utwórz nowy produkt w MPD"
+            save_button = driver.find_element(By.ID, "create-mpd-product-btn")
+
+            # Sprawdź czy przycisk jest widoczny i klikalny
+            if not save_button.is_displayed():
+                print(f"⚠️ Przycisk 'Utwórz nowy produkt w MPD' nie jest widoczny")
+                return {
+                    "success": False,
+                    "is_duplicate_error": False,
+                    "error_message": "Przycisk nie jest widoczny",
+                    "product_id": product_id
+                }
+
+            if not save_button.is_enabled():
+                print(f"⚠️ Przycisk 'Utwórz nowy produkt w MPD' nie jest aktywny")
+                return {
+                    "success": False,
+                    "is_duplicate_error": False,
+                    "error_message": "Przycisk nie jest aktywny",
+                    "product_id": product_id
+                }
+
+            # Kliknij przycisk
+            save_button.click()
+            print(f"✅ Kliknięto 'Utwórz nowy produkt w MPD'")
+
+            # Poczekaj na przetworzenie (może być komunikat lub przekierowanie)
+            import time
+            time.sleep(3)  # Zwiększone z 2 do 3 sekund dla pewności
+
+            # Sprawdź czy nie ma komunikatów błędów
+            try:
+                error_elements = driver.find_elements(
+                    By.CSS_SELECTOR, ".error, .alert-danger, .django-error, .errorlist")
+                if error_elements:
+                    error_text = error_elements[0].text.strip()
+                    print(f"⚠️ Komunikat błędu: {error_text}")
+
+                    # Sprawdź czy to błąd związany z duplikatem klucza (kolor, seria, itp.)
+                    duplicate_keywords = [
+                        "duplicate key value violates unique constraint",
+                        "already exists",
+                        "UNIQUE constraint failed",
+                        "IntegrityError",
+                        "klucz już istnieje"
+                    ]
+
+                    is_duplicate_error = any(keyword.lower() in error_text.lower()
+                                             for keyword in duplicate_keywords)
+
+                    if is_duplicate_error and product_id:
+                        print(
+                            f"🚨 Wykryto błąd duplikatu - dodaję produkt {product_id} do listy pomijanych")
+
+                        # Skróć komunikat błędu dla komentarza (max 100 znaków)
+                        short_error = error_text[:100] + \
+                            "..." if len(error_text) > 100 else error_text
+                        short_error = short_error.replace(
+                            '\n', ' ').replace('\r', ' ')
+
+                        # Dodaj do listy pomijanych z zapisem do pliku
+                        success = add_product_to_skip_file(
+                            product_id, f"duplikat: {short_error}")
+
+                        if success:
+                            print(
+                                f"✅ Produkt {product_id} dodany do listy pomijanych")
+                        else:
+                            print(
+                                f"⚠️ Nie udało się dodać produktu {product_id} do listy pomijanych")
+
+                    return {
+                        "success": False,
+                        "is_duplicate_error": is_duplicate_error,
+                        "error_message": error_text,
+                        "product_id": product_id
+                    }
+            except Exception as check_error:
+                print(
+                    f"⚠️ Błąd podczas sprawdzania komunikatów błędów: {str(check_error)}")
+                pass
+
+            # Sprawdź czy nie ma komunikatów sukcesu
+            try:
+                success_elements = driver.find_elements(
+                    By.CSS_SELECTOR, ".success, .alert-success, .django-success")
+                if success_elements:
+                    success_text = success_elements[0].text.strip()
+                    print(f"✅ Komunikat sukcesu: {success_text}")
+                    print(f"✅ Produkt MPD został pomyślnie zapisany")
+                    return {
+                        "success": True,
+                        "is_duplicate_error": False,
+                        "error_message": "",
+                        "product_id": product_id
+                    }
+            except:
+                pass
+
+            # Jeśli nie ma ani błędów ani komunikatów sukcesu,
+            # sprawdź czy nastąpiło przekierowanie (oznaka sukcesu)
+            try:
+                time.sleep(1)
+                new_url = driver.current_url
+                if new_url != current_url:
+                    print(f"✅ Nastąpiło przekierowanie - prawdopodobnie sukces")
+                    print(f"✅ Produkt MPD został zapisany")
+                    return {
+                        "success": True,
+                        "is_duplicate_error": False,
+                        "error_message": "",
+                        "product_id": product_id
+                    }
+            except:
+                pass
+
+            print(f"✅ Produkt MPD został zapisany (brak komunikatów błędów)")
+            return {
+                "success": True,
+                "is_duplicate_error": False,
+                "error_message": "",
+                "product_id": product_id
+            }
+
+        except Exception as e:
+            print(f"❌ Błąd podczas zapisywania produktu MPD: {str(e)}")
+            return {
+                "success": False,
+                "is_duplicate_error": False,
+                "error_message": str(e),
+                "product_id": None
+            }
 
     def return_to_products_list(self, filtered_url=None):
         """
@@ -2520,29 +2806,49 @@ WAŻNE:
             filtered_url (str): URL z filtrami do powrotu
 
         Returns:
-            bool: True jeśli operacja się powiodła
+            tuple: (success: bool, should_continue: bool)
+                   success: True jeśli operacja się powiodła
+                   should_continue: True jeśli agent powinien kontynuować z następnym produktem
         """
         try:
             print(f"\n💾 Finalizuję proces MPD...")
 
             # 1. Zapisz produkt MPD
-            save_success = self.save_mpd_product()
-            if not save_success:
-                print(f"❌ Nie udało się zapisać produktu MPD")
-                return False
+            save_result = self.save_mpd_product_with_error_info()
 
-            # 2. Powróć do listy produktów (z filtrami)
-            return_success = self.return_to_products_list(filtered_url)
-            if not return_success:
-                print(f"❌ Nie udało się powrócić do listy produktów")
-                return False
+            if save_result["success"]:
+                # 2. Powróć do listy produktów (z filtrami)
+                return_success = self.return_to_products_list(filtered_url)
+                if not return_success:
+                    print(f"❌ Nie udało się powrócić do listy produktów")
+                    # Błąd nawigacji, ale można kontynuować
+                    return (False, True)
 
-            print(f"✅ Proces MPD zakończony pomyślnie")
-            return True
+                print(f"✅ Proces MPD zakończony pomyślnie")
+                return (True, True)
+
+            elif save_result["is_duplicate_error"]:
+                # Błąd duplikatu - produkt już dodany do listy pomijanych
+                print(
+                    f"⚠️ Produkt pominięty z powodu duplikatu - kontynuuję z następnym")
+
+                # Powróć do listy produktów aby kontynuować
+                return_success = self.return_to_products_list(filtered_url)
+                if not return_success:
+                    print(f"❌ Nie udało się powrócić do listy produktów")
+                    # Błąd nawigacji, ale można kontynuować
+                    return (False, True)
+
+                return (False, True)  # Nie zapisano, ale można kontynuować
+
+            else:
+                # Inny błąd zapisywania
+                print(f"❌ Nie udało się zapisać produktu MPD - poważny błąd")
+                return (False, False)  # Nie kontynuuj - poważny błąd
 
         except Exception as e:
             print(f"❌ Błąd podczas finalizacji procesu MPD: {str(e)}")
-            return False
+            return (False, False)
 
     def auto_detect_and_set_fabric_components(self):
         """
@@ -3163,6 +3469,7 @@ def run_product_name_agent():
             url = "http://localhost:8000/admin/matterhorn/products/?active=true&brand=Lupo+Line&category_name=Kostiumy+Dwuczęściowe&is_mapped__exact=0"
 
             processed_count = 0
+            skipped_count = 0  # Liczba produktów pominiętych (duplikaty)
             max_products = 50  # Bezpiecznik - maksymalnie 50 produktów na sesję
 
             while processed_count < max_products:
@@ -3203,13 +3510,21 @@ def run_product_name_agent():
 
                         # 5. Zapisz produkt i wróć do listy (z filtrem is_mapped=0)
                         print("\n💾 Zapisuję produkt i wracam do listy...")
-                        if editor.complete_mpd_process(url):
+                        success, should_continue = editor.complete_mpd_process(
+                            url)
+
+                        if success:
                             print(
                                 f"✅ Produkt {processed_count + 1} został pomyślnie przetworzony i zapisany!")
                             processed_count += 1
+                        elif should_continue:
+                            skipped_count += 1
+                            print(
+                                f"⚠️ Produkt #{processed_count + skipped_count} pominięty (duplikat) - kontynuuję z następnym")
+                            # Nie inkrementuj processed_count dla pominiętych produktów
                         else:
                             print(
-                                f"❌ Nie udało się zapisać produktu {processed_count + 1}")
+                                f"❌ Poważny błąd z produktem {processed_count + 1} - przerywam")
                             break
 
                     else:
@@ -3226,11 +3541,16 @@ def run_product_name_agent():
             print(f"\n{'='*60}")
             print(f"🎉 AGENT ZAKOŃCZYŁ PRACĘ!")
             print(f"📊 Przetworzone produkty: {processed_count}")
+            print(f"⏭️ Pominięte produkty (duplikaty): {skipped_count}")
+            print(f"📈 Łącznie sprawdzonych: {processed_count + skipped_count}")
+
             if processed_count == max_products:
                 print(
                     f"⚠️ Osiągnięto limit maksymalny ({max_products} produktów)")
-            elif processed_count == 0:
+            elif processed_count == 0 and skipped_count == 0:
                 print(f"❌ Nie udało się przetworzyć żadnego produktu")
+            elif processed_count == 0 and skipped_count > 0:
+                print(f"⚠️ Wszystkie produkty były duplikatami")
             else:
                 print(f"✅ Wszystkie dostępne produkty zostały przetworzone")
             print(f"{'='*60}")
