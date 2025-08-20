@@ -12,48 +12,48 @@ class LupoLineKnowledgeBase:
         # Nazwy modeli i ich charakterystyki
         self.model_characteristics = {
             "Sofia": {
-                "typical_types": ["Figi", "Biustonosz"],
+                "typical_types": ["Figi", "Biustonosz", "Strój Jednoczęściowy"],
                 "common_sizes": ["Big", "Small"],
                 "typical_colors": ["Black", "Multicolor", "White"],
                 # regulowane, regulowane ramiączka
                 "usual_attributes": [26, 15]
             },
             "Ember": {
-                "typical_types": ["Biustonosz", "Bralet"],
+                "typical_types": ["Biustonosz", "Bralet", "Strój Jednoczęściowy"],
                 "common_sizes": ["Big"],
                 "typical_colors": ["Multicolor", "Black"],
                 # na fiszbinach, usztywniane miseczki
                 "usual_attributes": [9, 30]
             },
             "Aqua": {
-                "typical_types": ["Biustonosz", "Kopa"],
+                "typical_types": ["Biustonosz", "Kopa", "Strój Jednoczęściowy"],
                 "common_sizes": ["Big", "Small"],
                 "typical_colors": ["Turkus", "Blue"],
                 # usztywniane miseczki, wiązane na szyi, zapinane z tyłu
                 "usual_attributes": [30, 29, 24]
             },
             "Wave": {
-                "typical_types": ["Biustonosz"],
+                "typical_types": ["Biustonosz", "Strój Jednoczęściowy"],
                 "common_sizes": ["Big"],
                 "typical_colors": ["Multicolor", "Black"],
                 # miękkie miseczki, na fiszbinach, regulowane ramiączka, nieodpinane, duży biust
                 "usual_attributes": [27, 9, 15, 23, 5]
             },
             "Mirage": {
-                "typical_types": ["Figi"],
+                "typical_types": ["Figi", "Strój Jednoczęściowy"],
                 "common_sizes": ["Big"],
                 "typical_colors": ["Multicolor", "Black"],
                 "usual_attributes": [25, 26]  # wyższy stan, regulowane
             },
             "Coral": {
-                "typical_types": ["Biustonosz", "Figi"],
+                "typical_types": ["Biustonosz", "Figi", "Strój Jednoczęściowy"],
                 "common_sizes": ["Big", "Small"],
                 # Coral to nazwa modelu, nie kolor!
                 "typical_colors": ["Coral"],
                 "usual_attributes": [26, 15]
             },
             "Gabriella": {
-                "typical_types": ["Szorty Kąpielowe"],
+                "typical_types": ["Szorty Kąpielowe", "Strój Jednoczęściowy"],
                 "common_sizes": ["Big", "Small"],
                 "typical_colors": ["Multicolor", "Black"],
                 # regulowane, wyższy stan (prawdopodobnie)
@@ -86,6 +86,24 @@ class LupoLineKnowledgeBase:
                 "wiązane na szyi",
                 "halter",
                 "wiązanie na karku"
+            ],
+            "stroj_jednoczesciowy": [
+                "strój jednoczęściowy",
+                "one-piece",
+                "kostium jednoczęściowy",
+                "cały strój"
+            ],
+            "stroj_jednoczesciowy_z_biustonoszem": [
+                "z wbudowanym biustonoszem",
+                "biustonosz w stroju",
+                "usztywniany biustonosz",
+                "podtrzymujący biust"
+            ],
+            "stroj_jednoczesciowy_regulowany": [
+                "regulowane ramiączka",
+                "możliwość regulacji",
+                "dostosowywany",
+                "elastyczny"
             ]
         }
 
@@ -204,6 +222,64 @@ class LupoLineKnowledgeBase:
             return 0.8
         else:
             return 0.5
+
+    def get_product_category(self, title, description=""):
+        """Określa kategorię produktu na podstawie tytułu i opisu"""
+        text = f"{title} {description}".lower()
+        
+        if any(keyword in text for keyword in ["strój jednoczęściowy", "one-piece", "kostium jednoczęściowy"]):
+            return "stroj_jednoczesciowy"
+        elif any(keyword in text for keyword in ["biustonosz", "bralet", "figi", "kopa"]):
+            return "biustonosz"
+        elif any(keyword in text for keyword in ["szorty", "spodenki"]):
+            return "szorty"
+        else:
+            return "nieznana"
+
+    def get_category_specific_attributes(self, category, model_name):
+        """Zwraca atrybuty specyficzne dla kategorii produktu"""
+        base_attributes = self.predict_attributes_by_model(model_name)
+        
+        if category == "stroj_jednoczesciowy":
+            # Dodaj atrybuty specyficzne dla strojów jednoczęściowych
+            additional_attrs = [25]  # wyższy stan
+            return list(set(base_attributes + additional_attrs))
+        elif category == "biustonosz":
+            # Atrybuty specyficzne dla biustonoszy
+            return base_attributes
+        else:
+            return base_attributes
+
+    def get_category_filter_params(self, category):
+        """Zwraca parametry filtrowania dla danej kategorii"""
+        if category == "stroj_jednoczesciowy":
+            return {
+                "category_name": "Strój Jednoczęściowy",
+                "additional_params": {"product_type": "one-piece"}
+            }
+        elif category == "biustonosz":
+            return {
+                "category_name": "Biustonosz",
+                "additional_params": {"product_type": "bra"}
+            }
+        else:
+            return {
+                "category_name": None,
+                "additional_params": {}
+            }
+
+    def validate_category_consistency(self, title, description, category):
+        """Sprawdza spójność kategorii z treścią produktu"""
+        detected_category = self.get_product_category(title, description)
+        
+        if detected_category != category:
+            return {
+                "type": "category_mismatch",
+                "expected": category,
+                "detected": detected_category,
+                "suggestion": f"Produkt wydaje się być {detected_category}, nie {category}"
+            }
+        return None
 
 
 # Globalna instancja bazy wiedzy

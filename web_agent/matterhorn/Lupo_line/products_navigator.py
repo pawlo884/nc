@@ -123,6 +123,32 @@ class ProductsNavigator:
             print(f"❌ Błąd podczas nawigacji: {str(e)}")
             return False
 
+    def navigate_to_category(self, category_config):
+        """
+        Nawiguje do produktów określonej kategorii używając bezpośredniego linku
+
+        Args:
+            category_config (dict): Konfiguracja kategorii z URL
+
+        Returns:
+            bool: True jeśli nawigacja się powiodła
+        """
+        try:
+            url = category_config.get("url")
+            if not url:
+                print(f"❌ Brak URL dla kategorii: {category_config.get('name', 'nieznana')}")
+                return False
+
+            print(f"🎯 Nawiguję do kategorii: {category_config['display_name']}")
+            print(f"URL: {url}")
+            
+            # Użyj metody nawigacji do konkretnego URL
+            return self.navigate_to_specific_url(url)
+            
+        except Exception as e:
+            print(f"❌ Błąd podczas nawigacji do kategorii {category_config.get('name', 'nieznana')}: {str(e)}")
+            return False
+
     def navigate_to_specific_url(self, url):
         """
         Nawiguje do konkretnego URL po zalogowaniu
@@ -521,18 +547,22 @@ class ProductEditor:
         print(f"📝 Część główna: {main_part}")
         print(f"🏷️ Marka: {brand}")
 
-        # Wzorce dla kostiumów dwuczęściowych
+        # Wzorce dla różnych typów strojów kąpielowych
         optimized_title = None
 
-        # 1. Kostiumy dwuczęściowe - Szorty Kąpielowe (nowy typ!)
-        if self._is_szorty_swimsuit(main_part):
+        # 1. Stroje jednoczęściowe
+        if self._is_jednoczesciowy_swimsuit(main_part):
+            optimized_title = self._optimize_jednoczesciowy_title(main_part)
+
+        # 2. Kostiumy dwuczęściowe - Szorty Kąpielowe (nowy typ!)
+        elif self._is_szorty_swimsuit(main_part):
             optimized_title = self._optimize_szorty_title(main_part)
 
-        # 2. Kostiumy dwuczęściowe - Figi (tolerancja na literówki)
+        # 3. Kostiumy dwuczęściowe - Figi (tolerancja na literówki)
         elif self._is_figi_swimsuit(main_part):
             optimized_title = self._optimize_figi_title(main_part)
 
-        # 3. Kostiumy dwuczęściowy - Góra/Top/Biustonosz
+        # 4. Kostiumy dwuczęściowy - Góra/Top/Biustonosz
         elif self._is_top_swimsuit(main_part):
             optimized_title = self._optimize_top_title(main_part)
 
@@ -764,6 +794,26 @@ class ProductEditor:
             f"🔍 Sprawdzam góra/biustonosz: kostium={True}, top={has_top_word}")
         return has_top_word
 
+    def _is_jednoczesciowy_swimsuit(self, text):
+        """Sprawdza czy to strój kąpielowy jednoczęściowy"""
+        text_lower = text.lower()
+
+        # Sprawdź różne warianty strojów jednoczęściowych
+        jednoczesciowy_variants = [
+            "jednoczęściowy", "Jednoczęściowy", "JEDNOCZĘŚCIOWY",
+            "jednoczesciowy", "Jednoczesciowy", "JEDNOCZESCIOWY",  # bez polskich znaków
+            "kostium jednoczęściowy", "Kostium Jednoczęściowy",
+            "kostium jednoczesciowy", "Kostium Jednoczesciowy",
+            "strój jednoczęściowy", "Strój Jednoczęściowy",
+            "strój jednoczesciowy", "Strój Jednoczesciowy"
+        ]
+
+        has_jednoczesciowy_word = any(
+            variant in text for variant in jednoczesciowy_variants)
+
+        print(f"🔍 Sprawdzam jednoczęściowy: {has_jednoczesciowy_word}")
+        return has_jednoczesciowy_word
+
     def _optimize_szorty_title(self, main_part):
         """Optymalizuje tytuły szortów kąpielowych"""
         model_name = self._extract_model_name_for_title(main_part)
@@ -789,6 +839,24 @@ class ProductEditor:
                 clean_model_name = " ".join(words_without_big)
 
             return f"Figi kąpielowe {clean_model_name}"
+        return None
+
+    def _optimize_jednoczesciowy_title(self, main_part):
+        """Optymalizuje tytuły strojów jednoczęściowych"""
+        model_name = self._extract_model_name_for_title(main_part)
+        if model_name:
+            # Trimuj nadmiarowe spacje
+            clean_model_name = " ".join(model_name.split())
+
+            # Specjalna logika dla słowa "Big" - powinno być na końcu
+            words = clean_model_name.split()
+            if "Big" in words and not clean_model_name.endswith("Big"):
+                # Przenieś "Big" na koniec
+                words_without_big = [word for word in words if word != "Big"]
+                words_without_big.append("Big")
+                clean_model_name = " ".join(words_without_big)
+
+            return f"Jednoczęściowy strój kąpielowy {clean_model_name}"
         return None
 
     def _optimize_top_title(self, main_part):
@@ -1249,14 +1317,14 @@ WAŻNE:
             27: ["miękkie miseczki", "miękka miseczka", "soft cup"],
             9: ["na fiszbinach", "z fiszbinami", "fiszbiny", "na kościach", "usztywniony fiszbinami"],
             10: ["na kopie", "na kopię", "podkopie"],
-            23: ["nieodpinane ramiączka", "stałe ramiączka", "nieodpinane"],
+            23: ["nieodpinane ramiączka", "nieodpinane, ramiączka", "nieodpinane ramiączka,", "stałe ramiączka", "nieodpinane"],
             11: ["niewidoczne wzmocnienie", "push up", "push-up"],
             28: ["niski stan", "low rise", "nisko osadzone", "z niższym stanem", "niższym stanem", "z niskim stanem", "niskim stanem"],
             12: ["odpinane ramiączka", "odpinane"],
             13: ["płaski szew", "płaskie szwy"],
             14: ["przeciwżylakowe", "przeciwżylakowa", "uciskowe", "kompresyjne"],
             26: ["regulowane", "regulacja", "regulowany", "ściągane", "ściągany", "możesz regulować", "regulować", "ściągane sznureczki", "sznureczki", "z regulacją", "wiązane na troczki", "wiązane troczki", "umożliwiają regulację", "umożliwia regulację"],
-            15: ["regulowane ramiączka", "regulacja ramiączek", "ramiączka regulowane", "ramiączka z regulacją"],
+            15: ["regulowane ramiączka", "regulowane, nieodpinane ramiączka", "regulowane nieodpinane ramiączka", "regulacja ramiączek", "ramiączka regulowane", "ramiączka z regulacją", "regulowane, ramiączka", "regulowane ramiączka,"],
             16: ["sportowy", "sportowe", "do sportu", "aktywność"],
             29: ["wiązane na szyi", "wiązany na szyi", "wiązanie na szyi", "halter"],
             17: ["wielofunkcyjne", "wielofunkcyjna", "multiway"],
@@ -1300,7 +1368,9 @@ WAŻNE:
                         if attr_id in [12, 15, 23]:  # ramiączka
                             found_specific_straps = True
 
-                        break  # Jeśli znaleziono jeden keyword dla tego atrybutu, nie szukaj dalej
+                        # Dla atrybutów ramiączek (ID 12, 15, 23) szukaj dalej aby znaleźć wszystkie
+                        if attr_id not in [12, 15, 23]:
+                            break  # Dla innych atrybutów zatrzymaj po pierwszym znalezionym
 
         # Wykluczaj kolizje między podobnymi atrybutami ramiączek
         if 12 in found_attributes and 23 in found_attributes:
@@ -1314,7 +1384,8 @@ WAŻNE:
         if 15 in found_attributes and 26 in found_attributes:
             # Sprawdź czy "regulowane" w opisie odnosi się TYLKO do ramiączek
             straps_keywords = ["ramiączka regulowane", "regulowane ramiączka",
-                               "ramiączka z regulacją", "regulacja ramiączek"]
+                               "regulowane, nieodpinane ramiączka", "regulowane nieodpinane ramiączka",
+                               "ramiączka z regulacją", "regulacja ramiączek", "regulowane, ramiączka"]
             has_straps_specific = any(
                 keyword in description_lower for keyword in straps_keywords)
 
@@ -1802,7 +1873,7 @@ WAŻNE:
 
     def create_series_name(self, model_name):
         """
-        Tworzy nazwę serii według wzoru: "strój kąpielowy {nazwa modelu} - Lupo Line"
+        Tworzy nazwę serii według wzoru: "Strój kąpielowy {nazwa modelu} - Lupo Line"
 
         Args:
             model_name (str): Nazwa modelu
@@ -1811,9 +1882,9 @@ WAŻNE:
             str: Nazwa serii
         """
         if not model_name:
-            return "strój kąpielowy - Lupo Line"
+            return "Strój kąpielowy - Lupo Line"
 
-        series_name = f"strój kąpielowy {model_name} - Lupo Line"
+        series_name = f"Strój kąpielowy {model_name} - Lupo Line"
         print(f"📝 Utworzono nazwę serii: '{series_name}'")
         return series_name
 

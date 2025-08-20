@@ -3,8 +3,8 @@
 Przykład rozszerzonego workflow z bazą wiedzy i systemem uczenia
 """
 
-from lupo_line_knowledge_base import lupo_knowledge
-from agent_learning_system import learning_system
+from matterhorn.Lupo_line.lupo_line_knowledge_base import lupo_knowledge
+from matterhorn.Lupo_line.agent_learning_system import learning_system
 
 
 def enhanced_mpd_workflow_example():

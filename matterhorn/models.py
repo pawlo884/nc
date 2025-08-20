@@ -72,7 +72,7 @@ class Images(models.Model):
     image_id = models.BigAutoField(primary_key=True)
     image_path = models.TextField(blank=True, null=True)
     product = models.ForeignKey(
-        'Products', models.CASCADE, blank=True, null=True)
+        'Products', models.CASCADE, blank=True, null=True, related_name='images')
     timestamp = models.DateTimeField()
 
     class Meta:

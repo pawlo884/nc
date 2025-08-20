@@ -154,7 +154,7 @@ def print_skip_list_status():
         print(f"   ✅ Lista jest pusta - wszystkie produkty będą przetwarzane")
     else:
         print(f"   ⚠️ Produkty do pominięcia: {info['product_ids']}")
-        print(f"   💡 Aby dodać produkty, edytuj plik: web_agent/skip_products_list.py")
+        print(f"   💡 Aby dodać produkty, edytuj plik: web_agent/matterhorn/Lupo_line/skip_products_list.py")
 
 
 if __name__ == "__main__":

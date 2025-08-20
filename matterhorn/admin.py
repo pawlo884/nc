@@ -68,7 +68,7 @@ class ProductsAdmin(admin.ModelAdmin):
                 queryset.values_list('brand', flat=True).distinct())
 
         # Optymalizacja zapytań do relacji używanych w list_display i metodach
-        return queryset.select_related('brand').prefetch_related('images', 'variants', 'other_colors', 'product_in_set')
+        return queryset.prefetch_related('images', 'variants', 'other_colors', 'product_in_set')
 
     def lookup_allowed(self, lookup, value):
         # Zezwól na filtrowanie po kategorii i marce
@@ -210,6 +210,56 @@ class ProductsAdmin(admin.ModelAdmin):
                         cursor.execute("UPDATE products SET series_id = %s, updated_at = NOW() WHERE id = %s", [
                                        series_id, mapped_product_id])
                     return JsonResponse({'success': True, 'message': 'Zaktualizowano serię.'})
+
+                # Aktualizacja koloru producenta
+                if 'producer_color_name' in request.POST and len(request.POST) == 1:
+                    producer_color_name = request.POST.get('producer_color_name')
+                    main_color_id = request.POST.get('main_color_id')
+                    
+                    if not main_color_id:
+                        return JsonResponse({'success': False, 'error': 'Brak głównego koloru'})
+                    
+                    with connections['MPD'].cursor() as cursor:
+                        # Pobierz kolor aktualnego produktu z Matterhorn
+                        with connections['matterhorn'].cursor() as matterhorn_cursor:
+                            matterhorn_cursor.execute("SELECT color FROM products WHERE id = %s", [product_id])
+                            color_result = matterhorn_cursor.fetchone()
+                            if not color_result:
+                                return JsonResponse({'success': False, 'error': 'Nie można pobrać koloru produktu'})
+                            product_color = color_result[0]
+                        
+                        # Pobierz color_id dla koloru produktu
+                        cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id IS NULL", [product_color])
+                        color_row = cursor.fetchone()
+                        if not color_row:
+                            return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
+                        color_id = color_row[0]
+                        
+                        # Sprawdź czy kolor producenta już istnieje
+                        cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s", [producer_color_name, color_id])
+                        pc_row = cursor.fetchone()
+                        if pc_row:
+                            producer_color_id = pc_row[0]
+                        else:
+                            # Utwórz nowy kolor producenta
+                            cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id", [producer_color_name, color_id])
+                            row = cursor.fetchone()
+                            if row:
+                                producer_color_id = row[0]
+                            else:
+                                return JsonResponse({'success': False, 'error': 'Nie udało się utworzyć koloru producenta'})
+                        
+                        # Aktualizuj tylko warianty z tym samym color_id (tym samym kolorem produktu)
+                        cursor.execute("""
+                            UPDATE product_variants 
+                            SET producer_color_id = %s, updated_at = NOW() 
+                            WHERE product_id = %s AND color_id = %s
+                        """, [producer_color_id, mapped_product_id, color_id])
+                        
+                        updated_count = cursor.rowcount
+                        connections['MPD'].commit()
+                        
+                    return JsonResponse({'success': True, 'message': f'Zaktualizowano kolor producenta dla {updated_count} wariantów.'})
 
                 # Analogicznie możesz dodać kolejne pola...
 
@@ -865,12 +915,6 @@ class ProductsAdmin(admin.ModelAdmin):
                 return JsonResponse({'success': False, 'error': str(e)})
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
 
-    def get_queryset(self, request):
-        queryset = super().get_queryset(request)
-        queryset = queryset.prefetch_related(
-            'variants', 'other_colors', 'product_in_set')
-        return queryset
-
     def get_product_images(self, obj):
         images = Images.objects.filter(product=obj)
         if images:
@@ -1216,8 +1260,14 @@ class ProductsAdmin(admin.ModelAdmin):
                             suggested_in_query = 0
                         scored.append(
                             {'id': row[0], 'name': row[1], 'brand': row[2], 'similarity': score, 'suggested_in_query': suggested_in_query})
-                    suggested_products = sorted(
-                        scored, key=lambda x: x['similarity'], reverse=True)[:5]
+                    # Sprawdź parametr sortowania z request
+                    sort_by = request.GET.get('sort_by', 'similarity')
+                    if sort_by == 'suggested_in_query':
+                        suggested_products = sorted(
+                            scored, key=lambda x: x['suggested_in_query'], reverse=True)[:5]
+                    else:
+                        suggested_products = sorted(
+                            scored, key=lambda x: x['similarity'], reverse=True)[:5]
             except Exception as e:
                 logger.error(
                     f"Błąd fuzzy search sugerowanych produktów (RapidFuzz): {e}")
@@ -1602,8 +1652,33 @@ class ProductsAdmin(admin.ModelAdmin):
                                         f"Nie udało się utworzyć koloru: {value}")
                                     raise Exception(
                                         'Nie udało się utworzyć koloru')
-                        cursor.execute(f"UPDATE product_variants SET {field_name} = %s, updated_at = NOW() WHERE product_id = %s", [
-                                       color_id, product_id])
+                        
+                        # Dla producer_color_id, aktualizuj tylko warianty z odpowiednim color_id
+                        if field_name == 'producer_color_id':
+                            # Pobierz kolor aktualnego produktu z request
+                            request_data = json.loads(request.body)
+                            product_color = request_data.get('current_color')
+                            
+                            if not product_color:
+                                return JsonResponse({'success': False, 'error': 'Brak informacji o kolorze produktu'})
+                            
+                            # Pobierz color_id dla koloru produktu w MPD
+                            cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id IS NULL", [product_color])
+                            color_row = cursor.fetchone()
+                            if not color_row:
+                                return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
+                            product_color_id = color_row[0]
+                            
+                            # Aktualizuj tylko warianty z tym samym color_id (tym samym kolorem produktu)
+                            cursor.execute(f"""
+                                UPDATE product_variants 
+                                SET {field_name} = %s, updated_at = NOW() 
+                                WHERE product_id = %s AND color_id = %s
+                            """, [color_id, product_id, product_color_id])
+                        else:
+                            # Dla color_id, aktualizuj wszystkie warianty produktu
+                            cursor.execute(f"UPDATE product_variants SET {field_name} = %s, updated_at = NOW() WHERE product_id = %s", [
+                                           color_id, product_id])
                     elif field_name in variants_fields:
                         cursor.execute(f"UPDATE product_variants SET {field_name} = %s, updated_at = NOW() WHERE product_id = %s", [
                                        value, product_id])

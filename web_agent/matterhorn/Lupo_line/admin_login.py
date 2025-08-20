@@ -10,12 +10,12 @@ from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
 
 # Załaduj zmienne środowiskowe z .env.dev
-# Sprawdź czy jesteśmy w katalogu web_agent czy w głównym katalogu projektu
+# Sprawdź czy jesteśmy w katalogu web_agent/matterhorn/Lupo_line czy w głównym katalogu projektu
 if os.path.exists('.env.dev'):
     load_dotenv('.env.dev')
 else:
-    # Jeśli jesteśmy w katalogu web_agent, przejdź do katalogu nadrzędnego
-    load_dotenv('../.env.dev')
+    # Jeśli jesteśmy w katalogu web_agent/matterhorn/Lupo_line, przejdź do głównego katalogu projektu
+    load_dotenv('../../../.env.dev')
 
 
 class AdminLoginAgent:

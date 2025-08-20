@@ -13,7 +13,7 @@ Użycie:
 
 import sys
 import re
-from skip_products_list import SKIP_PRODUCT_IDS, should_skip_product, get_skip_list_info, print_skip_list_status
+from matterhorn.Lupo_line.skip_products_list import SKIP_PRODUCT_IDS, should_skip_product, get_skip_list_info, print_skip_list_status
 
 
 def add_products(ids_input):
@@ -44,7 +44,7 @@ def add_products(ids_input):
 
     if added_count > 0:
         print(f"\n🎯 Dodano {added_count} produktów do listy")
-        print("💡 UWAGA: Zmiany są tylko w pamięci. Aby je zapisać, edytuj plik skip_products_list.py")
+        print("💡 UWAGA: Zmiany są tylko w pamięci. Aby je zapisać, edytuj plik matterhorn/Lupo_line/skip_products_list.py")
         print_current_list()
 
     return added_count > 0
@@ -77,7 +77,7 @@ def remove_products(ids_input):
 
     if removed_count > 0:
         print(f"\n🎯 Usunięto {removed_count} produktów z listy")
-        print("💡 UWAGA: Zmiany są tylko w pamięci. Aby je zapisać, edytuj plik skip_products_list.py")
+        print("💡 UWAGA: Zmiany są tylko w pamięci. Aby je zapisać, edytuj plik matterhorn/Lupo_line/skip_products_list.py")
         print_current_list()
 
     return removed_count > 0
@@ -89,7 +89,7 @@ def clear_list():
     SKIP_PRODUCT_IDS.clear()
     print(
         f"🧹 Wyczyszczono listę pomijanych produktów ({original_count} produktów)")
-    print("💡 UWAGA: Zmiany są tylko w pamięci. Aby je zapisać, edytuj plik skip_products_list.py")
+    print("💡 UWAGA: Zmiany są tylko w pamięci. Aby je zapisać, edytuj plik matterhorn/Lupo_line/skip_products_list.py")
     print_current_list()
     return True
 
