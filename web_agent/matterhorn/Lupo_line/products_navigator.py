@@ -136,17 +136,20 @@ class ProductsNavigator:
         try:
             url = category_config.get("url")
             if not url:
-                print(f"❌ Brak URL dla kategorii: {category_config.get('name', 'nieznana')}")
+                print(
+                    f"❌ Brak URL dla kategorii: {category_config.get('name', 'nieznana')}")
                 return False
 
-            print(f"🎯 Nawiguję do kategorii: {category_config['display_name']}")
+            print(
+                f"🎯 Nawiguję do kategorii: {category_config['display_name']}")
             print(f"URL: {url}")
-            
+
             # Użyj metody nawigacji do konkretnego URL
             return self.navigate_to_specific_url(url)
-            
+
         except Exception as e:
-            print(f"❌ Błąd podczas nawigacji do kategorii {category_config.get('name', 'nieznana')}: {str(e)}")
+            print(
+                f"❌ Błąd podczas nawigacji do kategorii {category_config.get('name', 'nieznana')}: {str(e)}")
             return False
 
     def navigate_to_specific_url(self, url):
@@ -578,7 +581,7 @@ class ProductEditor:
         if "Model " not in text:
             return ""
 
-            # Sprawdź czy GDZIEKOLWIEK w tytule są słowa "Bralet" lub "Kopa"
+        # Sprawdź czy GDZIEKOLWIEK w tytule są słowa "Bralet" lub "Kopa"
         product_types_to_move = []
         types_to_check = ["Bralet", "Kopa"]
 
@@ -617,7 +620,7 @@ class ProductEditor:
                 # Zachowaj "Coral" jako nazwę modelu
                 filtered_words.append(word)
             elif word not in elements_to_remove:
-                # Jeśli to typ produktu który ma być przeniesiony na koniec, nie dodawaj go tutaj
+                # Jeśli to typ produktu który ma być przeniesiony na końcu, nie dodawaj go tutaj
                 if word in product_types_to_move:
                     continue  # Pomiń - zostanie dodany na końcu
                 else:
@@ -630,6 +633,14 @@ class ProductEditor:
         result = " ".join(filtered_words).strip()
         # Trimuj nadmiarowe spacje (usuwaj podwójne spacje)
         result = " ".join(result.split())
+
+        # Specjalna logika dla słowa "Big" - powinno być na końcu
+        if "Big" in result and not result.endswith("Big"):
+            words = result.split()
+            words_without_big = [word for word in words if word != "Big"]
+            words_without_big.append("Big")
+            result = " ".join(words_without_big)
+
         return result
 
     def _clean_model_name_from_colors(self, model_name):
@@ -664,6 +675,39 @@ class ProductEditor:
                 filtered_words.append(word)
 
         result = " ".join(filtered_words).strip()
+        return result
+
+    def _clean_title_directly(self, title):
+        """Czyści tytuł bezpośrednio (gdy nie ma 'Model') - usuwa kolory i typy produktów"""
+        # Lista elementów do usunięcia
+        elements_to_remove = [
+            # Kolory angielskie
+            "Multicolor", "Multcolor", "MUlticolor",
+            "Black", "White", "Red", "Blue", "Green", "Pink", "Coral",
+            "Yellow", "Orange", "Purple", "Brown", "Gray", "Grey", "Navy",
+            # Kolory polskie
+            "Turkus", "Czarny", "Biały", "Czerwony", "Niebieski", "Zielony",
+            "Różowy", "Żółty", "Pomarańczowy", "Fioletowy", "Brązowy", "Szary", "Granatowy",
+            # Typy produktów do usunięcia
+            "Kostium", "Bikini", "Strój", "Jednoczęściowy", "Dwuczęściowy",
+            "Kąpielowy", "Kąpielowe", "Kąpielowa", "jednoczęściowy"
+        ]
+
+        # Usuń końcówkę " - Lupo Line" jeśli istnieje
+        if " - Lupo Line" in title:
+            title = title.split(" - Lupo Line")[0]
+
+        # Podziel na słowa i usuń niepotrzebne elementy
+        words = title.split()
+        filtered_words = []
+
+        for word in words:
+            if word not in elements_to_remove:
+                filtered_words.append(word)
+
+        result = " ".join(filtered_words).strip()
+        # Trimuj nadmiarowe spacje
+        result = " ".join(result.split())
         return result
 
     def _extract_model_name(self, text):
@@ -843,7 +887,29 @@ class ProductEditor:
 
     def _optimize_jednoczesciowy_title(self, main_part):
         """Optymalizuje tytuły strojów jednoczęściowych"""
-        model_name = self._extract_model_name_for_title(main_part)
+        # Sprawdź czy jest "Big" przed "Model" - jeśli tak, zachowaj go do późniejszego przetworzenia
+        big_before_model = ""
+        if "Big" in main_part and "Model " in main_part:
+            # Znajdź pozycję "Model" i sprawdź czy "Big" jest przed nim
+            model_index = main_part.find("Model ")
+            before_model = main_part[:model_index]
+            if "Big" in before_model:
+                big_before_model = "Big"
+
+        # Usuń "Kostium jednoczęściowy" z tytułu jeśli występuje przed "Model"
+        if "Kostium jednoczęściowy" in main_part and "Model " in main_part:
+            # Znajdź pozycję "Model " i usuń wszystko przed nim
+            model_index = main_part.find("Model ")
+            main_part = main_part[model_index:]
+
+        # Sprawdź czy jest "Model" w tytule
+        if "Model " in main_part:
+            # Standardowa ścieżka - użyj _extract_model_name_for_title
+            model_name = self._extract_model_name_for_title(main_part)
+        else:
+            # Specjalna ścieżka - bezpośrednio wyczyść tytuł bez "Model"
+            model_name = self._clean_title_directly(main_part)
+
         if model_name:
             # Trimuj nadmiarowe spacje
             clean_model_name = " ".join(model_name.split())
@@ -855,6 +921,10 @@ class ProductEditor:
                 words_without_big = [word for word in words if word != "Big"]
                 words_without_big.append("Big")
                 clean_model_name = " ".join(words_without_big)
+
+            # Jeśli było "Big" przed "Model", dodaj je na koniec
+            if big_before_model and big_before_model not in clean_model_name:
+                clean_model_name = f"{clean_model_name} {big_before_model}"
 
             return f"Jednoczęściowy strój kąpielowy {clean_model_name}"
         return None
@@ -1295,6 +1365,9 @@ WAŻNE:
         """
         Wyciąga atrybuty MPD z opisu produktu
 
+        WAŻNE: Atrybuty ID 12 (odpinane ramiączka) i ID 23 (nieodpinane ramiączka)
+        są wzajemnie wykluczające - nie mogą być zaznaczone jednocześnie.
+
         Args:
             description (str): Opis produktu
 
@@ -1351,6 +1424,8 @@ WAŻNE:
 
         # Flagi dla wykluczania ogólnych atrybutów gdy znaleziono specyficzne
         found_specific_straps = False
+        found_odpinane = False
+        found_nieodpinane = False
 
         for attr_id in ordered_attrs:
             if attr_id in mpd_attributes:
@@ -1368,17 +1443,47 @@ WAŻNE:
                         if attr_id in [12, 15, 23]:  # ramiączka
                             found_specific_straps = True
 
+                            # Sprawdź wzajemnie wykluczające atrybuty ramiączek
+                            if attr_id == 12:  # odpinane ramiączka
+                                if found_nieodpinane:
+                                    # Jeśli już znaleziono "nieodpinane", pomiń "odpinane"
+                                    found_attributes.remove(attr_id)
+                                    print(
+                                        f"🔧 Pominięto atrybut 'odpinane ramiączka' (ID 12) bo już znaleziono 'nieodpinane ramiączka' (ID 23)")
+                                    continue
+                                found_odpinane = True
+                            elif attr_id == 23:  # nieodpinane ramiączka
+                                if found_odpinane:
+                                    # Jeśli już znaleziono "odpinane", pomiń "nieodpinane"
+                                    found_attributes.remove(attr_id)
+                                    print(
+                                        f"🔧 Pominięto atrybut 'nieodpinane ramiączka' (ID 23) bo już znaleziono 'odpinane ramiączka' (ID 12)")
+                                    continue
+                                found_nieodpinane = True
+
                         # Dla atrybutów ramiączek (ID 12, 15, 23) szukaj dalej aby znaleźć wszystkie
                         if attr_id not in [12, 15, 23]:
                             break  # Dla innych atrybutów zatrzymaj po pierwszym znalezionym
 
         # Wykluczaj kolizje między podobnymi atrybutami ramiączek
         if 12 in found_attributes and 23 in found_attributes:
-            # Sprawdź czy opis zawiera "nieodpinane" (bardziej specyficzne)
-            if "nieodpinane" in description_lower:
-                found_attributes.remove(12)  # Usuń ogólne "odpinane"
+            # Atrybuty ID 12 (odpinane ramiączka) i ID 23 (nieodpinane ramiączka) są wzajemnie wykluczające
+            # Sprawdź który jest bardziej specyficzny w opisie
+            if "nieodpinane" in description_lower and "odpinane" in description_lower:
+                # Jeśli opis zawiera oba słowa, usuń mniej specyficzny (ID 12)
+                found_attributes.remove(12)
                 print(
-                    f"🔧 Usunięto ogólny atrybut 'odpinane' (ID 12) bo znaleziono specyficzny 'nieodpinane' (ID 23)")
+                    f"🔧 Usunięto atrybut 'odpinane ramiączka' (ID 12) bo znaleziono 'nieodpinane ramiączka' (ID 23) - są wzajemnie wykluczające")
+            elif "nieodpinane" in description_lower:
+                # Jeśli tylko "nieodpinane", usuń "odpinane"
+                found_attributes.remove(12)
+                print(
+                    f"🔧 Usunięto atrybut 'odpinane ramiączka' (ID 12) bo znaleziono 'nieodpinane ramiączka' (ID 23)")
+            else:
+                # Jeśli tylko "odpinane", usuń "nieodpinane"
+                found_attributes.remove(23)
+                print(
+                    f"🔧 Usunięto atrybut 'nieodpinane ramiączka' (ID 23) bo znaleziono 'odpinane ramiączka' (ID 12)")
 
         # Usuń ogólne "regulowane" (ID 26) TYLKO jeśli koliduje ze specyficznymi ramiączkami
         if 15 in found_attributes and 26 in found_attributes:
@@ -3103,9 +3208,27 @@ WAŻNE:
         # Podstawowe czyszczenie
         text = long_description.strip()
 
-        # Podziel na zdania (zakończone kropką, wykrzyknikiem, znakiem zapytania)
+        # Lepszy regex - szukaj naturalnych końców zdań
         import re
-        sentences = re.split(r'[.!?]+', text)
+
+        # Najpierw spróbuj znaleźć naturalne końce zdań
+        # Szukaj kropki po spacji i przed wielką literą lub końcem tekstu
+        sentence_pattern = r'(?<=[.!?])\s+(?=[A-Z])'
+        sentences = re.split(sentence_pattern, text)
+
+        # Jeśli nie znaleziono naturalnych podziałów, spróbuj prostszego
+        if len(sentences) <= 1:
+            # Szukaj kropki po słowie (ale nie w skrótach)
+            sentence_pattern = r'(?<=\w)\.(?=\s|$)'
+            sentences = re.split(sentence_pattern, text)
+            # Dodaj kropki z powrotem
+            sentences = [
+                s + '.' if i < len(sentences) - 1 else s for i, s in enumerate(sentences)]
+
+        # Jeśli nadal nie ma podziałów, użyj prostego podziału na kropki
+        if len(sentences) <= 1:
+            sentences = re.split(r'[.!?]+', text)
+
         sentences = [s.strip() for s in sentences if s.strip()]
 
         if not sentences:
@@ -3120,8 +3243,9 @@ WAŻNE:
             print(f"✅ Wzięto pierwsze zdanie ({len(first_sentence)} znaków)")
             return first_sentence
 
-        # Jeśli za długie, inteligentnie skróć
-        short = self._smart_truncate(first_sentence, 150)
+        # Jeśli za długie, inteligentnie skróć z uwzględnieniem pełnych zdań
+        short = self._smart_truncate_with_sentence_boundary(
+            first_sentence, 150)
         print(
             f"✅ Skrócono pierwsze zdanie inteligentnie ({len(short)} znaków)")
         return short
@@ -3149,6 +3273,58 @@ WAŻNE:
                     break
 
         return result.strip()
+
+    def _smart_truncate_with_sentence_boundary(self, text, max_length):
+        """Inteligentnie skraca tekst z uwzględnieniem granic zdań"""
+        if len(text) <= max_length:
+            return text
+
+        # Znajdź ostatnią spację przed limitem
+        truncated = text[:max_length]
+        last_space = truncated.rfind(' ')
+
+        # Jeśli spacja jest w rozsądnym miejscu (po 70% tekstu)
+        if last_space > max_length * 0.7:
+            result = text[:last_space]
+        else:
+            # Jeśli nie ma dobrej spacji, skróć do ostatniego pełnego słowa
+            words = text.split()
+            result = ""
+            for word in words:
+                if len(result + " " + word) <= max_length:
+                    result += " " + word if result else word
+                else:
+                    break
+
+        # Sprawdź czy wynik kończy się na pełnym zdaniu
+        # Szukaj naturalnych końców zdań w skróconym tekście
+        import re
+
+        # Sprawdź czy można znaleźć lepsze miejsce do skrócenia
+        # Szukaj kropki, przecinka lub innego naturalnego podziału
+        better_cutoff = None
+
+        # Szukaj ostatniego przecinka przed limitem
+        last_comma = result.rfind(',')
+        if last_comma > max_length * 0.6:  # Jeśli przecinek jest w rozsądnym miejscu
+            better_cutoff = last_comma
+
+        # Szukaj ostatniego "oraz" lub "i" przed limitem
+        conjunctions = ['oraz', 'i', 'a także', 'jak również']
+        for conj in conjunctions:
+            conj_pos = result.rfind(conj)
+            if conj_pos > max_length * 0.6:
+                if better_cutoff is None or conj_pos > better_cutoff:
+                    better_cutoff = conj_pos
+
+        # Jeśli znaleziono lepsze miejsce, użyj go
+        if better_cutoff:
+            result = result[:better_cutoff].strip()
+            # Dodaj kropkę jeśli nie ma
+            if not result.endswith('.'):
+                result += '.'
+
+        return result
 
     def _is_title_already_optimized(self, title):
         """
