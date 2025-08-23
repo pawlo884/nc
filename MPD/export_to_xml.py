@@ -18,8 +18,10 @@ Użycie:
 Monitoring zmian:
 - Sprawdza kolumny updated_at w tabelach: product_variants, products, product_variants_retail_price
 - Sprawdza kolumnę last_updated w tabeli stock_and_prices
+- Sprawdza kolumnę updated_at w tabeli product_images
 - Generuje plik full.xml z produktami, które mają visibility=0 jeśli nie mają ceny detalicznej
-- Generuje plik full_change.xml z produktami zmienionymi w ciągu ostatnich 2 godzin
+- Generuje plik full_change.xml z produktami zmienionymi w ciągu ostatnich 2 godzin (tylko te już w full.xml)
+- Generuje plik light.xml z produktami zmienionymi w ciągu ostatniej godziny
 """
 
 logger = logging.getLogger(__name__)
@@ -612,6 +614,213 @@ class LightXMLExporter(BaseXMLExporter):
         xml.append('</offer>')
         return '\n'.join(xml)
 
+    def export_incremental(self):
+        """Eksport przyrostowy - tylko produkty zmienione w ciągu ostatniej godziny"""
+        from datetime import datetime, timedelta
+        from django.db.models import Q
+        from .models import Products
+
+        now = datetime.now()
+        one_hour_ago = now - timedelta(hours=1)
+
+        # Pobierz produkty zmienione w ciągu ostatniej godziny
+        products = Products.objects.using('MPD').filter(
+            Q(updated_at__gte=one_hour_ago) |
+            Q(productvariants__updated_at__gte=one_hour_ago)
+        ).distinct().select_related('brand')
+
+        # Generuj XML tylko dla zmienionych produktów
+        xml_content = self._generate_xml_for_products(products)
+        local_path = self.save_local(xml_content)
+        bucket_url = self.save_to_bucket(local_path)
+
+        if bucket_url:
+            print('✅ Eksport przyrostowy light.xml zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        else:
+            print('❌ Błąd podczas eksportu przyrostowego light.xml')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+
+        return {'bucket_url': bucket_url, 'local_path': local_path}
+
+    def _generate_xml_for_products(self, products):
+        """Generuj XML dla określonej listy produktów"""
+        from django.utils.html import escape
+        from .models import ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, Vat
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        expires = now + timedelta(days=1)
+
+        xml = []
+        xml.append('<?xml version="1.0" encoding="utf-8"?>')
+        xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
+            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+        xml.append('  <products currency="PLN" language="pol">')
+
+        for product in products:
+            # Pobierz warianty dla tego produktu
+            variants = ProductVariants.objects.using('MPD').filter(
+                product=product
+            ).select_related('size', 'color', 'producer_color')
+
+            if variants:
+                # Użyj iai_product_id z pierwszego wariantu
+                first_variant = variants.first()
+                iai_product_id = first_variant.iai_product_id if first_variant and first_variant.iai_product_id else product.id
+
+                # Pobierz VAT z pierwszego wariantu który ma cenę detaliczną
+                vat_rate = None
+                for variant in variants:
+                    retail_price = ProductVariantsRetailPrice.objects.using('MPD').filter(
+                        variant=variant
+                    ).first()
+                    if retail_price and retail_price.vat:
+                        # Pobierz VAT z tabeli vat
+                        vat_obj = Vat.objects.using('MPD').filter(
+                            id=retail_price.vat
+                        ).first()
+                        if vat_obj:
+                            vat_rate = vat_obj.vat_rate
+                        else:
+                            vat_rate = retail_price.vat
+                        break
+
+                # Pobierz group_name z category rozmiaru
+                group_name = ''
+                for variant in variants:
+                    if variant.size and variant.size.category:
+                        group_name = variant.size.category
+                        break
+
+                # Buduj atrybuty produktu
+                product_attrs = [f'id="{iai_product_id}"']
+                if vat_rate:
+                    product_attrs.append(f'vat="{vat_rate}"')
+
+                xml.append(f'    <product {" ".join(product_attrs)}>')
+
+                # Dodaj cenę na poziomie produktu (jeśli istnieje)
+                first_variant_retail = ProductVariantsRetailPrice.objects.using('MPD').filter(
+                    variant=variants.first()
+                ).first()
+                if first_variant_retail:
+                    gross = first_variant_retail.retail_price if hasattr(
+                        first_variant_retail, 'retail_price') else ''
+                    net = first_variant_retail.net_price if hasattr(
+                        first_variant_retail, 'net_price') else ''
+
+                    price_attrs = []
+                    if gross or net:
+                        if gross:
+                            price_attrs.append(f'gross="{gross}"')
+                        if net:
+                            price_attrs.append(f'net="{net}"')
+
+                    if price_attrs:
+                        xml.append(f'      <price {" ".join(price_attrs)}/>')
+
+                xml.append('      <sizes>')
+
+                for variant in variants:
+                    # Pobierz dane o rozmiarze
+                    size_id = variant.size.iai_size_id if variant.size and variant.size.iai_size_id else ''
+                    size_name = variant.size.name if variant.size else ""
+                    panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
+
+                    # code_external: product_id-variant_id
+                    code_external = f'{product.id}-{variant.variant_id}'
+
+                    # Pobierz kod producenta
+                    code_producer = ""
+                    try:
+                        variant_source = ProductvariantsSources.objects.using('MPD').filter(
+                            variant=variant
+                        ).first()
+                        if variant_source:
+                            if variant_source.ean:
+                                code_producer = variant_source.ean
+                            elif variant_source.gtin14:
+                                code_producer = variant_source.gtin14
+                            elif variant_source.gtin13:
+                                code_producer = variant_source.gtin13
+                            elif variant_source.other:
+                                code_producer = variant_source.other
+                    except Exception:
+                        pass
+
+                    # Buduj atrybuty rozmiaru
+                    size_attrs = []
+                    if size_id:
+                        size_attrs.append(f'id="{size_id}"')
+                    if size_name:
+                        size_attrs.append(f'name="{escape(size_name)}"')
+                    if panel_name:
+                        size_attrs.append(f'panel_name="{escape(panel_name)}"')
+                    if code_producer:
+                        size_attrs.append(
+                            f'code_producer="{escape(code_producer)}"')
+                    if code_external:
+                        size_attrs.append(
+                            f'iaiext:code_external="{escape(code_external)}"')
+
+                    xml.append(f'        <size {" ".join(size_attrs)}>')
+
+                    # Pobierz cenę i stan magazynowy
+                    stock_price = StockAndPrices.objects.using('MPD').filter(
+                        variant=variant
+                    ).first()
+
+                    if stock_price:
+                        # Dodaj cenę na poziomie rozmiaru
+                        try:
+                            retail_price_obj = ProductVariantsRetailPrice.objects.using('MPD').filter(
+                                variant=variant
+                            ).first()
+                        except Exception:
+                            pass
+
+                        gross = retail_price_obj.retail_price if retail_price_obj and hasattr(
+                            retail_price_obj, 'retail_price') else ''
+                        net = retail_price_obj.net_price if retail_price_obj and hasattr(
+                            retail_price_obj, 'net_price') else ''
+
+                        price_attrs = []
+                        if gross or net:
+                            if gross:
+                                price_attrs.append(f'gross="{gross}"')
+                            if net:
+                                price_attrs.append(f'net="{net}"')
+
+                        if price_attrs:
+                            xml.append(
+                                f'          <price {" ".join(price_attrs)}/>')
+
+                        # Dodaj stan magazynowy
+                        stock_id = ""
+                        if stock_price.source and hasattr(stock_price.source, 'type'):
+                            if stock_price.source.type == 'Magazyn główny':
+                                stock_id = "1"
+                            elif stock_price.source.type == 'Magazyn obcy':
+                                stock_id = "0"
+                            elif stock_price.source.type == 'Magazyn wymiany':
+                                stock_id = "3"
+                            elif stock_price.source.type == 'Magazyn pomocniczy':
+                                stock_id = "2"
+
+                        xml.append(
+                            f'          <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
+
+                    xml.append('        </size>')
+
+                xml.append('      </sizes>')
+                xml.append('    </product>')
+
+        xml.append('  </products>')
+        xml.append('</offer>')
+        return '\n'.join(xml)
+
 
 class GatewayXMLExporter(BaseXMLExporter):
     def __init__(self, source_name=None):
@@ -923,14 +1132,17 @@ class FullChangeXMLExporter(BaseXMLExporter):
             # Eksport przyrostowy - tylko produkty zmienione w ciągu ostatnich 2 godzin
             # ALE tylko te które są już wyeksportowane (id ≤ last_exported_product_id)
             if last_exported_id > 0:
-                # Sprawdź zmiany w wariantach i produktach
+                # Sprawdź zmiany w wariantach, produktach i obrazach
                 # Tylko dla produktów z id ≤ last_exported_product_id
                 variants_with_iai = ProductVariants.objects.using('MPD').filter(
                     iai_product_id__isnull=False,
                     iai_product_id__lte=last_exported_id  # Tylko wyeksportowane produkty
                 ).filter(
                     Q(updated_at__gte=two_hours_ago) |  # Wariant zmieniony
-                    Q(product__updated_at__gte=two_hours_ago)  # Produkt zmieniony
+                    # Produkt zmieniony
+                    Q(product__updated_at__gte=two_hours_ago) |
+                    # Obraz zmieniony
+                    Q(product__images__updated_at__gte=two_hours_ago)
                 ).select_related('product', 'size', 'color', 'producer_color', 'product__brand').distinct()
 
                 logger.info(

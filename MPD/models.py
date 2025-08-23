@@ -206,7 +206,7 @@ class ProductImage(models.Model):
         Products, on_delete=models.CASCADE, db_column='product_id', related_name='images')
     iai_product_id = models.IntegerField(blank=True, null=True)
     file_path = models.CharField(max_length=500)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     class Meta:
         managed = False

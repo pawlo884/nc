@@ -126,6 +126,7 @@ def create_tables_if_not_exist(conn):
             variant_id INT,
             iai_product_id INT,
             file_path VARCHAR(500) NOT NULL,
+            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
         )
     """
