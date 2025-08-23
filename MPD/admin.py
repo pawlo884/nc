@@ -1,7 +1,7 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter
 import decimal
 # Register your models here.
 
@@ -538,6 +538,19 @@ class PathsAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Paths, PathsAdmin)
+
+
+@admin.register(IaiProductCounter)
+class IaiProductCounterAdmin(admin.ModelAdmin):
+    list_display = ['id', 'counter_value']
+    readonly_fields = ['id', 'counter_value']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 # @admin.register(Categories)
 # class CategoriesAdmin(admin.ModelAdmin):

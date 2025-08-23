@@ -428,3 +428,17 @@ class ExportTracking(models.Model):
 
     def __str__(self):
         return f"{self.export_type} - {self.export_status}"
+
+
+class IaiProductCounter(models.Model):
+    id = models.IntegerField(primary_key=True)
+    counter_value = models.BigIntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'iai_product_counter'
+        verbose_name = 'Licznik IAI Product ID'
+        verbose_name_plural = 'Liczniki IAI Product ID'
+
+    def __str__(self):
+        return f"Licznik IAI: {str(self.counter_value)}"
