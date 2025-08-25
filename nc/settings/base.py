@@ -13,7 +13,11 @@ from logging.handlers import RotatingFileHandler
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Load environment variables
-load_dotenv()
+# Sprawdź czy używamy ustawień dev i załaduj odpowiedni plik .env
+if os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.dev'):
+    load_dotenv('.env.dev')
+else:
+    load_dotenv()
 
 # Konfiguracja logowania
 LOGGING = {

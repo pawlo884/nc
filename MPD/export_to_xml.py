@@ -131,25 +131,12 @@ class FullXMLExporter(BaseXMLExporter):
             now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products currency="PLN" language="pol">')
 
-        # Pobierz tracking
-        tracking = self.get_or_create_tracking()
-        last_exported_id = tracking.last_exported_product_id or 0
-
-        # Pobierz warianty z iai_product_id, od ostatniego wyeksportowanego
-        if incremental and last_exported_id > 0:
-            # Eksport przyrostowy - tylko nowe produkty
-            variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                iai_product_id__isnull=False,
-                iai_product_id__gt=last_exported_id
-            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
-            logger.info(
-                f"Eksport przyrostowy full.xml - od iai_product_id: {last_exported_id}")
-        else:
-            # Pełny eksport - wszystkie produkty
-            variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                iai_product_id__isnull=False
-            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
-            logger.info("Pełny eksport full.xml - wszystkie produkty")
+        # ZAWSZE generuj pełną ofertę - ignoruj parametr incremental
+        # Pobierz wszystkie warianty z iai_product_id
+        variants_with_iai = ProductVariants.objects.using('MPD').filter(
+            iai_product_id__isnull=False
+        ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+        logger.info("Generowanie pełnej oferty full.xml - wszystkie produkty")
 
         # Grupuj warianty po iai_product_id
         grouped_variants = {}
@@ -336,7 +323,7 @@ class FullXMLExporter(BaseXMLExporter):
                             if net:
                                 price_attrs.append(f'net="{net}"')
                         xml.append(
-                            f'          <price {' '.join(price_attrs)}/>')
+                            f'          <price {" ".join(price_attrs)}/>')
                         source = Sources.objects.filter(
                             id=stock_price.source.id).first() if stock_price and stock_price.source else None
                         stock_id = ""
@@ -379,6 +366,7 @@ class FullXMLExporter(BaseXMLExporter):
                 max_id=models.Max('iai_product_id')
             )['max_id']
             if max_iai_id:
+                tracking = self.get_or_create_tracking()
                 tracking.last_exported_product_id = max_iai_id
                 tracking.last_exported_timestamp = timezone.now()
                 tracking.total_products_exported += variants_with_iai.count()
@@ -390,18 +378,61 @@ class FullXMLExporter(BaseXMLExporter):
         return '\n'.join(xml)
 
     def export_incremental(self):
-        """Eksport przyrostowy - tylko nowe produkty"""
-        return self.export()
+        """Eksport przyrostowy - teraz generuje pełną ofertę"""
+        # Wywołaj metodę bazową export() zamiast self.export()
+        # Zawsze false - pełna oferta
+        xml_content = self.generate_xml(incremental=False)
+        local_path = self.save_local(xml_content)
+        bucket_url = self.save_to_bucket(local_path)
+
+        result = {'bucket_url': bucket_url, 'local_path': local_path}
+
+        if bucket_url:
+            print('✅ Eksport pełnej oferty XML zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+
+            # Automatycznie odśwież gateway.xml po eksporcie
+            try:
+                gateway_exporter = GatewayXMLExporter()
+                gateway_result = gateway_exporter.export()
+                if gateway_result['bucket_url']:
+                    print(
+                        '✅ Gateway.xml zaktualizowany automatycznie!')
+                else:
+                    print(
+                        '⚠️ Gateway.xml nie został zaktualizowany automatycznie')
+            except Exception as e:
+                print(
+                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
+        else:
+            print('❌ Błąd podczas eksportu XML')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+
+        return result
 
     def export_full(self):
         """Eksport pełny - wszystkie produkty"""
-        xml_content = self.generate_xml(incremental=False)
+        xml_content = self.generate_xml(
+            incremental=False)  # Zawsze false - pełna oferta
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
         if bucket_url:
             print('✅ Pełny eksport XML zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
+
+            # Automatycznie odśwież gateway.xml po eksporcie full.xml
+            try:
+                gateway_exporter = GatewayXMLExporter()
+                gateway_result = gateway_exporter.export()
+                if gateway_result['bucket_url']:
+                    print('✅ Gateway.xml zaktualizowany automatycznie!')
+                else:
+                    print('⚠️ Gateway.xml nie został zaktualizowany automatycznie')
+            except Exception as e:
+                print(
+                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
         else:
             print('❌ Błąd podczas pełnego eksportu XML')
             print(f'📄 Lokalnie zapisano: {local_path}')
@@ -638,6 +669,20 @@ class LightXMLExporter(BaseXMLExporter):
             print('✅ Eksport przyrostowy light.xml zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
+
+            # Automatycznie odśwież gateway.xml po eksporcie przyrostowym light.xml
+            try:
+                gateway_exporter = GatewayXMLExporter()
+                gateway_result = gateway_exporter.export()
+                if gateway_result['bucket_url']:
+                    print(
+                        '✅ Gateway.xml zaktualizowany automatycznie po eksporcie przyrostowym light.xml!')
+                else:
+                    print(
+                        '⚠️ Gateway.xml nie został zaktualizowany automatycznie po eksporcie przyrostowym light.xml')
+            except Exception as e:
+                print(
+                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
         else:
             print('❌ Błąd podczas eksportu przyrostowego light.xml')
             print(f'📄 Lokalnie zapisano: {local_path}')
@@ -829,7 +874,7 @@ class GatewayXMLExporter(BaseXMLExporter):
         try:
             self.source = Sources.objects.get(id=2)  # Tylko Matterhorn
             self.source_name = self.source.name
-        except Sources.DoesNotExist:
+        except Exception:
             raise ValueError("Nie znaleziono źródła Matterhorn (id=2)")
 
     def _create_meta_element(self, root):
@@ -894,7 +939,7 @@ class GatewayXMLExporter(BaseXMLExporter):
             url = bucket_url + file_name
             element.set("url", url)
 
-            # Najpierw sprawdź lokalny plik
+            # Zawsze sprawdź lokalny plik jako priorytet
             local_path = os.path.join('MPD_test/xml/matterhorn/', file_name)
             hash_value = ""
             changed_value = ""
@@ -912,13 +957,18 @@ class GatewayXMLExporter(BaseXMLExporter):
                     changed_dt = datetime.fromtimestamp(mtime)
                     changed_value = changed_dt.strftime('%Y-%m-%d %H:%M:%S')
 
+                    logger.info(
+                        f"Lokalny plik {file_name}: hash={hash_value}, changed={changed_value}")
+
                 except Exception as e:
                     logger.warning(
                         f"Błąd podczas obliczania hash/changed dla {file_name}: {str(e)}")
                     hash_value = ""
                     changed_value = ""
             else:
-                # Fallback: sprawdź zdalny plik
+                logger.warning(
+                    f"Lokalny plik {file_name} nie istnieje, używam fallback")
+                # Fallback: sprawdź zdalny plik tylko jeśli lokalny nie istnieje
                 try:
                     response = requests.get(url, timeout=10)
                     if response.status_code == 200:
@@ -941,6 +991,12 @@ class GatewayXMLExporter(BaseXMLExporter):
                                         continue
                             except Exception:
                                 changed_value = ""
+
+                        logger.info(
+                            f"Zdalny plik {file_name}: hash={hash_value}, changed={changed_value}")
+                    else:
+                        logger.warning(
+                            f"Zdalny plik {file_name} zwrócił status {response.status_code}")
                 except Exception as e:
                     logger.warning(
                         f"Błąd podczas pobierania zdalnego pliku {file_name}: {str(e)}")
@@ -1345,7 +1401,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
                             if net:
                                 price_attrs.append(f'net="{net}"')
                         xml.append(
-                            f'          <price {' '.join(price_attrs)}/>')
+                            f'          <price {" ".join(price_attrs)}/>')
                         source = Sources.objects.filter(
                             id=stock_price.source.id).first() if stock_price and stock_price.source else None
                         stock_id = ""
@@ -1359,7 +1415,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
                             elif source.type == 'Magazyn pomocniczy':
                                 stock_id = "2"
                         xml.append(
-                            f'  <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
+                            f'          <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
                     xml.append('        </size>')
                 xml.append('      </sizes>')
 
@@ -1385,18 +1441,258 @@ class FullChangeXMLExporter(BaseXMLExporter):
 
     def export_incremental(self):
         """Eksport przyrostowy - tylko produkty zmienione w ciągu ostatnich 2 godzin"""
-        return self.export()
+        # Wywołaj metodę bazową export() zamiast self.export()
+        xml_content = self.generate_xml(incremental=True)
+        local_path = self.save_local(xml_content)
+        bucket_url = self.save_to_bucket(local_path)
+
+        result = {'bucket_url': bucket_url, 'local_path': local_path}
+
+        if bucket_url:
+            print('✅ Eksport przyrostowy full_change.xml zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+
+            # Automatycznie odśwież gateway.xml po eksporcie przyrostowym full_change.xml
+            try:
+                gateway_exporter = GatewayXMLExporter()
+                gateway_result = gateway_exporter.export()
+                if gateway_result['bucket_url']:
+                    print(
+                        '✅ Gateway.xml zaktualizowany automatycznie po eksporcie przyrostowym full_change.xml!')
+                else:
+                    print(
+                        '⚠️ Gateway.xml nie został zaktualizowany automatycznie po eksporcie przyrostowym full_change.xml')
+            except Exception as e:
+                print(
+                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
+        else:
+            print('❌ Błąd podczas eksportu przyrostowego full_change.xml')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+
+        return result
 
     def export_full(self):
         """Eksport pełny - wszystkie produkty"""
-        xml_content = self.generate_xml(incremental=False)
+        xml_content = self.generate_xml(
+            incremental=False)  # Zawsze false - pełna oferta
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
         if bucket_url:
-            print('✅ Pełny eksport full_change.xml zakończony pomyślnie!')
+            print('✅ Pełny eksport XML zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
+
+            # Automatycznie odśwież gateway.xml po eksporcie full.xml
+            try:
+                gateway_exporter = GatewayXMLExporter()
+                gateway_result = gateway_exporter.export()
+                if gateway_result['bucket_url']:
+                    print('✅ Gateway.xml zaktualizowany automatycznie!')
+                else:
+                    print('⚠️ Gateway.xml nie został zaktualizowany automatycznie')
+            except Exception as e:
+                print(
+                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
         else:
-            print('❌ Błąd podczas pełnego eksportu full_change.xml')
+            print('❌ Błąd podczas pełnego eksportu XML')
             print(f'📄 Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
+
+
+def refresh_gateway_after_export():
+    """
+    Funkcja pomocnicza do odświeżania gateway.xml po eksporcie innych plików XML.
+    Może być wywoływana ręcznie lub automatycznie po eksporcie.
+    """
+    try:
+        gateway_exporter = GatewayXMLExporter()
+        result = gateway_exporter.export()
+        if result['bucket_url']:
+            print('✅ Gateway.xml odświeżony pomyślnie!')
+            print(f'📁 URL: {result["bucket_url"]}')
+            print(f'📄 Lokalnie zapisano: {result["local_path"]}')
+            return True
+        else:
+            print('❌ Błąd podczas odświeżania gateway.xml')
+            return False
+    except Exception as e:
+        print(f'❌ Błąd podczas odświeżania gateway.xml: {str(e)}')
+        return False
+
+
+# Funkcje eksportu dla łatwego użycia
+def export_full_xml():
+    """Eksport pełny wszystkich produktów do full.xml"""
+    exporter = FullXMLExporter()
+    return exporter.export_full()
+
+
+def export_incremental_xml():
+    """Eksport pełnej oferty do full.xml (dawniej przyrostowy)"""
+    exporter = FullXMLExporter()
+    return exporter.export_incremental()
+
+
+def export_full_change_xml():
+    """Eksport pełny wszystkich produktów do full_change.xml"""
+    exporter = FullChangeXMLExporter()
+    return exporter.export_full()
+
+
+def export_incremental_full_change_xml():
+    """Eksport przyrostowy zmienionych produktów do full_change.xml"""
+    exporter = FullChangeXMLExporter()
+    return exporter.export_incremental()
+
+
+def export_light_xml():
+    """Eksport przyrostowy zmienionych produktów do light.xml"""
+    exporter = LightXMLExporter()
+    return exporter.export_incremental()
+
+
+def export_gateway_xml():
+    """Eksport gateway.xml"""
+    exporter = GatewayXMLExporter()
+    return exporter.export()
+
+
+def export_all_xml():
+    """Eksport wszystkich plików XML"""
+    print("🚀 Rozpoczynam eksport wszystkich plików XML...")
+
+    # Eksport full.xml
+    print("\n📦 Eksport full.xml...")
+    full_result = export_full_xml()
+
+    # Eksport full_change.xml
+    print("\n📦 Eksport full_change.xml...")
+    full_change_result = export_full_change_xml()
+
+    # Eksport light.xml
+    print("\n📦 Eksport light.xml...")
+    light_result = export_light_xml()
+
+    # Eksport pozostałych plików
+    print("\n📦 Eksport pozostałych plików...")
+    producers_result = ProducersXMLExporter().export()
+    stocks_result = StocksXMLExporter().export()
+    units_result = UnitsXMLExporter().export()
+
+    # Ostatni eksport gateway.xml (zaktualizuje wszystkie hashe)
+    print("\n📦 Eksport gateway.xml...")
+    gateway_result = export_gateway_xml()
+
+    print("\n🎉 Eksport wszystkich plików XML zakończony!")
+    return {
+        'full': full_result,
+        'full_change': full_change_result,
+        'light': light_result,
+        'producers': producers_result,
+        'stocks': stocks_result,
+        'units': units_result,
+        'gateway': gateway_result
+    }
+
+
+def test_gateway_refresh():
+    """Funkcja testowa do sprawdzenia odświeżania gateway.xml"""
+    print("🧪 Test odświeżania gateway.xml...")
+
+    # Sprawdź aktualny stan plików lokalnych
+    local_dir = 'MPD_test/xml/matterhorn/'
+    full_path = os.path.join(local_dir, 'full.xml')
+
+    if os.path.exists(full_path):
+        mtime = os.path.getmtime(full_path)
+        changed_dt = datetime.fromtimestamp(mtime)
+        print(
+            f"📄 full.xml - ostatnia modyfikacja: {changed_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        # Oblicz hash
+        import hashlib
+        with open(full_path, 'rb') as f:
+            file_content = f.read()
+            hash_value = hashlib.md5(file_content).hexdigest()
+        print(f"🔐 full.xml - hash: {hash_value}")
+    else:
+        print("❌ Plik full.xml nie istnieje lokalnie")
+
+    # Odśwież gateway.xml
+    print("\n🔄 Odświeżam gateway.xml...")
+    success = refresh_gateway_after_export()
+
+    if success:
+        print("✅ Test zakończony pomyślnie!")
+    else:
+        print("❌ Test nie powiódł się!")
+
+    return success
+
+
+def refresh_gateway_simple():
+    """
+    Prosta funkcja do odświeżenia gateway.xml bez bazy danych.
+    Tylko odczytuje pliki lokalne i aktualizuje hash/changed.
+    """
+    try:
+        print("🔄 Odświeżam gateway.xml (prosta metoda)...")
+
+        # Sprawdź pliki lokalne
+        local_dir = 'MPD_test/xml/matterhorn/'
+        full_path = os.path.join(local_dir, 'full.xml')
+
+        if not os.path.exists(full_path):
+            print("❌ Plik full.xml nie istnieje lokalnie")
+            return False
+
+        # Oblicz nowy hash i datę dla full.xml
+        import hashlib
+        with open(full_path, 'rb') as f:
+            file_content = f.read()
+            new_hash = hashlib.md5(file_content).hexdigest()
+
+        mtime = os.path.getmtime(full_path)
+        new_changed = datetime.fromtimestamp(
+            mtime).strftime('%Y-%m-%d %H:%M:%S')
+
+        print(f"📄 full.xml - hash: {new_hash}, changed: {new_changed}")
+
+        # Odczytaj aktualny gateway.xml
+        gateway_path = os.path.join(local_dir, 'gateway.xml')
+        if not os.path.exists(gateway_path):
+            print("❌ Plik gateway.xml nie istnieje lokalnie")
+            return False
+
+        # Zaktualizuj gateway.xml
+        import xml.etree.ElementTree as ET
+        tree = ET.parse(gateway_path)
+        root = tree.getroot()
+
+        # Znajdź element <full> i zaktualizuj jego atrybuty
+        for full_elem in root.findall('full'):
+            old_hash = full_elem.get('hash', '')
+            old_changed = full_elem.get('changed', '')
+
+            full_elem.set('hash', new_hash)
+            full_elem.set('changed', new_changed)
+
+            print(f"🔄 Zaktualizowano: hash '{old_hash}' -> '{new_hash}'")
+            print(
+                f"🔄 Zaktualizowano: changed '{old_changed}' -> '{new_changed}'")
+
+            # Zaktualizuj również timestamp w głównym elemencie
+            root.set('generated', new_changed)
+            print(f"🔄 Zaktualizowano: generated -> '{new_changed}'")
+            break
+
+        # Zapisz zaktualizowany plik
+        tree.write(gateway_path, encoding='utf-8', xml_declaration=True)
+        print(f"✅ Gateway.xml zaktualizowany i zapisany: {gateway_path}")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Błąd podczas odświeżania gateway.xml: {str(e)}")
+        return False

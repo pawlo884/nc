@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-23 20:27:06">
+<provider_description file_format="IOF" version="3.0" generated_by="nc"
+  generated="2025-08-24 23:15:51">
   <meta>
     <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
     <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
-    <showcase_image url="https://matterhorn.pl/rwd_layout/assets/images/logo-hurt-pl.png"/>
+    <showcase_image url="https://matterhorn.pl/rwd_layout/assets/images/logo-hurt-pl.png" />
     <email>&lt;![CDATA[info@matterhorn.pl]]&gt;</email>
     <tel>&lt;![CDATA[+48 503 503 875]]&gt;</tel>
     <www>&lt;![CDATA[https://matterhorn.pl]]&gt;</www>
@@ -14,20 +15,37 @@
       <country>&lt;![CDATA[Poland]]&gt;</country>
     </address>
     <time>
-      <offer created="2025-08-23 20:27:06"/>
-      <offer expires="2025-08-30 20:27:06"/>
+      <offer created="2025-08-24 23:15:51" />
+      <offer expires="2025-08-31 23:15:51" />
     </time>
   </meta>
-  <full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full.xml" hash="747a124e8c35bb9056b7379163908063" changed="2025-08-23 20:23:49"/>
-  <full_change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change.xml" hash="0f36123a7f0be9d215959053f5566b53" changed="2025-08-23 19:49:03"/>
-  <light url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/light.xml" hash="0b6a48b0f793d1e52e9fbaea9ac21773" changed="2025-08-19 13:22:01"/>
-  <categories url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/categories.xml" hash="" changed=""/>
-  <sizes url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/sizes.xml" hash="" changed=""/>
-  <producers url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/producers.xml" hash="1c878b7ff77a26917ac76cd4dfcbf602" changed="2025-08-12 23:12:44"/>
-  <units url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/units.xml" hash="30e9bc1f74daf9a14991f05d8c12fdb6" changed="2025-08-12 23:12:44"/>
-  <parameters url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/parameters.xml" hash="" changed=""/>
-  <stocks url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/stocks.xml" hash="d862bee013e3b84273be6e64018906dc" changed="2025-08-12 23:12:44"/>
-  <series url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/series.xml" hash="" changed=""/>
-  <warranties url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/warranties.xml" hash="" changed=""/>
-  <preset url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/preset.xml" hash="" changed=""/>
+  <full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full.xml"
+    hash="4128cd6b0cf5f69082250e87c32e8338" changed="2025-08-24 23:12:31" />
+  <full_change
+    url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change.xml"
+    hash="e7401686d0fdc430a2ea523ef9089fd8" changed="2025-08-24 21:41:27" />
+  <light url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/light.xml"
+    hash="86dcf2f59bf2341ba697c8b15ef4b37c" changed="2025-08-24 15:01:24" />
+  <categories
+    url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/categories.xml"
+    hash="" changed="" />
+  <sizes url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/sizes.xml"
+    hash="" changed="" />
+  <producers
+    url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/producers.xml"
+    hash="1c878b7ff77a26917ac76cd4dfcbf602" changed="2025-08-12 23:12:44" />
+  <units url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/units.xml"
+    hash="" changed="" />
+  <parameters
+    url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/parameters.xml"
+    hash="" changed="" />
+  <stocks url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/stocks.xml"
+    hash="" changed="" />
+  <series url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/series.xml"
+    hash="" changed="" />
+  <warranties
+    url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/warranties.xml"
+    hash="" changed="" />
+  <preset url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/preset.xml"
+    hash="" changed="" />
 </provider_description>

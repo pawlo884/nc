@@ -105,8 +105,8 @@ def export_full_xml_full(self):
         # Utwórz eksporter
         exporter = FullXMLExporter()
 
-        # Eksport pełny - wszystkie produkty
-        result = exporter.export()
+        # Eksport przyrostowy - tylko nowe produkty
+        result = exporter.export_incremental()
 
         end_time = timezone.now()
         duration = end_time - start_time
@@ -188,8 +188,8 @@ def export_full_change_xml_full(self):
         # Utwórz eksporter
         exporter = FullChangeXMLExporter()
 
-        # Eksport pełny - wszystkie produkty
-        result = exporter.export_full()
+        # Eksport przyrostowy - tylko nowe produkty
+        result = exporter.export_incremental()
 
         end_time = timezone.now()
         duration = end_time - start_time

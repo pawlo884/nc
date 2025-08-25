@@ -268,9 +268,10 @@ def update_all_gateways():
 @csrf_exempt
 def generate_full_xml(request):
     exporter = FullXMLExporter()
-    exporter_result = exporter.export()
+    # Używa metody z automatyczną aktualizacją gateway.xml - eksport przyrostowy
+    exporter_result = exporter.export_incremental()
 
-    # Automatycznie zaktualizuj wszystkie gateway.xml
+    # Automatycznie zaktualizuj wszystkie gateway.xml (dodatkowe zabezpieczenie)
     update_all_gateways()
 
     with open(exporter_result['local_path'], 'rb') as f:

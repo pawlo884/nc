@@ -23,6 +23,7 @@ class Brands(models.Model):
     logo_url = models.TextField(blank=True, null=True)
     opis = models.TextField(blank=True, null=True)
     url = models.URLField(max_length=255, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -46,6 +47,7 @@ class Colors(models.Model):
     hex_code = models.CharField(max_length=7, blank=True, null=True)
     parent_id = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, db_column='parent_id')
+    objects = models.Manager()
 
     class Meta:
         managed = True
@@ -93,6 +95,7 @@ class Sizes(models.Model):
     unit = models.CharField(max_length=255, blank=True, null=True)
     name_lower = models.CharField(max_length=255, blank=True, null=True)
     iai_size_id = models.CharField(max_length=255, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -122,6 +125,7 @@ class Sources(models.Model):
     city = models.CharField(max_length=100, blank=True, null=True)
     country = models.CharField(max_length=100, blank=True, null=True)
     province = models.CharField(max_length=100, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = True
@@ -173,6 +177,7 @@ class ProductvariantsSources(models.Model):
     upce = models.CharField(max_length=50, blank=True, null=True)
     mpn = models.CharField(max_length=50, blank=True, null=True)
     other = models.CharField(max_length=50, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -207,6 +212,7 @@ class ProductImage(models.Model):
     iai_product_id = models.IntegerField(blank=True, null=True)
     file_path = models.CharField(max_length=500)
     updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -285,6 +291,7 @@ class StockAndPrices(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=10)
     last_updated = models.DateTimeField()
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -317,6 +324,7 @@ class Categories(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     path = models.CharField(max_length=255, blank=True, null=True)
     parent_id = models.BigIntegerField(blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -343,6 +351,7 @@ class Vat(models.Model):
     id = models.BigAutoField(primary_key=True)
     vat_rate = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True)
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -354,6 +363,7 @@ class Paths(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     path = models.CharField(max_length=255, blank=True, null=True)
     parent_id = models.BigIntegerField(blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -366,6 +376,7 @@ class ProductPaths(models.Model):
     id = models.BigAutoField(primary_key=True)
     product_id = models.IntegerField()
     path_id = models.IntegerField()
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -378,6 +389,7 @@ class Units(models.Model):
     id = models.BigAutoField(primary_key=True)
     unit_id = models.IntegerField(unique=True)
     name = models.CharField(max_length=255, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -419,6 +431,7 @@ class ExportTracking(models.Model):
     export_status = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    objects = models.Manager()
 
     class Meta:
         managed = False
@@ -433,6 +446,7 @@ class ExportTracking(models.Model):
 class IaiProductCounter(models.Model):
     id = models.IntegerField(primary_key=True)
     counter_value = models.BigIntegerField()
+    objects = models.Manager()
 
     class Meta:
         managed = False
