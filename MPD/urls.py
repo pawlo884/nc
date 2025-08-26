@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ProductSetViewSet, products, test_connection, test_table_structure, export_xml, export_full_xml, get_xml_file, xml_links, get_gateway_xml, generate_full_xml, generate_full_change_xml, generate_gateway_xml, empty_xml, generate_light_xml, generate_producers_xml, generate_stocks_xml, generate_units_xml, reset_full_xml_export, manage_product_paths
+from .views import ProductSetViewSet, products, test_connection, test_table_structure, export_xml, export_full_xml, get_xml_file, xml_links, get_gateway_xml, generate_full_xml, generate_full_change_xml, generate_gateway_xml, generate_gateway_xml_api, empty_xml, generate_light_xml, generate_producers_xml, generate_stocks_xml, generate_units_xml, generate_categories_xml, generate_sizes_xml, generate_parameters_xml, generate_series_xml, generate_warranties_xml, generate_preset_xml, reset_full_xml_export, manage_product_paths
 
 router = DefaultRouter()
 router.register(r'product-sets', ProductSetViewSet)
@@ -26,6 +26,17 @@ urlpatterns = [
     path('get-gateway-xml/', get_gateway_xml, name='get_gateway_xml'),
     path('xml-links/', xml_links, name='xml_links'),
     path('generate-units-xml/', generate_units_xml, name='generate_units_xml'),
+    path('generate-categories-xml/', generate_categories_xml,
+         name='generate_categories_xml'),
+    path('generate-sizes-xml/', generate_sizes_xml, name='generate_sizes_xml'),
+    path('generate-parameters-xml/', generate_parameters_xml,
+         name='generate_parameters_xml'),
+    path('generate-series-xml/', generate_series_xml, name='generate_series_xml'),
+    path('generate-warranties-xml/', generate_warranties_xml,
+         name='generate_warranties_xml'),
+    path('generate-preset-xml/', generate_preset_xml, name='generate_preset_xml'),
+    path('generate-gateway-xml-api/', generate_gateway_xml_api,
+         name='generate_gateway_xml_api'),
     path('reset-full-xml-export/', reset_full_xml_export,
          name='reset_full_xml_export'),
     path('manage-product-paths/', manage_product_paths,

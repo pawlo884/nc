@@ -19,6 +19,9 @@ if os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.dev'):
 else:
     load_dotenv()
 
+# API URL configuration
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
+
 # Konfiguracja logowania
 LOGGING = {
     'version': 1,

@@ -274,8 +274,20 @@ def generate_full_xml(request):
     # Automatycznie zaktualizuj wszystkie gateway.xml (dodatkowe zabezpieczenie)
     update_all_gateways()
 
+    # Zapisz lokalnie dla debugowania
+    import os
+    local_path = 'MPD_test/xml/matterhorn/full.xml'
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+
     with open(exporter_result['local_path'], 'rb') as f:
         content = f.read()
+
+    # Zapisz kopię lokalnie
+    with open(local_path, 'wb') as f:
+        f.write(content)
+
+    logger.info(f"Full.xml wygenerowany i zapisany lokalnie: {local_path}")
+
     return HttpResponse(content, content_type='application/xml')
 
 
@@ -335,6 +347,18 @@ def generate_full_change_xml(request):
 
     with open(exporter_result['local_path'], 'rb') as f:
         content = f.read()
+
+    # Zapisz lokalnie dla debugowania
+    import os
+    local_path = 'MPD_test/xml/matterhorn/full_change.xml'
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+
+    with open(local_path, 'wb') as f:
+        f.write(content)
+
+    logger.info(
+        f"Full_change.xml wygenerowany i zapisany lokalnie: {local_path}")
+
     return HttpResponse(content, content_type='application/xml')
 
 
@@ -407,6 +431,72 @@ def generate_units_xml(request):
 @csrf_exempt
 def empty_xml(request):
     return HttpResponse('<empty/>', content_type='application/xml')
+
+
+@csrf_exempt
+def generate_categories_xml(request):
+    """Generuje XML z kategoriami - tymczasowo puste"""
+    return HttpResponse('<categories file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste kategorie --></categories>', content_type='application/xml')
+
+
+@csrf_exempt
+def generate_sizes_xml(request):
+    """Generuje XML z rozmiarami - tymczasowo puste"""
+    return HttpResponse('<sizes file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste rozmiary --></sizes>', content_type='application/xml')
+
+
+@csrf_exempt
+def generate_parameters_xml(request):
+    """Generuje XML z parametrami - tymczasowo puste"""
+    return HttpResponse('<parameters file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste parametry --></parameters>', content_type='application/xml')
+
+
+@csrf_exempt
+def generate_series_xml(request):
+    """Generuje XML z seriami - tymczasowo puste"""
+    return HttpResponse('<series file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste serie --></series>', content_type='application/xml')
+
+
+@csrf_exempt
+def generate_warranties_xml(request):
+    """Generuje XML z gwarancjami - tymczasowo puste"""
+    return HttpResponse('<warranties file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste gwarancje --></warranties>', content_type='application/xml')
+
+
+@csrf_exempt
+def generate_preset_xml(request):
+    """Generuje XML z presetami - tymczasowo puste"""
+    return HttpResponse('<preset file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste presety --></preset>', content_type='application/xml')
+
+
+@csrf_exempt
+def generate_gateway_xml_api(request):
+    """Generuje gateway.xml z endpointami API"""
+    try:
+        # Zawsze używa Matterhorn (id=2)
+        exporter = GatewayXMLExporter()
+
+        # Przekaż czas żądania HTTP do eksportera
+        from datetime import datetime
+        request_time = datetime.now()
+
+        xml_content = exporter.generate_xml(request_time=request_time)
+
+        # Zapisz lokalnie dla debugowania
+        import os
+        local_path = 'MPD_test/xml/matterhorn/gateway.xml'
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+
+        with open(local_path, 'w', encoding='utf-8') as f:
+            f.write(xml_content)
+
+        logger.info(
+            f"Gateway.xml wygenerowany i zapisany lokalnie: {local_path}")
+
+        return HttpResponse(xml_content, content_type='application/xml')
+    except Exception as e:
+        logger.error(f"Błąd podczas generowania gateway.xml: {str(e)}")
+        return HttpResponse('<gateway><error>Błąd generowania</error></gateway>', content_type='application/xml')
 
 
 def xml_links(request):

@@ -72,6 +72,8 @@ class Products(models.Model):
                                on_delete=models.DO_NOTHING, blank=True, null=True)
     unit = models.ForeignKey(
         'Units', on_delete=models.CASCADE, db_column='unit', to_field='unit_id', null=True, blank=True)
+    visibility = models.BooleanField(
+        default=True, verbose_name='Widoczność w sklepie')
     objects = models.Manager()
 
     class Meta:
@@ -456,3 +458,25 @@ class IaiProductCounter(models.Model):
 
     def __str__(self):
         return f"Licznik IAI: {str(self.counter_value)}"
+
+
+class FullChangeFile(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    filename = models.CharField(max_length=255)
+    timestamp = models.CharField(max_length=50)  # YYYY-MM-DDTHH-MM-SS
+    created_at = models.DateTimeField()
+    bucket_url = models.URLField(blank=True, null=True)
+    local_path = models.CharField(max_length=500, blank=True, null=True)
+    file_size = models.BigIntegerField(default=0)
+    created_at_record = models.DateTimeField(auto_now_add=True)
+    objects = models.Manager()
+
+    class Meta:
+        managed = False
+        db_table = 'full_change_files'
+        verbose_name = 'Plik Full Change'
+        verbose_name_plural = 'Pliki Full Change'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.filename} ({self.timestamp})"

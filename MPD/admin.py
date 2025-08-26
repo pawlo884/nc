@@ -1,7 +1,7 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, ExportTracking
 import decimal
 # Register your models here.
 
@@ -14,10 +14,10 @@ import decimal
 class ProductsAdmin(admin.ModelAdmin):
     show_full_result_count = False
     list_per_page = 30
-    fields = ['name', 'short_description', 'description', 'brand', 'show_variants',
+    fields = ['visibility', 'name', 'short_description', 'description', 'brand', 'show_variants',
               'show_images', 'show_related_products', 'edit_retail_prices']  # karta produktu
     list_display = ['id', 'name', 'description',
-                    'brand', 'updated_at']  # widok listy produktów
+                    'brand', 'updated_at', 'visibility']  # widok listy produktów
     list_filter = ['brand']
     search_fields = ['id', 'name', 'description', 'brand__name']
     readonly_fields = ['show_variants', 'show_images',
@@ -549,6 +549,40 @@ class IaiProductCounterAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FullChangeFile)
+class FullChangeFileAdmin(admin.ModelAdmin):
+    list_display = ['id', 'filename', 'timestamp',
+                    'created_at', 'file_size', 'created_at_record']
+    list_filter = ['created_at', 'created_at_record']
+    search_fields = ['filename', 'timestamp']
+    readonly_fields = ['id', 'filename', 'timestamp', 'created_at',
+                       'bucket_url', 'local_path', 'file_size', 'created_at_record']
+    ordering = ['-created_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ExportTracking)
+class ExportTrackingAdmin(admin.ModelAdmin):
+    list_display = ['id', 'export_type', 'last_exported_product_id', 'last_exported_timestamp',
+                    'total_products_exported', 'export_status', 'created_at', 'updated_at']
+    list_filter = ['export_type', 'export_status', 'created_at', 'updated_at']
+    search_fields = ['export_type']
+    readonly_fields = ['id', 'export_type', 'last_exported_product_id', 'last_exported_timestamp',
+                       'total_products_exported', 'export_status', 'created_at', 'updated_at']
+    ordering = ['-updated_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
 

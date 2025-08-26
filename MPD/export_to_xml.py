@@ -3,7 +3,6 @@ from matterhorn.defs_db import s3_client, DO_SPACES_BUCKET, DO_SPACES_REGION
 import logging
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-import requests
 from datetime import datetime
 from django.utils import timezone
 from .models import Sources
@@ -235,18 +234,9 @@ class FullXMLExporter(BaseXMLExporter):
                     if price_attrs:
                         xml.append(f'      <price {" ".join(price_attrs)}/>')
 
-            # Sprawdź czy produkt ma cenę detaliczną w tabeli product_variants_retail_price
-            has_retail_price = False
-            for variant in variants:
-                retail_price_obj = ProductVariantsRetailPrice.objects.using(
-                    'MPD').filter(variant=variant).first()
-                if retail_price_obj and hasattr(retail_price_obj, 'retail_price') and retail_price_obj.retail_price:
-                    has_retail_price = True
-                    break
-
-            # Zawsze generuj węzeł visibility - yes jeśli ma cenę, no jeśli nie ma
+            # Użyj kolumny visibility z tabeli products
             xml.append('      <iaiext:visibility>')
-            if has_retail_price:
+            if product.visibility:
                 xml.append('        <iaiext:site visible="yes"/>')
             else:
                 xml.append('        <iaiext:site visible="no"/>')
@@ -917,103 +907,166 @@ class GatewayXMLExporter(BaseXMLExporter):
         offer_expires.set("expires", (datetime.now(
         ) + timezone.timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"))
 
-    def _create_url_elements(self, root):
-        elements = {
-            "full": "full.xml",
-            "full_change": "full_change.xml",
-            "light": "light.xml",
-            "categories": "categories.xml",
-            "sizes": "sizes.xml",
-            "producers": "producers.xml",
-            "units": "units.xml",
-            "parameters": "parameters.xml",
-            "stocks": "stocks.xml",
-            "series": "series.xml",
-            "warranties": "warranties.xml",
-            "preset": "preset.xml"
-        }
-        bucket_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/matterhorn/"
+    def _create_url_elements(self, root, request_time=None):
+        # Użyj endpointów API zamiast statycznych plików
+        from django.conf import settings
 
-        for element_name, file_name in elements.items():
-            element = ET.SubElement(root, element_name)
-            url = bucket_url + file_name
-            element.set("url", url)
+        # Podstawowy URL dla API z ustawień Django
+        base_url = getattr(settings, 'API_BASE_URL', 'http://localhost:8000')
 
-            # Zawsze sprawdź lokalny plik jako priorytet
-            local_path = os.path.join('MPD_test/xml/matterhorn/', file_name)
-            hash_value = ""
-            changed_value = ""
+        # Użyj czasu żądania HTTP lub aktualnego czasu
+        if request_time is None:
+            request_time = datetime.now()
 
-            if os.path.exists(local_path):
+        # Tymczasowo dezaktywowane - zostawiam tylko gateway, full i full_change
+        # required_elements = {}
+        # optional_elements = {}
+        # Generowanie węzłów wymaganych i opcjonalnych zostało wyłączone
+
+        # Dodaj węzeł full z podwęzłem changes dla plików full_change
+        self._create_full_with_changes_element(root, base_url, request_time)
+
+    def _create_full_with_changes_element(self, root, base_url, request_time=None):
+        """Tworzy węzeł full z podwęzłem changes dla rzeczywistych zmian w produktach"""
+
+        try:
+            # Utwórz węzeł full
+            full_element = ET.SubElement(root, "full")
+
+            # Dodaj podstawowe atrybuty dla full.xml - użyj endpointu API
+            full_url = f"{base_url}/mpd/generate-full-xml/"
+            full_element.set("url", full_url)
+
+            # Dla endpointów API używamy czasu żądania HTTP
+            import hashlib
+            from datetime import timedelta
+
+            # Użyj czasu żądania HTTP lub aktualnego czasu
+            if request_time is None:
+                request_time = datetime.now()
+
+            # Full.xml ma swój timestamp
+            full_time = request_time.strftime('%Y-%m-%d %H:%M:%S')
+
+            # Hash bazujący na rzeczywistych danych + czasie
+            from .models import Products
+            from django.db import models
+            try:
+                # Pobierz liczbę produktów i ostatni timestamp modyfikacji
+                total_products = Products.objects.using('MPD').count()
+                last_modified = Products.objects.using('MPD').aggregate(
+                    last_modified=models.Max('updated_at')
+                )['last_modified']
+
+                if last_modified:
+                    last_modified_str = last_modified.strftime(
+                        '%Y-%m-%d %H:%M:%S')
+                else:
+                    last_modified_str = "1970-01-01 00:00:00"
+
+                # Hash bazujący na: liczba produktów + ostatnia modyfikacja + czas żądania
+                full_hash_input = f"generate-full-xml_{total_products}_{last_modified_str}_{full_time}"
+                full_hash = hashlib.md5(full_hash_input.encode()).hexdigest()
+
+                logger.info(
+                    f"Full.xml hash: products={total_products}, last_modified={last_modified_str}, request_time={full_time}")
+
+            except Exception as e:
+                # Fallback: hash bazujący tylko na czasie
+                full_hash_input = f"generate-full-xml_{full_time}"
+                full_hash = hashlib.md5(full_hash_input.encode()).hexdigest()
+                logger.warning(
+                    f"Błąd generowania hash dla full.xml: {str(e)}, używam fallback")
+
+            full_element.set("hash", full_hash)
+            full_element.set("changed", full_time)
+
+            # Sprawdź rzeczywiste zmiany w produktach zgodnie ze specyfikacją IdoSell
+
+            # Pobierz produkty zmodyfikowane w ostatnich 60 minutach (specyfikacja IdoSell)
+            cutoff_time = request_time - timedelta(minutes=60)
+
+            recent_changes = Products.objects.using('MPD').filter(
+                updated_at__gte=cutoff_time
+            ).order_by('-updated_at')
+
+            if recent_changes.exists():
+                # Utwórz podwęzeł changes
+                changes_element = ET.SubElement(full_element, "changes")
+
+                # Generuj change dla ostatnich 60 minut (jeden plik przyrostowy)
+                change_element = ET.SubElement(changes_element, "change")
+
+                # URL do endpointu API dla full_change
+                url = f"{base_url}/mpd/generate-full-change-xml/"
+                change_element.set("url", url)
+
+                # Timestamp w formacie ISO 8601 (YYYY-MM-DDThh-mm-ss) - specyfikacja IdoSell
+                change_time_iso = request_time.strftime('%Y-%m-%dT%H-%M-%S')
+                change_time = request_time.strftime('%Y-%m-%d %H:%M:%S')
+
+                # Hash bazujący na rzeczywistych zmianach w produktach (ostatnie 60 minut)
                 try:
-                    # Oblicz hash z lokalnego pliku
-                    import hashlib
-                    with open(local_path, 'rb') as f:
-                        file_content = f.read()
-                        hash_value = hashlib.md5(file_content).hexdigest()
+                    # Liczba zmodyfikowanych produktów w ostatnich 60 minutach
+                    products_changed = len(recent_changes)
+                    # Ostatni timestamp modyfikacji w ostatnich 60 minutach
+                    last_mod = recent_changes.aggregate(
+                        last_modified=models.Max('updated_at')
+                    )['last_modified']
 
-                    # Pobierz datę modyfikacji z systemu plików
-                    mtime = os.path.getmtime(local_path)
-                    changed_dt = datetime.fromtimestamp(mtime)
-                    changed_value = changed_dt.strftime('%Y-%m-%d %H:%M:%S')
+                    if last_mod:
+                        last_mod_str = last_mod.strftime('%Y-%m-%d %H:%M:%S')
+                    else:
+                        last_mod_str = "1970-01-01 00:00:00"
+
+                    # Hash bazujący na: liczba zmian + ostatnia modyfikacja + czas żądania
+                    change_hash_input = f"generate-full-change-xml_{products_changed}_{last_mod_str}_{change_time_iso}"
+                    hash_value = hashlib.md5(
+                        change_hash_input.encode()).hexdigest()
 
                     logger.info(
-                        f"Lokalny plik {file_name}: hash={hash_value}, changed={changed_value}")
+                        f"Full_change.xml hash (IdoSell): products_changed={products_changed}, last_mod={last_mod_str}, change_time={change_time_iso}")
 
                 except Exception as e:
+                    # Fallback: hash bazujący tylko na czasie
+                    change_hash_input = f"generate-full-change-xml_{change_time_iso}"
+                    hash_value = hashlib.md5(
+                        change_hash_input.encode()).hexdigest()
                     logger.warning(
-                        f"Błąd podczas obliczania hash/changed dla {file_name}: {str(e)}")
-                    hash_value = ""
-                    changed_value = ""
+                        f"Błąd generowania hash dla full_change.xml: {str(e)}, używam fallback")
+
+                change_element.set("hash", hash_value)
+                change_element.set("changed", change_time)
+
+                logger.info(
+                    f"API endpoint full_change (IdoSell): hash={hash_value}, changed={change_time}, products={products_changed}")
+
             else:
-                logger.warning(
-                    f"Lokalny plik {file_name} nie istnieje, używam fallback")
-                # Fallback: sprawdź zdalny plik tylko jeśli lokalny nie istnieje
-                try:
-                    response = requests.get(url, timeout=10)
-                    if response.status_code == 200:
-                        import hashlib
-                        hash_value = hashlib.md5(response.content).hexdigest()
+                logger.info(
+                    "Brak zmian w produktach w ostatnich 60 minutach (IdoSell)")
 
-                        # Spróbuj pobrać datę z nagłówków
-                        last_modified = response.headers.get('Last-Modified')
-                        if last_modified:
-                            try:
-                                # Różne formaty dat w nagłówkach HTTP
-                                for fmt in ['%a, %d %b %Y %H:%M:%S %Z', '%a, %d %b %Y %H:%M:%S GMT']:
-                                    try:
-                                        changed_dt = datetime.strptime(
-                                            last_modified, fmt)
-                                        changed_value = changed_dt.strftime(
-                                            '%Y-%m-%d %H:%M:%S')
-                                        break
-                                    except ValueError:
-                                        continue
-                            except Exception:
-                                changed_value = ""
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas tworzenia węzła full z changes: {str(e)}")
+            # Utwórz podstawowy węzeł full bez changes
+            full_element = ET.SubElement(root, "full")
+            full_element.set("url", f"{base_url}/mpd/generate-full-xml/")
+            full_element.set("hash", "")
+            full_element.set("changed", "")
 
-                        logger.info(
-                            f"Zdalny plik {file_name}: hash={hash_value}, changed={changed_value}")
-                    else:
-                        logger.warning(
-                            f"Zdalny plik {file_name} zwrócił status {response.status_code}")
-                except Exception as e:
-                    logger.warning(
-                        f"Błąd podczas pobierania zdalnego pliku {file_name}: {str(e)}")
-                    hash_value = ""
-                    changed_value = ""
-
-            element.set("hash", hash_value)
-            element.set("changed", changed_value)
-
-    def generate_xml(self):
+    def generate_xml(self, request_time=None):
         root = ET.Element("provider_description")
         root.set("file_format", "IOF")
         root.set("version", "3.0")
         root.set("generated_by", "nc")
-        root.set("generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+        # Użyj czasu żądania HTTP lub aktualnego czasu
+        if request_time is None:
+            request_time = datetime.now()
+
+        root.set("generated", request_time.strftime("%Y-%m-%d %H:%M:%S"))
         self._create_meta_element(root)
-        self._create_url_elements(root)
+        self._create_url_elements(root, request_time)
         xmlstr = minidom.parseString(
             ET.tostring(root, encoding="utf-8")
         ).toprettyxml(indent="  ", encoding="utf-8")
@@ -1096,7 +1149,13 @@ class UnitsXMLExporter(BaseXMLExporter):
 
 class FullChangeXMLExporter(BaseXMLExporter):
     def __init__(self):
-        super().__init__('full_change.xml')
+        # Generuj nazwę pliku z aktualną datą
+        now = datetime.now()
+        timestamp = now.strftime('%Y-%m-%dT%H-%M-%S')
+        filename = f'full_change{timestamp}.xml'
+        super().__init__(filename)
+        self.timestamp = timestamp
+        self.created_at = now
 
     def get_or_create_tracking(self):
         """Pobierz lub utwórz tracking dla full_change.xml - używa last_exported_product_id z full.xml"""
@@ -1140,6 +1199,42 @@ class FullChangeXMLExporter(BaseXMLExporter):
             tracking.save()
 
         return tracking
+
+    def save_full_change_record(self, bucket_url, local_path):
+        """Zapisz rekord o wygenerowanym pliku full_change"""
+        from .models import FullChangeFile
+        try:
+            FullChangeFile.objects.using('MPD').create(
+                filename=self.filename,
+                timestamp=self.timestamp,
+                created_at=self.created_at,
+                bucket_url=bucket_url,
+                local_path=local_path,
+                file_size=os.path.getsize(
+                    local_path) if os.path.exists(local_path) else 0
+            )
+            logger.info(f"Zapisano rekord pliku full_change: {self.filename}")
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas zapisywania rekordu full_change: {str(e)}")
+
+    def export(self):
+        """Przesłonięta metoda export aby zapisać rekord pliku"""
+        xml_content = self.generate_xml()
+        local_path = self.save_local(xml_content)
+        bucket_url = self.save_to_bucket(local_path)
+
+        # Zapisz rekord o wygenerowanym pliku
+        self.save_full_change_record(bucket_url, local_path)
+
+        if bucket_url:
+            print('✅ Eksport XML zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        else:
+            print('❌ Błąd podczas eksportu XML')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        return {'bucket_url': bucket_url, 'local_path': local_path}
 
     def generate_navigation_xml(self, product_id):
         from .models import Paths, ProductPaths
@@ -1313,18 +1408,9 @@ class FullChangeXMLExporter(BaseXMLExporter):
                     if price_attrs:
                         xml.append(f'      <price {" ".join(price_attrs)}/>')
 
-            # Sprawdź czy produkt ma cenę detaliczną w tabeli product_variants_retail_price
-            has_retail_price = False
-            for variant in variants:
-                retail_price_obj = ProductVariantsRetailPrice.objects.using(
-                    'MPD').filter(variant=variant).first()
-                if retail_price_obj and hasattr(retail_price_obj, 'retail_price') and retail_price_obj.retail_price:
-                    has_retail_price = True
-                    break
-
-            # Zawsze generuj węzeł visibility - yes jeśli ma cenę, no jeśli nie ma
+            # Użyj kolumny visibility z tabeli products
             xml.append('      <iaiext:visibility>')
-            if has_retail_price:
+            if product.visibility:
                 xml.append('        <iaiext:site visible="yes"/>')
             else:
                 xml.append('        <iaiext:site visible="no"/>')
@@ -1439,66 +1525,6 @@ class FullChangeXMLExporter(BaseXMLExporter):
         xml.append('</offer>')
         return '\n'.join(xml)
 
-    def export_incremental(self):
-        """Eksport przyrostowy - tylko produkty zmienione w ciągu ostatnich 2 godzin"""
-        # Wywołaj metodę bazową export() zamiast self.export()
-        xml_content = self.generate_xml(incremental=True)
-        local_path = self.save_local(xml_content)
-        bucket_url = self.save_to_bucket(local_path)
-
-        result = {'bucket_url': bucket_url, 'local_path': local_path}
-
-        if bucket_url:
-            print('✅ Eksport przyrostowy full_change.xml zakończony pomyślnie!')
-            print(f'📁 URL: {bucket_url}')
-            print(f'📄 Lokalnie zapisano: {local_path}')
-
-            # Automatycznie odśwież gateway.xml po eksporcie przyrostowym full_change.xml
-            try:
-                gateway_exporter = GatewayXMLExporter()
-                gateway_result = gateway_exporter.export()
-                if gateway_result['bucket_url']:
-                    print(
-                        '✅ Gateway.xml zaktualizowany automatycznie po eksporcie przyrostowym full_change.xml!')
-                else:
-                    print(
-                        '⚠️ Gateway.xml nie został zaktualizowany automatycznie po eksporcie przyrostowym full_change.xml')
-            except Exception as e:
-                print(
-                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
-        else:
-            print('❌ Błąd podczas eksportu przyrostowego full_change.xml')
-            print(f'📄 Lokalnie zapisano: {local_path}')
-
-        return result
-
-    def export_full(self):
-        """Eksport pełny - wszystkie produkty"""
-        xml_content = self.generate_xml(
-            incremental=False)  # Zawsze false - pełna oferta
-        local_path = self.save_local(xml_content)
-        bucket_url = self.save_to_bucket(local_path)
-        if bucket_url:
-            print('✅ Pełny eksport XML zakończony pomyślnie!')
-            print(f'📁 URL: {bucket_url}')
-            print(f'📄 Lokalnie zapisano: {local_path}')
-
-            # Automatycznie odśwież gateway.xml po eksporcie full.xml
-            try:
-                gateway_exporter = GatewayXMLExporter()
-                gateway_result = gateway_exporter.export()
-                if gateway_result['bucket_url']:
-                    print('✅ Gateway.xml zaktualizowany automatycznie!')
-                else:
-                    print('⚠️ Gateway.xml nie został zaktualizowany automatycznie')
-            except Exception as e:
-                print(
-                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
-        else:
-            print('❌ Błąd podczas pełnego eksportu XML')
-            print(f'📄 Lokalnie zapisano: {local_path}')
-        return {'bucket_url': bucket_url, 'local_path': local_path}
-
 
 def refresh_gateway_after_export():
     """
@@ -1535,15 +1561,15 @@ def export_incremental_xml():
 
 
 def export_full_change_xml():
-    """Eksport pełny wszystkich produktów do full_change.xml"""
+    """Eksport pełny wszystkich produktów do full_change.xml z datą w nazwie"""
     exporter = FullChangeXMLExporter()
-    return exporter.export_full()
+    return exporter.export()
 
 
 def export_incremental_full_change_xml():
-    """Eksport przyrostowy zmienionych produktów do full_change.xml"""
+    """Eksport przyrostowy zmienionych produktów do full_change.xml z datą w nazwie"""
     exporter = FullChangeXMLExporter()
-    return exporter.export_incremental()
+    return exporter.export()
 
 
 def export_light_xml():
@@ -1580,7 +1606,7 @@ def export_all_xml():
     stocks_result = StocksXMLExporter().export()
     units_result = UnitsXMLExporter().export()
 
-    # Ostatni eksport gateway.xml (zaktualizuje wszystkie hashe)
+    # Ostatni eksport gateway.xml (zaktualizuje wszystkie hashe i węzeł changes)
     print("\n📦 Eksport gateway.xml...")
     gateway_result = export_gateway_xml()
 

@@ -7,7 +7,10 @@ SECRET_KEY = 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.109']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.109', '*']
+
+# API URL configuration for development
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://212.127.93.27:8000')
 
 # Security settings for development
 CORS_REPLACE_HTTPS_REFERER = False
