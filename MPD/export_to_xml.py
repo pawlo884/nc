@@ -119,7 +119,6 @@ class FullXMLExporter(BaseXMLExporter):
         from django.utils.html import escape
         from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths, Vat
         from datetime import datetime, timedelta
-        from django.utils import timezone
         from django.db import models
 
         now = datetime.now()
@@ -867,7 +866,8 @@ class GatewayXMLExporter(BaseXMLExporter):
         except Exception:
             raise ValueError("Nie znaleziono źródła Matterhorn (id=2)")
 
-    def _create_meta_element(self, root):
+    def _create_meta_element(self, root, request_time=None):
+        from datetime import timedelta
         meta = ET.SubElement(root, "meta")
         long_name = ET.SubElement(meta, "long_name")
         long_name.text = f"<![CDATA[{self.source.long_name}]]>" if self.source.long_name else ""
@@ -901,11 +901,19 @@ class GatewayXMLExporter(BaseXMLExporter):
                 country.text = f"<![CDATA[{self.source.country}]]>"
         time = ET.SubElement(meta, "time")
         offer_created = ET.SubElement(time, "offer")
+
+        # Użyj request_time lub aktualnego czasu
+        if request_time is None:
+            request_time = timezone.now()
+
+        # Konwertuj na lokalny czas (Europe/Warsaw)
+        local_request_time = timezone.localtime(request_time)
+
         offer_created.set(
-            "created", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            "created", local_request_time.strftime("%Y-%m-%d %H:%M:%S"))
         offer_expires = ET.SubElement(time, "offer")
-        offer_expires.set("expires", (datetime.now(
-        ) + timezone.timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"))
+        offer_expires.set("expires", (local_request_time +
+                          timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"))
 
     def _create_url_elements(self, root, request_time=None):
         # Użyj endpointów API zamiast statycznych plików
@@ -943,10 +951,13 @@ class GatewayXMLExporter(BaseXMLExporter):
 
             # Użyj czasu żądania HTTP lub aktualnego czasu
             if request_time is None:
-                request_time = datetime.now()
+                request_time = timezone.now()
+
+            # Konwertuj na lokalny czas (Europe/Warsaw)
+            local_request_time = timezone.localtime(request_time)
 
             # Full.xml ma swój timestamp
-            full_time = request_time.strftime('%Y-%m-%d %H:%M:%S')
+            full_time = local_request_time.strftime('%Y-%m-%d %H:%M:%S')
 
             # Hash bazujący na rzeczywistych danych + czasie
             from .models import Products
@@ -965,7 +976,7 @@ class GatewayXMLExporter(BaseXMLExporter):
                     last_modified_str = "1970-01-01 00:00:00"
 
                 # Hash bazujący na: liczba produktów + ostatnia modyfikacja + czas żądania
-                full_hash_input = f"generate-full-xml_{total_products}_{last_modified_str}_{full_time}"
+                full_hash_input = f"generate-full-xml_{total_products}_{last_modified_str}_{local_request_time.strftime('%Y-%m-%d %H:%M:%S')}"
                 full_hash = hashlib.md5(full_hash_input.encode()).hexdigest()
 
                 logger.info(
@@ -973,7 +984,7 @@ class GatewayXMLExporter(BaseXMLExporter):
 
             except Exception as e:
                 # Fallback: hash bazujący tylko na czasie
-                full_hash_input = f"generate-full-xml_{full_time}"
+                full_hash_input = f"generate-full-xml_{local_request_time.strftime('%Y-%m-%d %H:%M:%S')}"
                 full_hash = hashlib.md5(full_hash_input.encode()).hexdigest()
                 logger.warning(
                     f"Błąd generowania hash dla full.xml: {str(e)}, używam fallback")
@@ -994,52 +1005,52 @@ class GatewayXMLExporter(BaseXMLExporter):
                 # Utwórz podwęzeł changes
                 changes_element = ET.SubElement(full_element, "changes")
 
-                # Generuj change dla ostatnich 60 minut (jeden plik przyrostowy)
-                change_element = ET.SubElement(changes_element, "change")
+                # Generuj change dla każdej zmiany (zgodnie z IdoSell)
+                for i, product in enumerate(recent_changes):
+                    change_element = ET.SubElement(changes_element, "change")
 
-                # URL do endpointu API dla full_change
-                url = f"{base_url}/mpd/generate-full-change-xml/"
-                change_element.set("url", url)
+                    # URL do endpointu API dla full_change
+                    url = f"{base_url}/mpd/generate-full-change-xml/"
+                    change_element.set("url", url)
 
-                # Timestamp w formacie ISO 8601 (YYYY-MM-DDThh-mm-ss) - specyfikacja IdoSell
-                change_time_iso = request_time.strftime('%Y-%m-%dT%H-%M-%S')
-                change_time = request_time.strftime('%Y-%m-%d %H:%M:%S')
-
-                # Hash bazujący na rzeczywistych zmianach w produktach (ostatnie 60 minut)
-                try:
-                    # Liczba zmodyfikowanych produktów w ostatnich 60 minutach
-                    products_changed = len(recent_changes)
-                    # Ostatni timestamp modyfikacji w ostatnich 60 minutach
-                    last_mod = recent_changes.aggregate(
-                        last_modified=models.Max('updated_at')
-                    )['last_modified']
-
-                    if last_mod:
-                        last_mod_str = last_mod.strftime('%Y-%m-%d %H:%M:%S')
+                    # Timestamp w formacie ISO 8601 (YYYY-MM-DDThh-mm-ss) - specyfikacja IdoSell
+                    # Użyj czasu modyfikacji produktu + małe przesunięcie dla unikalności
+                    if product.updated_at:
+                        change_time = product.updated_at + timedelta(seconds=i)
                     else:
-                        last_mod_str = "1970-01-01 00:00:00"
+                        change_time = local_request_time + timedelta(seconds=i)
 
-                    # Hash bazujący na: liczba zmian + ostatnia modyfikacja + czas żądania
-                    change_hash_input = f"generate-full-change-xml_{products_changed}_{last_mod_str}_{change_time_iso}"
-                    hash_value = hashlib.md5(
-                        change_hash_input.encode()).hexdigest()
+                    # Konwertuj na lokalny czas
+                    local_change_time = timezone.localtime(change_time)
+                    change_time_str = local_change_time.strftime(
+                        '%Y-%m-%d %H:%M:%S')
+
+                    # Hash bazujący na konkretnym produkcie + czasie modyfikacji
+                    try:
+                        # Hash bazujący na: ID produktu + czas modyfikacji + indeks
+                        change_hash_input = f"generate-full-change-xml_{product.id}_{local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}_{i}"
+                        hash_value = hashlib.md5(
+                            change_hash_input.encode()).hexdigest()
+
+                        logger.info(
+                            f"Full_change.xml hash (IdoSell): product_id={product.id}, change_time={local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}, index={i}")
+
+                    except Exception as e:
+                        # Fallback: hash bazujący tylko na czasie
+                        change_hash_input = f"generate-full-change-xml_{local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}_{i}"
+                        hash_value = hashlib.md5(
+                            change_hash_input.encode()).hexdigest()
+                        logger.warning(
+                            f"Błąd generowania hash dla full_change.xml: {str(e)}, używam fallback")
+
+                    change_element.set("hash", hash_value)
+                    change_element.set("changed", change_time_str)
 
                     logger.info(
-                        f"Full_change.xml hash (IdoSell): products_changed={products_changed}, last_mod={last_mod_str}, change_time={change_time_iso}")
-
-                except Exception as e:
-                    # Fallback: hash bazujący tylko na czasie
-                    change_hash_input = f"generate-full-change-xml_{change_time_iso}"
-                    hash_value = hashlib.md5(
-                        change_hash_input.encode()).hexdigest()
-                    logger.warning(
-                        f"Błąd generowania hash dla full_change.xml: {str(e)}, używam fallback")
-
-                change_element.set("hash", hash_value)
-                change_element.set("changed", change_time)
+                        f"API endpoint full_change (IdoSell): hash={hash_value}, changed={change_time_str}, product_id={product.id}")
 
                 logger.info(
-                    f"API endpoint full_change (IdoSell): hash={hash_value}, changed={change_time}, products={products_changed}")
+                    f"Wygenerowano {len(recent_changes)} zmian w full_change.xml")
 
             else:
                 logger.info(
@@ -1062,10 +1073,12 @@ class GatewayXMLExporter(BaseXMLExporter):
 
         # Użyj czasu żądania HTTP lub aktualnego czasu
         if request_time is None:
-            request_time = datetime.now()
+            request_time = timezone.now()
 
-        root.set("generated", request_time.strftime("%Y-%m-%d %H:%M:%S"))
-        self._create_meta_element(root)
+        # Konwertuj na lokalny czas (Europe/Warsaw)
+        local_request_time = timezone.localtime(request_time)
+        root.set("generated", local_request_time.strftime("%Y-%m-%d %H:%M:%S"))
+        self._create_meta_element(root, request_time)
         self._create_url_elements(root, request_time)
         xmlstr = minidom.parseString(
             ET.tostring(root, encoding="utf-8")
@@ -1160,7 +1173,6 @@ class FullChangeXMLExporter(BaseXMLExporter):
     def get_or_create_tracking(self):
         """Pobierz lub utwórz tracking dla full_change.xml - używa last_exported_product_id z full.xml"""
         from .models import ExportTracking
-        from django.utils import timezone
 
         # Najpierw pobierz tracking dla full.xml
         full_tracking = ExportTracking.objects.using('MPD').filter(

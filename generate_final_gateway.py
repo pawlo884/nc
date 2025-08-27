@@ -106,6 +106,3 @@ if __name__ == "__main__":
     else:
         print("\n💥 Generowanie nie powiodło się!")
         sys.exit(1)
-
-
-

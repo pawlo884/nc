@@ -476,9 +476,8 @@ def generate_gateway_xml_api(request):
         # Zawsze używa Matterhorn (id=2)
         exporter = GatewayXMLExporter()
 
-        # Przekaż czas żądania HTTP do eksportera
-        from datetime import datetime
-        request_time = datetime.now()
+        # Przekaż czas żądania HTTP do eksportera (timezone-aware)
+        request_time = timezone.now()
 
         xml_content = exporter.generate_xml(request_time=request_time)
 

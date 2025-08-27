@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-27 12:56:19">
+  <meta>
+    <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
+    <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
+    <showcase_image url="https://matterhorn.pl/rwd_layout/assets/images/logo-hurt-pl.png"/>
+    <email>&lt;![CDATA[info@matterhorn.pl]]&gt;</email>
+    <tel>&lt;![CDATA[+48 503 503 875]]&gt;</tel>
+    <www>&lt;![CDATA[https://matterhorn.pl]]&gt;</www>
+    <address>
+      <street>&lt;![CDATA[Katowicka 51]]&gt;</street>
+      <zipcode>&lt;![CDATA[41-400]]&gt;</zipcode>
+      <city>&lt;![CDATA[Mysłowice]]&gt;</city>
+      <country>&lt;![CDATA[Poland]]&gt;</country>
+    </address>
+    <time>
+      <offer created="2025-08-27 12:56:19"/>
+      <offer expires="2025-09-03 12:56:19"/>
+    </time>
+  </meta>
+  <full url="http://212.127.93.27:8000/mpd/generate-full-xml/" hash="ab8820fef0037b1cbe7bdcc4e1f19e88" changed="2025-08-27 12:56:19">
+    <changes>
+      <change url="http://212.127.93.27:8000/mpd/generate-full-change-xml/" hash="e1422558f0b9dc5d645ec36f891219fe" changed="2025-08-27 12:06:44"/>
+      <change url="http://212.127.93.27:8000/mpd/generate-full-change-xml/" hash="a16d22a04b963c7fe635645a7ba0468d" changed="2025-08-27 12:06:31"/>
+    </changes>
+  </full>
+</provider_description>

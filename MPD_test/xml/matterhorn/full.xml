@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="utf-8"?>
+<offer file_format="IOF" version="3.0" generated="2025-08-27 09:27:43" expires="2025-08-28 09:27:43" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+  <products currency="PLN" language="pol">
+    <product id="313" currency="" type="regular" vat="" site="1">
+      <producer id="20" name="Lupo Line"/>
+      <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Biustonosz kąpielowy Amelia Bralet</name>
+        <short_desc><![CDATA[Biustonosz bikini w formie braletki na fiszbinach.]]></short_desc>
+        <long_desc><![CDATA[Biustonosz bikini w formie braletki na fiszbinach. Wykonany z dzianiny z motywem w  soczystych kolorach na białym tle. Miseczki miękkie z pionowym cięciem doskonale podtrzymują średnie i duże biusty. Biustonosz wiązany na szyi i zapinany na plecach.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="11" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="4" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="G" name="65D" panel_name="65D_bielizna" iaiext:code_external="983-115" code_producer="5905220660650">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="88" name="65E" panel_name="65E_bielizna" iaiext:code_external="983-116" code_producer="5905220660667">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="90" name="65G" panel_name="65G_bielizna" iaiext:code_external="983-114" code_producer="5905220660681">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="91" name="65H" panel_name="65H_bielizna" iaiext:code_external="983-117" code_producer="5905220660698">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="99" name="70B" panel_name="70B_bielizna" iaiext:code_external="983-118" code_producer="5905220660704">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="135" name="70D" panel_name="70D_bielizna" iaiext:code_external="983-119" code_producer="5905220660728">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="138" name="70F" panel_name="70F_bielizna" iaiext:code_external="983-120" code_producer="5905220660742">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="139" name="70G" panel_name="70G_bielizna" iaiext:code_external="983-121" code_producer="5905220660759">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="147" name="75A" panel_name="75A_bielizna" iaiext:code_external="983-122" code_producer="5905220660766">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="148" name="75B" panel_name="75B_bielizna" iaiext:code_external="983-123" code_producer="5905220660773">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="149" name="75C" panel_name="75C_bielizna" iaiext:code_external="983-124" code_producer="5905220660780">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="150" name="75D" panel_name="75D_bielizna" iaiext:code_external="983-125" code_producer="5905220660797">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="152" name="75E" panel_name="75E_bielizna" iaiext:code_external="983-126" code_producer="5905220660803">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="153" name="75F" panel_name="75F_bielizna" iaiext:code_external="983-127" code_producer="5905220660810">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="176" name="85C" panel_name="85C_bielizna" iaiext:code_external="983-128" code_producer="5905220660872">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="177" name="85D" panel_name="85D_bielizna" iaiext:code_external="983-129" code_producer="5905220660889">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/983/983_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/983/983_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="314" currency="" type="regular" vat="" site="1">
+      <producer id="20" name="Lupo Line"/>
+      <category id="4" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Biustonosz kąpielowy Eden Big</name>
+        <short_desc><![CDATA[Biustonosz kąpielowy Eden to propozycja dla kobiet, które pragną połączyć wygodę z egzotycznym stylem inspirowanym tropikalną przyrodą.]]></short_desc>
+        <long_desc><![CDATA[Biustonosz kąpielowy Eden to propozycja dla kobiet, które pragną połączyć wygodę z egzotycznym stylem inspirowanym tropikalną przyrodą. Zachwyca wyrazistym wzorem, który wprowadza świeżość i energię do letnich stylizacji. Biustonosz posiada miękkie miseczki z modelującymi cięciami oraz jest usztywniony fiszbinami, dzięki czemu doskonale podtrzymuje średnie i duże biusty. Ramiączka regulowane, nieodpinane. Szerokość ramiączek i typ zapięcia dopasowany do rozmiaru biustonosza. Miedzy miseczkami delikatna ozdoba dodająca uroku całości. Idealna propozycja dla kobiet o pełniejszych kształtach.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="11" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="4" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="90" name="65G" panel_name="65G_bielizna" iaiext:code_external="984-131" code_producer="5905220670826">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="91" name="65H" panel_name="65H_bielizna" iaiext:code_external="984-132" code_producer="5905220670833">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="92" name="65I" panel_name="65I_bielizna" iaiext:code_external="984-133" code_producer="5905220670840">
+          <price />
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="93" name="65J" panel_name="65J_bielizna" iaiext:code_external="984-134" code_producer="5905220670857">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="94" name="65K" panel_name="65K_bielizna" iaiext:code_external="984-135" code_producer="5905220670864">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="139" name="70G" panel_name="70G_bielizna" iaiext:code_external="984-136" code_producer="5905220670918">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="140" name="70H" panel_name="70H_bielizna" iaiext:code_external="984-137" code_producer="5905220670925">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="141" name="70I" panel_name="70I_bielizna" iaiext:code_external="984-138" code_producer="5905220670932">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="142" name="70J" panel_name="70J_bielizna" iaiext:code_external="984-139" code_producer="5905220670949">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="143" name="70K" panel_name="70K_bielizna" iaiext:code_external="984-140" code_producer="5905220670956">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="144" name="70L" panel_name="70L_bielizna" iaiext:code_external="984-141" code_producer="5905220670963">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="152" name="75E" panel_name="75E_bielizna" iaiext:code_external="984-142" code_producer="5905220670987">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="155" name="75H" panel_name="75H_bielizna" iaiext:code_external="984-143" code_producer="5905220671014">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="157" name="75J" panel_name="75J_bielizna" iaiext:code_external="984-144" code_producer="5905220671038">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="158" name="75K" panel_name="75K_bielizna" iaiext:code_external="984-130" code_producer="5905220671045">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="159" name="75L" panel_name="75L_bielizna" iaiext:code_external="984-145" code_producer="5905220671052">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="164" name="80D" panel_name="80D_bielizna" iaiext:code_external="984-146" code_producer="5905220671069">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="176" name="85C" panel_name="85C_bielizna" iaiext:code_external="984-147" code_producer="5905220671144">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="177" name="85D" panel_name="85D_bielizna" iaiext:code_external="984-148" code_producer="5905220671151">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="178" name="85E" panel_name="85E_bielizna" iaiext:code_external="984-149" code_producer="5905220671168">
+          <price />
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="17" name="85H" panel_name="85H_bielizna" iaiext:code_external="984-150" code_producer="5905220671199">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="20" name="85I" panel_name="85I_bielizna" iaiext:code_external="984-151" code_producer="5905220671205">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="41" name="90C" panel_name="90C_bielizna" iaiext:code_external="984-152" code_producer="5905220671229">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="42" name="90D" panel_name="90D_bielizna" iaiext:code_external="984-153" code_producer="5905220671236">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="179" name="90E" panel_name="90E_bielizna" iaiext:code_external="984-154" code_producer="5905220671243">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="180" name="90F" panel_name="90F_bielizna" iaiext:code_external="984-155" code_producer="5905220671250">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="181" name="90G" panel_name="90G_bielizna" iaiext:code_external="984-156" code_producer="5905220671267">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="182" name="90H" panel_name="90H_bielizna" iaiext:code_external="984-157" code_producer="5905220671274">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="183" name="90I" panel_name="90I_bielizna" iaiext:code_external="984-158" code_producer="5905220671281">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="191" name="95D" panel_name="95D_bielizna" iaiext:code_external="984-159" code_producer="5905220671304">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="192" name="95E" panel_name="95E_bielizna" iaiext:code_external="984-160" code_producer="5905220671311">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="193" name="95F" panel_name="95F_bielizna" iaiext:code_external="984-161" code_producer="5905220671328">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="194" name="95G" panel_name="95G_bielizna" iaiext:code_external="984-162" code_producer="5905220671335">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/984/984_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/984/984_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="315" currency="" type="regular" vat="" site="1">
+      <producer id="20" name="Lupo Line"/>
+      <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Amelia Big</name>
+        <short_desc><![CDATA[Klasyczne figi, z kolorowym motywem. Fason stworzony dla miłośniczek bardziej zabudowanych majteczek.]]></short_desc>
+        <long_desc><![CDATA[Klasyczne figi, z kolorowym motywem. Fason stworzony dla miłośniczek bardziej zabudowanych majteczek. Figi mają ściągane sznureczki po obu bokach, dzięki którym możesz regulować ich krój i wysokość majtek, przez co każda kobieta czuje się w nich komfortowo oraz elegancko.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="11" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="6" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="235" name="36" panel_name="36_bielizna" iaiext:code_external="985-164" code_producer="5905220660339">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="239" name="44" panel_name="44_bielizna" iaiext:code_external="985-167" code_producer="5905220660377">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" name="40" panel_name="40_bielizna" iaiext:code_external="985-165" code_producer="5905220660353">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" name="42" panel_name="42_bielizna" iaiext:code_external="985-166" code_producer="5905220660360">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="242" name="46" panel_name="46_bielizna" iaiext:code_external="985-163" code_producer="5905220660384">
+          <price />
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/985/985_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/985/985_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+  </products>
+</offer>
