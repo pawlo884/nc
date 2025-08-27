@@ -1284,37 +1284,26 @@ class FullChangeXMLExporter(BaseXMLExporter):
             now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products currency="PLN" language="pol">')
 
-        # Pobierz tracking
-        tracking = self.get_or_create_tracking()
-        last_exported_id = tracking.last_exported_product_id or 0
+        # Tracking nie jest używane w nowej logice IdoSell (60 minut dla wszystkich produktów)
 
-        # Oblicz timestamp z 2 godziny temu
-        two_hours_ago = now - timedelta(hours=2)
+        # Oblicz timestamp z 60 minut temu (specyfikacja IdoSell)
+        sixty_minutes_ago = now - timedelta(minutes=60)
 
         if incremental:
-            # Eksport przyrostowy - tylko produkty zmienione w ciągu ostatnich 2 godzin
-            # ALE tylko te które są już wyeksportowane (id ≤ last_exported_product_id)
-            if last_exported_id > 0:
-                # Sprawdź zmiany w wariantach, produktach i obrazach
-                # Tylko dla produktów z id ≤ last_exported_product_id
-                variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                    iai_product_id__isnull=False,
-                    iai_product_id__lte=last_exported_id  # Tylko wyeksportowane produkty
-                ).filter(
-                    Q(updated_at__gte=two_hours_ago) |  # Wariant zmieniony
-                    # Produkt zmieniony
-                    Q(product__updated_at__gte=two_hours_ago) |
-                    # Obraz zmieniony
-                    Q(product__images__updated_at__gte=two_hours_ago)
-                ).select_related('product', 'size', 'color', 'producer_color', 'product__brand').distinct()
+            # Eksport przyrostowy - tylko produkty zmienione w ciągu ostatnich 60 minut (IdoSell)
+            # Sprawdź zmiany w wariantach, produktach i obrazach - WSZYSTKIE produkty
+            variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                iai_product_id__isnull=False
+            ).filter(
+                Q(updated_at__gte=sixty_minutes_ago) |  # Wariant zmieniony
+                # Produkt zmieniony
+                Q(product__updated_at__gte=sixty_minutes_ago) |
+                # Obraz zmieniony
+                Q(product__images__updated_at__gte=sixty_minutes_ago)
+            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand').distinct()
 
-                logger.info(
-                    f"Eksport przyrostowy full_change.xml - produkty zmienione od: {two_hours_ago.strftime('%Y-%m-%d %H:%M:%S')} (tylko wyeksportowane, id ≤ {last_exported_id})")
-            else:
-                # Brak wyeksportowanych produktów - pusta lista
-                variants_with_iai = ProductVariants.objects.using('MPD').none()
-                logger.info(
-                    "Eksport przyrostowy full_change.xml - brak wyeksportowanych produktów")
+            logger.info(
+                f"Eksport przyrostowy full_change.xml (IdoSell) - produkty zmienione od: {sixty_minutes_ago.strftime('%Y-%m-%d %H:%M:%S')} (wszystkie produkty)")
         else:
             # Pełny eksport - wszystkie produkty
             variants_with_iai = ProductVariants.objects.using('MPD').filter(
