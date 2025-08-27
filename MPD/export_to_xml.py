@@ -101,25 +101,10 @@ class FullXMLExporter(BaseXMLExporter):
         xml.append('      </iaiext:navigation>')
         return '\n'.join(xml)
 
-    def get_or_create_tracking(self):
-        """Pobierz lub utwórz tracking dla full.xml"""
-        from .models import ExportTracking
-        tracking, created = ExportTracking.objects.using('MPD').get_or_create(
-            export_type='full.xml',
-            defaults={
-                'last_exported_product_id': 0,
-                'last_exported_timestamp': timezone.now(),
-                'total_products_exported': 0,
-                'export_status': 'success'
-            }
-        )
-        return tracking
-
     def generate_xml(self, incremental=True):
         from django.utils.html import escape
         from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths, Vat
         from datetime import datetime, timedelta
-        from django.db import models
 
         now = datetime.now()
         expires = now + timedelta(days=1)
@@ -349,20 +334,9 @@ class FullXMLExporter(BaseXMLExporter):
         xml.append('  </products>')
         xml.append('</offer>')
 
-        # Aktualizuj tracking po udanym eksporcie
-        if variants_with_iai.exists():
-            max_iai_id = variants_with_iai.aggregate(
-                max_id=models.Max('iai_product_id')
-            )['max_id']
-            if max_iai_id:
-                tracking = self.get_or_create_tracking()
-                tracking.last_exported_product_id = max_iai_id
-                tracking.last_exported_timestamp = timezone.now()
-                tracking.total_products_exported += variants_with_iai.count()
-                tracking.export_status = 'success'
-                tracking.save()
-                logger.info(
-                    f"Zaktualizowano tracking - ostatni iai_product_id: {max_iai_id}")
+        # Tracking nie jest już potrzebne w nowej logice IdoSell
+        logger.info(
+            f"Eksport zakończony - wyeksportowano {variants_with_iai.count()} produktów")
 
         return '\n'.join(xml)
 
@@ -406,6 +380,10 @@ class FullXMLExporter(BaseXMLExporter):
             incremental=False)  # Zawsze false - pełna oferta
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
+
+        # Zapisz rekord o wygenerowanym pliku full.xml
+        self.save_full_record(bucket_url, local_path)
+
         if bucket_url:
             print('✅ Pełny eksport XML zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
@@ -426,6 +404,27 @@ class FullXMLExporter(BaseXMLExporter):
             print('❌ Błąd podczas pełnego eksportu XML')
             print(f'📄 Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
+
+    def save_full_record(self, bucket_url, local_path):
+        """Zapisz rekord o wygenerowanym pliku full.xml"""
+        from .models import FullChangeFile
+        from datetime import datetime
+        try:
+            now = datetime.now()
+            timestamp = now.strftime('%Y-%m-%dT%H-%M-%S')
+            FullChangeFile.objects.using('MPD').create(
+                filename='full.xml',
+                timestamp=timestamp,
+                created_at=now,
+                bucket_url=bucket_url,
+                local_path=local_path,
+                file_size=os.path.getsize(
+                    local_path) if os.path.exists(local_path) else 0
+            )
+            logger.info(f"Zapisano rekord pliku full.xml: {timestamp}")
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas zapisywania rekordu full.xml: {str(e)}")
 
 
 class LightXMLExporter(BaseXMLExporter):
@@ -956,12 +955,28 @@ class GatewayXMLExporter(BaseXMLExporter):
             # Konwertuj na lokalny czas (Europe/Warsaw)
             local_request_time = timezone.localtime(request_time)
 
-            # Full.xml ma swój timestamp
-            full_time = local_request_time.strftime('%Y-%m-%d %H:%M:%S')
+            # Sprawdź rzeczywisty czas ostatniego wygenerowania full.xml
+            from .models import FullChangeFile
+            from django.db import models
+
+            # Pobierz ostatni plik full.xml (dokładnie 'full.xml')
+            last_full_file = FullChangeFile.objects.using('MPD').filter(
+                filename='full.xml'
+            ).order_by('-created_at').first()
+
+            if last_full_file:
+                # Użyj czasu ostatniego wygenerowania full.xml
+                full_time = timezone.localtime(
+                    last_full_file.created_at).strftime('%Y-%m-%d %H:%M:%S')
+                logger.info(f"Używam czasu ostatniego full.xml: {full_time}")
+            else:
+                # Fallback: użyj czasu żądania
+                full_time = local_request_time.strftime('%Y-%m-%d %H:%M:%S')
+                logger.info(
+                    f"Brak pliku full.xml, używam czasu żądania: {full_time}")
 
             # Hash bazujący na rzeczywistych danych + czasie
             from .models import Products
-            from django.db import models
             try:
                 # Pobierz liczbę produktów i ostatni timestamp modyfikacji
                 total_products = Products.objects.using('MPD').count()
@@ -975,16 +990,16 @@ class GatewayXMLExporter(BaseXMLExporter):
                 else:
                     last_modified_str = "1970-01-01 00:00:00"
 
-                # Hash bazujący na: liczba produktów + ostatnia modyfikacja + czas żądania
-                full_hash_input = f"generate-full-xml_{total_products}_{last_modified_str}_{local_request_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                # Hash bazujący na: liczba produktów + ostatnia modyfikacja + czas full.xml
+                full_hash_input = f"generate-full-xml_{total_products}_{last_modified_str}_{full_time}"
                 full_hash = hashlib.md5(full_hash_input.encode()).hexdigest()
 
                 logger.info(
-                    f"Full.xml hash: products={total_products}, last_modified={last_modified_str}, request_time={full_time}")
+                    f"Full.xml hash: products={total_products}, last_modified={last_modified_str}, full_time={full_time}")
 
             except Exception as e:
                 # Fallback: hash bazujący tylko na czasie
-                full_hash_input = f"generate-full-xml_{local_request_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                full_hash_input = f"generate-full-xml_{full_time}"
                 full_hash = hashlib.md5(full_hash_input.encode()).hexdigest()
                 logger.warning(
                     f"Błąd generowania hash dla full.xml: {str(e)}, używam fallback")
@@ -1169,48 +1184,6 @@ class FullChangeXMLExporter(BaseXMLExporter):
         super().__init__(filename)
         self.timestamp = timestamp
         self.created_at = now
-
-    def get_or_create_tracking(self):
-        """Pobierz lub utwórz tracking dla full_change.xml - używa last_exported_product_id z full.xml"""
-        from .models import ExportTracking
-
-        # Najpierw pobierz tracking dla full.xml
-        full_tracking = ExportTracking.objects.using('MPD').filter(
-            export_type='full.xml'
-        ).first()
-
-        if not full_tracking:
-            # Jeśli nie ma full.xml tracking, utwórz z wartością 0
-            tracking, created = ExportTracking.objects.using('MPD').get_or_create(
-                export_type='full_change.xml',
-                defaults={
-                    'last_exported_product_id': 0,
-                    'last_exported_timestamp': timezone.now(),
-                    'total_products_exported': 0,
-                    'export_status': 'success'
-                }
-            )
-            return tracking
-
-        # Pobierz lub utwórz tracking dla full_change.xml z last_exported_product_id z full.xml
-        tracking, created = ExportTracking.objects.using('MPD').get_or_create(
-            export_type='full_change.xml',
-            defaults={
-                'last_exported_product_id': full_tracking.last_exported_product_id,
-                'last_exported_timestamp': timezone.now(),
-                'total_products_exported': full_tracking.last_exported_product_id,
-                'export_status': 'success'
-            }
-        )
-
-        # Jeśli tracking już istniał, ale ma mniejszy last_exported_product_id niż full.xml
-        if not created and tracking.last_exported_product_id < full_tracking.last_exported_product_id:
-            tracking.last_exported_product_id = full_tracking.last_exported_product_id
-            tracking.total_products_exported = full_tracking.last_exported_product_id
-            tracking.last_exported_timestamp = timezone.now()
-            tracking.save()
-
-        return tracking
 
     def save_full_change_record(self, bucket_url, local_path):
         """Zapisz rekord o wygenerowanym pliku full_change"""

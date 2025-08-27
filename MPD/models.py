@@ -424,27 +424,6 @@ class ProductFabric(models.Model):
         return f"{self.component.name} {self.percentage}%"
 
 
-class ExportTracking(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    export_type = models.CharField(max_length=255)
-    last_exported_product_id = models.BigIntegerField()
-    last_exported_timestamp = models.DateTimeField()
-    total_products_exported = models.BigIntegerField()
-    export_status = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    objects = models.Manager()
-
-    class Meta:
-        managed = False
-        db_table = 'xml_export_tracking'
-        verbose_name = 'Status eksportu'
-        verbose_name_plural = 'Statusy eksportu'
-
-    def __str__(self):
-        return f"{self.export_type} - {self.export_status}"
-
-
 class IaiProductCounter(models.Model):
     id = models.IntegerField(primary_key=True)
     counter_value = models.BigIntegerField()
