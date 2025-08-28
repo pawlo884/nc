@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<provider_description file_format="IOF" version="3.0" generated_by="IdoSell" generated="2022-02-15 15:46:37">
+	<meta>
+		<long_name><![CDATA[Moj sklep IdoSell]]></long_name>
+		<short_name><![CDATA[iof]]></short_name>
+		<showcase_image url="http://iof.shop.pl/data/system/panel_logo.png"/>
+		<email><![CDATA[no-reply@idosell.com]]></email>
+		<tel><![CDATA[+48 91 443 66 00]]></tel>
+		<tel><![CDATA[+48 91 443 66 00]]></tel>
+		<www><![CDATA[iof.shop.pl]]></www>
+		<address>
+			<street><![CDATA[Aleja Piastów 30]]></street>
+			<zipcode><![CDATA[71-064]]></zipcode>
+			<city><![CDATA[Szczecin]]></city>
+			<country><![CDATA[Polska]]></country>
+			<province><![CDATA[]]></province>
+		</address>
+		<time>
+			<offer created="2022-02-15 15:46:37"/>
+			<offer expires="2022-02-22 15:46:37"/>
+		</time>
+	</meta>
+	<full url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=e19156ecfdeaf09da54cd9f&amp;shop=1&amp;type=full&amp;format=xml&amp;iof_3_0" hash="98b7e54f96335e632524ab267c11b8c3" changed="2022-02-14 23:08:30">
+		<changes>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T15-23-16&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 15:23:16"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T14-19-03&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 14:19:04"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T13-18-53&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 13:18:53"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T12-16-27&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 12:16:27"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T11-14-54&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 11:14:55"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T10-20-47&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 10:20:48"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T09-19-48&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 09:19:49"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T08-22-26&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 08:22:26"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T07-06-47&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 07:06:48"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T06-14-45&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 06:14:46"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T05-12-39&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 05:12:40"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T04-16-24&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 04:16:24"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T03-20-05&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 03:20:05"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T02-23-50&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 02:23:51"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T01-17-25&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 01:17:25"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-15T00-26-36&amp;format=xml&amp;iof_3_0" hash="982a963722ff18c7e1580de635841caa" changed="2022-02-15 00:26:36"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-14T22-20-27&amp;format=xml&amp;iof_3_0" hash="7ce2707299161bec392ad00f6ec14661" changed="2022-02-14 22:20:28"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-14T21-22-14&amp;format=xml&amp;iof_3_0" hash="7ce2707299161bec392ad00f6ec14661" changed="2022-02-14 21:22:15"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-14T20-09-38&amp;format=xml&amp;iof_3_0" hash="7ce2707299161bec392ad00f6ec14661" changed="2022-02-14 20:09:39"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-14T19-09-58&amp;format=xml&amp;iof_3_0" hash="7ce2707299161bec392ad00f6ec14661" changed="2022-02-14 19:09:58"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-14T18-09-21&amp;format=xml&amp;iof_3_0" hash="7ce2707299161bec392ad00f6ec14661" changed="2022-02-14 18:09:21"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-14T17-21-06&amp;format=xml&amp;iof_3_0" hash="7ce2707299161bec392ad00f6ec14661" changed="2022-02-14 17:21:07"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-14T16-12-19&amp;format=xml&amp;iof_3_0" hash="7ce2707299161bec392ad00f6ec14661" changed="2022-02-14 16:12:20"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-14T15-16-54&amp;format=xml&amp;iof_3_0" hash="7ce2707299161bec392ad00f6ec14661" changed="2022-02-14 15:16:54"/>
+			<change url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=8ea59f574526debab4d1c54&amp;shop=1&amp;type=full_change2022-02-14T14-06-48&amp;format=xml&amp;iof_3_0" hash="7ce2707299161bec392ad00f6ec14661" changed="2022-02-14 14:06:49"/>
+		</changes>
+	</full>
+	<light url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=9db5a606746e292d3230c66&amp;shop=1&amp;type=light&amp;format=xml&amp;iof_3_0"/>
+	<categories url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=a67204c7d297437b18d15a0&amp;shop=1&amp;type=categories&amp;format=xml&amp;iof_3_0" hash="9043b72e02c57f13306f5b85d93ad534" changed="2022-02-15 05:12:27"/>
+	<sizes url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=eb03fe0d7e57a060d4ad744&amp;shop=1&amp;type=sizes&amp;format=xml&amp;iof_3_0" hash="a0d3802a66185e7dde26acb86aa1fa25" changed="2022-02-15 05:12:27"/>
+	<producers url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=0be8bd7a34cee18fbca5e4b&amp;shop=1&amp;type=producers&amp;format=xml&amp;iof_3_0" hash="aa12f69dde2a0babd42e79e28d2c40b0" changed="2022-02-15 05:12:27"/>
+	<units url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=480f05b0ae61536842475dd&amp;shop=1&amp;type=units&amp;format=xml&amp;iof_3_0" hash="008572912c0afc620832459d3ec9b0e3" changed="2022-02-15 05:12:27"/>
+	<parameters url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=ea949767daf9658ddbab874&amp;shop=1&amp;type=parameters&amp;format=xml&amp;iof_3_0" hash="79b433144d3a6e6469479bfc9fe08ea7" changed="2022-02-15 05:12:27"/>
+	<stocks url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=3045d0e1977c06fc068bd62&amp;shop=1&amp;type=stocks&amp;format=xml&amp;iof_3_0" hash="06366fbd57b697c827111eac943e9944" changed="2022-02-15 05:12:27"/>
+	<series url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=db571db18e2422d0cac0907&amp;shop=1&amp;type=series&amp;format=xml&amp;iof_3_0" hash="5aa001c1ef2e296c912ff921bd0db0c8" changed="2022-02-15 05:12:27"/>
+	<warranties url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=f7c71d39b58a37e7215b76f&amp;shop=1&amp;type=warranties&amp;format=xml&amp;iof_3_0" hash="a8dc24d3f7f9eb36d04f1e06e92b32d3" changed="2022-02-15 05:12:27"/>
+	<preset url="https://iof.shop.pl/edi/export-offer.php?client=iof&amp;language=pol&amp;token=29a8853cc185963a3dfad7585a75d4a8&amp;shop=1&amp;type=preset&amp;format=xml&amp;iof_3_0" hash="29a8853cc185963a3dfad7585a75d4a8" changed="2022-02-15 05:12:27"/>
+</provider_description>

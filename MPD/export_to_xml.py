@@ -354,20 +354,6 @@ class FullXMLExporter(BaseXMLExporter):
             print('✅ Eksport pełnej oferty XML zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
-
-            # Automatycznie odśwież gateway.xml po eksporcie
-            try:
-                gateway_exporter = GatewayXMLExporter()
-                gateway_result = gateway_exporter.export()
-                if gateway_result['bucket_url']:
-                    print(
-                        '✅ Gateway.xml zaktualizowany automatycznie!')
-                else:
-                    print(
-                        '⚠️ Gateway.xml nie został zaktualizowany automatycznie')
-            except Exception as e:
-                print(
-                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
         else:
             print('❌ Błąd podczas eksportu XML')
             print(f'📄 Lokalnie zapisano: {local_path}')
@@ -388,18 +374,6 @@ class FullXMLExporter(BaseXMLExporter):
             print('✅ Pełny eksport XML zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
-
-            # Automatycznie odśwież gateway.xml po eksporcie full.xml
-            try:
-                gateway_exporter = GatewayXMLExporter()
-                gateway_result = gateway_exporter.export()
-                if gateway_result['bucket_url']:
-                    print('✅ Gateway.xml zaktualizowany automatycznie!')
-                else:
-                    print('⚠️ Gateway.xml nie został zaktualizowany automatycznie')
-            except Exception as e:
-                print(
-                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
         else:
             print('❌ Błąd podczas pełnego eksportu XML')
             print(f'📄 Lokalnie zapisano: {local_path}')
@@ -408,9 +382,9 @@ class FullXMLExporter(BaseXMLExporter):
     def save_full_record(self, bucket_url, local_path):
         """Zapisz rekord o wygenerowanym pliku full.xml"""
         from .models import FullChangeFile
-        from datetime import datetime
+        from django.utils import timezone
         try:
-            now = datetime.now()
+            now = timezone.now()
             timestamp = now.strftime('%Y-%m-%dT%H-%M-%S')
             FullChangeFile.objects.using('MPD').create(
                 filename='full.xml',
@@ -421,10 +395,9 @@ class FullXMLExporter(BaseXMLExporter):
                 file_size=os.path.getsize(
                     local_path) if os.path.exists(local_path) else 0
             )
-            logger.info(f"Zapisano rekord pliku full.xml: {timestamp}")
+            print(f"✅ Zapisano rekord pliku full.xml: {timestamp}")
         except Exception as e:
-            logger.error(
-                f"Błąd podczas zapisywania rekordu full.xml: {str(e)}")
+            print(f"❌ Błąd podczas zapisywania rekordu full.xml: {str(e)}")
 
 
 class LightXMLExporter(BaseXMLExporter):
@@ -657,20 +630,6 @@ class LightXMLExporter(BaseXMLExporter):
             print('✅ Eksport przyrostowy light.xml zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
-
-            # Automatycznie odśwież gateway.xml po eksporcie przyrostowym light.xml
-            try:
-                gateway_exporter = GatewayXMLExporter()
-                gateway_result = gateway_exporter.export()
-                if gateway_result['bucket_url']:
-                    print(
-                        '✅ Gateway.xml zaktualizowany automatycznie po eksporcie przyrostowym light.xml!')
-                else:
-                    print(
-                        '⚠️ Gateway.xml nie został zaktualizowany automatycznie po eksporcie przyrostowym light.xml')
-            except Exception as e:
-                print(
-                    f'⚠️ Błąd podczas automatycznej aktualizacji gateway.xml: {str(e)}')
         else:
             print('❌ Błąd podczas eksportu przyrostowego light.xml')
             print(f'📄 Lokalnie zapisano: {local_path}')
@@ -946,11 +905,10 @@ class GatewayXMLExporter(BaseXMLExporter):
 
             # Dla endpointów API używamy czasu żądania HTTP
             import hashlib
-            from datetime import timedelta
 
             # Użyj czasu żądania HTTP lub aktualnego czasu
             if request_time is None:
-                request_time = timezone.now()
+                request_time = datetime.now()
 
             # Konwertuj na lokalny czas (Europe/Warsaw)
             local_request_time = timezone.localtime(request_time)
@@ -970,89 +928,100 @@ class GatewayXMLExporter(BaseXMLExporter):
                     last_full_file.created_at).strftime('%Y-%m-%d %H:%M:%S')
                 logger.info(f"Używam czasu ostatniego full.xml: {full_time}")
             else:
-                # Fallback: użyj czasu żądania
-                full_time = local_request_time.strftime('%Y-%m-%d %H:%M:%S')
+                # Brak rekordu full.xml w bazie - użyj pustych wartości
+                full_time = ""
                 logger.info(
-                    f"Brak pliku full.xml, używam czasu żądania: {full_time}")
+                    "Brak pliku full.xml w bazie - używam pustych wartości")
 
             # Hash bazujący na rzeczywistych danych + czasie
             from .models import Products
-            try:
-                # Pobierz liczbę produktów i ostatni timestamp modyfikacji
-                total_products = Products.objects.using('MPD').count()
-                last_modified = Products.objects.using('MPD').aggregate(
-                    last_modified=models.Max('updated_at')
-                )['last_modified']
+            if last_full_file:
+                try:
+                    # Pobierz liczbę produktów i ostatni timestamp modyfikacji
+                    total_products = Products.objects.using('MPD').count()
+                    last_modified = Products.objects.using('MPD').aggregate(
+                        last_modified=models.Max('updated_at')
+                    )['last_modified']
 
-                if last_modified:
-                    last_modified_str = last_modified.strftime(
-                        '%Y-%m-%d %H:%M:%S')
-                else:
-                    last_modified_str = "1970-01-01 00:00:00"
+                    if last_modified:
+                        last_modified_str = last_modified.strftime(
+                            '%Y-%m-%d %H:%M:%S')
+                    else:
+                        last_modified_str = "1970-01-01 00:00:00"
 
-                # Hash bazujący na: liczba produktów + ostatnia modyfikacja + czas full.xml
-                full_hash_input = f"generate-full-xml_{total_products}_{last_modified_str}_{full_time}"
-                full_hash = hashlib.md5(full_hash_input.encode()).hexdigest()
+                    # Hash bazujący na: liczba produktów + ostatnia modyfikacja + czas full.xml
+                    full_hash_input = f"generate-full-xml_{total_products}_{last_modified_str}_{full_time}"
+                    full_hash = hashlib.md5(
+                        full_hash_input.encode()).hexdigest()
 
+                    logger.info(
+                        f"Full.xml hash: products={total_products}, last_modified={last_modified_str}, full_time={full_time}")
+
+                except Exception as e:
+                    # Fallback: hash bazujący tylko na czasie
+                    full_hash_input = f"generate-full-xml_{full_time}"
+                    full_hash = hashlib.md5(
+                        full_hash_input.encode()).hexdigest()
+                    logger.warning(
+                        f"Błąd generowania hash dla full.xml: {str(e)}, używam fallback")
+            else:
+                # Brak rekordu full.xml w bazie - użyj pustego hasha
+                full_hash = ""
                 logger.info(
-                    f"Full.xml hash: products={total_products}, last_modified={last_modified_str}, full_time={full_time}")
-
-            except Exception as e:
-                # Fallback: hash bazujący tylko na czasie
-                full_hash_input = f"generate-full-xml_{full_time}"
-                full_hash = hashlib.md5(full_hash_input.encode()).hexdigest()
-                logger.warning(
-                    f"Błąd generowania hash dla full.xml: {str(e)}, używam fallback")
+                    "Brak pliku full.xml w bazie - używam pustego hasha")
 
             full_element.set("hash", full_hash)
             full_element.set("changed", full_time)
 
-            # Sprawdź rzeczywiste zmiany w produktach zgodnie ze specyfikacją IdoSell
+            # Sprawdź rzeczywiste pliki full_change.xml z bazy
 
-            # Pobierz produkty zmodyfikowane w ostatnich 60 minutach (specyfikacja IdoSell)
-            cutoff_time = request_time - timedelta(minutes=60)
+            # Pobierz ostatnie 25 plików full_change.xml z bazy
+            recent_full_change_files = FullChangeFile.objects.using('MPD').filter(
+                filename__startswith='full_change'
+            ).order_by('-created_at')[:25]
 
-            recent_changes = Products.objects.using('MPD').filter(
-                updated_at__gte=cutoff_time
-            ).order_by('-updated_at')
+            # Zawsze utwórz podwęzeł changes
+            changes_element = ET.SubElement(full_element, "changes")
 
-            if recent_changes.exists():
-                # Utwórz podwęzeł changes
-                changes_element = ET.SubElement(full_element, "changes")
-
-                # Generuj change dla każdej zmiany (zgodnie z IdoSell)
-                for i, product in enumerate(recent_changes):
+            if recent_full_change_files.exists():
+                # Generuj change dla każdego wygenerowanego pliku full_change.xml
+                for full_change_file in recent_full_change_files:
                     change_element = ET.SubElement(changes_element, "change")
 
-                    # URL do endpointu API dla full_change
-                    url = f"{base_url}/mpd/generate-full-change-xml/"
-                    change_element.set("url", url)
-
-                    # Timestamp w formacie ISO 8601 (YYYY-MM-DDThh-mm-ss) - specyfikacja IdoSell
-                    # Użyj czasu modyfikacji produktu + małe przesunięcie dla unikalności
-                    if product.updated_at:
-                        change_time = product.updated_at + timedelta(seconds=i)
+                    # Użyj rzeczywistego czasu wygenerowania pliku full_change.xml
+                    if full_change_file.created_at:
+                        # Sprawdź czy datetime jest timezone-aware
+                        if timezone.is_aware(full_change_file.created_at):
+                            change_time = full_change_file.created_at
+                        else:
+                            change_time = timezone.make_aware(
+                                full_change_file.created_at)
                     else:
-                        change_time = local_request_time + timedelta(seconds=i)
+                        change_time = local_request_time
 
                     # Konwertuj na lokalny czas
                     local_change_time = timezone.localtime(change_time)
                     change_time_str = local_change_time.strftime(
                         '%Y-%m-%d %H:%M:%S')
 
-                    # Hash bazujący na konkretnym produkcie + czasie modyfikacji
+                    # URL do konkretnego pliku full_changeYYYY-MM-DDThh-mm-ss.xml zgodnie ze specyfikacją IdoSell
+                    change_filename = f"full_change{local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}.xml"
+                    url = f"{base_url}/mpd/{change_filename}"
+                    change_element.set("url", url)
+
+                    # Hash bazujący na nazwie pliku full_change.xml
                     try:
-                        # Hash bazujący na: ID produktu + czas modyfikacji + indeks
-                        change_hash_input = f"generate-full-change-xml_{product.id}_{local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}_{i}"
+                        # Hash bazujący na: nazwa pliku full_change.xml
+                        change_hash_input = f"generate-full-change-xml_{full_change_file.filename}"
                         hash_value = hashlib.md5(
                             change_hash_input.encode()).hexdigest()
 
                         logger.info(
-                            f"Full_change.xml hash (IdoSell): product_id={product.id}, change_time={local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}, index={i}")
+                            f"Full_change.xml hash: filename={full_change_file.filename}, change_time={local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}")
 
                     except Exception as e:
                         # Fallback: hash bazujący tylko na czasie
-                        change_hash_input = f"generate-full-change-xml_{local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}_{i}"
+                        change_hash_input = f"generate-full-change-xml_{local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}"
                         hash_value = hashlib.md5(
                             change_hash_input.encode()).hexdigest()
                         logger.warning(
@@ -1062,14 +1031,23 @@ class GatewayXMLExporter(BaseXMLExporter):
                     change_element.set("changed", change_time_str)
 
                     logger.info(
-                        f"API endpoint full_change (IdoSell): hash={hash_value}, changed={change_time_str}, product_id={product.id}")
+                        f"API endpoint full_change: hash={hash_value}, changed={change_time_str}, filename={full_change_file.filename}")
 
                 logger.info(
-                    f"Wygenerowano {len(recent_changes)} zmian w full_change.xml")
+                    f"Wygenerowano {len(recent_full_change_files)} zmian w full_change.xml")
 
             else:
+                # Brak plików full_change.xml w bazie - utwórz pusty change
+                change_element = ET.SubElement(changes_element, "change")
+
+                # URL do endpointu API dla full_change
+                url = f"{base_url}/mpd/generate-full-change-xml/"
+                change_element.set("url", url)
+                change_element.set("hash", "")
+                change_element.set("changed", "")
+
                 logger.info(
-                    "Brak zmian w produktach w ostatnich 60 minutach (IdoSell)")
+                    "Brak plików full_change.xml w bazie - utworzono pusty change")
 
         except Exception as e:
             logger.error(
@@ -1269,8 +1247,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 iai_product_id__isnull=False
             ).filter(
                 Q(updated_at__gte=sixty_minutes_ago) |  # Wariant zmieniony
-                # Produkt zmieniony
-                Q(product__updated_at__gte=sixty_minutes_ago) |
+                Q(product__updated_at__gte=sixty_minutes_ago) |  # Produkt zmieniony
                 # Obraz zmieniony
                 Q(product__images__updated_at__gte=sixty_minutes_ago)
             ).select_related('product', 'size', 'color', 'producer_color', 'product__brand').distinct()

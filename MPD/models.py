@@ -443,11 +443,10 @@ class FullChangeFile(models.Model):
     id = models.BigAutoField(primary_key=True)
     filename = models.CharField(max_length=255)
     timestamp = models.CharField(max_length=50)  # YYYY-MM-DDTHH-MM-SS
-    created_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
     bucket_url = models.URLField(blank=True, null=True)
     local_path = models.CharField(max_length=500, blank=True, null=True)
     file_size = models.BigIntegerField(default=0)
-    created_at_record = models.DateTimeField(auto_now_add=True)
     objects = models.Manager()
 
     class Meta:

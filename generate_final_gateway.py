@@ -41,7 +41,7 @@ def generate_final_gateway():
         with open(local_path, 'w', encoding='utf-8') as f:
             f.write(xml_content)
 
-        print(f"✅ Gateway.xml wygenerowany pomyślnie!")
+        print(image.pngf"✅ Gateway.xml wygenerowany pomyślnie!")
         print(f"📄 Zapisano lokalnie: {local_path}")
 
         # Sprawdź endpointy

@@ -555,11 +555,11 @@ class IaiProductCounterAdmin(admin.ModelAdmin):
 @admin.register(FullChangeFile)
 class FullChangeFileAdmin(admin.ModelAdmin):
     list_display = ['id', 'filename', 'timestamp',
-                    'created_at', 'file_size', 'created_at_record']
-    list_filter = ['created_at', 'created_at_record']
+                    'created_at', 'file_size']
+    list_filter = ['created_at']
     search_fields = ['filename', 'timestamp']
     readonly_fields = ['id', 'filename', 'timestamp', 'created_at',
-                       'bucket_url', 'local_path', 'file_size', 'created_at_record']
+                       'bucket_url', 'local_path', 'file_size']
     ordering = ['-created_at']
 
     def has_add_permission(self, request):

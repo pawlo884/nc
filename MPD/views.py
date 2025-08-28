@@ -268,8 +268,8 @@ def update_all_gateways():
 @csrf_exempt
 def generate_full_xml(request):
     exporter = FullXMLExporter()
-    # Używa metody z automatyczną aktualizacją gateway.xml - eksport przyrostowy
-    exporter_result = exporter.export_incremental()
+    # Używa metody z zapisem rekordu do bazy - eksport pełny
+    exporter_result = exporter.export_full()
 
     # Automatycznie zaktualizuj wszystkie gateway.xml (dodatkowe zabezpieczenie)
     update_all_gateways()
@@ -289,52 +289,6 @@ def generate_full_xml(request):
     logger.info(f"Full.xml wygenerowany i zapisany lokalnie: {local_path}")
 
     return HttpResponse(content, content_type='application/xml')
-
-
-@csrf_exempt
-def reset_full_xml_export(request):
-    """
-    Reset eksportu full.xml - wymusza pełny eksport wszystkich produktów
-    """
-    from .models import ExportTracking
-
-    try:
-        # Reset tracking dla full.xml
-        tracking, created = ExportTracking.objects.using('MPD').get_or_create(
-            export_type='full.xml',
-            defaults={
-                'last_exported_product_id': 0,
-                'last_exported_timestamp': timezone.now(),
-                'total_products_exported': 0,
-                'export_status': 'reset'
-            }
-        )
-
-        if not created:
-            tracking.last_exported_product_id = 0
-            tracking.total_products_exported = 0
-            tracking.export_status = 'reset'
-            tracking.save()
-
-        # Wykonaj pełny eksport
-        exporter = FullXMLExporter()
-        exporter_result = exporter.export_full()
-
-        # Automatycznie zaktualizuj wszystkie gateway.xml
-        update_all_gateways()
-
-        return JsonResponse({
-            'status': 'success',
-            'message': 'Reset eksportu full.xml zakończony pomyślnie',
-            'bucket_url': exporter_result.get('bucket_url'),
-            'local_path': exporter_result.get('local_path')
-        })
-
-    except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'message': f'Błąd podczas resetu eksportu: {str(e)}'
-        }, status=500)
 
 
 @csrf_exempt

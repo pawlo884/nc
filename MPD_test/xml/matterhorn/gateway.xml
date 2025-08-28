@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-27 13:45:52">
+<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-28 13:41:41">
   <meta>
     <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
     <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
@@ -14,13 +14,13 @@
       <country>&lt;![CDATA[Poland]]&gt;</country>
     </address>
     <time>
-      <offer created="2025-08-27 13:45:52"/>
-      <offer expires="2025-09-03 13:45:52"/>
+      <offer created="2025-08-28 13:41:41"/>
+      <offer expires="2025-09-04 13:41:41"/>
     </time>
   </meta>
-  <full url="http://212.127.93.27:8000/mpd/generate-full-xml/" hash="584b81058579a8ce385369db1266a95a" changed="2025-08-27 13:45:52">
+  <full url="http://212.127.93.27:8000/mpd/generate-full-xml/" hash="745363837ea96693faf270e4f64d6ee7" changed="2025-08-28 10:56:44">
     <changes>
-      <change url="http://212.127.93.27:8000/mpd/generate-full-change-xml/" hash="8464e85ed266ca9e6f3dad7c51c388d4" changed="2025-08-27 12:57:59"/>
+      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-28T13-38-24.xml" hash="079b1ae73620827594b89713ba487efa" changed="2025-08-28 13:38:24"/>
     </changes>
   </full>
 </provider_description>
