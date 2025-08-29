@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<categories file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="2025-08-29 12:57:38" expires="2025-08-30 12:57:38">
+  <category id="1">
+    <name xml:lang="pol">Moda damska</name>
+    <category id="2">
+      <name xml:lang="pol">Bielizna</name>
+      <category id="3">
+        <name xml:lang="pol">Stroje kąpielowe</name>
+        <category id="5">
+          <name xml:lang="pol">Dwuczęściowe</name>
+          <category id="4">
+            <name xml:lang="pol">Biustonosze | Topy</name>
+          </category>
+          <category id="6">
+            <name xml:lang="pol">Figi | Stringi | Szorty</name>
+          </category>
+        </category>
+        <category id="7">
+          <name xml:lang="pol">Jednoczęściowe</name>
+        </category>
+        <category id="8">
+          <name xml:lang="pol">Kombinezony</name>
+        </category>
+        <category id="9">
+          <name xml:lang="pol">Pareo</name>
+        </category>
+        <category id="10">
+          <name xml:lang="pol">Spódniczki plażowe</name>
+        </category>
+        <category id="11">
+          <name xml:lang="pol">Sukienki plażowe</name>
+        </category>
+        <category id="12">
+          <name xml:lang="pol">Tankini</name>
+        </category>
+        <category id="13">
+          <name xml:lang="pol">Tuniki</name>
+        </category>
+      </category>
+    </category>
+  </category>
+  <category id="14">
+    <name xml:lang="pol">Moda męska</name>
+  </category>
+</categories>

@@ -23,6 +23,7 @@ class Brands(models.Model):
     logo_url = models.TextField(blank=True, null=True)
     opis = models.TextField(blank=True, null=True)
     url = models.URLField(max_length=255, blank=True, null=True)
+    iai_brand_id = models.IntegerField(blank=True, null=True)
     objects = models.Manager()
 
     class Meta:
@@ -447,14 +448,15 @@ class FullChangeFile(models.Model):
     bucket_url = models.URLField(blank=True, null=True)
     local_path = models.CharField(max_length=500, blank=True, null=True)
     file_size = models.BigIntegerField(default=0)
+
     objects = models.Manager()
 
     class Meta:
         managed = False
         db_table = 'full_change_files'
-        verbose_name = 'Plik Full Change'
-        verbose_name_plural = 'Pliki Full Change'
+        verbose_name = 'Plik XML'
+        verbose_name_plural = 'Pliki XML'
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.filename} ({self.timestamp})"
+        return f"{self.filename} ({self.timestamp}) - {self.file_type}"

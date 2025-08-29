@@ -17,6 +17,8 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nc.settings.dev')
 # Inicjalizuj Django
 django.setup()
 
+# Import po inicjalizacji Django
+
 
 def generate_final_gateway():
     """Generuje finalny gateway.xml z poprawną konfiguracją"""
@@ -41,7 +43,7 @@ def generate_final_gateway():
         with open(local_path, 'w', encoding='utf-8') as f:
             f.write(xml_content)
 
-        print(image.pngf"✅ Gateway.xml wygenerowany pomyślnie!")
+        print("✅ Gateway.xml wygenerowany pomyślnie!")
         print(f"📄 Zapisano lokalnie: {local_path}")
 
         # Sprawdź endpointy

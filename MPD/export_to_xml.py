@@ -1,4 +1,5 @@
 import os
+import hashlib
 from matterhorn.defs_db import s3_client, DO_SPACES_BUCKET, DO_SPACES_REGION
 import logging
 import xml.etree.ElementTree as ET
@@ -104,14 +105,16 @@ class FullXMLExporter(BaseXMLExporter):
     def generate_xml(self, incremental=True):
         from django.utils.html import escape
         from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths, Vat
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
-        now = datetime.now()
-        expires = now + timedelta(days=1)
+        now = timezone.now()
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products currency="PLN" language="pol">')
 
         # ZAWSZE generuj pełną ofertę - ignoruj parametr incremental
@@ -141,6 +144,7 @@ class FullXMLExporter(BaseXMLExporter):
             # Pobierz dane waluty i VAT z pierwszego wariantu
             currency = ''
             vat_rate = ''
+            has_price = False
             for variant in variants:
                 pvrp = ProductVariantsRetailPrice.objects.using(
                     'MPD').filter(variant=variant).first()
@@ -153,7 +157,12 @@ class FullXMLExporter(BaseXMLExporter):
                             vat_rate = str(vat_obj.vat_rate)
                         else:
                             vat_rate = str(pvrp.vat)
+                    has_price = True
                     break
+
+            # Jeśli nie ma ceny, ustaw VAT na 0
+            if not has_price:
+                vat_rate = '0'
 
             xml.append(
                 f'    <product id="{iai_product_id}" currency="{currency}" type="regular" vat="{vat_rate}" site="1">')
@@ -263,8 +272,11 @@ class FullXMLExporter(BaseXMLExporter):
 
                     # Buduj atrybuty do węzła <size>
                     size_id = variant.size.iai_size_id if variant.size and variant.size.iai_size_id else ''
+                    # Dodaj wymagany atrybut @code w formacie iai_product_id-size_id
+                    code_value = f"{iai_product_id}-{size_id}" if size_id else f"{iai_product_id}"
                     size_attrs = [
                         f'id="{size_id}"',
+                        f'code="{escape(code_value)}"',
                         f'name="{escape(size_name)}"',
                         f'panel_name="{escape(panel_name)}"',
                         f'iaiext:code_external="{code_external}"'
@@ -272,46 +284,55 @@ class FullXMLExporter(BaseXMLExporter):
                     if code_producer:
                         size_attrs.append(
                             f'code_producer="{escape(code_producer)}"')
-                    xml.append(
-                        f'        <size {' '.join(size_attrs)}>'
-                    )
-                    stock_price = StockAndPrices.objects.using(
-                        'MPD').filter(variant=variant).first()
-                    if stock_price:
-                        # Pobierz ceny detaliczne z product_variants_retail_price
-                        retail_price_obj = None
-                        try:
-                            from .models import ProductVariantsRetailPrice
-                            retail_price_obj = ProductVariantsRetailPrice.objects.using(
-                                'MPD').filter(variant=variant).first()
-                        except Exception:
-                            pass
-                        gross = retail_price_obj.retail_price if retail_price_obj and hasattr(
-                            retail_price_obj, 'retail_price') else ''
-                        net = retail_price_obj.net_price if retail_price_obj and hasattr(
-                            retail_price_obj, 'net_price') else ''
-                        price_attrs = []
-                        if gross or net:
-                            if gross:
-                                price_attrs.append(f'gross="{gross}"')
-                            if net:
-                                price_attrs.append(f'net="{net}"')
                         xml.append(
-                            f'          <price {" ".join(price_attrs)}/>')
-                        source = Sources.objects.filter(
-                            id=stock_price.source.id).first() if stock_price and stock_price.source else None
-                        stock_id = ""
-                        if source and hasattr(source, 'type'):
-                            if source.type == 'Magazyn główny':
-                                stock_id = "1"
-                            elif source.type == 'Magazyn obcy':
-                                stock_id = "0"
-                            elif source.type == 'Magazyn wymiany':
-                                stock_id = "3"
-                            elif source.type == 'Magazyn pomocniczy':
-                                stock_id = "2"
-                        xml.append(
-                            f'          <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
+                            f'        <size {' '.join(size_attrs)}>'
+                        )
+                        stock_price = StockAndPrices.objects.using(
+                            'MPD').filter(variant=variant).first()
+                        if stock_price:
+                            # Pobierz ceny detaliczne z product_variants_retail_price
+                            retail_price_obj = None
+                            try:
+                                from .models import ProductVariantsRetailPrice
+                                retail_price_obj = ProductVariantsRetailPrice.objects.using(
+                                    'MPD').filter(variant=variant).first()
+                            except Exception:
+                                pass
+                            gross = retail_price_obj.retail_price if retail_price_obj and hasattr(
+                                retail_price_obj, 'retail_price') else ''
+                            net = retail_price_obj.net_price if retail_price_obj and hasattr(
+                                retail_price_obj, 'net_price') else ''
+                            price_attrs = []
+                            if gross or net:
+                                if gross:
+                                    price_attrs.append(f'gross="{gross}"')
+                                if net:
+                                    price_attrs.append(f'net="{net}"')
+
+                            if price_attrs:
+                                xml.append(
+                                    f'          <price {" ".join(price_attrs)}/>')
+                            else:
+                                # Brak ceny w bazie - dodaj cenę 0 jako fallback (jak w light.xml)
+                                # Zgodnie z dokumentacją full.md, @net jest wymagany
+                                xml.append(
+                                    '          <price gross="0" net="0"/>')
+
+                            # Dodaj stan magazynowy
+                            source = Sources.objects.filter(
+                                id=stock_price.source.id).first() if stock_price and stock_price.source else None
+                            stock_id = ""
+                            if source and hasattr(source, 'type'):
+                                if source.type == 'Magazyn główny':
+                                    stock_id = "1"
+                                elif source.type == 'Magazyn obcy':
+                                    stock_id = "0"
+                                elif source.type == 'Magazyn wymiany':
+                                    stock_id = "3"
+                                elif source.type == 'Magazyn pomocniczy':
+                                    stock_id = "2"
+                            xml.append(
+                                f'          <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
                     xml.append('        </size>')
                 xml.append('      </sizes>')
 
@@ -404,18 +425,50 @@ class LightXMLExporter(BaseXMLExporter):
     def __init__(self):
         super().__init__('light.xml')
 
+    def export(self):
+        xml_content = self.generate_xml()
+        local_path = self.save_local(xml_content)
+
+        # Zapisz rekord do bazy danych
+        from .models import FullChangeFile
+
+        light_file = FullChangeFile.objects.using('MPD').create(
+            filename='light.xml',
+            timestamp=timezone.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            local_path=local_path,
+            file_size=0,  # Zostanie zaktualizowane po zapisie
+
+        )
+
+        # Zaktualizuj rozmiar pliku
+        if os.path.exists(local_path):
+            light_file.file_size = os.path.getsize(local_path)
+            light_file.save(using='MPD')
+
+        bucket_url = self.save_to_bucket(local_path)
+        if bucket_url:
+            print('✅ Eksport XML zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        else:
+            print('❌ Błąd podczas eksportu XML')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        return {'bucket_url': bucket_url, 'local_path': local_path}
+
     def generate_xml(self):
         from django.utils.html import escape
         from .models import Products, ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, Vat
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
-        now = datetime.now()
-        expires = now + timedelta(days=1)
+        now = timezone.now()
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
 
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products currency="PLN" language="pol">')
 
         # Pobierz wszystkie produkty z wariantami
@@ -462,6 +515,9 @@ class LightXMLExporter(BaseXMLExporter):
                 product_attrs = [f'id="{iai_product_id}"']
                 if vat_rate:
                     product_attrs.append(f'vat="{vat_rate}"')
+                else:
+                    # Brak VAT w bazie - dodaj VAT 0 jako fallback
+                    product_attrs.append('vat="0"')
 
                 xml.append(f'    <product {" ".join(product_attrs)}>')
 
@@ -484,6 +540,9 @@ class LightXMLExporter(BaseXMLExporter):
 
                     if price_attrs:
                         xml.append(f'      <price {" ".join(price_attrs)}/>')
+                else:
+                    # Brak ceny w bazie - dodaj cenę 0 jako fallback
+                    xml.append('      <price gross="0" net="0"/>')
 
                 # Dodaj cenę detaliczną na poziomie produktu (jeśli istnieje)
                 # try:
@@ -570,6 +629,9 @@ class LightXMLExporter(BaseXMLExporter):
                         if price_attrs:
                             xml.append(
                                 f'          <price {" ".join(price_attrs)}/>')
+                        else:
+                            # Brak ceny w bazie - dodaj cenę 0 jako fallback
+                            xml.append('          <price gross="0" net="0"/>')
 
                         # Dodaj stan magazynowy - tak samo jak w full.xml
                         stock_id = ""
@@ -608,11 +670,11 @@ class LightXMLExporter(BaseXMLExporter):
 
     def export_incremental(self):
         """Eksport przyrostowy - tylko produkty zmienione w ciągu ostatniej godziny"""
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         from django.db.models import Q
         from .models import Products
 
-        now = datetime.now()
+        now = timezone.now()
         one_hour_ago = now - timedelta(hours=1)
 
         # Pobierz produkty zmienione w ciągu ostatniej godziny
@@ -640,15 +702,17 @@ class LightXMLExporter(BaseXMLExporter):
         """Generuj XML dla określonej listy produktów"""
         from django.utils.html import escape
         from .models import ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, Vat
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
-        now = datetime.now()
-        expires = now + timedelta(days=1)
+        now = timezone.now()
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
 
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products currency="PLN" language="pol">')
 
         for product in products:
@@ -690,6 +754,9 @@ class LightXMLExporter(BaseXMLExporter):
                 product_attrs = [f'id="{iai_product_id}"']
                 if vat_rate:
                     product_attrs.append(f'vat="{vat_rate}"')
+                else:
+                    # Brak VAT w bazie - dodaj VAT 0 jako fallback
+                    product_attrs.append('vat="0"')
 
                 xml.append(f'    <product {" ".join(product_attrs)}>')
 
@@ -840,6 +907,11 @@ class GatewayXMLExporter(BaseXMLExporter):
         if self.source.tel:
             tel = ET.SubElement(meta, "tel")
             tel.text = f"<![CDATA[{self.source.tel}]]>"
+
+        # Dodaj fax (wymagany przez XSD)
+        fax = ET.SubElement(meta, "fax")
+        fax.text = f"<![CDATA[{getattr(self.source, 'fax', '+48 503 503 876')}]]>"
+
         if self.source.www:
             www = ET.SubElement(meta, "www")
             www.text = f"<![CDATA[{self.source.www}]]>"
@@ -882,15 +954,24 @@ class GatewayXMLExporter(BaseXMLExporter):
 
         # Użyj czasu żądania HTTP lub aktualnego czasu
         if request_time is None:
-            request_time = datetime.now()
-
-        # Tymczasowo dezaktywowane - zostawiam tylko gateway, full i full_change
-        # required_elements = {}
-        # optional_elements = {}
-        # Generowanie węzłów wymaganych i opcjonalnych zostało wyłączone
+            request_time = timezone.now()
 
         # Dodaj węzeł full z podwęzłem changes dla plików full_change
         self._create_full_with_changes_element(root, base_url, request_time)
+
+        # Dodaj wymagane elementy zgodnie ze schematem XSD
+        self._create_light_element(root, base_url)
+        self._create_categories_element(root, base_url)
+        self._create_sizes_element(root, base_url)
+        self._create_producers_element(root, base_url)
+
+        # Opcjonalne elementy - pomijamy na chwilę obecną
+        # self._create_units_element(root, base_url)
+        # self._create_parameters_element(root, base_url)
+        # self._create_stocks_element(root, base_url)
+        # self._create_series_element(root, base_url)
+        # self._create_warranties_element(root, base_url)
+        # self._create_preset_element(root, base_url)
 
     def _create_full_with_changes_element(self, root, base_url, request_time=None):
         """Tworzy węzeł full z podwęzłem changes dla rzeczywistych zmian w produktach"""
@@ -905,10 +986,11 @@ class GatewayXMLExporter(BaseXMLExporter):
 
             # Dla endpointów API używamy czasu żądania HTTP
             import hashlib
+            from django.utils import timezone
 
             # Użyj czasu żądania HTTP lub aktualnego czasu
             if request_time is None:
-                request_time = datetime.now()
+                request_time = timezone.now()
 
             # Konwertuj na lokalny czas (Europe/Warsaw)
             local_request_time = timezone.localtime(request_time)
@@ -1011,17 +1093,45 @@ class GatewayXMLExporter(BaseXMLExporter):
 
                     # Hash bazujący na nazwie pliku full_change.xml
                     try:
-                        # Hash bazujący na: nazwa pliku full_change.xml
-                        change_hash_input = f"generate-full-change-xml_{full_change_file.filename}"
+                        # Hash bazujący na rzeczywistych zmianach w danych (ignoruje timestamp w pliku)
+                        # Użyj timestamp ostatniej zmiany w produktach + liczba zmienionych produktów
+                        from .models import Products
+                        from datetime import timedelta
+                        from django.db.models import Q
+                        from django.utils import timezone
+
+                        # Pobierz ostatni timestamp modyfikacji produktów
+                        last_product_change = Products.objects.using('MPD').aggregate(
+                            last_modified=models.Max('updated_at')
+                        )['last_modified']
+
+                        # Pobierz liczbę produktów zmienionych w ciągu ostatnich 30 minut (IOF 3.0)
+                        thirty_minutes_ago = timezone.now() - timedelta(minutes=30)
+                        changed_products_count = Products.objects.using('MPD').filter(
+                            Q(updated_at__gte=thirty_minutes_ago) |
+                            Q(productvariants__updated_at__gte=thirty_minutes_ago) |
+                            Q(productvariants__product__images__updated_at__gte=thirty_minutes_ago)
+                        ).distinct().count()
+
+                        if last_product_change:
+                            last_change_str = last_product_change.strftime(
+                                '%Y-%m-%dT%H-%M-%S')
+                        else:
+                            last_change_str = "1970-01-01T00-00-00"
+
+                        # Hash bazujący na: ostatnia zmiana produktów + liczba zmienionych produktów + rozmiar pliku
+                        file_size = full_change_file.file_size or 0
+                        change_hash_input = f"full_change_data_{last_change_str}_{changed_products_count}_{file_size}"
                         hash_value = hashlib.md5(
                             change_hash_input.encode()).hexdigest()
 
                         logger.info(
-                            f"Full_change.xml hash: filename={full_change_file.filename}, change_time={local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}")
+                            f"Full_change.xml hash z danych: filename={full_change_file.filename}, last_change={last_change_str}, changed_count={changed_products_count}, size={file_size}")
 
                     except Exception as e:
-                        # Fallback: hash bazujący tylko na czasie
-                        change_hash_input = f"generate-full-change-xml_{local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}"
+                        # Fallback: hash bazujący na rozmiarze pliku i czasie utworzenia
+                        file_size = full_change_file.file_size or 0
+                        change_hash_input = f"full_change_fallback_{full_change_file.created_at.strftime('%Y-%m-%dT%H-%M-%S')}_{file_size}"
                         hash_value = hashlib.md5(
                             change_hash_input.encode()).hexdigest()
                         logger.warning(
@@ -1058,6 +1168,183 @@ class GatewayXMLExporter(BaseXMLExporter):
             full_element.set("hash", "")
             full_element.set("changed", "")
 
+    def _create_light_element(self, root, base_url):
+        """Tworzy węzeł light zgodnie ze schematem XSD"""
+        from .models import FullChangeFile
+        from django.utils import timezone
+
+        light_element = ET.SubElement(root, "light")
+        light_element.set("url", f"{base_url}/mpd/generate-light-xml/")
+
+        # Pobierz ostatni plik light.xml z bazy
+        try:
+            latest_light_file = FullChangeFile.objects.using('MPD').filter(
+                filename='light.xml'
+            ).order_by('-created_at').first()
+
+            if latest_light_file:
+                # Hash bazujący na nazwie pliku i czasie utworzenia
+                hash_input = f"light_xml_{latest_light_file.created_at.strftime('%Y-%m-%dT%H-%M-%S')}"
+                hash_value = hashlib.md5(hash_input.encode()).hexdigest()
+
+                # Czas w formacie YYYY-MM-DD HH:MM:SS
+                if timezone.is_aware(latest_light_file.created_at):
+                    light_time = latest_light_file.created_at
+                else:
+                    light_time = timezone.make_aware(
+                        latest_light_file.created_at)
+
+                local_light_time = timezone.localtime(light_time)
+                light_time_str = local_light_time.strftime('%Y-%m-%d %H:%M:%S')
+
+                light_element.set("hash", hash_value)
+                light_element.set("changed", light_time_str)
+                logger.info(
+                    f"Light.xml: hash={hash_value}, changed={light_time_str}")
+            else:
+                light_element.set("hash", "")
+                light_element.set("changed", "")
+                logger.info(
+                    "Brak plików light.xml w bazie - pusty hash i changed")
+        except Exception as e:
+            light_element.set("hash", "")
+            light_element.set("changed", "")
+            logger.warning(f"Błąd pobierania light.xml z bazy: {str(e)}")
+
+    def _create_categories_element(self, root, base_url):
+        """Tworzy węzeł categories zgodnie ze schematem XSD"""
+        from .models import FullChangeFile
+        from django.utils import timezone
+
+        categories_element = ET.SubElement(root, "categories")
+        categories_element.set(
+            "url", f"{base_url}/mpd/generate-categories-xml/")
+
+        # Pobierz ostatni plik categories.xml z bazy
+        try:
+            latest_categories_file = FullChangeFile.objects.using('MPD').filter(
+                filename='categories.xml'
+            ).order_by('-created_at').first()
+
+            if latest_categories_file:
+                # Hash bazujący na nazwie pliku i czasie utworzenia
+                hash_input = f"categories_xml_{latest_categories_file.created_at.strftime('%Y-%m-%dT%H-%M-%S')}"
+                hash_value = hashlib.md5(hash_input.encode()).hexdigest()
+
+                # Czas w formacie YYYY-MM-DD HH:MM:SS
+                if timezone.is_aware(latest_categories_file.created_at):
+                    categories_time = latest_categories_file.created_at
+                else:
+                    categories_time = timezone.make_aware(
+                        latest_categories_file.created_at)
+
+                local_categories_time = timezone.localtime(categories_time)
+                categories_time_str = local_categories_time.strftime(
+                    '%Y-%m-%d %H:%M:%S')
+
+                categories_element.set("hash", hash_value)
+                categories_element.set("changed", categories_time_str)
+                logger.info(
+                    f"Categories.xml: hash={hash_value}, changed={categories_time_str}")
+            else:
+                categories_element.set("hash", "")
+                categories_element.set("changed", "")
+                logger.info(
+                    "Brak plików categories.xml w bazie - pusty hash i changed")
+        except Exception as e:
+            categories_element.set("hash", "")
+            categories_element.set("changed", "")
+            logger.warning(f"Błąd pobierania categories.xml z bazy: {str(e)}")
+
+    def _create_sizes_element(self, root, base_url):
+        """Tworzy węzeł sizes zgodnie ze schematem XSD"""
+        from .models import FullChangeFile
+        from django.utils import timezone
+
+        sizes_element = ET.SubElement(root, "sizes")
+        sizes_element.set("url", f"{base_url}/mpd/generate-sizes-xml/")
+
+        # Pobierz ostatni plik sizes.xml z bazy
+        try:
+            latest_sizes_file = FullChangeFile.objects.using('MPD').filter(
+                filename='sizes.xml'
+            ).order_by('-created_at').first()
+
+            if latest_sizes_file:
+                # Hash bazujący na nazwie pliku i czasie utworzenia
+                hash_input = f"sizes_xml_{latest_sizes_file.created_at.strftime('%Y-%m-%dT%H-%M-%S')}"
+                hash_value = hashlib.md5(hash_input.encode()).hexdigest()
+
+                # Czas w formacie YYYY-MM-DD HH:MM:SS
+                if timezone.is_aware(latest_sizes_file.created_at):
+                    sizes_time = latest_sizes_file.created_at
+                else:
+                    sizes_time = timezone.make_aware(
+                        latest_sizes_file.created_at)
+
+                local_sizes_time = timezone.localtime(sizes_time)
+                sizes_time_str = local_sizes_time.strftime(
+                    '%Y-%m-%d %H:%M:%S')
+
+                sizes_element.set("hash", hash_value)
+                sizes_element.set("changed", sizes_time_str)
+                logger.info(
+                    f"Sizes.xml: hash={hash_value}, changed={sizes_time_str}")
+            else:
+                sizes_element.set("hash", "")
+                sizes_element.set("changed", "")
+                logger.info(
+                    "Brak plików sizes.xml w bazie - pusty hash i changed")
+        except Exception as e:
+            sizes_element.set("hash", "")
+            sizes_element.set("changed", "")
+            logger.error(f"Błąd podczas pobierania sizes.xml: {str(e)}")
+
+    def _create_producers_element(self, root, base_url):
+        """Tworzy węzeł producers zgodnie ze schematem XSD"""
+        from .models import FullChangeFile
+        from django.utils import timezone
+
+        producers_element = ET.SubElement(root, "producers")
+        producers_element.set(
+            "url", f"{base_url}/mpd/generate-producers-xml/")
+
+        # Pobierz ostatni plik producers.xml z bazy
+        try:
+            latest_producers_file = FullChangeFile.objects.using('MPD').filter(
+                filename='producers.xml'
+            ).order_by('-created_at').first()
+
+            if latest_producers_file:
+                # Hash bazujący na nazwie pliku i czasie utworzenia
+                hash_input = f"producers_xml_{latest_producers_file.created_at.strftime('%Y-%m-%dT%H-%M-%S')}"
+                hash_value = hashlib.md5(hash_input.encode()).hexdigest()
+
+                # Czas w formacie YYYY-MM-DD HH:MM:SS
+                if timezone.is_aware(latest_producers_file.created_at):
+                    producers_time = latest_producers_file.created_at
+                else:
+                    producers_time = timezone.make_aware(
+                        latest_producers_file.created_at)
+
+                local_producers_time = timezone.localtime(producers_time)
+                producers_time_str = local_producers_time.strftime(
+                    '%Y-%m-%d %H:%M:%S')
+
+                producers_element.set("hash", hash_value)
+                producers_element.set("changed", producers_time_str)
+                logger.info(
+                    f"Producers.xml: hash={hash_value}, changed={producers_time_str}")
+            else:
+                producers_element.set("hash", "")
+                producers_element.set("changed", "")
+                logger.info(
+                    "Brak plików producers.xml w bazie - pusty hash i changed")
+        except Exception as e:
+            producers_element.set("hash", "")
+            producers_element.set("changed", "")
+            logger.warning(f"Błąd pobierania producers.xml z bazy: {str(e)}")
+
     def generate_xml(self, request_time=None):
         root = ET.Element("provider_description")
         root.set("file_format", "IOF")
@@ -1086,22 +1373,53 @@ class ProducersXMLExporter(BaseXMLExporter):
     def generate_xml(self):
         from django.utils.html import escape
         from .models import Brands
-        from datetime import datetime, timedelta
-        now = datetime.now()
-        expires = now + timedelta(days=1)
+        from datetime import timedelta
+        now = timezone.now()
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<producers file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="{}" expires="{}">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
-        brands = Brands.objects.using('MPD').all()
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
+        brands = Brands.objects.using('MPD').filter(iai_brand_id__isnull=False)
         for brand in brands:
             # id: string, bez spacji, tylko a-z, A-Z, _, -
-            brand_id = str(brand.id) if brand.id is not None else ''
+            brand_id = str(brand.iai_brand_id)
             brand_id = brand_id.replace(' ', '_')
             name = escape(brand.name) if brand.name else ''
             xml.append(f'  <producer id="{brand_id}" name="{name}"/>')
         xml.append('</producers>')
         return '\n'.join(xml)
+
+    def export(self):
+        xml_content = self.generate_xml()
+        local_path = self.save_local(xml_content)
+
+        # Zapisz rekord do bazy danych
+        from .models import FullChangeFile
+
+        producers_file = FullChangeFile.objects.using('MPD').create(
+            filename='producers.xml',
+            timestamp=timezone.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            local_path=local_path,
+            file_size=0,  # Zostanie zaktualizowane po zapisie
+        )
+
+        # Zaktualizuj rozmiar pliku
+        if os.path.exists(local_path):
+            producers_file.file_size = os.path.getsize(local_path)
+            producers_file.save(using='MPD')
+
+        bucket_url = self.save_to_bucket(local_path)
+        if bucket_url:
+            print('✅ Eksport XML zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        else:
+            print('❌ Błąd podczas eksportu XML')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        return {'bucket_url': bucket_url, 'local_path': local_path}
 
 
 class StocksXMLExporter(BaseXMLExporter):
@@ -1111,13 +1429,15 @@ class StocksXMLExporter(BaseXMLExporter):
     def generate_xml(self):
         from django.utils.html import escape
         from .models import StockAndPrices
-        from datetime import datetime, timedelta
-        now = datetime.now()
-        expires = now + timedelta(days=1)
+        from datetime import timedelta
+        now = timezone.now()
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<stocks file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="{}" expires="{}">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         stocks = StockAndPrices.objects.using(
             'MPD').all().select_related('variant__product')
         for stock in stocks:
@@ -1131,6 +1451,120 @@ class StocksXMLExporter(BaseXMLExporter):
         return '\n'.join(xml)
 
 
+class CategoriesXMLExporter(BaseXMLExporter):
+    def __init__(self):
+        super().__init__('categories.xml')
+
+    def export(self):
+        xml_content = self.generate_xml()
+        local_path = self.save_local(xml_content)
+
+        # Zapisz rekord do bazy danych
+        from .models import FullChangeFile
+
+        categories_file = FullChangeFile.objects.using('MPD').create(
+            filename='categories.xml',
+            timestamp=timezone.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            local_path=local_path,
+            file_size=0,  # Zostanie zaktualizowane po zapisie
+
+        )
+
+        # Zaktualizuj rozmiar pliku
+        if os.path.exists(local_path):
+            categories_file.file_size = os.path.getsize(local_path)
+            categories_file.save(using='MPD')
+
+        bucket_url = self.save_to_bucket(local_path)
+        if bucket_url:
+            print('✅ Eksport XML zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        else:
+            print('❌ Błąd podczas eksportu XML')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        return {'bucket_url': bucket_url, 'local_path': local_path}
+
+    def generate_xml(self):
+        from django.utils.html import escape
+        from .models import Paths
+        from datetime import timedelta
+
+        now = timezone.now()
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
+
+        xml = []
+        xml.append('<?xml version="1.0" encoding="utf-8"?>')
+        xml.append('<categories file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="{}" expires="{}">'.format(
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
+
+        # Pobierz wszystkie ścieżki (kategorie) z bazy
+        paths = Paths.objects.using('MPD').all().order_by('id')
+
+        # Grupuj ścieżki według poziomów hierarchii
+        categories_tree = {}
+        for path in paths:
+            if path.path:
+                # Podziel ścieżkę na części (np. "Moda damska\Bielizna" -> ["Moda damska", "Bielizna"])
+                path_parts = path.path.split('\\')
+
+                # Buduj hierarchię
+                current_level = categories_tree
+                for i, part in enumerate(path_parts):
+                    if part not in current_level:
+                        current_level[part] = {
+                            'id': path.id if i == len(path_parts) - 1 else None,
+                            'children': {},
+                            'full_path': '\\'.join(path_parts[:i + 1])
+                        }
+                    current_level = current_level[part]['children']
+
+        # Generuj XML z hierarchii używając parent_id
+        # Rekurencyjnie generuj XML z hierarchii
+        def generate_category_tree(parent_id=None, level=1):
+            xml_lines = []
+            indent = '  ' * level
+
+            # Znajdź dzieci dla danego parent_id
+            children = [path for path in paths if path.parent_id == parent_id]
+
+            for child in children:
+                if child.parent_id is None:
+                    # To jest kategoria główna
+                    xml_lines.append(f'{indent}<category id="{child.id}">')
+                    xml_lines.append(
+                        f'{indent}  <name xml:lang="pol">{escape(child.name)}</name>')
+
+                    # Rekurencyjnie generuj podkategorie
+                    sub_xml = generate_category_tree(child.id, level + 1)
+                    if sub_xml:
+                        xml_lines.extend(sub_xml)
+
+                    xml_lines.append(f'{indent}</category>')
+                else:
+                    # To jest podkategoria
+                    xml_lines.append(f'{indent}<category id="{child.id}">')
+                    xml_lines.append(
+                        f'{indent}  <name xml:lang="pol">{escape(child.name)}</name>')
+
+                    # Rekurencyjnie generuj podkategorie
+                    sub_xml = generate_category_tree(child.id, level + 1)
+                    if sub_xml:
+                        xml_lines.extend(sub_xml)
+
+                    xml_lines.append(f'{indent}</category>')
+
+            return xml_lines
+
+        # Generuj XML z hierarchii
+        xml.extend(generate_category_tree())
+
+        xml.append('</categories>')
+        return '\n'.join(xml)
+
+
 class UnitsXMLExporter(BaseXMLExporter):
     def __init__(self):
         super().__init__('units.xml')
@@ -1138,13 +1572,15 @@ class UnitsXMLExporter(BaseXMLExporter):
     def generate_xml(self):
         from django.utils.html import escape
         from .models import Units
-        from datetime import datetime, timedelta
-        now = datetime.now()
-        expires = now + timedelta(days=1)
+        from datetime import timedelta
+        now = timezone.now()
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<units file_format="IOF" version="3.0" generated="{}" expires="{}" language="pol">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         units = Units.objects.using('MPD').all()
         for unit in units:
             xml.append(
@@ -1156,7 +1592,7 @@ class UnitsXMLExporter(BaseXMLExporter):
 class FullChangeXMLExporter(BaseXMLExporter):
     def __init__(self):
         # Generuj nazwę pliku z aktualną datą
-        now = datetime.now()
+        now = timezone.now()
         timestamp = now.strftime('%Y-%m-%dT%H-%M-%S')
         filename = f'full_change{timestamp}.xml'
         super().__init__(filename)
@@ -1223,37 +1659,40 @@ class FullChangeXMLExporter(BaseXMLExporter):
     def generate_xml(self, incremental=True):
         from django.utils.html import escape
         from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         from django.db.models import Q
         from .models import Vat
 
-        now = datetime.now()
-        expires = now + timedelta(days=1)
+        now = timezone.now()
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products currency="PLN" language="pol">')
 
-        # Tracking nie jest używane w nowej logice IdoSell (60 minut dla wszystkich produktów)
+        # Tracking nie jest używane w nowej logice IOF 3.0 (30 minut dla wszystkich produktów)
 
-        # Oblicz timestamp z 60 minut temu (specyfikacja IdoSell)
-        sixty_minutes_ago = now - timedelta(minutes=60)
+        # Oblicz timestamp z 30 minut temu (specyfikacja IOF 3.0)
+        thirty_minutes_ago = now - timedelta(minutes=30)
 
         if incremental:
-            # Eksport przyrostowy - tylko produkty zmienione w ciągu ostatnich 60 minut (IdoSell)
+            # Eksport przyrostowy - tylko produkty zmienione w ciągu ostatnich 30 minut (IOF 3.0)
             # Sprawdź zmiany w wariantach, produktach i obrazach - WSZYSTKIE produkty
             variants_with_iai = ProductVariants.objects.using('MPD').filter(
                 iai_product_id__isnull=False
             ).filter(
-                Q(updated_at__gte=sixty_minutes_ago) |  # Wariant zmieniony
-                Q(product__updated_at__gte=sixty_minutes_ago) |  # Produkt zmieniony
+                Q(updated_at__gte=thirty_minutes_ago) |  # Wariant zmieniony
+                # Produkt zmieniony
+                Q(product__updated_at__gte=thirty_minutes_ago) |
                 # Obraz zmieniony
-                Q(product__images__updated_at__gte=sixty_minutes_ago)
+                Q(product__images__updated_at__gte=thirty_minutes_ago)
             ).select_related('product', 'size', 'color', 'producer_color', 'product__brand').distinct()
 
             logger.info(
-                f"Eksport przyrostowy full_change.xml (IdoSell) - produkty zmienione od: {sixty_minutes_ago.strftime('%Y-%m-%d %H:%M:%S')} (wszystkie produkty)")
+                f"Eksport przyrostowy full_change.xml (IOF 3.0) - produkty zmienione od: {thirty_minutes_ago.strftime('%Y-%m-%d %H:%M:%S')} (zgodnie z IOF 3.0)")
         else:
             # Pełny eksport - wszystkie produkty
             variants_with_iai = ProductVariants.objects.using('MPD').filter(
@@ -1281,6 +1720,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
             # Pobierz dane waluty i VAT z pierwszego wariantu
             currency = ''
             vat_rate = ''
+            has_price = False
             for variant in variants:
                 pvrp = ProductVariantsRetailPrice.objects.using(
                     'MPD').filter(variant=variant).first()
@@ -1293,7 +1733,12 @@ class FullChangeXMLExporter(BaseXMLExporter):
                             vat_rate = str(vat_obj.vat_rate)
                         else:
                             vat_rate = str(pvrp.vat)
+                    has_price = True
                     break
+
+            # Jeśli nie ma ceny, ustaw VAT na 0
+            if not has_price:
+                vat_rate = '0'
 
             xml.append(
                 f'    <product id="{iai_product_id}" currency="{currency}" type="regular" vat="{vat_rate}" site="1">')
@@ -1358,6 +1803,10 @@ class FullChangeXMLExporter(BaseXMLExporter):
                             price_attrs.append(f'net="{net}"')
                     if price_attrs:
                         xml.append(f'      <price {" ".join(price_attrs)}/>')
+                    else:
+                        # Brak ceny w bazie - dodaj cenę 0 jako fallback
+                        # Zgodnie z dokumentacją full.md, @net jest wymagany
+                        xml.append('      <price gross="0" net="0"/>')
 
             # Użyj kolumny visibility z tabeli products
             xml.append('      <iaiext:visibility>')
@@ -1379,13 +1828,11 @@ class FullChangeXMLExporter(BaseXMLExporter):
 
             if variants:
                 xml.append(
-                    f'      <sizes iaiext:group_name="{group_name}" iaiext:group_id="1098261181" iaiext:sizeList="full">')
+                    '      <sizes>')
                 for variant in variants:
                     size_name = variant.size.name if variant.size else ""
                     # panel_name: size_name + '_' + group_name
                     panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
-                    # code_external: product_id-variant_id (variant_id jest unikalny dla każdego wariantu)
-                    code_external = f'{product.id}-{variant.variant_id}'
                     # code_producer: z tabeli product_variants_sources (ean, gtin14, gtin13, other)
                     from .models import ProductvariantsSources
                     variant_source = ProductvariantsSources.objects.using(
@@ -1404,15 +1851,21 @@ class FullChangeXMLExporter(BaseXMLExporter):
 
                     # Buduj atrybuty do węzła <size>
                     size_id = variant.size.iai_size_id if variant.size and variant.size.iai_size_id else ''
+                    # Dodaj wymagany atrybut @code w formacie iai_product_id-size_id
+                    code_value = f"{iai_product_id}-{size_id}" if size_id else f"{iai_product_id}"
                     size_attrs = [
                         f'id="{size_id}"',
+                        f'code="{escape(code_value)}"',
                         f'name="{escape(size_name)}"',
-                        f'panel_name="{escape(panel_name)}"',
-                        f'iaiext:code_external="{code_external}"'
+                        f'panel_name="{escape(panel_name)}"'
                     ]
+                    # Dodaj wymagany atrybut @code zgodnie ze schematem XSD
                     if code_producer:
                         size_attrs.append(
                             f'code_producer="{escape(code_producer)}"')
+                    # Usuń nieistniejące atrybuty z schematu
+                    # size_attrs.append(f'iaiext:code_external="{code_external}"')
+                    # size_attrs.append(f'code_producer="{escape(code_producer)}"')
                     xml.append(
                         f'        <size {' '.join(size_attrs)}>'
                     )
@@ -1437,8 +1890,14 @@ class FullChangeXMLExporter(BaseXMLExporter):
                                 price_attrs.append(f'gross="{gross}"')
                             if net:
                                 price_attrs.append(f'net="{net}"')
-                        xml.append(
-                            f'          <price {" ".join(price_attrs)}/>')
+
+                        if price_attrs:
+                            xml.append(
+                                f'          <price {" ".join(price_attrs)}/>')
+                        else:
+                            # Brak ceny w bazie - dodaj cenę 0 jako fallback (jak w light.xml)
+                            # Zgodnie z dokumentacją full.md, @net jest wymagany
+                            xml.append('          <price gross="0" net="0"/>')
                         source = Sources.objects.filter(
                             id=stock_price.source.id).first() if stock_price and stock_price.source else None
                         stock_id = ""
@@ -1673,3 +2132,77 @@ def refresh_gateway_simple():
     except Exception as e:
         print(f"❌ Błąd podczas odświeżania gateway.xml: {str(e)}")
         return False
+
+
+class SizesXMLExporter(BaseXMLExporter):
+    """Eksporter dla pliku sizes.xml zgodnie ze schematem sizes.xsd"""
+
+    def __init__(self):
+        super().__init__('sizes.xml')
+
+    def export(self):
+        xml_content = self.generate_xml()
+        local_path = self.save_local(xml_content)
+
+        # Zapisz rekord do bazy danych
+        from .models import FullChangeFile
+
+        sizes_file = FullChangeFile.objects.using('MPD').create(
+            filename='sizes.xml',
+            timestamp=timezone.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            local_path=local_path,
+            file_size=0,  # Zostanie zaktualizowane po zapisie
+        )
+
+        # Zaktualizuj rozmiar pliku
+        if os.path.exists(local_path):
+            sizes_file.file_size = os.path.getsize(local_path)
+            sizes_file.save(using='MPD')
+
+        bucket_url = self.save_to_bucket(local_path)
+        if bucket_url:
+            print('✅ Eksport XML zakończony pomyślnie!')
+            print(f'📁 URL: {bucket_url}')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        else:
+            print('❌ Błąd podczas eksportu XML')
+            print(f'📄 Lokalnie zapisano: {local_path}')
+        return {'bucket_url': bucket_url, 'local_path': local_path}
+
+    def generate_xml(self):
+        from django.utils.html import escape
+        from .models import ProductVariants
+
+        now = timezone.now()
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+
+        xml = []
+        xml.append('<?xml version="1.0" encoding="utf-8"?>')
+        xml.append('<sizes file_format="IOF" version="3.0" language="pol" generated="{}">'.format(
+            local_now.strftime('%Y-%m-%d %H:%M:%S')))
+
+        # Pobierz wszystkie unikalne rozmiary z bazy danych
+        sizes = ProductVariants.objects.using('MPD').filter(
+            size__isnull=False
+        ).select_related('size').distinct('size__id').order_by('size__id')
+
+        # Grupuj rozmiary według kategorii (obecnie tylko bielizna)
+        # ID grupy z full.xml: iaiext:group_id="1098261181"
+        xml.append('  <group id="1098261181" name="bielizna">')
+
+        for variant in sizes:
+            if variant.size:
+                size_id = variant.size.id
+                size_name = variant.size.name
+
+                xml.append(
+                    f'    <size id="{size_id}" name="{escape(size_name)}">')
+                xml.append(
+                    f'      <name xml:lang="pol">{escape(size_name)}</name>')
+                xml.append('    </size>')
+
+        xml.append('  </group>')
+        xml.append('</sizes>')
+
+        return '\n'.join(xml)

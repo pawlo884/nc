@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<offer file_format="IOF" version="3.0" generated="2025-08-29 13:38:27" expires="2025-08-30 13:38:27" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+  <products currency="PLN" language="pol">
+    <product id="323" vat="0">
+      <price gross="0" net="0"/>
+      <sizes>
+        <size id="177" name="85D" panel_name="85D_bielizna" code_producer="5905220662982" iaiext:code_external="993-9">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="165" name="80E" panel_name="80E_bielizna" code_producer="5905220662951" iaiext:code_external="993-8">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="164" name="80D" panel_name="80D_bielizna" code_producer="5905220662944" iaiext:code_external="993-7">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="153" name="75F" panel_name="75F_bielizna" code_producer="5905220662913" iaiext:code_external="993-6">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="152" name="75E" panel_name="75E_bielizna" code_producer="5905220662906" iaiext:code_external="993-5">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="150" name="75D" panel_name="75D_bielizna" code_producer="5905220662890" iaiext:code_external="993-4">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="139" name="70G" panel_name="70G_bielizna" code_producer="5905220662852" iaiext:code_external="993-3">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="138" name="70F" panel_name="70F_bielizna" code_producer="5905220662845" iaiext:code_external="993-2">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="137" name="70E" panel_name="70E_bielizna" code_producer="5905220662838" iaiext:code_external="993-1">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+    </product>
+    <product id="324" vat="0">
+      <price gross="0" net="0"/>
+      <sizes>
+        <size id="176" name="85C" panel_name="85C_bielizna" code_producer="5905220658596" iaiext:code_external="994-15">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="175" name="85B" panel_name="85B_bielizna" code_producer="5905220658589" iaiext:code_external="994-14">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="A" name="80C" panel_name="80C_bielizna" code_producer="5905220658558" iaiext:code_external="994-13">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="135" name="70D" panel_name="70D_bielizna" code_producer="5905220658442" iaiext:code_external="994-12">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="91" name="65H" panel_name="65H_bielizna" code_producer="5905220658411" iaiext:code_external="994-11">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="177" name="85D" panel_name="85D_bielizna" code_producer="5905220658602" iaiext:code_external="994-10">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+    </product>
+    <product id="325" vat="23.00">
+      <price gross="201.00" net="163.41"/>
+      <sizes>
+        <size id="44" name="100G" panel_name="100G_bielizna" code_producer="5905220650095" iaiext:code_external="995-43">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="194" name="95G" panel_name="95G_bielizna" code_producer="5905220650613" iaiext:code_external="995-42">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="183" name="90I" panel_name="90I_bielizna" code_producer="5905220650569" iaiext:code_external="995-41">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="182" name="90H" panel_name="90H_bielizna" code_producer="5905220650552" iaiext:code_external="995-40">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="181" name="90G" panel_name="90G_bielizna" code_producer="5905220650545" iaiext:code_external="995-39">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="180" name="90F" panel_name="90F_bielizna" code_producer="5905220650538" iaiext:code_external="995-38">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="20" name="85I" panel_name="85I_bielizna" code_producer="5905220650484" iaiext:code_external="995-37">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="17" name="85H" panel_name="85H_bielizna" code_producer="5905220650477" iaiext:code_external="995-36">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="171" name="80K" panel_name="80K_bielizna" code_producer="5905220650415" iaiext:code_external="995-35">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="170" name="80J" panel_name="80J_bielizna" code_producer="5905220650408" iaiext:code_external="995-34">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="169" name="80I" panel_name="80I_bielizna" code_producer="5905220650392" iaiext:code_external="995-33">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="168" name="80H" panel_name="80H_bielizna" code_producer="5905220650385" iaiext:code_external="995-32">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="167" name="80G" panel_name="80G_bielizna" code_producer="5905220650378" iaiext:code_external="995-31">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="158" name="75K" panel_name="75K_bielizna" code_producer="5905220650323" iaiext:code_external="995-30">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="157" name="75J" panel_name="75J_bielizna" code_producer="5905220650316" iaiext:code_external="995-29">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="155" name="75H" panel_name="75H_bielizna" code_producer="5905220650293" iaiext:code_external="995-28">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="154" name="75G" panel_name="75G_bielizna" code_producer="5905220650286" iaiext:code_external="995-27">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="153" name="75F" panel_name="75F_bielizna" code_producer="5905220650279" iaiext:code_external="995-26">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="152" name="75E" panel_name="75E_bielizna" code_producer="5905220650262" iaiext:code_external="995-25">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="143" name="70K" panel_name="70K_bielizna" code_producer="5905220650231" iaiext:code_external="995-24">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="142" name="70J" panel_name="70J_bielizna" code_producer="5905220650224" iaiext:code_external="995-23">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="138" name="70F" panel_name="70F_bielizna" code_producer="5905220650187" iaiext:code_external="995-22">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="95" name="65L" panel_name="65L_bielizna" code_producer="5905220650156" iaiext:code_external="995-21">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="94" name="65K" panel_name="65K_bielizna" code_producer="5905220650149" iaiext:code_external="995-20">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="93" name="65J" panel_name="65J_bielizna" code_producer="5905220650132" iaiext:code_external="995-19">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="92" name="65I" panel_name="65I_bielizna" code_producer="5905220650125" iaiext:code_external="995-18">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="91" name="65H" panel_name="65H_bielizna" code_producer="5905220650118" iaiext:code_external="995-17">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="90" name="65G" panel_name="65G_bielizna" code_producer="5905220650101" iaiext:code_external="995-16">
+          <price gross="201.00" net="163.41"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+    </product>
+  </products>
+</offer>

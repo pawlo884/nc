@@ -8,13 +8,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .serializers import ProductSetSerializer, ProductSetItemSerializer
 from collections import defaultdict
-from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter, ProducersXMLExporter, StocksXMLExporter, UnitsXMLExporter, FullChangeXMLExporter
+from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter, ProducersXMLExporter, StocksXMLExporter, UnitsXMLExporter, FullChangeXMLExporter, CategoriesXMLExporter, SizesXMLExporter
 import logging
 from django.http import HttpResponse
 import requests
 from matterhorn.defs_db import DO_SPACES_BUCKET, DO_SPACES_REGION
 from django.urls import reverse
-from .models import Sources
+
 from django.views.decorators.csrf import csrf_exempt
 import json
 
@@ -389,14 +389,30 @@ def empty_xml(request):
 
 @csrf_exempt
 def generate_categories_xml(request):
-    """Generuje XML z kategoriami - tymczasowo puste"""
-    return HttpResponse('<categories file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste kategorie --></categories>', content_type='application/xml')
+    """Generuje XML z kategoriami zgodnie ze schematem categories.xsd"""
+    exporter = CategoriesXMLExporter()
+    exporter_result = exporter.export()
+
+    # Automatycznie zaktualizuj wszystkie gateway.xml
+    update_all_gateways()
+
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
 
 
 @csrf_exempt
 def generate_sizes_xml(request):
-    """Generuje XML z rozmiarami - tymczasowo puste"""
-    return HttpResponse('<sizes file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste rozmiary --></sizes>', content_type='application/xml')
+    """Generuje XML z rozmiarami zgodnie ze schematem sizes.xsd"""
+    exporter = SizesXMLExporter()
+    exporter_result = exporter.export()
+
+    # Automatycznie zaktualizuj wszystkie gateway.xml
+    update_all_gateways()
+
+    with open(exporter_result['local_path'], 'rb') as f:
+        content = f.read()
+    return HttpResponse(content, content_type='application/xml')
 
 
 @csrf_exempt
