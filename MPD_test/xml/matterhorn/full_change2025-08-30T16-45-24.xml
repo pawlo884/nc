@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<offer file_format="IOF" version="3.0" generated="2025-08-30 18:45:24" expires="2025-08-31 18:45:24" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+  <products currency="PLN" language="pol">
+    <product id="329" currency="" type="regular" vat="0" site="1">
+      <producer id="20" name="Lupo Line"/>
+      <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Ana</name>
+        <short_desc><![CDATA[Figi Ana to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania.]]></short_desc>
+        <long_desc><![CDATA[Figi Ana to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania. Klasyczny krój optycznie wydłuża nogi, podkreśla kobiece kształty i idealnie dopasowuje się do sylwetki. To propozycja dla kobiet, które cenią najwyższą jakość materiałów, komfort użytkowania oraz stylową elegancję w minimalistycznym wydaniu.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="5" name="różowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="6" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes>
+        <size id="235" code="329-235" name="36" panel_name="36_bielizna" code_producer="5905220681327">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="236" code="329-236" name="38" panel_name="38_bielizna" code_producer="5905220681334">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="329-240" name="40" panel_name="40_bielizna" code_producer="5905220681341">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="329-241" name="42" panel_name="42_bielizna" code_producer="5905220681358">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/999/999_1_Coral.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/999/999_2_Coral.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="330" currency="" type="regular" vat="0" site="1">
+      <producer id="20" name="Lupo Line"/>
+      <category id="6" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Mirage Big</name>
+        <short_desc><![CDATA[Figi 1 Mirage w poziome paski w ciepłych kolorach lata, z wyższym stanem, który optycznie spłaszcza brzuch, ukrywając niedoskonałości sylwetki.]]></short_desc>
+        <long_desc><![CDATA[Figi 1 Mirage w poziome paski w ciepłych kolorach lata, z wyższym stanem, który optycznie spłaszcza brzuch, ukrywając niedoskonałości sylwetki. Figi mają ściągane sznureczki po obu bokach, dzięki którym możesz regulować ich krój i wysokość majtek, przez co każda kobieta czuje się w nich komfortowo oraz elegancko.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="11" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="6" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes>
+        <size id="235" code="330-235" name="36" panel_name="36_bielizna" code_producer="5905220673810">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="236" code="330-236" name="38" panel_name="38_bielizna" code_producer="5905220673827">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="330-240" name="40" panel_name="40_bielizna" code_producer="5905220673834">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="330-241" name="42" panel_name="42_bielizna" code_producer="5905220673841">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="239" code="330-239" name="44" panel_name="44_bielizna" code_producer="5905220673858">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1000/1000_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1000/1000_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+  </products>
+</offer>

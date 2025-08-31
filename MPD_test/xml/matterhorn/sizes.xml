@@ -1,119 +1,608 @@
 <?xml version="1.0" encoding="utf-8"?>
-<sizes file_format="IOF" version="3.0" language="pol" generated="2025-08-29 12:57:39">
+<sizes file_format="IOF" version="3.0" language="pol" generated="2025-08-30 22:28:10">
   <group id="1098261181" name="bielizna">
-    <size id="35" name="100G">
+    <size id="K" name="100B">
+      <name xml:lang="pol">100B</name>
+    </size>
+    <size id="M" name="100C">
+      <name xml:lang="pol">100C</name>
+    </size>
+    <size id="O" name="100D">
+      <name xml:lang="pol">100D</name>
+    </size>
+    <size id="Q" name="100E">
+      <name xml:lang="pol">100E</name>
+    </size>
+    <size id="43" name="100F">
+      <name xml:lang="pol">100F</name>
+    </size>
+    <size id="44" name="100G">
       <name xml:lang="pol">100G</name>
     </size>
-    <size id="82" name="65G">
+    <size id="45" name="100H">
+      <name xml:lang="pol">100H</name>
+    </size>
+    <size id="46" name="100I">
+      <name xml:lang="pol">100I</name>
+    </size>
+    <size id="47" name="105B">
+      <name xml:lang="pol">105B</name>
+    </size>
+    <size id="48" name="105C">
+      <name xml:lang="pol">105C</name>
+    </size>
+    <size id="49" name="105D">
+      <name xml:lang="pol">105D</name>
+    </size>
+    <size id="50" name="105E">
+      <name xml:lang="pol">105E</name>
+    </size>
+    <size id="51" name="105F">
+      <name xml:lang="pol">105F</name>
+    </size>
+    <size id="52" name="105G">
+      <name xml:lang="pol">105G</name>
+    </size>
+    <size id="53" name="105H">
+      <name xml:lang="pol">105H</name>
+    </size>
+    <size id="54" name="105I">
+      <name xml:lang="pol">105I</name>
+    </size>
+    <size id="55" name="110B">
+      <name xml:lang="pol">110B</name>
+    </size>
+    <size id="56" name="110C">
+      <name xml:lang="pol">110C</name>
+    </size>
+    <size id="57" name="110D">
+      <name xml:lang="pol">110D</name>
+    </size>
+    <size id="58" name="110E">
+      <name xml:lang="pol">110E</name>
+    </size>
+    <size id="59" name="110F">
+      <name xml:lang="pol">110F</name>
+    </size>
+    <size id="60" name="110G">
+      <name xml:lang="pol">110G</name>
+    </size>
+    <size id="61" name="110H">
+      <name xml:lang="pol">110H</name>
+    </size>
+    <size id="62" name="110I">
+      <name xml:lang="pol">110I</name>
+    </size>
+    <size id="63" name="115B">
+      <name xml:lang="pol">115B</name>
+    </size>
+    <size id="64" name="115C">
+      <name xml:lang="pol">115C</name>
+    </size>
+    <size id="65" name="115D">
+      <name xml:lang="pol">115D</name>
+    </size>
+    <size id="66" name="115E">
+      <name xml:lang="pol">115E</name>
+    </size>
+    <size id="67" name="115F">
+      <name xml:lang="pol">115F</name>
+    </size>
+    <size id="68" name="115G">
+      <name xml:lang="pol">115G</name>
+    </size>
+    <size id="69" name="115H">
+      <name xml:lang="pol">115H</name>
+    </size>
+    <size id="70" name="115I">
+      <name xml:lang="pol">115I</name>
+    </size>
+    <size id="71" name="120B">
+      <name xml:lang="pol">120B</name>
+    </size>
+    <size id="72" name="120C">
+      <name xml:lang="pol">120C</name>
+    </size>
+    <size id="73" name="120D">
+      <name xml:lang="pol">120D</name>
+    </size>
+    <size id="74" name="120E">
+      <name xml:lang="pol">120E</name>
+    </size>
+    <size id="75" name="120F">
+      <name xml:lang="pol">120F</name>
+    </size>
+    <size id="201" name="2XL">
+      <name xml:lang="pol">2XL</name>
+    </size>
+    <size id="235" name="36">
+      <name xml:lang="pol">36</name>
+    </size>
+    <size id="206" name="36B">
+      <name xml:lang="pol">36B</name>
+    </size>
+    <size id="207" name="36C">
+      <name xml:lang="pol">36C</name>
+    </size>
+    <size id="244" name="36D">
+      <name xml:lang="pol">36D</name>
+    </size>
+    <size id="236" name="38">
+      <name xml:lang="pol">38</name>
+    </size>
+    <size id="208" name="38B">
+      <name xml:lang="pol">38B</name>
+    </size>
+    <size id="209" name="38C">
+      <name xml:lang="pol">38C</name>
+    </size>
+    <size id="210" name="38D">
+      <name xml:lang="pol">38D</name>
+    </size>
+    <size id="211" name="38E">
+      <name xml:lang="pol">38E</name>
+    </size>
+    <size id="223" name="38F">
+      <name xml:lang="pol">38F</name>
+    </size>
+    <size id="224" name="38G">
+      <name xml:lang="pol">38G</name>
+    </size>
+    <size id="247" name="38H">
+      <name xml:lang="pol">38H</name>
+    </size>
+    <size id="202" name="3XL">
+      <name xml:lang="pol">3XL</name>
+    </size>
+    <size id="240" name="40">
+      <name xml:lang="pol">40</name>
+    </size>
+    <size id="212" name="40B">
+      <name xml:lang="pol">40B</name>
+    </size>
+    <size id="213" name="40C">
+      <name xml:lang="pol">40C</name>
+    </size>
+    <size id="214" name="40D">
+      <name xml:lang="pol">40D</name>
+    </size>
+    <size id="215" name="40E">
+      <name xml:lang="pol">40E</name>
+    </size>
+    <size id="226" name="40F">
+      <name xml:lang="pol">40F</name>
+    </size>
+    <size id="246" name="40H">
+      <name xml:lang="pol">40H</name>
+    </size>
+    <size id="241" name="42">
+      <name xml:lang="pol">42</name>
+    </size>
+    <size id="237" name="42B">
+      <name xml:lang="pol">42B</name>
+    </size>
+    <size id="216" name="42C">
+      <name xml:lang="pol">42C</name>
+    </size>
+    <size id="217" name="42D">
+      <name xml:lang="pol">42D</name>
+    </size>
+    <size id="218" name="42E">
+      <name xml:lang="pol">42E</name>
+    </size>
+    <size id="225" name="42F">
+      <name xml:lang="pol">42F</name>
+    </size>
+    <size id="252" name="42G">
+      <name xml:lang="pol">42G</name>
+    </size>
+    <size id="239" name="44">
+      <name xml:lang="pol">44</name>
+    </size>
+    <size id="222" name="44B">
+      <name xml:lang="pol">44B</name>
+    </size>
+    <size id="219" name="44C">
+      <name xml:lang="pol">44C</name>
+    </size>
+    <size id="220" name="44D">
+      <name xml:lang="pol">44D</name>
+    </size>
+    <size id="229" name="44E">
+      <name xml:lang="pol">44E</name>
+    </size>
+    <size id="245" name="44F">
+      <name xml:lang="pol">44F</name>
+    </size>
+    <size id="253" name="44G">
+      <name xml:lang="pol">44G</name>
+    </size>
+    <size id="242" name="46">
+      <name xml:lang="pol">46</name>
+    </size>
+    <size id="221" name="46C">
+      <name xml:lang="pol">46C</name>
+    </size>
+    <size id="227" name="46D">
+      <name xml:lang="pol">46D</name>
+    </size>
+    <size id="250" name="46E">
+      <name xml:lang="pol">46E</name>
+    </size>
+    <size id="254" name="46F">
+      <name xml:lang="pol">46F</name>
+    </size>
+    <size id="238" name="48">
+      <name xml:lang="pol">48</name>
+    </size>
+    <size id="228" name="48C">
+      <name xml:lang="pol">48C</name>
+    </size>
+    <size id="230" name="48D">
+      <name xml:lang="pol">48D</name>
+    </size>
+    <size id="E" name="48E">
+      <name xml:lang="pol">48E</name>
+    </size>
+    <size id="203" name="4XL">
+      <name xml:lang="pol">4XL</name>
+    </size>
+    <size id="C" name="50C">
+      <name xml:lang="pol">50C</name>
+    </size>
+    <size id="204" name="5XL">
+      <name xml:lang="pol">5XL</name>
+    </size>
+    <size id="76" name="60B">
+      <name xml:lang="pol">60B</name>
+    </size>
+    <size id="77" name="60C">
+      <name xml:lang="pol">60C</name>
+    </size>
+    <size id="78" name="60D">
+      <name xml:lang="pol">60D</name>
+    </size>
+    <size id="79" name="60E">
+      <name xml:lang="pol">60E</name>
+    </size>
+    <size id="80" name="60F">
+      <name xml:lang="pol">60F</name>
+    </size>
+    <size id="81" name="60G">
+      <name xml:lang="pol">60G</name>
+    </size>
+    <size id="82" name="60H">
+      <name xml:lang="pol">60H</name>
+    </size>
+    <size id="84" name="65A">
+      <name xml:lang="pol">65A</name>
+    </size>
+    <size id="83" name="65AA">
+      <name xml:lang="pol">65AA</name>
+    </size>
+    <size id="85" name="65B">
+      <name xml:lang="pol">65B</name>
+    </size>
+    <size id="86" name="65BB">
+      <name xml:lang="pol">65BB</name>
+    </size>
+    <size id="87" name="65C">
+      <name xml:lang="pol">65C</name>
+    </size>
+    <size id="G" name="65D">
+      <name xml:lang="pol">65D</name>
+    </size>
+    <size id="88" name="65E">
+      <name xml:lang="pol">65E</name>
+    </size>
+    <size id="89" name="65F">
+      <name xml:lang="pol">65F</name>
+    </size>
+    <size id="90" name="65G">
       <name xml:lang="pol">65G</name>
     </size>
-    <size id="83" name="65H">
+    <size id="91" name="65H">
       <name xml:lang="pol">65H</name>
     </size>
-    <size id="84" name="65I">
+    <size id="92" name="65I">
       <name xml:lang="pol">65I</name>
     </size>
-    <size id="85" name="65J">
+    <size id="93" name="65J">
       <name xml:lang="pol">65J</name>
     </size>
-    <size id="86" name="65K">
+    <size id="94" name="65K">
       <name xml:lang="pol">65K</name>
     </size>
-    <size id="87" name="65L">
+    <size id="95" name="65L">
       <name xml:lang="pol">65L</name>
     </size>
-    <size id="94" name="70D">
+    <size id="96" name="65M">
+      <name xml:lang="pol">65M</name>
+    </size>
+    <size id="243" name="65N">
+      <name xml:lang="pol">65N</name>
+    </size>
+    <size id="98" name="70A">
+      <name xml:lang="pol">70A</name>
+    </size>
+    <size id="97" name="70AA">
+      <name xml:lang="pol">70AA</name>
+    </size>
+    <size id="99" name="70B">
+      <name xml:lang="pol">70B</name>
+    </size>
+    <size id="133" name="70BB">
+      <name xml:lang="pol">70BB</name>
+    </size>
+    <size id="134" name="70C">
+      <name xml:lang="pol">70C</name>
+    </size>
+    <size id="135" name="70D">
       <name xml:lang="pol">70D</name>
     </size>
-    <size id="96" name="70E">
+    <size id="136" name="70DD">
+      <name xml:lang="pol">70DD</name>
+    </size>
+    <size id="137" name="70E">
       <name xml:lang="pol">70E</name>
     </size>
-    <size id="97" name="70F">
+    <size id="138" name="70F">
       <name xml:lang="pol">70F</name>
     </size>
-    <size id="98" name="70G">
+    <size id="139" name="70G">
       <name xml:lang="pol">70G</name>
     </size>
-    <size id="101" name="70J">
+    <size id="140" name="70H">
+      <name xml:lang="pol">70H</name>
+    </size>
+    <size id="141" name="70I">
+      <name xml:lang="pol">70I</name>
+    </size>
+    <size id="142" name="70J">
       <name xml:lang="pol">70J</name>
     </size>
-    <size id="102" name="70K">
+    <size id="143" name="70K">
       <name xml:lang="pol">70K</name>
     </size>
-    <size id="109" name="75D">
+    <size id="144" name="70L">
+      <name xml:lang="pol">70L</name>
+    </size>
+    <size id="145" name="70M">
+      <name xml:lang="pol">70M</name>
+    </size>
+    <size id="147" name="75A">
+      <name xml:lang="pol">75A</name>
+    </size>
+    <size id="146" name="75AA">
+      <name xml:lang="pol">75AA</name>
+    </size>
+    <size id="148" name="75B">
+      <name xml:lang="pol">75B</name>
+    </size>
+    <size id="149" name="75C">
+      <name xml:lang="pol">75C</name>
+    </size>
+    <size id="150" name="75D">
       <name xml:lang="pol">75D</name>
     </size>
-    <size id="111" name="75E">
+    <size id="151" name="75DD">
+      <name xml:lang="pol">75DD</name>
+    </size>
+    <size id="152" name="75E">
       <name xml:lang="pol">75E</name>
     </size>
-    <size id="112" name="75F">
+    <size id="153" name="75F">
       <name xml:lang="pol">75F</name>
     </size>
-    <size id="113" name="75G">
+    <size id="154" name="75G">
       <name xml:lang="pol">75G</name>
     </size>
-    <size id="114" name="75H">
+    <size id="155" name="75H">
       <name xml:lang="pol">75H</name>
     </size>
-    <size id="116" name="75J">
+    <size id="156" name="75I">
+      <name xml:lang="pol">75I</name>
+    </size>
+    <size id="157" name="75J">
       <name xml:lang="pol">75J</name>
     </size>
-    <size id="117" name="75K">
+    <size id="158" name="75K">
       <name xml:lang="pol">75K</name>
     </size>
-    <size id="123" name="80C">
+    <size id="159" name="75L">
+      <name xml:lang="pol">75L</name>
+    </size>
+    <size id="160" name="75M">
+      <name xml:lang="pol">75M</name>
+    </size>
+    <size id="161" name="80A">
+      <name xml:lang="pol">80A</name>
+    </size>
+    <size id="162" name="80B">
+      <name xml:lang="pol">80B</name>
+    </size>
+    <size id="163" name="80BB">
+      <name xml:lang="pol">80BB</name>
+    </size>
+    <size id="A" name="80C">
       <name xml:lang="pol">80C</name>
     </size>
-    <size id="124" name="80D">
+    <size id="164" name="80D">
       <name xml:lang="pol">80D</name>
     </size>
-    <size id="125" name="80E">
+    <size id="165" name="80E">
       <name xml:lang="pol">80E</name>
     </size>
-    <size id="127" name="80G">
+    <size id="166" name="80F">
+      <name xml:lang="pol">80F</name>
+    </size>
+    <size id="167" name="80G">
       <name xml:lang="pol">80G</name>
     </size>
-    <size id="128" name="80H">
+    <size id="168" name="80H">
       <name xml:lang="pol">80H</name>
     </size>
-    <size id="129" name="80I">
+    <size id="169" name="80I">
       <name xml:lang="pol">80I</name>
     </size>
-    <size id="130" name="80J">
+    <size id="170" name="80J">
       <name xml:lang="pol">80J</name>
     </size>
-    <size id="131" name="80K">
+    <size id="171" name="80K">
       <name xml:lang="pol">80K</name>
     </size>
-    <size id="135" name="85B">
+    <size id="172" name="80L">
+      <name xml:lang="pol">80L</name>
+    </size>
+    <size id="173" name="80M">
+      <name xml:lang="pol">80M</name>
+    </size>
+    <size id="174" name="85A">
+      <name xml:lang="pol">85A</name>
+    </size>
+    <size id="175" name="85B">
       <name xml:lang="pol">85B</name>
     </size>
-    <size id="136" name="85C">
+    <size id="176" name="85C">
       <name xml:lang="pol">85C</name>
     </size>
-    <size id="137" name="85D">
+    <size id="177" name="85D">
       <name xml:lang="pol">85D</name>
     </size>
-    <size id="141" name="85H">
+    <size id="178" name="85E">
+      <name xml:lang="pol">85E</name>
+    </size>
+    <size id="S" name="85F">
+      <name xml:lang="pol">85F</name>
+    </size>
+    <size id="15" name="85G">
+      <name xml:lang="pol">85G</name>
+    </size>
+    <size id="17" name="85H">
       <name xml:lang="pol">85H</name>
     </size>
-    <size id="142" name="85I">
+    <size id="20" name="85I">
       <name xml:lang="pol">85I</name>
     </size>
-    <size id="152" name="90F">
+    <size id="22" name="85J">
+      <name xml:lang="pol">85J</name>
+    </size>
+    <size id="32" name="85K">
+      <name xml:lang="pol">85K</name>
+    </size>
+    <size id="33" name="85L">
+      <name xml:lang="pol">85L</name>
+    </size>
+    <size id="38" name="85M">
+      <name xml:lang="pol">85M</name>
+    </size>
+    <size id="39" name="90A">
+      <name xml:lang="pol">90A</name>
+    </size>
+    <size id="40" name="90B">
+      <name xml:lang="pol">90B</name>
+    </size>
+    <size id="41" name="90C">
+      <name xml:lang="pol">90C</name>
+    </size>
+    <size id="42" name="90D">
+      <name xml:lang="pol">90D</name>
+    </size>
+    <size id="179" name="90E">
+      <name xml:lang="pol">90E</name>
+    </size>
+    <size id="180" name="90F">
       <name xml:lang="pol">90F</name>
     </size>
-    <size id="153" name="90G">
+    <size id="181" name="90G">
       <name xml:lang="pol">90G</name>
     </size>
-    <size id="154" name="90H">
+    <size id="182" name="90H">
       <name xml:lang="pol">90H</name>
     </size>
-    <size id="155" name="90I">
+    <size id="183" name="90I">
       <name xml:lang="pol">90I</name>
     </size>
-    <size id="166" name="95G">
+    <size id="184" name="90J">
+      <name xml:lang="pol">90J</name>
+    </size>
+    <size id="185" name="90K">
+      <name xml:lang="pol">90K</name>
+    </size>
+    <size id="186" name="90L">
+      <name xml:lang="pol">90L</name>
+    </size>
+    <size id="187" name="90M">
+      <name xml:lang="pol">90M</name>
+    </size>
+    <size id="188" name="95A">
+      <name xml:lang="pol">95A</name>
+    </size>
+    <size id="189" name="95B">
+      <name xml:lang="pol">95B</name>
+    </size>
+    <size id="190" name="95C">
+      <name xml:lang="pol">95C</name>
+    </size>
+    <size id="191" name="95D">
+      <name xml:lang="pol">95D</name>
+    </size>
+    <size id="192" name="95E">
+      <name xml:lang="pol">95E</name>
+    </size>
+    <size id="193" name="95F">
+      <name xml:lang="pol">95F</name>
+    </size>
+    <size id="194" name="95G">
       <name xml:lang="pol">95G</name>
+    </size>
+    <size id="195" name="95H">
+      <name xml:lang="pol">95H</name>
+    </size>
+    <size id="196" name="95I">
+      <name xml:lang="pol">95I</name>
+    </size>
+    <size id="197" name="95J">
+      <name xml:lang="pol">95J</name>
+    </size>
+    <size id="198" name="95K">
+      <name xml:lang="pol">95K</name>
+    </size>
+    <size id="199" name="95L">
+      <name xml:lang="pol">95L</name>
+    </size>
+    <size id="200" name="95M">
+      <name xml:lang="pol">95M</name>
+    </size>
+    <size id="232" name="L">
+      <name xml:lang="pol">L</name>
+    </size>
+    <size id="251" name="L/S">
+      <name xml:lang="pol">L/S</name>
+    </size>
+    <size id="I" name="M">
+      <name xml:lang="pol">M</name>
+    </size>
+    <size id="231" name="S">
+      <name xml:lang="pol">S</name>
+    </size>
+    <size id="255" name="uniwersalny">
+      <name xml:lang="pol">uniwersalny</name>
+    </size>
+    <size id="233" name="XL">
+      <name xml:lang="pol">XL</name>
+    </size>
+    <size id="249" name="XL/M">
+      <name xml:lang="pol">XL/M</name>
+    </size>
+    <size id="205" name="XS">
+      <name xml:lang="pol">XS</name>
+    </size>
+    <size id="234" name="XXL">
+      <name xml:lang="pol">XXL</name>
+    </size>
+    <size id="248" name="XXL/L">
+      <name xml:lang="pol">XXL/L</name>
     </size>
   </group>
 </sizes>

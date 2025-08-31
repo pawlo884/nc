@@ -48,6 +48,7 @@ class Colors(models.Model):
     hex_code = models.CharField(max_length=7, blank=True, null=True)
     parent_id = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, db_column='parent_id')
+    iai_colors_id = models.IntegerField(blank=True, null=True)
     objects = models.Manager()
 
     class Meta:
@@ -366,6 +367,7 @@ class Paths(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     path = models.CharField(max_length=255, blank=True, null=True)
     parent_id = models.BigIntegerField(blank=True, null=True)
+    iai_category_id = models.IntegerField(blank=True, null=True)
     objects = models.Manager()
 
     class Meta:

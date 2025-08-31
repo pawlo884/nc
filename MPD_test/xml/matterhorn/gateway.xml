@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-29 13:38:30">
+<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-31 11:44:49">
   <meta>
     <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
     <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
@@ -15,34 +15,18 @@
       <country>&lt;![CDATA[Poland]]&gt;</country>
     </address>
     <time>
-      <offer created="2025-08-29 13:38:30"/>
-      <offer expires="2025-09-05 13:38:30"/>
+      <offer created="2025-08-31 11:44:49"/>
+      <offer expires="2025-09-07 11:44:49"/>
     </time>
   </meta>
-  <full url="http://212.127.93.27:8000/mpd/generate-full-xml/" hash="7b5ddf1409697f546ce953628fd55dbe" changed="2025-08-29 12:57:30">
+  <full url="http://212.127.93.27:8000/mpd/generate-full-xml/" hash="12192d458b9fd190108dba82a295ae55" changed="2025-08-31 11:44:49">
     <changes>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T13-38-14.xml" hash="98eb22c0c3feb276831547a005b7563e" changed="2025-08-29 13:38:14"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T13-23-54.xml" hash="98eb22c0c3feb276831547a005b7563e" changed="2025-08-29 13:23:54"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T13-18-47.xml" hash="98eb22c0c3feb276831547a005b7563e" changed="2025-08-29 13:18:47"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T13-11-50.xml" hash="0b8b2d35b403f5984b0e101fea0b5065" changed="2025-08-29 13:11:50"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T13-07-51.xml" hash="0b8b2d35b403f5984b0e101fea0b5065" changed="2025-08-29 13:07:51"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T13-07-34.xml" hash="0b8b2d35b403f5984b0e101fea0b5065" changed="2025-08-29 13:07:34"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T13-05-07.xml" hash="eb0bd711ae7c9e2187d8a2d314e6c01b" changed="2025-08-29 13:05:07"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T13-04-57.xml" hash="eb0bd711ae7c9e2187d8a2d314e6c01b" changed="2025-08-29 13:04:57"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T13-00-27.xml" hash="eb0bd711ae7c9e2187d8a2d314e6c01b" changed="2025-08-29 13:00:27"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T12-58-34.xml" hash="eb0bd711ae7c9e2187d8a2d314e6c01b" changed="2025-08-29 12:58:34"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T12-58-22.xml" hash="eb0bd711ae7c9e2187d8a2d314e6c01b" changed="2025-08-29 12:58:22"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T12-56-13.xml" hash="eb0bd711ae7c9e2187d8a2d314e6c01b" changed="2025-08-29 12:56:13"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T12-55-16.xml" hash="eb0bd711ae7c9e2187d8a2d314e6c01b" changed="2025-08-29 12:55:16"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T12-49-07.xml" hash="eb0bd711ae7c9e2187d8a2d314e6c01b" changed="2025-08-29 12:49:07"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T12-48-37.xml" hash="eb0bd711ae7c9e2187d8a2d314e6c01b" changed="2025-08-29 12:48:37"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T12-14-46.xml" hash="0b8b2d35b403f5984b0e101fea0b5065" changed="2025-08-29 12:14:46"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-29T12-14-10.xml" hash="98eb22c0c3feb276831547a005b7563e" changed="2025-08-29 12:14:10"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-28T13-38-24.xml" hash="d9ce675733dbe784c54d0ad742388c70" changed="2025-08-28 13:38:24"/>
+      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-30T23-36-27.xml" hash="8d82e5d5169947fcde57e06cfcd57d8c" changed="2025-08-30 23:36:27"/>
+      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-30T23-35-37.xml" hash="60f6aec6d15993e22d5bab790bafed44" changed="2025-08-30 23:35:37"/>
     </changes>
   </full>
-  <light url="http://212.127.93.27:8000/mpd/generate-light-xml/" hash="85cbe699483e3968b5141f2cc9c0bc54" changed="2025-08-29 13:38:30"/>
-  <categories url="http://212.127.93.27:8000/mpd/generate-categories-xml/" hash="41286fcec1a39480862a187ac631cefa" changed="2025-08-29 12:57:38"/>
-  <sizes url="http://212.127.93.27:8000/mpd/generate-sizes-xml/" hash="4a53d932fbfd5f53ec281754cfb8dbe0" changed="2025-08-29 12:57:39"/>
-  <producers url="http://212.127.93.27:8000/mpd/generate-producers-xml/" hash="2b57687afb892c18eb515463dfce793d" changed="2025-08-29 10:02:55"/>
+  <light url="http://212.127.93.27:8000/mpd/generate-light-xml/" hash="97a1a9ce5f7ed1a035f68c78a9e83dd0" changed="2025-08-31 10:42:34"/>
+  <categories url="http://212.127.93.27:8000/mpd/generate-categories-xml/" hash="65ec9064d1ea47003d3599ffd34c64c8" changed="2025-08-30 22:28:10"/>
+  <sizes url="http://212.127.93.27:8000/mpd/generate-sizes-xml/" hash="2ef22c20ad94568bfb0d1d3a498f36ab" changed="2025-08-30 22:28:11"/>
+  <producers url="http://212.127.93.27:8000/mpd/generate-producers-xml/" hash="0d3981b4ae2b0731df64ccc2e2919d34" changed="2025-08-30 22:28:11"/>
 </provider_description>

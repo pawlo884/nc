@@ -1,45 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<categories file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="2025-08-29 12:57:38" expires="2025-08-30 12:57:38">
-  <category id="1">
+<categories file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="2025-08-30 22:28:10" expires="2025-08-31 22:28:10">
+  <category id="1214553886">
     <name xml:lang="pol">Moda damska</name>
-    <category id="2">
+    <category id="1214553887">
       <name xml:lang="pol">Bielizna</name>
-      <category id="3">
+      <category id="1214553888">
         <name xml:lang="pol">Stroje kąpielowe</name>
-        <category id="5">
+        <category id="1214553891">
           <name xml:lang="pol">Dwuczęściowe</name>
-          <category id="4">
+          <category id="1214553889">
             <name xml:lang="pol">Biustonosze | Topy</name>
           </category>
-          <category id="6">
+          <category id="1214553890">
             <name xml:lang="pol">Figi | Stringi | Szorty</name>
           </category>
         </category>
-        <category id="7">
+        <category id="1214553892">
           <name xml:lang="pol">Jednoczęściowe</name>
         </category>
-        <category id="8">
+        <category id="1214553895">
           <name xml:lang="pol">Kombinezony</name>
         </category>
-        <category id="9">
+        <category id="1214553896">
           <name xml:lang="pol">Pareo</name>
         </category>
-        <category id="10">
+        <category id="1214553897">
           <name xml:lang="pol">Spódniczki plażowe</name>
         </category>
-        <category id="11">
+        <category id="1214553898">
           <name xml:lang="pol">Sukienki plażowe</name>
         </category>
-        <category id="12">
+        <category id="1214553899">
           <name xml:lang="pol">Tankini</name>
         </category>
-        <category id="13">
+        <category id="1214553900">
           <name xml:lang="pol">Tuniki</name>
         </category>
       </category>
     </category>
   </category>
-  <category id="14">
+  <category id="1214553894">
     <name xml:lang="pol">Moda męska</name>
   </category>
 </categories>

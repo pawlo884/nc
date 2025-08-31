@@ -115,7 +115,7 @@ class FullXMLExporter(BaseXMLExporter):
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
             local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
-        xml.append('  <products currency="PLN" language="pol">')
+        xml.append('  <products language="pol">')
 
         # ZAWSZE generuj pełną ofertę - ignoruj parametr incremental
         # Pobierz wszystkie warianty z iai_product_id
@@ -142,14 +142,14 @@ class FullXMLExporter(BaseXMLExporter):
             product = first_variant.product
 
             # Pobierz dane waluty i VAT z pierwszego wariantu
-            currency = ''
+            currency = '' or 'PLN'
             vat_rate = ''
             has_price = False
             for variant in variants:
                 pvrp = ProductVariantsRetailPrice.objects.using(
                     'MPD').filter(variant=variant).first()
                 if pvrp:
-                    currency = pvrp.currency or ''
+                    currency = pvrp.currency or 'PLN'
                     if pvrp.vat:
                         vat_obj = Vat.objects.using(
                             'MPD').filter(id=pvrp.vat).first()
@@ -169,7 +169,7 @@ class FullXMLExporter(BaseXMLExporter):
 
             if product.brand:
                 xml.append(
-                    f'      <producer id="{product.brand.id}" name="{escape(product.brand.name) if product.brand.name else ""}"/>')
+                    f'      <producer id="{product.brand.iai_brand_id}" name="{escape(product.brand.name) if product.brand.name else ""}"/>')
 
             # Dodaj wszystkie kategorie (category) powiązane z produktem
             product_paths = ProductPaths.objects.using(
@@ -178,8 +178,10 @@ class FullXMLExporter(BaseXMLExporter):
                 path_obj = Paths.objects.using('MPD').filter(
                     id=product_path.path_id).first()
                 if path_obj:
+                    # Użyj iai_category_id zamiast id, jeśli jest dostępny
+                    category_id = path_obj.iai_category_id if path_obj.iai_category_id else path_obj.id
                     xml.append(
-                        f'      <category id="{path_obj.id}" name="{escape(path_obj.path)}"/>')
+                        f'      <category id="{category_id}" name="{escape(path_obj.path)}"/>')
 
             # Dodaj jednostkę, jeśli jest przypisana
             if product.unit:
@@ -203,7 +205,7 @@ class FullXMLExporter(BaseXMLExporter):
                 xml.append(
                     '        <parameter type="parameter" id="26" name="Kolor">')
                 xml.append(
-                    f'          <value id="{first_variant.color.id}" name="{escape(first_variant.color.name)}"/>')
+                    f'          <value id="{first_variant.color.iai_colors_id}" name="{escape(first_variant.color.name)}"/>')
                 xml.append('        </parameter>')
                 xml.append('      </parameters>')
 
@@ -469,7 +471,7 @@ class LightXMLExporter(BaseXMLExporter):
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
             local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
-        xml.append('  <products currency="PLN" language="pol">')
+        xml.append('  <products language="pol">')
 
         # Pobierz wszystkie produkty z wariantami
         products = Products.objects.using('MPD').filter(
@@ -713,7 +715,7 @@ class LightXMLExporter(BaseXMLExporter):
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
             local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
-        xml.append('  <products currency="PLN" language="pol">')
+        xml.append('  <products language="pol">')
 
         for product in products:
             # Pobierz warianty dla tego produktu
@@ -891,7 +893,7 @@ class GatewayXMLExporter(BaseXMLExporter):
         except Exception:
             raise ValueError("Nie znaleziono źródła Matterhorn (id=2)")
 
-    def _create_meta_element(self, root, request_time=None):
+    def _create_meta_element(self, root, request_time=None, full_time=None):
         from datetime import timedelta
         meta = ET.SubElement(root, "meta")
         long_name = ET.SubElement(meta, "long_name")
@@ -932,20 +934,32 @@ class GatewayXMLExporter(BaseXMLExporter):
         time = ET.SubElement(meta, "time")
         offer_created = ET.SubElement(time, "offer")
 
-        # Użyj request_time lub aktualnego czasu
-        if request_time is None:
-            request_time = timezone.now()
+        # Użyj full_time jako bazowego czasu, aby created nie było późniejsze niż changed
+        if full_time:
+            # Konwertuj string na datetime
+            from datetime import datetime
+            try:
+                # Parsuj czas z formatu "YYYY-MM-DD HH:MM:SS"
+                base_time = datetime.strptime(full_time, "%Y-%m-%d %H:%M:%S")
+                # Konwertuj na timezone-aware datetime
+                base_time = timezone.make_aware(base_time)
+            except ValueError:
+                # Fallback: użyj request_time lub aktualnego czasu
+                base_time = request_time if request_time else timezone.now()
+        else:
+            # Brak full_time - użyj request_time lub aktualnego czasu
+            base_time = request_time if request_time else timezone.now()
 
         # Konwertuj na lokalny czas (Europe/Warsaw)
-        local_request_time = timezone.localtime(request_time)
+        local_base_time = timezone.localtime(base_time)
 
         offer_created.set(
-            "created", local_request_time.strftime("%Y-%m-%d %H:%M:%S"))
+            "created", local_base_time.strftime("%Y-%m-%d %H:%M:%S"))
         offer_expires = ET.SubElement(time, "offer")
-        offer_expires.set("expires", (local_request_time +
+        offer_expires.set("expires", (local_base_time +
                           timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"))
 
-    def _create_url_elements(self, root, request_time=None):
+    def _create_url_elements(self, root, request_time=None, full_time=None):
         # Użyj endpointów API zamiast statycznych plików
         from django.conf import settings
 
@@ -957,7 +971,8 @@ class GatewayXMLExporter(BaseXMLExporter):
             request_time = timezone.now()
 
         # Dodaj węzeł full z podwęzłem changes dla plików full_change
-        self._create_full_with_changes_element(root, base_url, request_time)
+        self._create_full_with_changes_element(
+            root, base_url, request_time, full_time)
 
         # Dodaj wymagane elementy zgodnie ze schematem XSD
         self._create_light_element(root, base_url)
@@ -973,7 +988,7 @@ class GatewayXMLExporter(BaseXMLExporter):
         # self._create_warranties_element(root, base_url)
         # self._create_preset_element(root, base_url)
 
-    def _create_full_with_changes_element(self, root, base_url, request_time=None):
+    def _create_full_with_changes_element(self, root, base_url, request_time=None, full_time=None):
         """Tworzy węzeł full z podwęzłem changes dla rzeczywistych zmian w produktach"""
 
         try:
@@ -995,28 +1010,33 @@ class GatewayXMLExporter(BaseXMLExporter):
             # Konwertuj na lokalny czas (Europe/Warsaw)
             local_request_time = timezone.localtime(request_time)
 
-            # Sprawdź rzeczywisty czas ostatniego wygenerowania full.xml
-            from .models import FullChangeFile
-            from django.db import models
+            # Użyj przekazanego full_time zamiast pobierania z bazy
+            if not full_time:
+                # Fallback: pobierz z bazy jeśli nie przekazano
+                from .models import FullChangeFile
+                last_full_file = FullChangeFile.objects.using('MPD').filter(
+                    filename='full.xml'
+                ).order_by('-created_at').first()
 
-            # Pobierz ostatni plik full.xml (dokładnie 'full.xml')
-            last_full_file = FullChangeFile.objects.using('MPD').filter(
-                filename='full.xml'
-            ).order_by('-created_at').first()
-
-            if last_full_file:
-                # Użyj czasu ostatniego wygenerowania full.xml
-                full_time = timezone.localtime(
-                    last_full_file.created_at).strftime('%Y-%m-%d %H:%M:%S')
-                logger.info(f"Używam czasu ostatniego full.xml: {full_time}")
+                if last_full_file:
+                    full_time = timezone.localtime(
+                        last_full_file.created_at).strftime('%Y-%m-%d %H:%M:%S')
+                    logger.info(
+                        f"Używam czasu ostatniego full.xml: {full_time}")
+                else:
+                    full_time = ""
+                    logger.info(
+                        "Brak pliku full.xml w bazie - używam pustych wartości")
             else:
-                # Brak rekordu full.xml w bazie - użyj pustych wartości
-                full_time = ""
-                logger.info(
-                    "Brak pliku full.xml w bazie - używam pustych wartości")
+                # Jeśli full_time jest przekazane, pobierz last_full_file dla hash
+                from .models import FullChangeFile
+                last_full_file = FullChangeFile.objects.using('MPD').filter(
+                    filename='full.xml'
+                ).order_by('-created_at').first()
 
             # Hash bazujący na rzeczywistych danych + czasie
             from .models import Products
+            from django.db import models
             if last_full_file:
                 try:
                     # Pobierz liczbę produktów i ostatni timestamp modyfikacji
@@ -1162,11 +1182,8 @@ class GatewayXMLExporter(BaseXMLExporter):
         except Exception as e:
             logger.error(
                 f"Błąd podczas tworzenia węzła full z changes: {str(e)}")
-            # Utwórz podstawowy węzeł full bez changes
-            full_element = ET.SubElement(root, "full")
-            full_element.set("url", f"{base_url}/mpd/generate-full-xml/")
-            full_element.set("hash", "")
-            full_element.set("changed", "")
+            # Nie twórz dodatkowego węzła full - główny już istnieje
+            # Tylko loguj błąd i kontynuuj
 
     def _create_light_element(self, root, base_url):
         """Tworzy węzeł light zgodnie ze schematem XSD"""
@@ -1358,8 +1375,20 @@ class GatewayXMLExporter(BaseXMLExporter):
         # Konwertuj na lokalny czas (Europe/Warsaw)
         local_request_time = timezone.localtime(request_time)
         root.set("generated", local_request_time.strftime("%Y-%m-%d %H:%M:%S"))
-        self._create_meta_element(root, request_time)
-        self._create_url_elements(root, request_time)
+
+        # Pobierz full_time z bazy danych, aby przekazać go do _create_meta_element
+        from .models import FullChangeFile
+        last_full_file = FullChangeFile.objects.using('MPD').filter(
+            filename='full.xml'
+        ).order_by('-created_at').first()
+
+        full_time = ""
+        if last_full_file:
+            full_time = timezone.localtime(
+                last_full_file.created_at).strftime('%Y-%m-%d %H:%M:%S')
+
+        self._create_meta_element(root, request_time, full_time)
+        self._create_url_elements(root, request_time, full_time)
         xmlstr = minidom.parseString(
             ET.tostring(root, encoding="utf-8")
         ).toprettyxml(indent="  ", encoding="utf-8")
@@ -1515,7 +1544,7 @@ class CategoriesXMLExporter(BaseXMLExporter):
                 for i, part in enumerate(path_parts):
                     if part not in current_level:
                         current_level[part] = {
-                            'id': path.id if i == len(path_parts) - 1 else None,
+                            'id': path.iai_category_id if path.iai_category_id else path.id if i == len(path_parts) - 1 else None,
                             'children': {},
                             'full_path': '\\'.join(path_parts[:i + 1])
                         }
@@ -1531,9 +1560,12 @@ class CategoriesXMLExporter(BaseXMLExporter):
             children = [path for path in paths if path.parent_id == parent_id]
 
             for child in children:
+                # Użyj iai_category_id zamiast id, jeśli jest dostępny
+                category_id = child.iai_category_id if child.iai_category_id else child.id
+
                 if child.parent_id is None:
                     # To jest kategoria główna
-                    xml_lines.append(f'{indent}<category id="{child.id}">')
+                    xml_lines.append(f'{indent}<category id="{category_id}">')
                     xml_lines.append(
                         f'{indent}  <name xml:lang="pol">{escape(child.name)}</name>')
 
@@ -1545,7 +1577,7 @@ class CategoriesXMLExporter(BaseXMLExporter):
                     xml_lines.append(f'{indent}</category>')
                 else:
                     # To jest podkategoria
-                    xml_lines.append(f'{indent}<category id="{child.id}">')
+                    xml_lines.append(f'{indent}<category id="{category_id}">')
                     xml_lines.append(
                         f'{indent}  <name xml:lang="pol">{escape(child.name)}</name>')
 
@@ -1671,7 +1703,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
             local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
-        xml.append('  <products currency="PLN" language="pol">')
+        xml.append('  <products language="pol">')
 
         # Tracking nie jest używane w nowej logice IOF 3.0 (30 minut dla wszystkich produktów)
 
@@ -1718,14 +1750,14 @@ class FullChangeXMLExporter(BaseXMLExporter):
             product = first_variant.product
 
             # Pobierz dane waluty i VAT z pierwszego wariantu
-            currency = ''
+            currency = '' or 'PLN'
             vat_rate = ''
             has_price = False
             for variant in variants:
                 pvrp = ProductVariantsRetailPrice.objects.using(
                     'MPD').filter(variant=variant).first()
                 if pvrp:
-                    currency = pvrp.currency or ''
+                    currency = pvrp.currency or 'PLN'
                     if pvrp.vat:
                         vat_obj = Vat.objects.using(
                             'MPD').filter(id=pvrp.vat).first()
@@ -1745,7 +1777,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
 
             if product.brand:
                 xml.append(
-                    f'      <producer id="{product.brand.id}" name="{escape(product.brand.name) if product.brand.name else ""}"/>')
+                    f'      <producer id="{product.brand.iai_brand_id}" name="{escape(product.brand.name) if product.brand.name else ""}"/>')
 
             # Dodaj wszystkie kategorie (category) powiązane z produktem
             product_paths = ProductPaths.objects.using(
@@ -1754,8 +1786,10 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 path_obj = Paths.objects.using('MPD').filter(
                     id=product_path.path_id).first()
                 if path_obj:
+                    # Użyj iai_category_id zamiast id, jeśli jest dostępny
+                    category_id = path_obj.iai_category_id if path_obj.iai_category_id else path_obj.id
                     xml.append(
-                        f'      <category id="{path_obj.id}" name="{escape(path_obj.path)}"/>')
+                        f'      <category id="{category_id}" name="{escape(path_obj.path)}"/>')
 
             # Dodaj jednostkę, jeśli jest przypisana
             if product.unit:
@@ -1780,7 +1814,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 xml.append(
                     '        <parameter type="parameter" id="26" name="Kolor">')
                 xml.append(
-                    f'          <value id="{first_variant.color.id}" name="{escape(first_variant.color.name)}"/>')
+                    f'          <value id="{first_variant.color.iai_colors_id}" name="{escape(first_variant.color.name)}"/>')
                 xml.append('        </parameter>')
                 xml.append('      </parameters>')
 
@@ -2171,7 +2205,7 @@ class SizesXMLExporter(BaseXMLExporter):
 
     def generate_xml(self):
         from django.utils.html import escape
-        from .models import ProductVariants
+        from .models import Sizes
 
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
@@ -2182,27 +2216,39 @@ class SizesXMLExporter(BaseXMLExporter):
         xml.append('<sizes file_format="IOF" version="3.0" language="pol" generated="{}">'.format(
             local_now.strftime('%Y-%m-%d %H:%M:%S')))
 
-        # Pobierz wszystkie unikalne rozmiary z bazy danych
-        sizes = ProductVariants.objects.using('MPD').filter(
-            size__isnull=False
-        ).select_related('size').distinct('size__id').order_by('size__id')
+        # Pobierz wszystkie unikalne rozmiary z tabeli Sizes
+        sizes = Sizes.objects.using('MPD').filter(
+            category__isnull=False,
+            name__isnull=False
+        ).order_by('category', 'name')
 
-        # Grupuj rozmiary według kategorii (obecnie tylko bielizna)
-        # ID grupy z full.xml: iaiext:group_id="1098261181"
-        xml.append('  <group id="1098261181" name="bielizna">')
+        # Grupuj rozmiary według kategorii
+        current_category = None
+        for size in sizes:
+            if size.category != current_category:
+                # Zamknij poprzednią grupę jeśli istnieje
+                if current_category is not None:
+                    xml.append('  </group>')
 
-        for variant in sizes:
-            if variant.size:
-                size_id = variant.size.id
-                size_name = variant.size.name
-
+                # Otwórz nową grupę
+                current_category = size.category
                 xml.append(
-                    f'    <size id="{size_id}" name="{escape(size_name)}">')
-                xml.append(
-                    f'      <name xml:lang="pol">{escape(size_name)}</name>')
-                xml.append('    </size>')
+                    f'  <group id="1098261181" name="{escape(current_category)}">')
 
-        xml.append('  </group>')
+            # Użyj iai_size_id zamiast id, jeśli jest dostępny
+            size_id = size.iai_size_id if size.iai_size_id else size.id
+            size_name = size.name
+
+            xml.append(
+                f'    <size id="{size_id}" name="{escape(size_name)}">')
+            xml.append(
+                f'      <name xml:lang="pol">{escape(size_name)}</name>')
+            xml.append('    </size>')
+
+        # Zamknij ostatnią grupę
+        if current_category is not None:
+            xml.append('  </group>')
+
         xml.append('</sizes>')
 
         return '\n'.join(xml)
