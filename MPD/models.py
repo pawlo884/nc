@@ -10,7 +10,7 @@ class Attributes(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'attributes'
         app_label = 'MPD'
         verbose_name = 'Attribute'
@@ -27,7 +27,7 @@ class Brands(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'brands'
         app_label = 'MPD'
         verbose_name = 'Brand'
@@ -80,7 +80,7 @@ class Products(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'products'
         app_label = 'MPD'
         verbose_name = 'Product'
@@ -103,7 +103,7 @@ class Sizes(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'sizes'
         app_label = 'MPD'
         verbose_name = 'Size'
@@ -156,7 +156,7 @@ class ProductVariants(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_variants'
         app_label = 'MPD'
         verbose_name = 'Product Variant'
@@ -185,7 +185,7 @@ class ProductvariantsSources(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_variants_sources'
         app_label = 'MPD'
         verbose_name = 'Product Variant Source'
@@ -206,7 +206,7 @@ class ProductVariantsRetailPrice(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_variants_retail_price'
 
 
@@ -220,7 +220,7 @@ class ProductImage(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_images'
         app_label = 'MPD'
         verbose_name = 'Product Image'
@@ -241,7 +241,7 @@ class ProductSet(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_set'
         verbose_name = 'Product Set'
         verbose_name_plural = 'Product Sets'
@@ -261,7 +261,7 @@ class ProductSetItem(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_set_items'
         verbose_name = 'Product Set Item'
         verbose_name_plural = 'Product Set Items'
@@ -276,7 +276,7 @@ class ProductSeries(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_series'
         app_label = 'MPD'
         verbose_name = 'Seria'
@@ -299,7 +299,7 @@ class StockAndPrices(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'stock_and_prices'
         verbose_name = 'Stan magazynowy'
         verbose_name_plural = 'Stany magazynowe'
@@ -318,7 +318,7 @@ class StockHistory(models.Model):
     change_date = models.DateTimeField()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'stock_history'
         verbose_name = 'Historia stanu magazynowego'
         verbose_name_plural = 'Historia stanów magazynowych'
@@ -332,7 +332,7 @@ class Categories(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'categories'
         verbose_name = 'Kategoria'
         verbose_name_plural = 'Kategorie'
@@ -359,7 +359,7 @@ class Vat(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'vat'
 
 
@@ -374,7 +374,7 @@ class Paths(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'path'
         verbose_name = 'Ścieżka'
         verbose_name_plural = 'Ścieżki'
@@ -387,9 +387,10 @@ class ProductPaths(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_path'
         verbose_name = 'Ścieżka produktu'
+        verbose_name_plural = 'Ścieżki produktów'
         unique_together = ('product_id', 'path_id')
 
 
@@ -400,7 +401,7 @@ class Units(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'units'
         verbose_name = 'Jednostka'
         verbose_name_plural = 'Jednostki'
@@ -413,7 +414,7 @@ class FabricComponent(models.Model):
         db_table = 'fabric_component'
 
     def __str__(self):
-        return self.name
+        return str(self.name) if self.name else "Brak nazwy"
 
 
 class ProductFabric(models.Model):
@@ -427,7 +428,8 @@ class ProductFabric(models.Model):
         unique_together = ('product', 'component')
 
     def __str__(self):
-        return f"{self.component.name} {self.percentage}%"
+        component_name = self.component.name if self.component and self.component.name else "Nieznany komponent"
+        return f"{component_name} {self.percentage}%"
 
 
 class IaiProductCounter(models.Model):
@@ -436,7 +438,7 @@ class IaiProductCounter(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'iai_product_counter'
         verbose_name = 'Licznik IAI Product ID'
         verbose_name_plural = 'Liczniki IAI Product ID'
@@ -457,11 +459,11 @@ class FullChangeFile(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'full_change_files'
         verbose_name = 'Plik XML'
         verbose_name_plural = 'Pliki XML'
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.filename} ({self.timestamp}) - {self.file_type}"
+        return f"{self.filename} ({self.timestamp}) - {self.file_size} bytes"

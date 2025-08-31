@@ -1,7 +1,7 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductImage, ProductSeries, Categories, Vat, Units, FabricComponent, ProductFabric
 import decimal
 # Register your models here.
 
@@ -425,8 +425,8 @@ class ProductsAdmin(admin.ModelAdmin):
 
 @admin.register(Brands)
 class BrandsAdmin(admin.ModelAdmin):
-    fields = ['name', 'logo_url', 'opis', 'url']
-    list_display = ['id', 'name', 'url']
+    fields = ['name', 'logo_url', 'opis', 'url', 'iai_brand_id']
+    list_display = ['id', 'name', 'url', 'iai_brand_id']
     search_fields = ['name']
 
     def get_queryset(self, request):
@@ -574,3 +574,128 @@ class FullChangeFileAdmin(admin.ModelAdmin):
 #     list_display = ['id', 'name', 'path', 'parent_id']
 #     search_fields = ['name', 'path']
 #     list_filter = ['name']
+
+
+@admin.register(Attributes)
+class AttributesAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name']
+    search_fields = ['name']
+    list_filter = ['name']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductVariants)
+class ProductVariantsAdmin(admin.ModelAdmin):
+    list_display = ['variant_id', 'product', 'color', 'producer_color',
+                    'size', 'producer_code', 'iai_product_id', 'updated_at']
+    list_filter = ['color', 'producer_color', 'size', 'updated_at']
+    search_fields = ['variant_id', 'product__name',
+                     'producer_code', 'iai_product_id']
+    raw_id_fields = ['product', 'color', 'producer_color', 'size']
+    readonly_fields = ['variant_id', 'updated_at']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductvariantsSources)
+class ProductVariantsSourcesAdmin(admin.ModelAdmin):
+    list_display = ['id', 'variant', 'source', 'ean', 'variant_uid',
+                    'gtin14', 'gtin13', 'gtin12', 'isbn10', 'gtin8', 'upce', 'mpn', 'other']
+    list_filter = ['source']
+    search_fields = ['ean', 'variant_uid', 'gtin14', 'gtin13',
+                     'gtin12', 'isbn10', 'gtin8', 'upce', 'mpn', 'other']
+    raw_id_fields = ['variant', 'source']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductVariantsRetailPrice)
+class ProductVariantsRetailPriceAdmin(admin.ModelAdmin):
+    list_display = ['variant', 'retail_price',
+                    'vat', 'currency', 'net_price', 'updated_at']
+    list_filter = ['currency', 'updated_at']
+    search_fields = ['variant__variant_id', 'variant__product__name']
+    raw_id_fields = ['variant']
+    readonly_fields = ['updated_at']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductImage)
+class ProductImageAdmin(admin.ModelAdmin):
+    list_display = ['id', 'product',
+                    'iai_product_id', 'file_path', 'updated_at']
+    list_filter = ['updated_at']
+    search_fields = ['product__name', 'file_path', 'iai_product_id']
+    raw_id_fields = ['product']
+    readonly_fields = ['id', 'updated_at']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductSeries)
+class ProductSeriesAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name']
+    search_fields = ['name']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(Categories)
+class CategoriesAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'path', 'parent_id']
+    search_fields = ['name', 'path']
+    list_filter = ['name']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(Vat)
+class VatAdmin(admin.ModelAdmin):
+    list_display = ['id', 'vat_rate']
+    search_fields = ['vat_rate']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductPaths)
+class ProductPathsAdmin(admin.ModelAdmin):
+    list_display = ['id', 'product_id', 'path_id']
+    search_fields = ['product_id', 'path_id']
+    list_filter = ['path_id']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(Units)
+class UnitsAdmin(admin.ModelAdmin):
+    list_display = ['id', 'unit_id', 'name']
+    search_fields = ['name', 'unit_id']
+    list_filter = ['unit_id']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(FabricComponent)
+class FabricComponentAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name']
+    search_fields = ['name']
+
+
+@admin.register(ProductFabric)
+class ProductFabricAdmin(admin.ModelAdmin):
+    list_display = ['id', 'product', 'component', 'percentage']
+    list_filter = ['component', 'percentage']
+    search_fields = ['product__name', 'component__name']
+    raw_id_fields = ['product', 'component']
