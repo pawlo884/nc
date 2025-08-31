@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-31 15:08:26">
+<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-31 21:50:44">
   <meta>
     <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
     <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
@@ -15,18 +15,17 @@
       <country>&lt;![CDATA[Poland]]&gt;</country>
     </address>
     <time>
-      <offer created="2025-08-31 15:08:26"/>
-      <offer expires="2025-09-07 15:08:26"/>
+      <offer created="2025-08-31 21:42:15"/>
+      <offer expires="2025-09-07 21:42:15"/>
     </time>
   </meta>
-  <full url="http://212.127.93.27:8000/mpd/generate-full-xml/" hash="cdf4ac6e48d3f54bf803f10dfa3df7fe" changed="2025-08-31 15:08:26">
+  <full url="http://212.127.93.27:8000/mpd/generate-full-xml/" hash="261c27cb70128aa4be9c4e195d84b654" changed="2025-08-31 21:42:15">
     <changes>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-30T23-36-27.xml" hash="3e62eef95683349cc23fc0352e46ca0c" changed="2025-08-30 23:36:27"/>
-      <change url="http://212.127.93.27:8000/mpd/full_change2025-08-30T23-35-37.xml" hash="ee7a4b574faa6c62f1e12f4ee6158466" changed="2025-08-30 23:35:37"/>
+      <change url="http://212.127.93.27:8000/mpd/generate-full-change-xml/" hash="" changed=""/>
     </changes>
   </full>
-  <light url="http://212.127.93.27:8000/mpd/generate-light-xml/" hash="97a1a9ce5f7ed1a035f68c78a9e83dd0" changed="2025-08-31 10:42:34"/>
-  <categories url="http://212.127.93.27:8000/mpd/generate-categories-xml/" hash="65ec9064d1ea47003d3599ffd34c64c8" changed="2025-08-30 22:28:10"/>
-  <sizes url="http://212.127.93.27:8000/mpd/generate-sizes-xml/" hash="2ef22c20ad94568bfb0d1d3a498f36ab" changed="2025-08-30 22:28:11"/>
-  <producers url="http://212.127.93.27:8000/mpd/generate-producers-xml/" hash="0d3981b4ae2b0731df64ccc2e2919d34" changed="2025-08-30 22:28:11"/>
+  <light url="http://212.127.93.27:8000/mpd/generate-light-xml/" hash="ecea4f841142ad073388776c48f61118" changed="2025-08-31 21:42:16"/>
+  <categories url="http://212.127.93.27:8000/mpd/generate-categories-xml/" hash="c092b3b4fe44de0d6527638cf60f62df" changed="2025-08-31 21:42:16"/>
+  <sizes url="http://212.127.93.27:8000/mpd/generate-sizes-xml/" hash="138186953b9d96b42f45d15ab27b4011" changed="2025-08-31 21:42:17"/>
+  <producers url="http://212.127.93.27:8000/mpd/generate-producers-xml/" hash="" changed=""/>
 </provider_description>

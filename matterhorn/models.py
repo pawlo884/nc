@@ -36,7 +36,7 @@ class Products(models.Model):
     last_updated = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'products'
         verbose_name = "Product"
         verbose_name_plural = "Products"
@@ -76,14 +76,14 @@ class Images(models.Model):
     timestamp = models.DateTimeField()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'images'
 
 
 class ProductsProxy(Products):
     class Meta:
         proxy = True
-        managed = False
+        managed = True
         verbose_name = "Mapper"
         verbose_name_plural = "Mapper"
 
@@ -124,7 +124,7 @@ class OtherColors(models.Model):
     timestamp = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
+        managed = True
         verbose_name_plural = "Other Colors"
         db_table = 'other_colors'
         unique_together = (('product', 'color_product'),)
@@ -150,7 +150,7 @@ class ProductInSet(models.Model):
     timestamp = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_in_set'
         verbose_name_plural = "Product in Series"
         unique_together = (('product', 'set_product'),)
@@ -167,7 +167,7 @@ class UpdateLog(models.Model):
     data_inventory = models.TextField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'update_log'
 
 
@@ -185,7 +185,7 @@ class Variants(models.Model):
     last_updated = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         verbose_name_plural = "Variants"
         db_table = 'variants'
         indexes = [
@@ -287,7 +287,7 @@ class StockHistory(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
+        managed = True
         verbose_name_plural = "Stock History"
         db_table = 'stock_history'
         indexes = [

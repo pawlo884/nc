@@ -75,7 +75,6 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'debug_toolbar',
-    'main',
     'matterhorn',
     'MPD',
     'web_agent',

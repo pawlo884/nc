@@ -1206,46 +1206,9 @@ class GatewayXMLExporter(BaseXMLExporter):
 
     def _create_light_element(self, root, base_url):
         """Tworzy węzeł light zgodnie ze schematem XSD"""
-        from .models import FullChangeFile
-        from django.utils import timezone
-
         light_element = ET.SubElement(root, "light")
         light_element.set("url", f"{base_url}/mpd/generate-light-xml/")
-
-        # Pobierz ostatni plik light.xml z bazy
-        try:
-            latest_light_file = FullChangeFile.objects.using('MPD').filter(
-                filename='light.xml'
-            ).order_by('-created_at').first()
-
-            if latest_light_file:
-                # Hash bazujący na nazwie pliku i czasie utworzenia
-                hash_input = f"light_xml_{latest_light_file.created_at.strftime('%Y-%m-%dT%H-%M-%S')}"
-                hash_value = hashlib.md5(hash_input.encode()).hexdigest()
-
-                # Czas w formacie YYYY-MM-DD HH:MM:SS
-                if timezone.is_aware(latest_light_file.created_at):
-                    light_time = latest_light_file.created_at
-                else:
-                    light_time = timezone.make_aware(
-                        latest_light_file.created_at)
-
-                local_light_time = timezone.localtime(light_time)
-                light_time_str = local_light_time.strftime('%Y-%m-%d %H:%M:%S')
-
-                light_element.set("hash", hash_value)
-                light_element.set("changed", light_time_str)
-                logger.info(
-                    f"Light.xml: hash={hash_value}, changed={light_time_str}")
-            else:
-                light_element.set("hash", "")
-                light_element.set("changed", "")
-                logger.info(
-                    "Brak plików light.xml w bazie - pusty hash i changed")
-        except Exception as e:
-            light_element.set("hash", "")
-            light_element.set("changed", "")
-            logger.warning(f"Błąd pobierania light.xml z bazy: {str(e)}")
+        logger.info("Light.xml: utworzono węzeł light bez hash i changed")
 
     def _create_categories_element(self, root, base_url):
         """Tworzy węzeł categories zgodnie ze schematem XSD"""
