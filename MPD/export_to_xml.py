@@ -95,8 +95,10 @@ class FullXMLExporter(BaseXMLExporter):
             id__in=path_ids).order_by('id'))
         for idx, path in enumerate(paths, 1):
             textid = escape(path.path) if path.path else ''
+            # Użyj iai_menu_id zamiast id dla węzła iaiext:item
+            item_id = path.iai_menu_id if path.iai_menu_id else path.id
             xml.append(
-                f'            <iaiext:item id="{path.id}" menu_id="1" textid="{textid}" iaiext:priority_menu="{idx}"/>')
+                f'            <iaiext:item id="{item_id}" menu_id="1" textid="{textid}" iaiext:priority_menu="{idx}"/>')
         xml.append('          </iaiext:menu>')
         xml.append('        </iaiext:site>')
         xml.append('      </iaiext:navigation>')
@@ -170,6 +172,23 @@ class FullXMLExporter(BaseXMLExporter):
             if product.brand:
                 xml.append(
                     f'      <producer id="{product.brand.iai_brand_id}" name="{escape(product.brand.name) if product.brand.name else ""}"/>')
+
+            # Dodaj węzeł deliverer
+            xml.append('      <iaiext:deliverer id="1" name="Matterhorn"/>')
+
+            # Dodaj węzeł date_created z kolumny created_at
+            if product.created_at:
+                # Konwertuj na czas lokalny (Europe/Warsaw)
+                local_created_at = timezone.localtime(product.created_at)
+                xml.append(
+                    f'      <iaiext:date_created datetime="{local_created_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
+
+            # Dodaj węzeł modification_date z kolumny updated_at
+            if product.updated_at:
+                # Konwertuj na czas lokalny (Europe/Warsaw)
+                local_updated_at = timezone.localtime(product.updated_at)
+                xml.append(
+                    f'      <iaiext:modification_date datetime="{local_updated_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
 
             # Dodaj wszystkie kategorie (category) powiązane z produktem
             product_paths = ProductPaths.objects.using(
@@ -1681,8 +1700,10 @@ class FullChangeXMLExporter(BaseXMLExporter):
             id__in=path_ids).order_by('id'))
         for idx, path in enumerate(paths, 1):
             textid = escape(path.path) if path.path else ''
+            # Użyj iai_menu_id zamiast id dla węzła iaiext:item
+            item_id = path.iai_menu_id if path.iai_menu_id else path.id
             xml.append(
-                f'            <iaiext:item id="{path.id}" menu_id="1" textid="{textid}" iaiext:priority_menu="{idx}"/>')
+                f'            <iaiext:item id="{item_id}" menu_id="1" textid="{textid}" iaiext:priority_menu="{idx}"/>')
         xml.append('          </iaiext:menu>')
         xml.append('        </iaiext:site>')
         xml.append('      </iaiext:navigation>')
@@ -1778,6 +1799,23 @@ class FullChangeXMLExporter(BaseXMLExporter):
             if product.brand:
                 xml.append(
                     f'      <producer id="{product.brand.iai_brand_id}" name="{escape(product.brand.name) if product.brand.name else ""}"/>')
+
+            # Dodaj węzeł deliverer
+            xml.append('      <iaiext:deliverer id="1" name="Matterhorn"/>')
+
+            # Dodaj węzeł date_created z kolumny created_at
+            if product.created_at:
+                # Konwertuj na czas lokalny (Europe/Warsaw)
+                local_created_at = timezone.localtime(product.created_at)
+                xml.append(
+                    f'      <iaiext:date_created datetime="{local_created_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
+
+            # Dodaj węzeł modification_date z kolumny updated_at
+            if product.updated_at:
+                # Konwertuj na czas lokalny (Europe/Warsaw)
+                local_updated_at = timezone.localtime(product.updated_at)
+                xml.append(
+                    f'      <iaiext:modification_date datetime="{local_updated_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
 
             # Dodaj wszystkie kategorie (category) powiązane z produktem
             product_paths = ProductPaths.objects.using(

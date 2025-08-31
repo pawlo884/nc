@@ -69,6 +69,7 @@ class Products(models.Model):
     short_description = models.CharField(max_length=500, blank=True, null=True)
     brand = models.ForeignKey(
         Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id')
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     series = models.ForeignKey('ProductSeries', db_column='series_id',
                                on_delete=models.DO_NOTHING, blank=True, null=True)
@@ -368,6 +369,8 @@ class Paths(models.Model):
     path = models.CharField(max_length=255, blank=True, null=True)
     parent_id = models.BigIntegerField(blank=True, null=True)
     iai_category_id = models.IntegerField(blank=True, null=True)
+    iai_menu_id = models.IntegerField(blank=True, null=True)
+    iai_menu_parent_id = models.IntegerField(blank=True, null=True)
     objects = models.Manager()
 
     class Meta:

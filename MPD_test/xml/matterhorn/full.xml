@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<offer file_format="IOF" version="3.0" generated="2025-08-31 11:44:44" expires="2025-09-01 11:44:44" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+<offer file_format="IOF" version="3.0" generated="2025-08-31 15:08:23" expires="2025-09-01 15:08:23" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
   <products language="pol">
-    <product id="332" currency="PLN" type="regular" vat="0" site="1">
+    <product id="332" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-08-30 22:31:35"/>
+      <iaiext:modification_date datetime="2025-08-31 15:03:46"/>
       <category id="1214553889" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
       <unit id="0" name="szt."/>
       <description>
@@ -15,59 +18,60 @@
           <value id="90" name="wielokolorowy"/>
         </parameter>
       </parameters>
+      <price gross="200.00" net="162.60"/>
       <iaiext:visibility>
         <iaiext:site visible="no"/>
       </iaiext:visibility>
       <iaiext:navigation>
         <iaiext:site id="1">
           <iaiext:menu id="1">
-            <iaiext:item id="4" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
+            <iaiext:item id="256" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
       <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="G" code="332-G" name="65D" panel_name="65D_bielizna" iaiext:code_external="1002-19" code_producer="5905220644483">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="5"/>
         </size>
         <size id="88" code="332-88" name="65E" panel_name="65E_bielizna" iaiext:code_external="1002-17" code_producer="5905220644490">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="91" code="332-91" name="65H" panel_name="65H_bielizna" iaiext:code_external="1002-21" code_producer="5905220644520">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="135" code="332-135" name="70D" panel_name="70D_bielizna" iaiext:code_external="1002-24" code_producer="5905220644551">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="150" code="332-150" name="75D" panel_name="75D_bielizna" iaiext:code_external="1002-16" code_producer="5905220644629">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="152" code="332-152" name="75E" panel_name="75E_bielizna" iaiext:code_external="1002-23" code_producer="5905220644636">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="A" code="332-A" name="80C" panel_name="80C_bielizna" iaiext:code_external="1002-18" code_producer="5905220644667">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="164" code="332-164" name="80D" panel_name="80D_bielizna" iaiext:code_external="1002-15" code_producer="5905220644674">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="165" code="332-165" name="80E" panel_name="80E_bielizna" iaiext:code_external="1002-22" code_producer="5905220644681">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="176" code="332-176" name="85C" panel_name="85C_bielizna" iaiext:code_external="1002-20" code_producer="5905220644704">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="5"/>
         </size>
         <size id="177" code="332-177" name="85D" panel_name="85D_bielizna" iaiext:code_external="1002-14" code_producer="5905220644711">
-          <price gross="0" net="0"/>
+          <price gross="200.00" net="162.60"/>
           <stock id="0" quantity="0"/>
         </size>
       </sizes>
@@ -80,6 +84,9 @@
     </product>
     <product id="331" currency="PLN" type="regular" vat="0" site="1">
       <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-08-30 21:58:22"/>
+      <iaiext:modification_date datetime="2025-08-30 23:36:21"/>
       <category id="1214553889" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
       <unit id="0" name="szt."/>
       <description>
@@ -98,7 +105,7 @@
       <iaiext:navigation>
         <iaiext:site id="1">
           <iaiext:menu id="1">
-            <iaiext:item id="4" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
+            <iaiext:item id="256" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
           </iaiext:menu>
         </iaiext:site>
       </iaiext:navigation>
