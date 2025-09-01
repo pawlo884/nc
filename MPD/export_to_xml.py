@@ -1130,8 +1130,13 @@ class GatewayXMLExporter(BaseXMLExporter):
                         '%Y-%m-%d %H:%M:%S')
 
                     # URL do konkretnego pliku full_changeYYYY-MM-DDThh-mm-ss.xml zgodnie ze specyfikacją IdoSell
-                    change_filename = f"full_change{local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}.xml"
-                    url = f"{base_url}/mpd/{change_filename}"
+                    # Użyj bucket_url z bazy danych zamiast endpointu API
+                    if full_change_file.bucket_url:
+                        url = full_change_file.bucket_url
+                    else:
+                        # Fallback: URL do endpointu API jeśli brak bucket_url
+                        change_filename = f"full_change{local_change_time.strftime('%Y-%m-%dT%H-%M-%S')}.xml"
+                        url = f"{base_url}/mpd/{change_filename}"
                     change_element.set("url", url)
 
                     # Hash bazujący na nazwie pliku full_change.xml
@@ -2012,13 +2017,15 @@ def export_incremental_xml():
 def export_full_change_xml():
     """Eksport pełny wszystkich produktów do full_change.xml z datą w nazwie"""
     exporter = FullChangeXMLExporter()
-    return exporter.export()
+    result = exporter.export()
+    return result.get('bucket_url', '') if result else ''
 
 
 def export_incremental_full_change_xml():
     """Eksport przyrostowy zmienionych produktów do full_change.xml z datą w nazwie"""
     exporter = FullChangeXMLExporter()
-    return exporter.export()
+    result = exporter.export()
+    return result.get('bucket_url', '') if result else ''
 
 
 def export_light_xml():
