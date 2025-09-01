@@ -247,6 +247,10 @@ class FullXMLExporter(BaseXMLExporter):
                             price_attrs.append(f'net="{net}"')
                     if price_attrs:
                         xml.append(f'      <price {" ".join(price_attrs)}/>')
+                    else:
+                        # Brak ceny w bazie - dodaj cenę 0 jako fallback
+                        # Zgodnie z dokumentacją full.md, @net jest wymagany
+                        xml.append('      <price gross="0" net="0"/>')
 
             # Użyj kolumny visibility z tabeli products
             xml.append('      <iaiext:visibility>')
@@ -1863,11 +1867,13 @@ class FullChangeXMLExporter(BaseXMLExporter):
 
             if variants:
                 xml.append(
-                    '      <sizes>')
+                    f'      <sizes iaiext:group_name="{group_name}" iaiext:group_id="1098261181" iaiext:sizeList="full">')
                 for variant in variants:
                     size_name = variant.size.name if variant.size else ""
                     # panel_name: size_name + '_' + group_name
                     panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
+                    # code_external: product_id-variant_id (variant_id jest unikalny dla każdego wariantu)
+                    code_external = f'{product.id}-{variant.variant_id}'
                     # code_producer: z tabeli product_variants_sources (ean, gtin14, gtin13, other)
                     from .models import ProductvariantsSources
                     variant_source = ProductvariantsSources.objects.using(
@@ -1892,15 +1898,13 @@ class FullChangeXMLExporter(BaseXMLExporter):
                         f'id="{size_id}"',
                         f'code="{escape(code_value)}"',
                         f'name="{escape(size_name)}"',
-                        f'panel_name="{escape(panel_name)}"'
+                        f'panel_name="{escape(panel_name)}"',
+                        f'iaiext:code_external="{code_external}"'
                     ]
                     # Dodaj wymagany atrybut @code zgodnie ze schematem XSD
                     if code_producer:
                         size_attrs.append(
                             f'code_producer="{escape(code_producer)}"')
-                    # Usuń nieistniejące atrybuty z schematu
-                    # size_attrs.append(f'iaiext:code_external="{code_external}"')
-                    # size_attrs.append(f'code_producer="{escape(code_producer)}"')
                     xml.append(
                         f'        <size {' '.join(size_attrs)}>'
                     )

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-08-31 21:50:44">
+<provider_description file_format="IOF" version="3.0" generated_by="nc" generated="2025-09-01 14:33:56">
   <meta>
     <long_name>&lt;![CDATA[Matterhorn]]&gt;</long_name>
     <short_name>&lt;![CDATA[Matterhorn]]&gt;</short_name>
@@ -19,13 +19,18 @@
       <offer expires="2025-09-07 21:42:15"/>
     </time>
   </meta>
-  <full url="http://212.127.93.27:8000/mpd/generate-full-xml/" hash="261c27cb70128aa4be9c4e195d84b654" changed="2025-08-31 21:42:15">
+  <full url="http://212.127.93.27:8000/mpd/generate-full-xml/" hash="631c1bb55a04b2c7e12967c15181b871" changed="2025-08-31 21:42:15">
     <changes>
-      <change url="http://212.127.93.27:8000/mpd/generate-full-change-xml/" hash="" changed=""/>
+      <change url="http://212.127.93.27:8000/mpd/full_change2025-09-01T14-33-56.xml" hash="80fa2ae7ef76fbba80932a56ffe9128c" changed="2025-09-01 14:33:56"/>
+      <change url="http://212.127.93.27:8000/mpd/full_change2025-09-01T14-28-37.xml" hash="80fa2ae7ef76fbba80932a56ffe9128c" changed="2025-09-01 14:28:37"/>
+      <change url="http://212.127.93.27:8000/mpd/full_change2025-09-01T14-18-39.xml" hash="0cba4732d6cd3180301e981e2bc1d8ad" changed="2025-09-01 14:18:39"/>
+      <change url="http://212.127.93.27:8000/mpd/full_change2025-09-01T13-10-21.xml" hash="b06040a6ed724614ac83c838c89df81b" changed="2025-09-01 13:10:21"/>
+      <change url="http://212.127.93.27:8000/mpd/full_change2025-09-01T13-09-46.xml" hash="1c80a250f1d686b0edd4fb92a312d4a9" changed="2025-09-01 13:09:46"/>
+      <change url="http://212.127.93.27:8000/mpd/full_change2025-09-01T10-41-46.xml" hash="f8f8750b282ee2f1fcd6100cf076f5df" changed="2025-09-01 10:41:46"/>
     </changes>
   </full>
-  <light url="http://212.127.93.27:8000/mpd/generate-light-xml/" hash="ecea4f841142ad073388776c48f61118" changed="2025-08-31 21:42:16"/>
-  <categories url="http://212.127.93.27:8000/mpd/generate-categories-xml/" hash="c092b3b4fe44de0d6527638cf60f62df" changed="2025-08-31 21:42:16"/>
-  <sizes url="http://212.127.93.27:8000/mpd/generate-sizes-xml/" hash="138186953b9d96b42f45d15ab27b4011" changed="2025-08-31 21:42:17"/>
-  <producers url="http://212.127.93.27:8000/mpd/generate-producers-xml/" hash="" changed=""/>
+  <light url="http://212.127.93.27:8000/mpd/generate-light-xml/"/>
+  <categories url="http://212.127.93.27:8000/mpd/generate-categories-xml/" hash="93df9506f46513baa2ef665d199c1687" changed="2025-09-01 11:55:40"/>
+  <sizes url="http://212.127.93.27:8000/mpd/generate-sizes-xml/" hash="f3f0d81421b64e42a4358004c450a048" changed="2025-09-01 11:55:40"/>
+  <producers url="http://212.127.93.27:8000/mpd/generate-producers-xml/" hash="8049654538cb6678a5c53bfac97e7ede" changed="2025-09-01 11:55:40"/>
 </provider_description>

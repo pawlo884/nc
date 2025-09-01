@@ -114,13 +114,17 @@ class OtherColors(models.Model):
         on_delete=models.CASCADE,
         db_column='product_id',
         related_name='other_colors',
-        db_index=True)
+        db_index=True,
+        null=True,
+        blank=True)
     color_product = models.ForeignKey(
         Products,
         on_delete=models.CASCADE,
         related_name='othercolors_color_product_id',
         db_column='color_product_id',
-        db_index=True)
+        db_index=True,
+        null=True,
+        blank=True)
     timestamp = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -141,12 +145,16 @@ class ProductInSet(models.Model):
         on_delete=models.CASCADE,
         db_column='product_id',
         related_name='product_in_set',
-        db_index=True)
+        db_index=True,
+        null=True,
+        blank=True)
     set_product = models.ForeignKey(
         Products,
         on_delete=models.CASCADE,
         related_name='productinset_set_product_id',
-        db_index=True)
+        db_index=True,
+        null=True,
+        blank=True)
     timestamp = models.DateTimeField(auto_now=True)
 
     class Meta:

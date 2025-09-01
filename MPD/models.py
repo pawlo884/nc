@@ -64,11 +64,11 @@ class Colors(models.Model):
 
 class Products(models.Model):
     id = models.BigAutoField(primary_key=True)
-    name = models.CharField(max_length=255, blank=True, null=True)
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     short_description = models.CharField(max_length=500, blank=True, null=True)
     brand = models.ForeignKey(
-        Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id')
+        Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     series = models.ForeignKey('ProductSeries', db_column='series_id',
