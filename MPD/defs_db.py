@@ -241,6 +241,57 @@ def create_tables_if_not_exist(conn):
         )
     """
 
+    create_fabric_component_table_queries = """
+        CREATE TABLE IF NOT EXISTS fabric_component (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL UNIQUE
+        )
+    """
+
+    create_product_fabric_table_queries = """
+        CREATE TABLE IF NOT EXISTS product_fabric (
+            id SERIAL PRIMARY KEY,
+            product_id BIGINT NOT NULL,
+            component_id INT NOT NULL,
+            percentage SMALLINT NOT NULL CHECK (percentage > 0 AND percentage <= 100),
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            FOREIGN KEY (component_id) REFERENCES fabric_component(id) ON DELETE CASCADE,
+            UNIQUE (product_id, component_id)
+        )
+    """
+
+    # Funkcja sprawdzająca sumę procentów materiałów dla produktu
+    create_check_percentage_function = """
+        CREATE OR REPLACE FUNCTION check_product_fabric_percentage()
+        RETURNS TRIGGER AS $$
+        DECLARE
+            total_percentage INTEGER;
+        BEGIN
+            -- Oblicz sumę procentów dla danego produktu
+            SELECT COALESCE(SUM(percentage), 0) INTO total_percentage
+            FROM product_fabric
+            WHERE product_id = NEW.product_id;
+            
+            -- Sprawdź czy suma nie przekracza 100%
+            IF total_percentage > 100 THEN
+                RAISE EXCEPTION 'Suma procentów materiałów dla produktu % przekracza 100%% (aktualnie: %%)', 
+                    NEW.product_id, total_percentage;
+            END IF;
+            
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+    """
+
+    # Trigger sprawdzający sumę procentów przed wstawieniem/aktualizacją
+    create_percentage_check_trigger = """
+        DROP TRIGGER IF EXISTS product_fabric_percentage_check ON product_fabric;
+        CREATE TRIGGER product_fabric_percentage_check
+            BEFORE INSERT OR UPDATE ON product_fabric
+            FOR EACH ROW
+            EXECUTE FUNCTION check_product_fabric_percentage();
+    """
+
     # Execute the table creation queries
     cursor.execute(create_attributes_table_queries)
     cursor.execute(create_brands_table_queries)
@@ -263,6 +314,12 @@ def create_tables_if_not_exist(conn):
     cursor.execute(create_sources_table_queries)
     cursor.execute(create_stock_and_prices_table_queries)
     cursor.execute(create_iai_product_counter_table_queries)
+    cursor.execute(create_fabric_component_table_queries)
+    cursor.execute(create_product_fabric_table_queries)
+
+    # Utwórz funkcję i trigger sprawdzający sumę procentów materiałów
+    cursor.execute(create_check_percentage_function)
+    cursor.execute(create_percentage_check_trigger)
 
     # Inicjalizacja tabeli iai_product_counter z wartością początkową
     cursor.execute("""

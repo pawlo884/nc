@@ -811,24 +811,42 @@ class ProductsAdmin(admin.ModelAdmin):
                             f"FABRICS: {fabric_components} {fabric_percentages}")
                         # --- DODAJ: zapis materiałów (fabric) ---
                         if fabric_components and fabric_percentages:
+                            # Sprawdź czy suma procentów nie przekracza 100%
+                            total_percentage = 0
+                            valid_percentages = []
+                            
                             for comp_id, perc in zip(fabric_components, fabric_percentages):
-                                try:
-                                    # Sprawdź czy wartości nie są puste
-                                    if comp_id and perc and comp_id.strip() and perc.strip():
+                                if comp_id and perc and comp_id.strip() and perc.strip():
+                                    try:
                                         comp_id_int = int(comp_id)
                                         perc_int = int(perc)
-                                        if perc_int > 0:
-                                            cursor.execute(
-                                                "INSERT INTO product_fabric (product_id, component_id, percentage) VALUES (%s, %s, %s)",
-                                                [new_product_id,
-                                                    comp_id_int, perc_int]
-                                            )
-                                except (ValueError, TypeError) as e:
-                                    logger.error(
-                                        f"Błąd zapisu materiału: {comp_id}, {perc}: {e}")
-                                except Exception as e:
-                                    logger.error(
-                                        f"Nieoczekiwany błąd zapisu materiału: {comp_id}, {perc}: {e}")
+                                        if perc_int > 0 and perc_int <= 100:
+                                            total_percentage += perc_int
+                                            valid_percentages.append((comp_id_int, perc_int))
+                                    except (ValueError, TypeError) as e:
+                                        logger.error(
+                                            f"Błąd parsowania materiału: {comp_id}, {perc}: {e}")
+                            
+                            # Sprawdź czy suma procentów jest poprawna
+                            if total_percentage > 100:
+                                logger.warning(
+                                    f"Suma procentów materiałów przekracza 100%: {total_percentage}%. Pomijam zapis materiałów.")
+                                variant_logger.warning(
+                                    f"Suma procentów materiałów przekracza 100%: {total_percentage}%. Pomijam zapis materiałów.")
+                            elif total_percentage == 0:
+                                logger.info("Brak poprawnych procentów materiałów do zapisu.")
+                            else:
+                                # Zapisz materiały tylko jeśli suma procentów jest poprawna
+                                for comp_id_int, perc_int in valid_percentages:
+                                    try:
+                                        cursor.execute(
+                                            "INSERT INTO product_fabric (product_id, component_id, percentage) VALUES (%s, %s, %s)",
+                                            [new_product_id, comp_id_int, perc_int]
+                                        )
+                                        logger.info(f"Zapisano materiał: component_id={comp_id_int}, percentage={perc_int}%")
+                                    except Exception as e:
+                                        logger.error(
+                                            f"Błąd zapisu materiału: {comp_id_int}, {perc_int}: {e}")
                         # --- KONIEC ZAPISU MATERIAŁÓW ---
 
                 return JsonResponse({'success': True, 'message': 'Produkt został pomyślnie zmapowany'})
