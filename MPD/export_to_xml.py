@@ -482,7 +482,7 @@ class LightXMLExporter(BaseXMLExporter):
 
     def generate_xml(self):
         from django.utils.html import escape
-        from .models import Products, ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, Vat
+        from .models import Products, ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, Vat, FullChangeFile
         from datetime import timedelta
 
         now = timezone.now()
@@ -496,10 +496,28 @@ class LightXMLExporter(BaseXMLExporter):
             local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products language="pol">')
 
-        # Pobierz wszystkie produkty z wariantami
-        products = Products.objects.using('MPD').filter(
-            productvariants__isnull=False
-        ).distinct().select_related('brand')
+        # Pobierz datę utworzenia ostatniego pliku full.xml
+        last_full_file = FullChangeFile.objects.using('MPD').filter(
+            filename='full.xml'
+        ).order_by('-created_at').first()
+
+        if last_full_file:
+            # Eksportuj tylko produkty utworzone przed datą utworzenia full.xml
+            # (czyli te, które były już w full.xml)
+            full_file_created_at = last_full_file.created_at
+            products = Products.objects.using('MPD').filter(
+                productvariants__isnull=False,
+                created_at__lte=full_file_created_at
+            ).distinct().select_related('brand')
+            logger.info(
+                f"Light.xml: eksportuję produkty utworzone przed {full_file_created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        else:
+            # Brak pliku full.xml - eksportuj wszystkie produkty
+            products = Products.objects.using('MPD').filter(
+                productvariants__isnull=False
+            ).distinct().select_related('brand')
+            logger.info(
+                "Light.xml: brak pliku full.xml - eksportuję wszystkie produkty")
 
         for product in products:
             # Pobierz warianty dla tego produktu
@@ -697,16 +715,35 @@ class LightXMLExporter(BaseXMLExporter):
         """Eksport przyrostowy - tylko produkty zmienione w ciągu ostatniej godziny"""
         from datetime import timedelta
         from django.db.models import Q
-        from .models import Products
+        from .models import Products, FullChangeFile
 
         now = timezone.now()
         one_hour_ago = now - timedelta(hours=1)
 
-        # Pobierz produkty zmienione w ciągu ostatniej godziny
-        products = Products.objects.using('MPD').filter(
-            Q(updated_at__gte=one_hour_ago) |
-            Q(productvariants__updated_at__gte=one_hour_ago)
-        ).distinct().select_related('brand')
+        # Pobierz datę utworzenia ostatniego pliku full.xml
+        last_full_file = FullChangeFile.objects.using('MPD').filter(
+            filename='full.xml'
+        ).order_by('-created_at').first()
+
+        if last_full_file:
+            # Eksportuj tylko produkty zmienione w ciągu ostatniej godziny,
+            # które były już w full.xml (utworzone przed datą full.xml)
+            full_file_created_at = last_full_file.created_at
+            products = Products.objects.using('MPD').filter(
+                Q(updated_at__gte=one_hour_ago) |
+                Q(productvariants__updated_at__gte=one_hour_ago),
+                created_at__lte=full_file_created_at
+            ).distinct().select_related('brand')
+            logger.info(
+                f"Light.xml incremental: eksportuję produkty zmienione w ciągu ostatniej godziny, utworzone przed {full_file_created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        else:
+            # Brak pliku full.xml - eksportuj wszystkie zmienione produkty
+            products = Products.objects.using('MPD').filter(
+                Q(updated_at__gte=one_hour_ago) |
+                Q(productvariants__updated_at__gte=one_hour_ago)
+            ).distinct().select_related('brand')
+            logger.info(
+                "Light.xml incremental: brak pliku full.xml - eksportuję wszystkie zmienione produkty")
 
         # Generuj XML tylko dla zmienionych produktów
         xml_content = self._generate_xml_for_products(products)
