@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<offer file_format="IOF" version="3.0" generated="2025-09-02 10:12:45" expires="2025-09-03 10:12:45" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+<offer file_format="IOF" version="3.0" generated="2025-09-03 12:24:29" expires="2025-09-04 12:24:29" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
   <products language="pol">
     <product id="339" currency="PLN" type="regular" vat="0" site="1">
       <producer id="1" name="Lupo Line"/>
@@ -342,7 +342,7 @@
       <producer id="1" name="Lupo Line"/>
       <iaiext:deliverer id="1" name="Matterhorn"/>
       <iaiext:date_created datetime="2025-08-31 21:44:14"/>
-      <iaiext:modification_date datetime="2025-08-31 21:44:14"/>
+      <iaiext:modification_date datetime="2025-09-03 08:06:33"/>
       <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
       <unit id="0" name="szt."/>
       <description>
@@ -356,7 +356,7 @@
         </parameter>
       </parameters>
       <iaiext:visibility>
-        <iaiext:site visible="no"/>
+        <iaiext:site visible="yes"/>
       </iaiext:visibility>
       <iaiext:navigation>
         <iaiext:site id="1">
@@ -402,7 +402,7 @@
       <producer id="1" name="Lupo Line"/>
       <iaiext:deliverer id="1" name="Matterhorn"/>
       <iaiext:date_created datetime="2025-09-01 12:00:47"/>
-      <iaiext:modification_date datetime="2025-09-01 14:42:48"/>
+      <iaiext:modification_date datetime="2025-09-03 08:15:58"/>
       <category id="1214553889" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
       <unit id="0" name="szt."/>
       <description>
@@ -416,7 +416,7 @@
         </parameter>
       </parameters>
       <iaiext:visibility>
-        <iaiext:site visible="no"/>
+        <iaiext:site visible="yes"/>
       </iaiext:visibility>
       <iaiext:navigation>
         <iaiext:site id="1">
@@ -478,12 +478,12 @@
       <producer id="1" name="Lupo Line"/>
       <iaiext:deliverer id="1" name="Matterhorn"/>
       <iaiext:date_created datetime="2025-09-01 14:18:14"/>
-      <iaiext:modification_date datetime="2025-09-01 14:18:14"/>
+      <iaiext:modification_date datetime="2025-09-03 09:08:27"/>
       <category id="1214553889" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
       <unit id="0" name="szt."/>
       <description>
         <name>Biustonosz kąpielowy Paloma Kopa</name>
-        <short_desc><![CDATA[Odkryj piękno natury z naszym biustonoszem Paloma, zachowanym w kolorystyce ziemi. ]]></short_desc>
+        <short_desc><![CDATA[Odkryj piękno natury z naszym biustonoszem Paloma, zachowanym w kolorystyce ziemi.]]></short_desc>
         <long_desc><![CDATA[Odkryj piękno natury z naszym biustonoszem Paloma, zachowanym w kolorystyce ziemi. Biustonoszem kąpielowym z  efektownym kolorowym printem, który celebrują kobiecość w każdym rozmiarze. Linia stworzona dla kobiet, które nie lubią nudy i szukają rozwiązań, dzięki którym podkreślą swój charakter, elegancję i zdecydowany styl. Miski z żelową wkładką push-up na fiszbinie świetnie zbierają i uwydatniają biust. Miedzy miseczkami subtelna ozdoba. Ramiączka nieodpinane, regulowane. Model stworzony z myślą o mniejszych i średnich biustach.]]></long_desc>
       </description>
       <parameters>
@@ -492,7 +492,7 @@
         </parameter>
       </parameters>
       <iaiext:visibility>
-        <iaiext:site visible="no"/>
+        <iaiext:site visible="yes"/>
       </iaiext:visibility>
       <iaiext:navigation>
         <iaiext:site id="1">
@@ -578,7 +578,7 @@
       <producer id="1" name="Lupo Line"/>
       <iaiext:deliverer id="1" name="Matterhorn"/>
       <iaiext:date_created datetime="2025-09-01 14:42:48"/>
-      <iaiext:modification_date datetime="2025-09-01 22:11:59"/>
+      <iaiext:modification_date datetime="2025-09-03 09:39:43"/>
       <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
       <unit id="0" name="szt."/>
       <description>
@@ -592,7 +592,7 @@
         </parameter>
       </parameters>
       <iaiext:visibility>
-        <iaiext:site visible="no"/>
+        <iaiext:site visible="yes"/>
       </iaiext:visibility>
       <iaiext:navigation>
         <iaiext:site id="1">
@@ -627,6 +627,110 @@
         <large>
           <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1007/1007_1_Blue.jpg"/>
           <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1007/1007_2_Blue.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="341" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-03 07:37:35"/>
+      <iaiext:modification_date datetime="2025-09-03 09:07:58"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Amelia</name>
+        <short_desc><![CDATA[Klasyczne figi bikini wiązane po bokach, w pięknej, wakacyjnej kolorystyce.]]></short_desc>
+        <long_desc><![CDATA[Klasyczne figi bikini wiązane po bokach, w pięknej, wakacyjnej kolorystyce. Jest to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania. Klasyczny krój optycznie wydłuża nogi, podkreśla kobiece kształty i idealnie dopasowuje się do sylwetki.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="90" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="241" code="341-241" name="42" panel_name="42_bielizna" iaiext:code_external="1012-95" code_producer="5905220660636">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="235" code="341-235" name="36" panel_name="36_bielizna" iaiext:code_external="1012-96" code_producer="5905220660605">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="341-240" name="40" panel_name="40_bielizna" iaiext:code_external="1012-97" code_producer="5905220660629">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1012/1012_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1012/1012_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="342" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-03 09:07:58"/>
+      <iaiext:modification_date datetime="2025-09-03 09:07:58"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Amelia Big</name>
+        <short_desc><![CDATA[Klasyczne figi, z kolorowym motywem. Fason stworzony dla miłośniczek bardziej zabudowanych majteczek.]]></short_desc>
+        <long_desc><![CDATA[Klasyczne figi, z kolorowym motywem. Fason stworzony dla miłośniczek bardziej zabudowanych majteczek. Figi mają ściągane sznureczki po obu bokach, dzięki którym możesz regulować ich krój i wysokość majtek, przez co każda kobieta czuje się w nich komfortowo oraz elegancko.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="90" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="242" code="342-242" name="46" panel_name="46_bielizna" iaiext:code_external="1013-98" code_producer="5905220660384">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="235" code="342-235" name="36" panel_name="36_bielizna" iaiext:code_external="1013-99" code_producer="5905220660339">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="342-240" name="40" panel_name="40_bielizna" iaiext:code_external="1013-100" code_producer="5905220660353">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="342-241" name="42" panel_name="42_bielizna" iaiext:code_external="1013-101" code_producer="5905220660360">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="239" code="342-239" name="44" panel_name="44_bielizna" iaiext:code_external="1013-102" code_producer="5905220660377">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1013/1013_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1013/1013_2_Multicolor.jpg"/>
         </large>
       </images>
     </product>

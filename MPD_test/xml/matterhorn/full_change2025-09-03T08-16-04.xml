@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<offer file_format="IOF" version="3.0" generated="2025-09-03 08:16:04" expires="2025-09-04 08:16:04" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+  <products language="pol">
+    <product id="334" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-08-31 21:44:14"/>
+      <iaiext:modification_date datetime="2025-09-03 08:06:33"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Negros Big</name>
+        <short_desc><![CDATA[Klasyczne figi z wyższym stanem, wykonane z dzianiny z motywem wakacyjnych palm.]]></short_desc>
+        <long_desc><![CDATA[Klasyczne figi z wyższym stanem, wykonane z dzianiny z motywem wakacyjnych palm.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="None" name="zielony"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="yes"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="239" code="334-239" name="44" panel_name="44_bielizna" iaiext:code_external="1004-5" code_producer="5907665178400">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="240" code="334-240" name="40" panel_name="40_bielizna" iaiext:code_external="1004-6" code_producer="5907665178387">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="238" code="334-238" name="48" panel_name="48_bielizna" iaiext:code_external="1004-7" code_producer="5907665178424">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="236" code="334-236" name="38" panel_name="38_bielizna" iaiext:code_external="1004-8" code_producer="5907665178370">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="241" code="334-241" name="42" panel_name="42_bielizna" iaiext:code_external="1004-9" code_producer="5907665178394">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="242" code="334-242" name="46" panel_name="46_bielizna" iaiext:code_external="1004-10" code_producer="5907665178417">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1004/1004_1_Green.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1004/1004_2_Green.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="335" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-01 12:00:47"/>
+      <iaiext:modification_date datetime="2025-09-03 08:15:58"/>
+      <category id="1214553889" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Biustonosz kąpielowy Wave Bralet</name>
+        <short_desc><![CDATA[sssWzory przypominające paski zebry zestawione z klasycznym krojem są idealnym wyborem na plażę lub basen.]]></short_desc>
+        <long_desc><![CDATA[Wzory przypominające paski zebry zestawione z klasycznym krojem są idealnym wyborem na plażę lub basen. Biustonosz kąpielowy Wave to model, który łączy w sobie funkcjonalność i wyrafinowany design inspirowany dziką naturą. Biustonosz bikini w formie braletki na fiszbinach. Idealnie prezentują się w nim średnie oraz większe biusty. Miękkie miseczki z pionowym cięciem wykonane z dzianiny w pięknych kolorach. Konstrukcja biustonosza zapewnia pełen komfort noszenia oraz doskonałe podtrzymanie biustu. Biustonosz wiązany na szyi i zapinany na plecach.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="None" name="niebieski"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="yes"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="256" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="88" code="335-88" name="65E" panel_name="65E_bielizna" iaiext:code_external="1005-11" code_producer="5905220676538">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="89" code="335-89" name="65F" panel_name="65F_bielizna" iaiext:code_external="1005-12" code_producer="5905220676545">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="90" code="335-90" name="65G" panel_name="65G_bielizna" iaiext:code_external="1005-13" code_producer="5905220676552">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="135" code="335-135" name="70D" panel_name="70D_bielizna" iaiext:code_external="1005-14" code_producer="5905220676590">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="149" code="335-149" name="75C" panel_name="75C_bielizna" iaiext:code_external="1005-15" code_producer="5905220676651">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="150" code="335-150" name="75D" panel_name="75D_bielizna" iaiext:code_external="1005-16" code_producer="5905220676668">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="164" code="335-164" name="80D" panel_name="80D_bielizna" iaiext:code_external="1005-17" code_producer="5905220676712">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="165" code="335-165" name="80E" panel_name="80E_bielizna" iaiext:code_external="1005-18" code_producer="5905220676729">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="176" code="335-176" name="85C" panel_name="85C_bielizna" iaiext:code_external="1005-19" code_producer="5905220676743">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="177" code="335-177" name="85D" panel_name="85D_bielizna" iaiext:code_external="1005-20" code_producer="5905220676750">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1005/1005_1_Blue.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1005/1005_2_Blue.jpg"/>
+        </large>
+      </images>
+    </product>
+  </products>
+</offer>

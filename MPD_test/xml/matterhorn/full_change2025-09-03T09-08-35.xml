@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<offer file_format="IOF" version="3.0" generated="2025-09-03 09:08:35" expires="2025-09-04 09:08:35" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+  <products language="pol">
+    <product id="336" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-01 14:18:14"/>
+      <iaiext:modification_date datetime="2025-09-03 09:08:27"/>
+      <category id="1214553889" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Biustonosz kąpielowy Paloma Kopa</name>
+        <short_desc><![CDATA[Odkryj piękno natury z naszym biustonoszem Paloma, zachowanym w kolorystyce ziemi.]]></short_desc>
+        <long_desc><![CDATA[Odkryj piękno natury z naszym biustonoszem Paloma, zachowanym w kolorystyce ziemi. Biustonoszem kąpielowym z  efektownym kolorowym printem, który celebrują kobiecość w każdym rozmiarze. Linia stworzona dla kobiet, które nie lubią nudy i szukają rozwiązań, dzięki którym podkreślą swój charakter, elegancję i zdecydowany styl. Miski z żelową wkładką push-up na fiszbinie świetnie zbierają i uwydatniają biust. Miedzy miseczkami subtelna ozdoba. Ramiączka nieodpinane, regulowane. Model stworzony z myślą o mniejszych i średnich biustach.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="90" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="yes"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="256" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="G" code="336-G" name="65D" panel_name="65D_bielizna" iaiext:code_external="1006-21" code_producer="5905220658138">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="88" code="336-88" name="65E" panel_name="65E_bielizna" iaiext:code_external="1006-22" code_producer="5905220658145">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="89" code="336-89" name="65F" panel_name="65F_bielizna" iaiext:code_external="1006-23" code_producer="5905220658152">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="134" code="336-134" name="70C" panel_name="70C_bielizna" iaiext:code_external="1006-24" code_producer="5905220658183">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="137" code="336-137" name="70E" panel_name="70E_bielizna" iaiext:code_external="1006-25" code_producer="5905220658206">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="138" code="336-138" name="70F" panel_name="70F_bielizna" iaiext:code_external="1006-26" code_producer="5905220658213">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="147" code="336-147" name="75A" panel_name="75A_bielizna" iaiext:code_external="1006-27" code_producer="5905220658220">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="148" code="336-148" name="75B" panel_name="75B_bielizna" iaiext:code_external="1006-28" code_producer="5905220658237">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="149" code="336-149" name="75C" panel_name="75C_bielizna" iaiext:code_external="1006-29" code_producer="5905220658244">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="150" code="336-150" name="75D" panel_name="75D_bielizna" iaiext:code_external="1006-30" code_producer="5905220658251">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="152" code="336-152" name="75E" panel_name="75E_bielizna" iaiext:code_external="1006-31" code_producer="5905220658268">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="162" code="336-162" name="80B" panel_name="80B_bielizna" iaiext:code_external="1006-32" code_producer="5905220658275">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="A" code="336-A" name="80C" panel_name="80C_bielizna" iaiext:code_external="1006-33" code_producer="5905220658282">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="175" code="336-175" name="85B" panel_name="85B_bielizna" iaiext:code_external="1006-34" code_producer="5905220658305">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="176" code="336-176" name="85C" panel_name="85C_bielizna" iaiext:code_external="1006-35" code_producer="5905220658312">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="135" code="336-135" name="70D" panel_name="70D_bielizna" iaiext:code_external="1006-36" code_producer="5905220658190">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1006/1006_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1006/1006_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="341" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-03 07:37:35"/>
+      <iaiext:modification_date datetime="2025-09-03 09:07:58"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Amelia</name>
+        <short_desc><![CDATA[Klasyczne figi bikini wiązane po bokach, w pięknej, wakacyjnej kolorystyce.]]></short_desc>
+        <long_desc><![CDATA[Klasyczne figi bikini wiązane po bokach, w pięknej, wakacyjnej kolorystyce. Jest to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania. Klasyczny krój optycznie wydłuża nogi, podkreśla kobiece kształty i idealnie dopasowuje się do sylwetki.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="90" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="241" code="341-241" name="42" panel_name="42_bielizna" iaiext:code_external="1012-95" code_producer="5905220660636">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="235" code="341-235" name="36" panel_name="36_bielizna" iaiext:code_external="1012-96" code_producer="5905220660605">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="341-240" name="40" panel_name="40_bielizna" iaiext:code_external="1012-97" code_producer="5905220660629">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1012/1012_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1012/1012_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="342" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-03 09:07:58"/>
+      <iaiext:modification_date datetime="2025-09-03 09:07:58"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Amelia Big</name>
+        <short_desc><![CDATA[Klasyczne figi, z kolorowym motywem. Fason stworzony dla miłośniczek bardziej zabudowanych majteczek.]]></short_desc>
+        <long_desc><![CDATA[Klasyczne figi, z kolorowym motywem. Fason stworzony dla miłośniczek bardziej zabudowanych majteczek. Figi mają ściągane sznureczki po obu bokach, dzięki którym możesz regulować ich krój i wysokość majtek, przez co każda kobieta czuje się w nich komfortowo oraz elegancko.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="90" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="242" code="342-242" name="46" panel_name="46_bielizna" iaiext:code_external="1013-98" code_producer="5905220660384">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="235" code="342-235" name="36" panel_name="36_bielizna" iaiext:code_external="1013-99" code_producer="5905220660339">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="342-240" name="40" panel_name="40_bielizna" iaiext:code_external="1013-100" code_producer="5905220660353">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="342-241" name="42" panel_name="42_bielizna" iaiext:code_external="1013-101" code_producer="5905220660360">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="239" code="342-239" name="44" panel_name="44_bielizna" iaiext:code_external="1013-102" code_producer="5905220660377">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1013/1013_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1013/1013_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+  </products>
+</offer>

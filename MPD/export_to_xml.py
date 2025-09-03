@@ -110,12 +110,13 @@ class FullXMLExporter(BaseXMLExporter):
         from datetime import timedelta
 
         now = timezone.now()
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
-        expires = now + timedelta(days=1)
+        # Konwertuj na czas lokalny (Europe/Warsaw)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products language="pol">')
 
         # ZAWSZE generuj pełną ofertę - ignoruj parametr incremental
@@ -177,15 +178,17 @@ class FullXMLExporter(BaseXMLExporter):
 
             # Dodaj węzeł date_created z kolumny created_at
             if product.created_at:
-                # Django ma już ustawioną strefę czasową Europe/Warsaw
+                # Konwertuj na czas lokalny (Europe/Warsaw)
+                local_created_at = timezone.localtime(product.created_at)
                 xml.append(
-                    f'      <iaiext:date_created datetime="{product.created_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
+                    f'      <iaiext:date_created datetime="{local_created_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
 
             # Dodaj węzeł modification_date z kolumny updated_at
             if product.updated_at:
-                # Django ma już ustawioną strefę czasową Europe/Warsaw
+                # Konwertuj na czas lokalny (Europe/Warsaw)
+                local_updated_at = timezone.localtime(product.updated_at)
                 xml.append(
-                    f'      <iaiext:modification_date datetime="{product.updated_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
+                    f'      <iaiext:modification_date datetime="{local_updated_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
 
             # Dodaj wszystkie kategorie (category) powiązane z produktem
             product_paths = ProductPaths.objects.using(
@@ -428,7 +431,8 @@ class FullXMLExporter(BaseXMLExporter):
         from django.utils import timezone
         try:
             now = timezone.now()
-            timestamp = now.strftime('%Y-%m-%dT%H-%M-%S')
+            local_now = timezone.localtime(now)
+            timestamp = local_now.strftime('%Y-%m-%dT%H-%M-%S')
             FullChangeFile.objects.using('MPD').create(
                 filename='full.xml',
                 timestamp=timestamp,
@@ -456,7 +460,8 @@ class LightXMLExporter(BaseXMLExporter):
 
         light_file = FullChangeFile.objects.using('MPD').create(
             filename='light.xml',
-            timestamp=timezone.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            timestamp=timezone.localtime(
+                timezone.now()).strftime('%Y-%m-%dT%H-%M-%S'),
             local_path=local_path,
             file_size=0,  # Zostanie zaktualizowane po zapisie
 
@@ -484,14 +489,21 @@ class LightXMLExporter(BaseXMLExporter):
 
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
-        expires = now + timedelta(days=1)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
 
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products language="pol">')
+
+        # Eksport przyrostowy - tylko produkty zmienione w ciągu ostatniej godziny
+        from datetime import timedelta
+        from django.db.models import Q
+
+        now = timezone.now()
+        one_hour_ago = now - timedelta(hours=1)
 
         # Pobierz datę utworzenia ostatniego pliku full.xml
         last_full_file = FullChangeFile.objects.using('MPD').filter(
@@ -499,22 +511,24 @@ class LightXMLExporter(BaseXMLExporter):
         ).order_by('-created_at').first()
 
         if last_full_file:
-            # Eksportuj tylko produkty utworzone przed datą utworzenia full.xml
-            # (czyli te, które były już w full.xml)
+            # Eksportuj tylko produkty ze zmienionymi stanami magazynowymi lub cenami w ciągu ostatniej godziny,
+            # które były już w full.xml (utworzone przed datą full.xml)
             full_file_created_at = last_full_file.created_at
             products = Products.objects.using('MPD').filter(
-                productvariants__isnull=False,
+                Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
+                Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago),
                 created_at__lte=full_file_created_at
             ).distinct().select_related('brand')
             logger.info(
-                f"Light.xml: eksportuję produkty utworzone przed {full_file_created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                f"Light.xml: eksportuję produkty ze zmienionymi stanami/cenami w ciągu ostatniej godziny, utworzone przed {full_file_created_at.strftime('%Y-%m-%d %H:%M:%S')}")
         else:
-            # Brak pliku full.xml - eksportuj wszystkie produkty
+            # Brak pliku full.xml - eksportuj produkty ze zmienionymi stanami/cenami
             products = Products.objects.using('MPD').filter(
-                productvariants__isnull=False
+                Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
+                Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago)
             ).distinct().select_related('brand')
             logger.info(
-                "Light.xml: brak pliku full.xml - eksportuję wszystkie produkty")
+                "Light.xml: brak pliku full.xml - eksportuję produkty ze zmienionymi stanami/cenami z ostatniej godziny")
 
         for product in products:
             # Pobierz warianty dla tego produktu
@@ -728,7 +742,9 @@ class LightXMLExporter(BaseXMLExporter):
             full_file_created_at = last_full_file.created_at
             products = Products.objects.using('MPD').filter(
                 Q(updated_at__gte=one_hour_ago) |
-                Q(productvariants__updated_at__gte=one_hour_ago),
+                Q(productvariants__updated_at__gte=one_hour_ago) |
+                Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
+                Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago),
                 created_at__lte=full_file_created_at
             ).distinct().select_related('brand')
             logger.info(
@@ -737,7 +753,9 @@ class LightXMLExporter(BaseXMLExporter):
             # Brak pliku full.xml - eksportuj wszystkie zmienione produkty
             products = Products.objects.using('MPD').filter(
                 Q(updated_at__gte=one_hour_ago) |
-                Q(productvariants__updated_at__gte=one_hour_ago)
+                Q(productvariants__updated_at__gte=one_hour_ago) |
+                Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
+                Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago)
             ).distinct().select_related('brand')
             logger.info(
                 "Light.xml incremental: brak pliku full.xml - eksportuję wszystkie zmienione produkty")
@@ -765,13 +783,13 @@ class LightXMLExporter(BaseXMLExporter):
 
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
-        expires = now + timedelta(days=1)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
 
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products language="pol">')
 
         for product in products:
@@ -1008,12 +1026,12 @@ class GatewayXMLExporter(BaseXMLExporter):
             base_time = request_time if request_time else timezone.now()
 
         # Konwertuj na lokalny czas (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
+        local_base_time = timezone.localtime(base_time)
 
         offer_created.set(
-            "created", base_time.strftime("%Y-%m-%d %H:%M:%S"))
+            "created", local_base_time.strftime("%Y-%m-%d %H:%M:%S"))
         offer_expires = ET.SubElement(time, "offer")
-        offer_expires.set("expires", (base_time +
+        offer_expires.set("expires", (local_base_time +
                           timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"))
 
     def _create_url_elements(self, root, request_time=None, full_time=None):
@@ -1028,6 +1046,8 @@ class GatewayXMLExporter(BaseXMLExporter):
             request_time = timezone.now()
 
         # Dodaj węzeł full z podwęzłem changes dla plików full_change
+        print("=== WYWOŁUJĘ _create_full_with_changes_element ===")
+        logger.info("=== WYWOŁUJĘ _create_full_with_changes_element ===")
         self._create_full_with_changes_element(
             root, base_url, request_time, full_time)
 
@@ -1047,6 +1067,8 @@ class GatewayXMLExporter(BaseXMLExporter):
 
     def _create_full_with_changes_element(self, root, base_url, request_time=None, full_time=None):
         """Tworzy węzeł full z podwęzłem changes dla rzeczywistych zmian w produktach"""
+        print("=== ROZPOCZYNAM _create_full_with_changes_element ===")
+        logger.info("=== ROZPOCZYNAM _create_full_with_changes_element ===")
 
         try:
             # Utwórz węzeł full
@@ -1065,7 +1087,7 @@ class GatewayXMLExporter(BaseXMLExporter):
                 request_time = timezone.now()
 
             # Konwertuj na lokalny czas (Europe/Warsaw)
-            # Django ma już ustawioną strefę czasową Europe/Warsaw
+            local_request_time = timezone.localtime(request_time)
 
             # Użyj przekazanego full_time zamiast pobierania z bazy
             if not full_time:
@@ -1076,9 +1098,8 @@ class GatewayXMLExporter(BaseXMLExporter):
                 ).order_by('-created_at').first()
 
                 if last_full_file:
-                    # Django ma już ustawioną strefę czasową Europe/Warsaw
-                    full_time = last_full_file.created_at.strftime(
-                        '%Y-%m-%d %H:%M:%S')
+                    full_time = timezone.localtime(
+                        last_full_file.created_at).strftime('%Y-%m-%d %H:%M:%S')
                     logger.info(
                         f"Używam czasu ostatniego full.xml: {full_time}")
                 else:
@@ -1140,104 +1161,166 @@ class GatewayXMLExporter(BaseXMLExporter):
                 filename__startswith='full_change'
             ).order_by('-created_at')[:25]
 
+            # Debug: sprawdź ile plików full_change znaleziono
+            print(
+                f"Znaleziono {recent_full_change_files.count()} plików full_change w bazie")
+            logger.info(
+                f"Znaleziono {recent_full_change_files.count()} plików full_change w bazie")
+
+            # Debug: wyświetl nazwy plików
+            for fcf in recent_full_change_files:
+                print(
+                    f"Plik w bazie: {fcf.filename} (created_at: {fcf.created_at})")
+                logger.info(
+                    f"Plik w bazie: {fcf.filename} (created_at: {fcf.created_at})")
+
             # Zawsze utwórz podwęzeł changes
             changes_element = ET.SubElement(full_element, "changes")
 
             if recent_full_change_files.exists():
+                print(
+                    f"Znaleziono {recent_full_change_files.count()} plików full_change, przetwarzam...")
+                logger.info(
+                    f"Znaleziono {recent_full_change_files.count()} plików full_change, przetwarzam...")
                 # Generuj change dla każdego wygenerowanego pliku full_change.xml
                 for full_change_file in recent_full_change_files:
+                    print(f"Przetwarzam plik: {full_change_file.filename}")
+                    logger.info(
+                        f"Przetwarzam plik: {full_change_file.filename}")
                     change_element = ET.SubElement(changes_element, "change")
 
-                    # Użyj timestamp z nazwy pliku, aby zachować spójność
-                    # Nazwa pliku: full_change2025-09-02T07-06-15.xml
-                    # Wyciągnij timestamp z nazwy pliku
+                    # Nazwa pliku: full_change2025-09-02T09-06-15.xml (czas lokalny)
+                    # Wyciągnij timestamp z nazwy pliku i potraktuj jako czas lokalny
                     filename = full_change_file.filename
-                    logger.info(f"Przetwarzam plik: {filename} (długość: {len(filename)})")
-                    
+                    change_time = None
+                    print(f"DEBUG: Przetwarzam plik {filename}")
+                    print(f"DEBUG: Długość nazwy pliku: {len(filename)}")
+                    print(f"DEBUG: filename[12:-4] = '{filename[12:-4]}'")
+                    print(f"DEBUG: filename[12:] = '{filename[12:]}'")
+                    print(f"DEBUG: filename[:-4] = '{filename[:-4]}'")
+                    print(f"DEBUG: filename[0:12] = '{filename[0:12]}'")
+                    print(f"DEBUG: filename[12] = '{filename[12]}'")
+                    print(f"DEBUG: filename[13] = '{filename[13]}'")
+                    print(f"DEBUG: filename[14] = '{filename[14]}'")
+
                     if filename.startswith('full_change') and filename.endswith('.xml'):
-                        # Wyciągnij timestamp z nazwy pliku (np. "full_change2025-09-02T07-06-15.xml")
-                        # Usuń "full_change" i ".xml" - bardziej elastycznie
-                        prefix = 'full_change'
-                        suffix = '.xml'
-                        if len(filename) > len(prefix) + len(suffix):
-                            timestamp_part = filename[len(prefix):-len(suffix)]
-                            logger.info(f"Wyciągnięty timestamp_part: '{timestamp_part}' (długość: {len(timestamp_part)})")
-                        else:
-                            timestamp_part = None
-                            logger.error(f"Nazwa pliku za krótka: {filename}")
-                        
-                        if timestamp_part is not None:
+                        # Wyciągnij timestamp z nazwy pliku (np. "2025-09-02T09-06-15")
+                        # Usuń "full_change" i ".xml" - użyj bezpiecznego podejścia
+                        timestamp_part = filename.replace(
+                            'full_change', '').replace('.xml', '')
+                        print(f"DEBUG: timestamp_part = {timestamp_part}")
+
+                        # Spróbuj różne formaty timestamp
+                        timestamp_formats = [
+                            '%Y-%m-%dT%H-%M-%S',  # 2025-09-02T09-06-15
+                            # 25-09-02T09-06-15 (rok 2-cyfrowy)
+                            '%y-%m-%dT%H-%M-%S',
+                            '%m-%dT%H-%M-%S',     # 09-02T09-06-15 (bez roku)
+                        ]
+
+                        # Dodatkowe formaty dla niepoprawnych nazw plików
+                        if timestamp_part.startswith('0'):
+                            # Format dla 025-09-02T22-33-26 (3-cyfrowy rok)
                             try:
-                                # Parsuj timestamp z formatu "2025-09-02T07-06-15"
-                                # Django ma już ustawioną strefę czasową Europe/Warsaw
-                                parsed_time = datetime.strptime(
-                                    timestamp_part, '%Y-%m-%dT%H-%M-%S')
-                                # Konwertuj na timezone-aware datetime w strefie Europe/Warsaw
-                                change_time = timezone.make_aware(
-                                    parsed_time, timezone.get_current_timezone())
-                                logger.info(
-                                    f"Używam timestamp z nazwy pliku: {timestamp_part}")
-                            except ValueError as e:
-                                logger.error(f"Błąd parsowania timestamp '{timestamp_part}' z nazwy pliku '{filename}': {str(e)}")
-                            
-                            # Spróbuj alternatywne formaty
-                            alternative_formats = [
-                                '%Y-%m-%dT%H:%M:%S',  # z dwukropkami
-                                '%Y-%m-%d %H:%M:%S',  # ze spacją
-                                '%Y-%m-%dT%H-%M-%S',  # z myślnikami (główny format)
-                                '%Y-%m-%d %H-%M-%S'   # ze spacją i myślnikami
-                            ]
-                            
-                            parsed_time = None
-                            for fmt in alternative_formats:
-                                try:
-                                    parsed_time = datetime.strptime(timestamp_part, fmt)
-                                    logger.info(f"Udało się sparsować z formatem '{fmt}': {timestamp_part}")
-                                    break
-                                except ValueError:
-                                    continue
-                            
-                            if parsed_time:
-                                # Konwertuj na timezone-aware datetime w strefie Europe/Warsaw
-                                change_time = timezone.make_aware(
-                                    parsed_time, timezone.get_current_timezone())
-                                logger.info(f"Używam timestamp z nazwy pliku (alternatywny format): {timestamp_part}")
-                            else:
-                                # Fallback: użyj created_at z bazy
-                                if full_change_file.created_at:
-                                    if timezone.is_aware(full_change_file.created_at):
-                                        change_time = full_change_file.created_at
-                                    else:
+                                # Wyciągnij rok, miesiąc, dzień, godzinę, minutę, sekundę
+                                parts = timestamp_part.split('T')
+                                if len(parts) == 2:
+                                    date_part = parts[0]  # 025-09-02
+                                    time_part = parts[1]  # 22-33-26
+
+                                    date_parts = date_part.split('-')
+                                    time_parts = time_part.split('-')
+
+                                    if len(date_parts) == 3 and len(time_parts) == 3:
+                                        year = int(date_parts[0])  # 025
+                                        month = int(date_parts[1])  # 09
+                                        day = int(date_parts[2])   # 02
+                                        hour = int(time_parts[0])  # 22
+                                        minute = int(time_parts[1])  # 33
+                                        second = int(time_parts[2])  # 26
+
+                                        # Napraw rok (025 -> 2025)
+                                        if year < 100:
+                                            year += 2000
+                                        elif year < 1000:
+                                            year += 1000
+
+                                        parsed_time = datetime(
+                                            year, month, day, hour, minute, second)
                                         change_time = timezone.make_aware(
-                                            full_change_file.created_at, timezone.get_current_timezone())
-                                    logger.warning(
-                                        f"Błąd parsowania timestamp z nazwy pliku, używam created_at: {full_change_file.created_at}")
-                                else:
-                                    change_time = request_time
-                                    logger.warning(
-                                        "Brak timestamp w nazwie pliku i created_at, używam request_time")
-                    else:
-                        # Fallback: użyj created_at z bazy
+                                            parsed_time)
+                                        logger.info(
+                                            f"Naprawiłem timestamp z 3-cyfrowego roku: {timestamp_part} -> {parsed_time}")
+                                        break
+                            except (ValueError, IndexError):
+                                pass
+
+                        for fmt in timestamp_formats:
+                            try:
+                                parsed_time = datetime.strptime(
+                                    timestamp_part, fmt)
+
+                                # Napraw rok jeśli użyto formatu 2-cyfrowego lub bez roku
+                                if fmt == '%y-%m-%dT%H-%M-%S':
+                                    # Konwertuj 2-cyfrowy rok na 4-cyfrowy (25 -> 2025)
+                                    parsed_time = parsed_time.replace(
+                                        year=2000 + parsed_time.year)
+                                elif fmt == '%m-%dT%H-%M-%S':
+                                    # Dodaj aktualny rok
+                                    current_year = timezone.now().year
+                                    parsed_time = parsed_time.replace(
+                                        year=current_year)
+
+                                # Traktuj jako czas lokalny i konwertuj na timezone-aware
+                                change_time = timezone.make_aware(parsed_time)
+                                logger.info(
+                                    f"Parsuję timestamp z nazwy pliku: {timestamp_part} (format: {fmt})")
+                                break
+
+                            except ValueError:
+                                continue
+
+                        if change_time is None:
+                            print(
+                                f"DEBUG: Nie udało się sparsować timestamp z nazwy pliku: {timestamp_part}")
+                            logger.warning(
+                                f"Nie udało się sparsować timestamp z nazwy pliku: {timestamp_part}")
+                            change_time = None
+
+                    # Fallback: użyj created_at z bazy jeśli nie udało się sparsować nazwy pliku
+                    if change_time is None:
+                        print(f"DEBUG: Używam fallback - created_at z bazy")
                         if full_change_file.created_at:
                             if timezone.is_aware(full_change_file.created_at):
                                 change_time = full_change_file.created_at
                             else:
                                 change_time = timezone.make_aware(
-                                    full_change_file.created_at, timezone.get_current_timezone())
+                                    full_change_file.created_at)
+                            print(
+                                f"DEBUG: Używam created_at z bazy: {full_change_file.created_at}")
+                            logger.info(
+                                f"Używam created_at z bazy: {full_change_file.created_at}")
                         else:
-                            change_time = request_time
+                            change_time = local_request_time
+                            print(f"DEBUG: Brak created_at, używam request_time")
+                            logger.warning(
+                                "Brak timestamp w nazwie pliku i created_at, używam request_time")
 
-                    # Django ma już ustawioną strefę czasową Europe/Warsaw
-                    change_time_str = change_time.strftime('%Y-%m-%d %H:%M:%S')
+                    # Konwertuj na lokalny czas
+                    local_change_time = timezone.localtime(change_time)
+                    change_time_str = local_change_time.strftime(
+                        '%Y-%m-%d %H:%M:%S')
+                    print(f"DEBUG: change_time_str = {change_time_str}")
 
-                    # URL do konkretnego pliku full_changeYYYY-MM-DDThh-mm-ss.xml zgodnie ze specyfikacją IdoSell
+                    # URL do konkretnego pliku full_changeYYYY-MM-DDThh-mm-ss.xml (zachowaj oryginalną nazwę UTC)
                     # Użyj bucket_url z bazy danych zamiast endpointu API
                     if full_change_file.bucket_url:
                         url = full_change_file.bucket_url
                     else:
                         # Fallback: URL do endpointu API jeśli brak bucket_url
-                        change_filename = f"full_change{change_time.strftime('%Y-%m-%dT%H-%M-%S')}.xml"
-                        url = f"{base_url}/mpd/{change_filename}"
+                        # Użyj oryginalnej nazwy pliku z bazy (UTC)
+                        url = f"{base_url}/mpd/{filename}"
+                    print(f"DEBUG: url = {url}")
                     change_element.set("url", url)
 
                     # Hash bazujący na nazwie pliku full_change.xml
@@ -1289,14 +1372,21 @@ class GatewayXMLExporter(BaseXMLExporter):
                     change_element.set("hash", hash_value)
                     change_element.set("changed", change_time_str)
 
+                    print(
+                        f"DEBUG: Dodano element change do XML: url={url}, changed={change_time_str}")
                     logger.info(
                         f"API endpoint full_change: hash={hash_value}, changed={change_time_str}, filename={full_change_file.filename}")
+                    logger.info(
+                        f"Dodano element change do XML: url={url}, changed={change_time_str}")
 
                 logger.info(
                     f"Wygenerowano {len(recent_full_change_files)} zmian w full_change.xml")
 
             else:
                 # Brak plików full_change.xml w bazie - utwórz pusty change
+                print("Brak plików full_change w bazie - tworzę pusty element change")
+                logger.warning(
+                    "Brak plików full_change w bazie - tworzę pusty element change")
                 change_element = ET.SubElement(changes_element, "change")
 
                 # URL do endpointu API dla full_change
@@ -1347,8 +1437,8 @@ class GatewayXMLExporter(BaseXMLExporter):
                     categories_time = timezone.make_aware(
                         latest_categories_file.created_at)
 
-                # Django ma już ustawioną strefę czasową Europe/Warsaw
-                categories_time_str = categories_time.strftime(
+                local_categories_time = timezone.localtime(categories_time)
+                categories_time_str = local_categories_time.strftime(
                     '%Y-%m-%d %H:%M:%S')
 
                 categories_element.set("hash", hash_value)
@@ -1391,8 +1481,8 @@ class GatewayXMLExporter(BaseXMLExporter):
                     sizes_time = timezone.make_aware(
                         latest_sizes_file.created_at)
 
-                # Django ma już ustawioną strefę czasową Europe/Warsaw
-                sizes_time_str = sizes_time.strftime(
+                local_sizes_time = timezone.localtime(sizes_time)
+                sizes_time_str = local_sizes_time.strftime(
                     '%Y-%m-%d %H:%M:%S')
 
                 sizes_element.set("hash", hash_value)
@@ -1436,8 +1526,8 @@ class GatewayXMLExporter(BaseXMLExporter):
                     producers_time = timezone.make_aware(
                         latest_producers_file.created_at)
 
-                # Django ma już ustawioną strefę czasową Europe/Warsaw
-                producers_time_str = producers_time.strftime(
+                local_producers_time = timezone.localtime(producers_time)
+                producers_time_str = local_producers_time.strftime(
                     '%Y-%m-%d %H:%M:%S')
 
                 producers_element.set("hash", hash_value)
@@ -1455,6 +1545,8 @@ class GatewayXMLExporter(BaseXMLExporter):
             logger.warning(f"Błąd pobierania producers.xml z bazy: {str(e)}")
 
     def generate_xml(self, request_time=None):
+        print("=== ROZPOCZYNAM GatewayXMLExporter.generate_xml ===")
+        logger.info("=== ROZPOCZYNAM GatewayXMLExporter.generate_xml ===")
         root = ET.Element("provider_description")
         root.set("file_format", "IOF")
         root.set("version", "3.0")
@@ -1465,8 +1557,8 @@ class GatewayXMLExporter(BaseXMLExporter):
             request_time = timezone.now()
 
         # Konwertuj na lokalny czas (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
-        root.set("generated", request_time.strftime("%Y-%m-%d %H:%M:%S"))
+        local_request_time = timezone.localtime(request_time)
+        root.set("generated", local_request_time.strftime("%Y-%m-%d %H:%M:%S"))
 
         # Pobierz full_time z bazy danych, aby przekazać go do _create_meta_element
         from .models import FullChangeFile
@@ -1476,8 +1568,8 @@ class GatewayXMLExporter(BaseXMLExporter):
 
         full_time = ""
         if last_full_file:
-            # Django ma już ustawioną strefę czasową Europe/Warsaw
-            full_time = last_full_file.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            full_time = timezone.localtime(
+                last_full_file.created_at).strftime('%Y-%m-%d %H:%M:%S')
 
         self._create_meta_element(root, request_time, full_time)
         self._create_url_elements(root, request_time, full_time)
@@ -1497,12 +1589,12 @@ class ProducersXMLExporter(BaseXMLExporter):
         from datetime import timedelta
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
-        expires = now + timedelta(days=1)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<producers file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="{}" expires="{}">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         brands = Brands.objects.using('MPD').filter(iai_brand_id__isnull=False)
         for brand in brands:
             # id: string, bez spacji, tylko a-z, A-Z, _, -
@@ -1522,7 +1614,8 @@ class ProducersXMLExporter(BaseXMLExporter):
 
         producers_file = FullChangeFile.objects.using('MPD').create(
             filename='producers.xml',
-            timestamp=timezone.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            timestamp=timezone.localtime(
+                timezone.now()).strftime('%Y-%m-%dT%H-%M-%S'),
             local_path=local_path,
             file_size=0,  # Zostanie zaktualizowane po zapisie
         )
@@ -1553,12 +1646,12 @@ class StocksXMLExporter(BaseXMLExporter):
         from datetime import timedelta
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
-        expires = now + timedelta(days=1)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<stocks file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="{}" expires="{}">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         stocks = StockAndPrices.objects.using(
             'MPD').all().select_related('variant__product')
         for stock in stocks:
@@ -1585,7 +1678,8 @@ class CategoriesXMLExporter(BaseXMLExporter):
 
         categories_file = FullChangeFile.objects.using('MPD').create(
             filename='categories.xml',
-            timestamp=timezone.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            timestamp=timezone.localtime(
+                timezone.now()).strftime('%Y-%m-%dT%H-%M-%S'),
             local_path=local_path,
             file_size=0,  # Zostanie zaktualizowane po zapisie
 
@@ -1613,13 +1707,13 @@ class CategoriesXMLExporter(BaseXMLExporter):
 
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
-        expires = now + timedelta(days=1)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
 
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<categories file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="{}" expires="{}">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
 
         # Pobierz wszystkie ścieżki (kategorie) z bazy
         paths = Paths.objects.using('MPD').all().order_by('id')
@@ -1699,12 +1793,12 @@ class UnitsXMLExporter(BaseXMLExporter):
         from datetime import timedelta
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
-        expires = now + timedelta(days=1)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<units file_format="IOF" version="3.0" generated="{}" expires="{}" language="pol">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         units = Units.objects.using('MPD').all()
         for unit in units:
             xml.append(
@@ -1715,14 +1809,14 @@ class UnitsXMLExporter(BaseXMLExporter):
 
 class FullChangeXMLExporter(BaseXMLExporter):
     def __init__(self):
-        # Generuj nazwę pliku z aktualną datą
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
+        # Generuj nazwę pliku z aktualną datą w czasie lokalnym
         now = timezone.now()
-        timestamp = now.strftime('%Y-%m-%dT%H-%M-%S')
+        local_now = timezone.localtime(now)
+        timestamp = local_now.strftime('%Y-%m-%dT%H-%M-%S')
         filename = f'full_change{timestamp}.xml'
         super().__init__(filename)
         self.timestamp = timestamp
-        self.created_at = now
+        self.created_at = now  # Zachowaj oryginalny czas UTC w bazie
 
     def save_full_change_record(self, bucket_url, local_path):
         """Zapisz rekord o wygenerowanym pliku full_change"""
@@ -1792,12 +1886,12 @@ class FullChangeXMLExporter(BaseXMLExporter):
 
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
-        expires = now + timedelta(days=1)
+        local_now = timezone.localtime(now)
+        local_expires = local_now + timedelta(days=1)
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<offer file_format="IOF" version="3.0" generated="{}" expires="{}" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S'), expires.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products language="pol">')
 
         # Tracking nie jest używane w nowej logice IOF 3.0 (30 minut dla wszystkich produktów)
@@ -1880,16 +1974,16 @@ class FullChangeXMLExporter(BaseXMLExporter):
             # Dodaj węzeł date_created z kolumny created_at
             if product.created_at:
                 # Konwertuj na czas lokalny (Europe/Warsaw)
-                # Django ma już ustawioną strefę czasową Europe/Warsaw
+                local_created_at = timezone.localtime(product.created_at)
                 xml.append(
-                    f'      <iaiext:date_created datetime="{product.created_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
+                    f'      <iaiext:date_created datetime="{local_created_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
 
             # Dodaj węzeł modification_date z kolumny updated_at
             if product.updated_at:
                 # Konwertuj na czas lokalny (Europe/Warsaw)
-                # Django ma już ustawioną strefę czasową Europe/Warsaw
+                local_updated_at = timezone.localtime(product.updated_at)
                 xml.append(
-                    f'      <iaiext:modification_date datetime="{product.updated_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
+                    f'      <iaiext:modification_date datetime="{local_updated_at.strftime("%Y-%m-%d %H:%M:%S")}"/>')
 
             # Dodaj wszystkie kategorie (category) powiązane z produktem
             product_paths = ProductPaths.objects.using(
@@ -2297,7 +2391,8 @@ class SizesXMLExporter(BaseXMLExporter):
 
         sizes_file = FullChangeFile.objects.using('MPD').create(
             filename='sizes.xml',
-            timestamp=timezone.now().strftime('%Y-%m-%dT%H-%M-%S'),
+            timestamp=timezone.localtime(
+                timezone.now()).strftime('%Y-%m-%dT%H-%M-%S'),
             local_path=local_path,
             file_size=0,  # Zostanie zaktualizowane po zapisie
         )
@@ -2323,12 +2418,12 @@ class SizesXMLExporter(BaseXMLExporter):
 
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
-        # Django ma już ustawioną strefę czasową Europe/Warsaw
+        local_now = timezone.localtime(now)
 
         xml = []
         xml.append('<?xml version="1.0" encoding="utf-8"?>')
         xml.append('<sizes file_format="IOF" version="3.0" language="pol" generated="{}">'.format(
-            now.strftime('%Y-%m-%d %H:%M:%S')))
+            local_now.strftime('%Y-%m-%d %H:%M:%S')))
 
         # Pobierz wszystkie unikalne rozmiary z tabeli Sizes
         sizes = Sizes.objects.using('MPD').filter(
