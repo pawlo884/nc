@@ -1,34 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<offer file_format="IOF" version="3.0" generated="2025-09-03 15:06:34" expires="2025-09-04 15:06:34" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+<offer file_format="IOF" version="3.0" generated="2025-09-03 19:44:16" expires="2025-09-04 19:44:16" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
   <products language="pol">
-    <product id="334" vat="23.00">
-      <price gross="81.00" net="65.85"/>
-      <sizes>
-        <size id="239" name="44" panel_name="44_bielizna" code_producer="5907665178400" iaiext:code_external="1004-5">
-          <price gross="81.00" net="65.85"/>
-          <stock id="0" quantity="0"/>
-        </size>
-        <size id="240" name="40" panel_name="40_bielizna" code_producer="5907665178387" iaiext:code_external="1004-6">
-          <price gross="81.00" net="65.85"/>
-          <stock id="0" quantity="0"/>
-        </size>
-        <size id="238" name="48" panel_name="48_bielizna" code_producer="5907665178424" iaiext:code_external="1004-7">
-          <price gross="81.00" net="65.85"/>
-          <stock id="0" quantity="5"/>
-        </size>
-        <size id="236" name="38" panel_name="38_bielizna" code_producer="5907665178370" iaiext:code_external="1004-8">
-          <price gross="81.00" net="65.85"/>
-          <stock id="0" quantity="0"/>
-        </size>
-        <size id="241" name="42" panel_name="42_bielizna" code_producer="5907665178394" iaiext:code_external="1004-9">
-          <price gross="81.00" net="65.85"/>
-          <stock id="0" quantity="0"/>
-        </size>
-        <size id="242" name="46" panel_name="46_bielizna" code_producer="5907665178417" iaiext:code_external="1004-10">
-          <price gross="81.00" net="65.85"/>
-          <stock id="0" quantity="0"/>
-        </size>
-      </sizes>
-    </product>
   </products>
 </offer>

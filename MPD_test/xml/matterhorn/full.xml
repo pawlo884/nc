@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<offer file_format="IOF" version="3.0" generated="2025-09-03 12:24:29" expires="2025-09-04 12:24:29" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+<offer file_format="IOF" version="3.0" generated="2025-09-03 16:34:37" expires="2025-09-04 16:34:37" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
   <products language="pol">
     <product id="339" currency="PLN" type="regular" vat="0" site="1">
       <producer id="1" name="Lupo Line"/>
       <iaiext:deliverer id="1" name="Matterhorn"/>
       <iaiext:date_created datetime="2025-09-01 22:03:34"/>
-      <iaiext:modification_date datetime="2025-09-01 22:03:34"/>
+      <iaiext:modification_date datetime="2025-09-03 14:05:57"/>
       <category id="1214553889" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
       <unit id="0" name="szt."/>
       <description>
@@ -19,7 +19,7 @@
         </parameter>
       </parameters>
       <iaiext:visibility>
-        <iaiext:site visible="no"/>
+        <iaiext:site visible="yes"/>
       </iaiext:visibility>
       <iaiext:navigation>
         <iaiext:site id="1">
@@ -338,11 +338,11 @@
         </large>
       </images>
     </product>
-    <product id="334" currency="PLN" type="regular" vat="0" site="1">
+    <product id="334" currency="PLN" type="regular" vat="23.00" site="1">
       <producer id="1" name="Lupo Line"/>
       <iaiext:deliverer id="1" name="Matterhorn"/>
       <iaiext:date_created datetime="2025-08-31 21:44:14"/>
-      <iaiext:modification_date datetime="2025-09-03 08:06:33"/>
+      <iaiext:modification_date datetime="2025-09-03 14:35:36"/>
       <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
       <unit id="0" name="szt."/>
       <description>
@@ -355,6 +355,7 @@
           <value id="None" name="zielony"/>
         </parameter>
       </parameters>
+      <price gross="81.00" net="65.85"/>
       <iaiext:visibility>
         <iaiext:site visible="yes"/>
       </iaiext:visibility>
@@ -367,27 +368,27 @@
       </iaiext:navigation>
       <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
         <size id="239" code="334-239" name="44" panel_name="44_bielizna" iaiext:code_external="1004-5" code_producer="5907665178400">
-          <price gross="0" net="0"/>
+          <price gross="81.00" net="65.85"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="240" code="334-240" name="40" panel_name="40_bielizna" iaiext:code_external="1004-6" code_producer="5907665178387">
-          <price gross="0" net="0"/>
+          <price gross="81.00" net="65.85"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="238" code="334-238" name="48" panel_name="48_bielizna" iaiext:code_external="1004-7" code_producer="5907665178424">
-          <price gross="0" net="0"/>
+          <price gross="81.00" net="65.85"/>
           <stock id="0" quantity="5"/>
         </size>
         <size id="236" code="334-236" name="38" panel_name="38_bielizna" iaiext:code_external="1004-8" code_producer="5907665178370">
-          <price gross="0" net="0"/>
+          <price gross="81.00" net="65.85"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="241" code="334-241" name="42" panel_name="42_bielizna" iaiext:code_external="1004-9" code_producer="5907665178394">
-          <price gross="0" net="0"/>
+          <price gross="81.00" net="65.85"/>
           <stock id="0" quantity="0"/>
         </size>
         <size id="242" code="334-242" name="46" panel_name="46_bielizna" iaiext:code_external="1004-10" code_producer="5907665178417">
-          <price gross="0" net="0"/>
+          <price gross="81.00" net="65.85"/>
           <stock id="0" quantity="0"/>
         </size>
       </sizes>
@@ -731,6 +732,62 @@
         <large>
           <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1013/1013_1_Multicolor.jpg"/>
           <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1013/1013_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="343" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-03 14:23:00"/>
+      <iaiext:modification_date datetime="2025-09-03 14:23:00"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Mirage Big</name>
+        <short_desc><![CDATA[Figi 1 Mirage w poziome paski w ciepłych kolorach lata, z wyższym stanem, który optycznie spłaszcza brzuch, ukrywając niedoskonałości sylwetki. ]]></short_desc>
+        <long_desc><![CDATA[Figi 1 Mirage w poziome paski w ciepłych kolorach lata, z wyższym stanem, który optycznie spłaszcza brzuch, ukrywając niedoskonałości sylwetki. Figi mają ściągane sznureczki po obu bokach, dzięki którym możesz regulować ich krój i wysokość majtek, przez co każda kobieta czuje się w nich komfortowo oraz elegancko.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="90" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="235" code="343-235" name="36" panel_name="36_bielizna" iaiext:code_external="1014-103" code_producer="5905220673810">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="236" code="343-236" name="38" panel_name="38_bielizna" iaiext:code_external="1014-104" code_producer="5905220673827">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="343-240" name="40" panel_name="40_bielizna" iaiext:code_external="1014-105" code_producer="5905220673834">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="343-241" name="42" panel_name="42_bielizna" iaiext:code_external="1014-106" code_producer="5905220673841">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="239" code="343-239" name="44" panel_name="44_bielizna" iaiext:code_external="1014-107" code_producer="5905220673858">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1014/1014_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1014/1014_2_Multicolor.jpg"/>
         </large>
       </images>
     </product>

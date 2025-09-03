@@ -1290,21 +1290,21 @@ class GatewayXMLExporter(BaseXMLExporter):
                     # Fallback: użyj created_at z bazy jeśli nie udało się sparsować nazwy pliku
                     if change_time is None:
                         print(f"DEBUG: Używam fallback - created_at z bazy")
-                        if full_change_file.created_at:
-                            if timezone.is_aware(full_change_file.created_at):
-                                change_time = full_change_file.created_at
-                            else:
-                                change_time = timezone.make_aware(
-                                    full_change_file.created_at)
+                    if full_change_file.created_at:
+                        if timezone.is_aware(full_change_file.created_at):
+                            change_time = full_change_file.created_at
+                        else:
+                            change_time = timezone.make_aware(
+                                full_change_file.created_at)
                             print(
                                 f"DEBUG: Używam created_at z bazy: {full_change_file.created_at}")
                             logger.info(
                                 f"Używam created_at z bazy: {full_change_file.created_at}")
-                        else:
-                            change_time = local_request_time
-                            print(f"DEBUG: Brak created_at, używam request_time")
-                            logger.warning(
-                                "Brak timestamp w nazwie pliku i created_at, używam request_time")
+                    else:
+                        change_time = local_request_time
+                        print(f"DEBUG: Brak created_at, używam request_time")
+                        logger.warning(
+                            "Brak timestamp w nazwie pliku i created_at, używam request_time")
 
                     # Konwertuj na lokalny czas
                     local_change_time = timezone.localtime(change_time)
