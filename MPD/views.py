@@ -268,8 +268,8 @@ def update_all_gateways():
 @csrf_exempt
 def generate_full_xml(request):
     exporter = FullXMLExporter()
-    # Używa metody z zapisem rekordu do bazy - eksport pełny
-    exporter_result = exporter.export_full()
+    # Używa metody z zapisem rekordu do bazy - eksport przyrostowy (tylko nowe produkty)
+    exporter_result = exporter.export_incremental()
 
     # Automatycznie zaktualizuj wszystkie gateway.xml (dodatkowe zabezpieczenie)
     update_all_gateways()

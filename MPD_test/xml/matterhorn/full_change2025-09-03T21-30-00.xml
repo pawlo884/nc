@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<offer file_format="IOF" version="3.0" generated="2025-09-03 21:30:00" expires="2025-09-04 21:30:00" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+  <products language="pol">
+    <product id="344" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-03 21:06:10"/>
+      <iaiext:modification_date datetime="2025-09-03 21:06:10"/>
+      <category id="1214553889" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Biustonosz kąpielowy Wave Big</name>
+        <short_desc><![CDATA[Biustonosz Wave to model stworzony z myślą o kobietach z pełniejszym biustem, które pragną połączyć komfort z modnym, odważnym wzorem.]]></short_desc>
+        <long_desc><![CDATA[Biustonosz Wave to model stworzony z myślą o kobietach z pełniejszym biustem, które pragną połączyć komfort z modnym, odważnym wzorem. Egzotyczny, zwierzęcy motyw inspirowany dzikimii krajobrazami wprowadza do stylizacji nutę niepowtarzalnego charakteru. Dzięki połączeniu klasycznej elegancji z egzotycznym printem, ten biustonosz doskonale podkreśla kobiecą siłę i indywidualność, przyciągając spojrzenia na każdej plaży. Biustonosz posiada miękkie miseczki z modelującymi cięciami oraz jest usztywniony fiszbinami, dzięki czemu doskonale podtrzymuje średnie i duże biusty. Ramiączka regulowane, nieodpinane. Szerokość ramiączek i typ zapięcia dopasowany do rozmiaru biustonosza. Miedzy miseczkami delikatna ozdoba dodająca uroku całości.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="None" name="niebieski"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="256" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Biustonosze | Topy" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="94" code="344-94" name="65K" panel_name="65K_bielizna" iaiext:code_external="1015-108" code_producer="5905220675715">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="139" code="344-139" name="70G" panel_name="70G_bielizna" iaiext:code_external="1015-109" code_producer="5905220675760">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="141" code="344-141" name="70I" panel_name="70I_bielizna" iaiext:code_external="1015-110" code_producer="5905220675784">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="142" code="344-142" name="70J" panel_name="70J_bielizna" iaiext:code_external="1015-111" code_producer="5905220675791">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="158" code="344-158" name="75K" panel_name="75K_bielizna" iaiext:code_external="1015-112" code_producer="5905220675890">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="165" code="344-165" name="80E" panel_name="80E_bielizna" iaiext:code_external="1015-113" code_producer="5905220675920">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="166" code="344-166" name="80F" panel_name="80F_bielizna" iaiext:code_external="1015-114" code_producer="5905220675937">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="167" code="344-167" name="80G" panel_name="80G_bielizna" iaiext:code_external="1015-115" code_producer="5905220675944">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="168" code="344-168" name="80H" panel_name="80H_bielizna" iaiext:code_external="1015-116" code_producer="5905220675951">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="169" code="344-169" name="80I" panel_name="80I_bielizna" iaiext:code_external="1015-117" code_producer="5905220675968">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="170" code="344-170" name="80J" panel_name="80J_bielizna" iaiext:code_external="1015-118" code_producer="5905220675975">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="140" code="344-140" name="70H" panel_name="70H_bielizna" iaiext:code_external="1015-119" code_producer="5905220675777">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="177" code="344-177" name="85D" panel_name="85D_bielizna" iaiext:code_external="1015-120" code_producer="5905220676002">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="178" code="344-178" name="85E" panel_name="85E_bielizna" iaiext:code_external="1015-121" code_producer="5905220676019">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="S" code="344-S" name="85F" panel_name="85F_bielizna" iaiext:code_external="1015-122" code_producer="5905220676026">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="15" code="344-15" name="85G" panel_name="85G_bielizna" iaiext:code_external="1015-123" code_producer="5905220676033">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="22" code="344-22" name="85J" panel_name="85J_bielizna" iaiext:code_external="1015-124" code_producer="5905220676064">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="179" code="344-179" name="90E" panel_name="90E_bielizna" iaiext:code_external="1015-125" code_producer="5905220676095">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="143" code="344-143" name="70K" panel_name="70K_bielizna" iaiext:code_external="1015-126" code_producer="5905220675807">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="152" code="344-152" name="75E" panel_name="75E_bielizna" iaiext:code_external="1015-127" code_producer="5905220675838">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="153" code="344-153" name="75F" panel_name="75F_bielizna" iaiext:code_external="1015-128" code_producer="5905220675845">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="157" code="344-157" name="75J" panel_name="75J_bielizna" iaiext:code_external="1015-129" code_producer="5905220675883">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="180" code="344-180" name="90F" panel_name="90F_bielizna" iaiext:code_external="1015-130" code_producer="5905220676101">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="181" code="344-181" name="90G" panel_name="90G_bielizna" iaiext:code_external="1015-131" code_producer="5905220676118">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="182" code="344-182" name="90H" panel_name="90H_bielizna" iaiext:code_external="1015-132" code_producer="5905220676125">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="183" code="344-183" name="90I" panel_name="90I_bielizna" iaiext:code_external="1015-133" code_producer="5905220676132">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="191" code="344-191" name="95D" panel_name="95D_bielizna" iaiext:code_external="1015-134" code_producer="5905220676156">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="192" code="344-192" name="95E" panel_name="95E_bielizna" iaiext:code_external="1015-135" code_producer="5905220676163">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="193" code="344-193" name="95F" panel_name="95F_bielizna" iaiext:code_external="1015-136" code_producer="5905220676170">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="194" code="344-194" name="95G" panel_name="95G_bielizna" iaiext:code_external="1015-137" code_producer="5905220676187">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="195" code="344-195" name="95H" panel_name="95H_bielizna" iaiext:code_external="1015-138" code_producer="5905220676194">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1015/1015_1_Blue.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1015/1015_2_Blue.jpg"/>
+        </large>
+      </images>
+    </product>
+  </products>
+</offer>

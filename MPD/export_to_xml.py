@@ -27,6 +27,40 @@ Monitoring zmian:
 logger = logging.getLogger(__name__)
 
 
+def get_last_full_xml_date():
+    """Pobierz datę ostatniego wygenerowanego pliku full.xml"""
+    from .models import FullChangeFile
+    try:
+        last_full = FullChangeFile.objects.using('MPD').filter(
+            filename='full.xml'
+        ).order_by('-created_at').first()
+
+        if last_full:
+            print(f"Znaleziono ostatni full.xml: {last_full.created_at}")
+            return last_full.created_at
+        else:
+            print("Brak rekordu full.xml w bazie - pierwsze uruchomienie")
+            return None
+    except Exception as e:
+        logger.error(
+            f"Błąd podczas pobierania daty ostatniego full.xml: {str(e)}")
+        return None
+
+
+def get_last_full_change_xml_date():
+    """Pobierz datę ostatniego wygenerowanego pliku full_change.xml"""
+    from .models import FullChangeFile
+    try:
+        last_full_change = FullChangeFile.objects.using('MPD').filter(
+            filename__startswith='full_change'
+        ).order_by('-created_at').first()
+        return last_full_change.created_at if last_full_change else None
+    except Exception as e:
+        logger.error(
+            f"Błąd podczas pobierania daty ostatniego full_change.xml: {str(e)}")
+        return None
+
+
 class BaseXMLExporter:
     def __init__(self, filename):
         self.filename = filename
@@ -119,12 +153,36 @@ class FullXMLExporter(BaseXMLExporter):
             local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products language="pol">')
 
-        # ZAWSZE generuj pełną ofertę - ignoruj parametr incremental
-        # Pobierz wszystkie warianty z iai_product_id
-        variants_with_iai = ProductVariants.objects.using('MPD').filter(
-            iai_product_id__isnull=False
-        ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
-        logger.info("Generowanie pełnej oferty full.xml - wszystkie produkty")
+        # Sprawdź czy generować tylko nowe produkty (incremental=True) czy wszystkie
+        print(f"FullXMLExporter.generate_xml - incremental={incremental}")
+        if incremental:
+            # Pobierz datę ostatniego pliku full.xml
+            last_full_date = get_last_full_xml_date()
+            if last_full_date:
+                # Generuj tylko nowe produkty dodane po ostatnim full.xml
+                variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                    iai_product_id__isnull=False,
+                    product__created_at__gte=last_full_date
+                ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+                count = variants_with_iai.count()
+                print(
+                    f"Generowanie przyrostowe full.xml - znaleziono {count} nowych produktów od: {last_full_date.strftime('%Y-%m-%d %H:%M:%S')}")
+            else:
+                # Pierwsze uruchomienie - generuj wszystkie produkty
+                variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                    iai_product_id__isnull=False
+                ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+                count = variants_with_iai.count()
+                print(
+                    f"Pierwsze uruchomienie full.xml - wszystkie produkty ({count} produktów)")
+        else:
+            # Generuj wszystkie produkty
+            variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                iai_product_id__isnull=False
+            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+            count = variants_with_iai.count()
+            print(
+                f"Generowanie pełnej oferty full.xml - wszystkie produkty ({count} produktów)")
 
         # Grupuj warianty po iai_product_id
         grouped_variants = {}
@@ -387,21 +445,20 @@ class FullXMLExporter(BaseXMLExporter):
         return '\n'.join(xml)
 
     def export_incremental(self):
-        """Eksport przyrostowy - teraz generuje pełną ofertę"""
-        # Wywołaj metodę bazową export() zamiast self.export()
-        # Zawsze false - pełna oferta
-        xml_content = self.generate_xml(incremental=False)
+        """Eksport przyrostowy - tylko nowe produkty"""
+        # Generuj tylko nowe produkty dodane po ostatnim full.xml
+        xml_content = self.generate_xml(incremental=True)
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
 
         result = {'bucket_url': bucket_url, 'local_path': local_path}
 
         if bucket_url:
-            print('✅ Eksport pełnej oferty XML zakończony pomyślnie!')
+            print('✅ Eksport przyrostowy full.xml zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
         else:
-            print('❌ Błąd podczas eksportu XML')
+            print('❌ Błąd podczas eksportu przyrostowego full.xml')
             print(f'📄 Lokalnie zapisano: {local_path}')
 
         return result
@@ -473,7 +530,11 @@ class LightXMLExporter(BaseXMLExporter):
             light_file.save(using='MPD')
 
         bucket_url = self.save_to_bucket(local_path)
+
+        # Zaktualizuj rekord w bazie z bucket_url
         if bucket_url:
+            light_file.bucket_url = bucket_url
+            light_file.save(using='MPD')
             print('✅ Eksport XML zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
@@ -1046,8 +1107,6 @@ class GatewayXMLExporter(BaseXMLExporter):
             request_time = timezone.now()
 
         # Dodaj węzeł full z podwęzłem changes dla plików full_change
-        print("=== WYWOŁUJĘ _create_full_with_changes_element ===")
-        logger.info("=== WYWOŁUJĘ _create_full_with_changes_element ===")
         self._create_full_with_changes_element(
             root, base_url, request_time, full_time)
 
@@ -1067,8 +1126,6 @@ class GatewayXMLExporter(BaseXMLExporter):
 
     def _create_full_with_changes_element(self, root, base_url, request_time=None, full_time=None):
         """Tworzy węzeł full z podwęzłem changes dla rzeczywistych zmian w produktach"""
-        print("=== ROZPOCZYNAM _create_full_with_changes_element ===")
-        logger.info("=== ROZPOCZYNAM _create_full_with_changes_element ===")
 
         try:
             # Utwórz węzeł full
@@ -1161,54 +1218,24 @@ class GatewayXMLExporter(BaseXMLExporter):
                 filename__startswith='full_change'
             ).order_by('-created_at')[:25]
 
-            # Debug: sprawdź ile plików full_change znaleziono
-            print(
-                f"Znaleziono {recent_full_change_files.count()} plików full_change w bazie")
-            logger.info(
-                f"Znaleziono {recent_full_change_files.count()} plików full_change w bazie")
-
-            # Debug: wyświetl nazwy plików
-            for fcf in recent_full_change_files:
-                print(
-                    f"Plik w bazie: {fcf.filename} (created_at: {fcf.created_at})")
-                logger.info(
-                    f"Plik w bazie: {fcf.filename} (created_at: {fcf.created_at})")
-
             # Zawsze utwórz podwęzeł changes
             changes_element = ET.SubElement(full_element, "changes")
 
             if recent_full_change_files.exists():
-                print(
-                    f"Znaleziono {recent_full_change_files.count()} plików full_change, przetwarzam...")
-                logger.info(
-                    f"Znaleziono {recent_full_change_files.count()} plików full_change, przetwarzam...")
                 # Generuj change dla każdego wygenerowanego pliku full_change.xml
                 for full_change_file in recent_full_change_files:
-                    print(f"Przetwarzam plik: {full_change_file.filename}")
-                    logger.info(
-                        f"Przetwarzam plik: {full_change_file.filename}")
                     change_element = ET.SubElement(changes_element, "change")
 
                     # Nazwa pliku: full_change2025-09-02T09-06-15.xml (czas lokalny)
                     # Wyciągnij timestamp z nazwy pliku i potraktuj jako czas lokalny
                     filename = full_change_file.filename
                     change_time = None
-                    print(f"DEBUG: Przetwarzam plik {filename}")
-                    print(f"DEBUG: Długość nazwy pliku: {len(filename)}")
-                    print(f"DEBUG: filename[12:-4] = '{filename[12:-4]}'")
-                    print(f"DEBUG: filename[12:] = '{filename[12:]}'")
-                    print(f"DEBUG: filename[:-4] = '{filename[:-4]}'")
-                    print(f"DEBUG: filename[0:12] = '{filename[0:12]}'")
-                    print(f"DEBUG: filename[12] = '{filename[12]}'")
-                    print(f"DEBUG: filename[13] = '{filename[13]}'")
-                    print(f"DEBUG: filename[14] = '{filename[14]}'")
 
                     if filename.startswith('full_change') and filename.endswith('.xml'):
                         # Wyciągnij timestamp z nazwy pliku (np. "2025-09-02T09-06-15")
                         # Usuń "full_change" i ".xml" - użyj bezpiecznego podejścia
                         timestamp_part = filename.replace(
                             'full_change', '').replace('.xml', '')
-                        print(f"DEBUG: timestamp_part = {timestamp_part}")
 
                         # Spróbuj różne formaty timestamp
                         timestamp_formats = [
@@ -1281,28 +1308,23 @@ class GatewayXMLExporter(BaseXMLExporter):
                                 continue
 
                         if change_time is None:
-                            print(
-                                f"DEBUG: Nie udało się sparsować timestamp z nazwy pliku: {timestamp_part}")
                             logger.warning(
                                 f"Nie udało się sparsować timestamp z nazwy pliku: {timestamp_part}")
                             change_time = None
 
                     # Fallback: użyj created_at z bazy jeśli nie udało się sparsować nazwy pliku
                     if change_time is None:
-                        print(f"DEBUG: Używam fallback - created_at z bazy")
+                        pass
                     if full_change_file.created_at:
                         if timezone.is_aware(full_change_file.created_at):
                             change_time = full_change_file.created_at
                         else:
                             change_time = timezone.make_aware(
                                 full_change_file.created_at)
-                            print(
-                                f"DEBUG: Używam created_at z bazy: {full_change_file.created_at}")
                             logger.info(
                                 f"Używam created_at z bazy: {full_change_file.created_at}")
                     else:
                         change_time = local_request_time
-                        print(f"DEBUG: Brak created_at, używam request_time")
                         logger.warning(
                             "Brak timestamp w nazwie pliku i created_at, używam request_time")
 
@@ -1310,7 +1332,6 @@ class GatewayXMLExporter(BaseXMLExporter):
                     local_change_time = timezone.localtime(change_time)
                     change_time_str = local_change_time.strftime(
                         '%Y-%m-%d %H:%M:%S')
-                    print(f"DEBUG: change_time_str = {change_time_str}")
 
                     # URL do konkretnego pliku full_changeYYYY-MM-DDThh-mm-ss.xml (zachowaj oryginalną nazwę UTC)
                     # Użyj bucket_url z bazy danych zamiast endpointu API
@@ -1320,7 +1341,6 @@ class GatewayXMLExporter(BaseXMLExporter):
                         # Fallback: URL do endpointu API jeśli brak bucket_url
                         # Użyj oryginalnej nazwy pliku z bazy (UTC)
                         url = f"{base_url}/mpd/{filename}"
-                    print(f"DEBUG: url = {url}")
                     change_element.set("url", url)
 
                     # Hash bazujący na nazwie pliku full_change.xml
@@ -1372,8 +1392,6 @@ class GatewayXMLExporter(BaseXMLExporter):
                     change_element.set("hash", hash_value)
                     change_element.set("changed", change_time_str)
 
-                    print(
-                        f"DEBUG: Dodano element change do XML: url={url}, changed={change_time_str}")
                     logger.info(
                         f"API endpoint full_change: hash={hash_value}, changed={change_time_str}, filename={full_change_file.filename}")
                     logger.info(
@@ -1545,8 +1563,6 @@ class GatewayXMLExporter(BaseXMLExporter):
             logger.warning(f"Błąd pobierania producers.xml z bazy: {str(e)}")
 
     def generate_xml(self, request_time=None):
-        print("=== ROZPOCZYNAM GatewayXMLExporter.generate_xml ===")
-        logger.info("=== ROZPOCZYNAM GatewayXMLExporter.generate_xml ===")
         root = ET.Element("provider_description")
         root.set("file_format", "IOF")
         root.set("version", "3.0")
@@ -1691,7 +1707,11 @@ class CategoriesXMLExporter(BaseXMLExporter):
             categories_file.save(using='MPD')
 
         bucket_url = self.save_to_bucket(local_path)
+
+        # Zaktualizuj rekord w bazie z bucket_url
         if bucket_url:
+            categories_file.bucket_url = bucket_url
+            categories_file.save(using='MPD')
             print('✅ Eksport XML zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
@@ -1836,9 +1856,55 @@ class FullChangeXMLExporter(BaseXMLExporter):
             logger.error(
                 f"Błąd podczas zapisywania rekordu full_change: {str(e)}")
 
+    def has_products_to_export(self):
+        """Sprawdź czy są produkty do wyeksportowania"""
+        from .models import ProductVariants
+        from django.db.models import Q
+
+        # Eksport przyrostowy - tylko produkty zmienione od ostatniego full_change.xml
+        last_full_change_date = get_last_full_change_xml_date()
+        if last_full_change_date:
+            # Sprawdź czy są produkty zmienione po ostatnim full_change.xml
+            variants_count = ProductVariants.objects.using('MPD').filter(
+                iai_product_id__isnull=False
+            ).filter(
+                # Wariant zmieniony
+                Q(updated_at__gte=last_full_change_date) |
+                # Produkt zmieniony
+                Q(product__updated_at__gte=last_full_change_date) |
+                # Obraz zmieniony
+                Q(product__images__updated_at__gte=last_full_change_date)
+            ).distinct().count()
+
+            logger.info(
+                f"Sprawdzam produkty do full_change.xml - znaleziono {variants_count} produktów zmienionych od: {last_full_change_date.strftime('%Y-%m-%d %H:%M:%S')}")
+            return variants_count > 0
+        else:
+            # Pierwsze uruchomienie - sprawdź czy są jakiekolwiek produkty
+            variants_count = ProductVariants.objects.using('MPD').filter(
+                iai_product_id__isnull=False
+            ).count()
+
+            logger.info(
+                f"Pierwsze uruchomienie full_change.xml - znaleziono {variants_count} produktów")
+            return variants_count > 0
+
     def export(self):
         """Przesłonięta metoda export aby zapisać rekord pliku"""
+        # Sprawdź czy są produkty do wyeksportowania
+        if not self.has_products_to_export():
+            print(
+                'ℹ️ Brak produktów do wyeksportowania w full_change.xml - pomijam generowanie')
+            return {'bucket_url': None, 'local_path': None, 'skipped': True}
+
         xml_content = self.generate_xml()
+
+        # Sprawdź czy XML zawiera produkty (nie jest pusty)
+        if '<product id=' not in xml_content:
+            print(
+                'ℹ️ Wygenerowany full_change.xml jest pusty (brak produktów) - pomijam zapisywanie')
+            return {'bucket_url': None, 'local_path': None, 'skipped': True}
+
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
 
@@ -1894,26 +1960,31 @@ class FullChangeXMLExporter(BaseXMLExporter):
             local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         xml.append('  <products language="pol">')
 
-        # Tracking nie jest używane w nowej logice IOF 3.0 (30 minut dla wszystkich produktów)
-
-        # Oblicz timestamp z 30 minut temu (specyfikacja IOF 3.0)
-        thirty_minutes_ago = now - timedelta(minutes=30)
-
         if incremental:
-            # Eksport przyrostowy - tylko produkty zmienione w ciągu ostatnich 30 minut (IOF 3.0)
-            # Sprawdź zmiany w wariantach, produktach i obrazach - WSZYSTKIE produkty
-            variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                iai_product_id__isnull=False
-            ).filter(
-                Q(updated_at__gte=thirty_minutes_ago) |  # Wariant zmieniony
-                # Produkt zmieniony
-                Q(product__updated_at__gte=thirty_minutes_ago) |
-                # Obraz zmieniony
-                Q(product__images__updated_at__gte=thirty_minutes_ago)
-            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand').distinct()
+            # Eksport przyrostowy - tylko produkty zmienione od ostatniego full_change.xml
+            last_full_change_date = get_last_full_change_xml_date()
+            if last_full_change_date:
+                # Generuj tylko produkty zmienione po ostatnim full_change.xml
+                variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                    iai_product_id__isnull=False
+                ).filter(
+                    # Wariant zmieniony
+                    Q(updated_at__gte=last_full_change_date) |
+                    # Produkt zmieniony
+                    Q(product__updated_at__gte=last_full_change_date) |
+                    # Obraz zmieniony
+                    Q(product__images__updated_at__gte=last_full_change_date)
+                ).select_related('product', 'size', 'color', 'producer_color', 'product__brand').distinct()
 
-            logger.info(
-                f"Eksport przyrostowy full_change.xml (IOF 3.0) - produkty zmienione od: {thirty_minutes_ago.strftime('%Y-%m-%d %H:%M:%S')} (zgodnie z IOF 3.0)")
+                logger.info(
+                    f"Eksport przyrostowy full_change.xml - produkty zmienione od: {last_full_change_date.strftime('%Y-%m-%d %H:%M:%S')}")
+            else:
+                # Pierwsze uruchomienie - generuj wszystkie produkty
+                variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                    iai_product_id__isnull=False
+                ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+                logger.info(
+                    "Pierwsze uruchomienie full_change.xml - wszystkie produkty")
         else:
             # Pełny eksport - wszystkie produkty
             variants_with_iai = ProductVariants.objects.using('MPD').filter(
@@ -2205,7 +2276,7 @@ def export_full_xml():
 
 
 def export_incremental_xml():
-    """Eksport pełnej oferty do full.xml (dawniej przyrostowy)"""
+    """Eksport przyrostowy - tylko nowe produkty do full.xml"""
     exporter = FullXMLExporter()
     return exporter.export_incremental()
 
@@ -2218,7 +2289,7 @@ def export_full_change_xml():
 
 
 def export_incremental_full_change_xml():
-    """Eksport przyrostowy zmienionych produktów do full_change.xml z datą w nazwie"""
+    """Eksport przyrostowy - tylko zmienione produkty do full_change.xml z datą w nazwie"""
     exporter = FullChangeXMLExporter()
     result = exporter.export()
     return result.get('bucket_url', '') if result else ''
@@ -2403,7 +2474,11 @@ class SizesXMLExporter(BaseXMLExporter):
             sizes_file.save(using='MPD')
 
         bucket_url = self.save_to_bucket(local_path)
+
+        # Zaktualizuj rekord w bazie z bucket_url
         if bucket_url:
+            sizes_file.bucket_url = bucket_url
+            sizes_file.save(using='MPD')
             print('✅ Eksport XML zakończony pomyślnie!')
             print(f'📁 URL: {bucket_url}')
             print(f'📄 Lokalnie zapisano: {local_path}')
