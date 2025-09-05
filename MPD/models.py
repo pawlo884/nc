@@ -93,6 +93,23 @@ class Products(models.Model):
         return self.brand.name if self.brand else 'Brak marki'
 
 
+class ProductAttribute(models.Model):
+    product = models.ForeignKey(
+        Products, on_delete=models.CASCADE, related_name='product_attributes')
+    attribute = models.ForeignKey(Attributes, on_delete=models.CASCADE)
+
+    class Meta:
+        managed = True
+        db_table = 'product_attributes'
+        app_label = 'MPD'
+        verbose_name = 'Atrybut produktu'
+        verbose_name_plural = 'Atrybuty produktów'
+        unique_together = ('product', 'attribute')
+
+    def __str__(self):
+        return str(self.attribute.name)
+
+
 class Sizes(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255, blank=True, null=True)

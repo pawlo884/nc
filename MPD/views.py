@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .models import Products, ProductSet, ProductSetItem, ProductPaths
+from .models import Products, ProductSet, ProductSetItem, ProductPaths, ProductAttribute
 from django.http import JsonResponse
 from django.db import connections
 from django.utils import timezone
@@ -568,4 +568,93 @@ def manage_product_paths(request):
         return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
     except Exception as e:
         logger.error(f"Błąd podczas zarządzania ścieżkami produktu: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
+
+
+@csrf_exempt
+def manage_product_attributes(request):
+    """
+    Endpoint do zarządzania atrybutami produktów
+    Obsługuje dodawanie i usuwanie atrybutów
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        action = data.get('action')  # 'add' lub 'remove'
+
+        if not all([product_id, action]):
+            return JsonResponse({'status': 'error', 'message': 'Brak wymaganych parametrów'}, status=400)
+
+        if action not in ['add', 'remove']:
+            return JsonResponse({'status': 'error', 'message': 'Nieprawidłowa akcja'}, status=400)
+
+        # Konwertuj product_id na int
+        try:
+            product_id = int(product_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format ID produktu'}, status=400)
+
+        # Sprawdź czy produkt istnieje
+        try:
+            product = Products.objects.using('MPD').get(id=product_id)
+        except Products.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Produkt nie istnieje'}, status=404)
+
+        if action == 'add':
+            # Dodaj atrybuty do produktu
+            attribute_ids = data.get('attribute_ids', [])
+            if not attribute_ids:
+                return JsonResponse({'status': 'error', 'message': 'Brak atrybutów do dodania'}, status=400)
+
+            added_count = 0
+            for attribute_id in attribute_ids:
+                product_attribute, created = ProductAttribute.objects.using('MPD').get_or_create(
+                    product_id=product_id,
+                    attribute_id=attribute_id
+                )
+                if created:
+                    added_count += 1
+
+            message = f'Dodano {added_count} atrybutów do produktu {product.name}'
+
+        elif action == 'remove':
+            # Usuń atrybut z produktu
+            attribute_id = data.get('attribute_id')
+            if not attribute_id:
+                return JsonResponse({'status': 'error', 'message': 'Brak ID atrybutu do usunięcia'}, status=400)
+
+            # Konwertuj na int jeśli to string
+            try:
+                attribute_id = int(attribute_id)
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format ID atrybutu'}, status=400)
+
+            logger.info(
+                f"Usuwanie atrybutu: product_id={product_id}, attribute_id={attribute_id}")
+
+            deleted_count, _ = ProductAttribute.objects.using('MPD').filter(
+                product_id=product_id,
+                attribute_id=attribute_id
+            ).delete()
+
+            if deleted_count > 0:
+                message = f'Usunięto atrybut z produktu {product.name}'
+            else:
+                message = f'Atrybut nie był przypisany do produktu {product.name}'
+
+        logger.info(f"Zarządzanie atrybutami produktu: {message}")
+
+        return JsonResponse({
+            'status': 'success',
+            'message': message,
+            'product_id': product_id,
+            'action': action
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Błąd podczas zarządzania atrybutami produktu: {str(e)}")
         return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
