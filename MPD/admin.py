@@ -43,8 +43,32 @@ class HasRetailPricesFilter(SimpleListFilter):
 class ProductsAdmin(admin.ModelAdmin):
     show_full_result_count = False
     list_per_page = 30
-    fields = ['visibility', 'name', 'short_description', 'description', 'brand', 'show_variants',
-              'show_images', 'show_related_products', 'edit_retail_prices']  # karta produktu
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('name', 'short_description', 'description', 'brand', 'series', 'unit', 'visibility')
+        }),
+        ('Warianty produktu', {
+            'fields': ('show_variants',),
+            'description': 'Przegląd wszystkich wariantów produktu z kolorami, rozmiarami i cenami'
+        }),
+        ('Zdjęcia produktu', {
+            'fields': ('show_images',),
+            'description': 'Zdjęcia produktu pogrupowane według kolorów'
+        }),
+        ('Powiązane produkty', {
+            'fields': ('show_related_products',),
+            'description': 'Zestawy i produkty z tej samej serii'
+        }),
+        ('Ceny detaliczne', {
+            'fields': ('edit_retail_prices',),
+            'description': 'Edycja cen detalicznych dla wszystkich wariantów'
+        }),
+        ('Metadane', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+            'description': 'Informacje o dacie utworzenia i ostatniej aktualizacji'
+        }),
+    )
     list_display = ['id', 'name', 'description',
                     'brand', 'updated_at', 'visibility']  # widok listy produktów
     list_filter = [
@@ -58,7 +82,7 @@ class ProductsAdmin(admin.ModelAdmin):
     search_fields = ['id', 'name', 'description',
                      'brand__name', 'series__name']
     readonly_fields = ['show_variants', 'show_images',
-                       'show_related_products', 'edit_retail_prices']
+                       'show_related_products', 'edit_retail_prices', 'created_at', 'updated_at']
     change_form_template = 'admin/MPD/products/change_form.html'
     actions = ['make_visible', 'make_hidden']
 

@@ -1978,7 +1978,7 @@ WAŻNE:
 
     def create_series_name(self, model_name):
         """
-        Tworzy nazwę serii według wzoru: "Strój kąpielowy {nazwa modelu} - Lupo Line"
+        Tworzy nazwę serii według wzoru: "strój kąpielowy {nazwa modelu} - Lupo Line"
 
         Args:
             model_name (str): Nazwa modelu
@@ -1987,9 +1987,9 @@ WAŻNE:
             str: Nazwa serii
         """
         if not model_name:
-            return "Strój kąpielowy - Lupo Line"
+            return "strój kąpielowy - Lupo Line"
 
-        series_name = f"Strój kąpielowy {model_name} - Lupo Line"
+        series_name = f"strój kąpielowy {model_name} - Lupo Line"
         print(f"📝 Utworzono nazwę serii: '{series_name}'")
         return series_name
 

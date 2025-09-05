@@ -407,6 +407,9 @@ class Units(models.Model):
         verbose_name = 'Jednostka'
         verbose_name_plural = 'Jednostki'
 
+    def __str__(self):
+        return str(self.name) if self.name else f'Jednostka {self.unit_id}'
+
 
 class FabricComponent(models.Model):
     name = models.CharField(max_length=100, unique=True)
