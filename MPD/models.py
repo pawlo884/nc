@@ -77,6 +77,8 @@ class Products(models.Model):
         'Units', on_delete=models.CASCADE, db_column='unit', to_field='unit_id', null=True, blank=True)
     visibility = models.BooleanField(
         default=True, verbose_name='Widoczność w sklepie')
+    exported_to_iai = models.BooleanField(
+        default=False, verbose_name='Wyeksportowany do IAI')
     objects = models.Manager()
 
     class Meta:

@@ -63,19 +63,13 @@ def get_last_full_change_xml_date():
 
 def get_products_exported_in_full_xml():
     """Pobierz produkty, które były wyeksportowane w full.xml"""
-    from .models import ProductVariants
+    from .models import Products
     try:
-        # Pobierz datę ostatniego full.xml
-        last_full_date = get_last_full_xml_date()
-        if last_full_date:
-            # Produkty, które były w full.xml (utworzone przed ostatnim full.xml)
-            products_in_full = ProductVariants.objects.using('MPD').filter(
-                product__created_at__lt=last_full_date
-            ).values_list('product_id', flat=True).distinct()
-            return set(products_in_full)
-        else:
-            # Jeśli nie ma full.xml, to wszystkie produkty są "w full.xml"
-            return set()
+        # Pobierz produkty, które mają ustawione exported_to_iai=True
+        products_in_full = Products.objects.using('MPD').filter(
+            exported_to_iai=True
+        ).values_list('id', flat=True).distinct()
+        return set(products_in_full)
     except Exception as e:
         logger.error(f"Błąd podczas pobierania produktów z full.xml: {str(e)}")
         return set()
@@ -507,7 +501,7 @@ class FullXMLExporter(BaseXMLExporter):
 
     def save_full_record(self, bucket_url, local_path):
         """Zapisz rekord o wygenerowanym pliku full.xml"""
-        from .models import FullChangeFile
+        from .models import FullChangeFile, Products
         from django.utils import timezone
         try:
             now = timezone.now()
@@ -522,7 +516,22 @@ class FullXMLExporter(BaseXMLExporter):
                 file_size=os.path.getsize(
                     local_path) if os.path.exists(local_path) else 0
             )
+
+            # Ustaw exported_to_iai=True dla wszystkich produktów, które były eksportowane w full.xml
+            # Pobierz wszystkie produkty, które mają iai_product_id (są gotowe do eksportu)
+            from .models import ProductVariants
+            exported_product_ids = ProductVariants.objects.using('MPD').filter(
+                iai_product_id__isnull=False
+            ).values_list('product_id', flat=True).distinct()
+
+            # Ustaw exported_to_iai=True dla tych produktów
+            Products.objects.using('MPD').filter(
+                id__in=exported_product_ids
+            ).update(exported_to_iai=True)
+
             print(f"✅ Zapisano rekord pliku full.xml: {timestamp}")
+            print(
+                f"✅ Oznaczono {len(exported_product_ids)} produktów jako wyeksportowane do IAI")
         except Exception as e:
             print(f"❌ Błąd podczas zapisywania rekordu full.xml: {str(e)}")
 
@@ -1884,43 +1893,51 @@ class FullChangeXMLExporter(BaseXMLExporter):
         from .models import ProductVariants
         from django.db.models import Q
 
-        # Eksport przyrostowy - tylko produkty zmienione od ostatniego full_change.xml
-        last_full_change_date = get_last_full_change_xml_date()
-        if last_full_change_date:
-            # Pobierz produkty, które były w full.xml
-            products_in_full = get_products_exported_in_full_xml()
+        try:
+            # Eksport przyrostowy - tylko produkty zmienione od ostatniego full_change.xml
+            last_full_change_date = get_last_full_change_xml_date()
+            if last_full_change_date:
+                # Pobierz produkty, które były w full.xml
+                products_in_full = get_products_exported_in_full_xml()
 
-            if products_in_full:
-                # Sprawdź czy są produkty zmienione po ostatnim full_change.xml, które były w full.xml
-                variants_count = ProductVariants.objects.using('MPD').filter(
-                    product_id__in=products_in_full
-                ).filter(
-                    # Wariant zmieniony
-                    Q(updated_at__gte=last_full_change_date) |
-                    # Produkt zmieniony
-                    Q(product__updated_at__gte=last_full_change_date) |
-                    # Obraz zmieniony
-                    Q(product__images__updated_at__gte=last_full_change_date)
-                ).distinct().count()
+                if products_in_full:
+                    # Sprawdź czy są produkty zmienione po ostatnim full_change.xml, które były w full.xml
+                    variants_count = ProductVariants.objects.using('MPD').filter(
+                        product_id__in=products_in_full
+                    ).filter(
+                        # Wariant zmieniony
+                        Q(updated_at__gte=last_full_change_date) |
+                        # Produkt zmieniony
+                        Q(product__updated_at__gte=last_full_change_date) |
+                        # Obraz zmieniony
+                        Q(product__images__updated_at__gte=last_full_change_date)
+                    ).distinct().count()
+                else:
+                    variants_count = 0
+
+                logger.info(
+                    f"Sprawdzam produkty do full_change.xml - znaleziono {variants_count} produktów zmienionych od: {last_full_change_date.strftime('%Y-%m-%d %H:%M:%S')}, produkty w full.xml: {len(products_in_full)}")
+                return variants_count > 0
             else:
-                variants_count = 0
-
-            logger.info(
-                f"Sprawdzam produkty do full_change.xml - znaleziono {variants_count} produktów zmienionych od: {last_full_change_date.strftime('%Y-%m-%d %H:%M:%S')}, produkty w full.xml: {len(products_in_full)}")
-            return variants_count > 0
-        else:
-            # Pierwsze uruchomienie - sprawdź czy są produkty, które były w full.xml
-            products_in_full = get_products_exported_in_full_xml()
-            if products_in_full:
-                variants_count = ProductVariants.objects.using('MPD').filter(
-                    product_id__in=products_in_full
-                ).count()
-            else:
-                variants_count = 0
-
-            logger.info(
-                f"Pierwsze uruchomienie full_change.xml - znaleziono {variants_count} produktów z full.xml")
-            return variants_count > 0
+                # Pierwsze uruchomienie - sprawdź czy są produkty, które były w full.xml
+                products_in_full = get_products_exported_in_full_xml()
+                if products_in_full:
+                    variants_count = ProductVariants.objects.using('MPD').filter(
+                        product_id__in=products_in_full
+                    ).count()
+                    logger.info(
+                        f"Pierwsze uruchomienie full_change.xml - znaleziono {variants_count} produktów z full.xml")
+                    return variants_count > 0
+                else:
+                    # Jeśli nie ma produktów w full.xml (brak dostępu do bazy), eksportuj wszystkie produkty
+                    logger.warning(
+                        "Brak produktów w full.xml (prawdopodobnie brak dostępu do bazy) - eksportuję wszystkie produkty")
+                    return True
+        except Exception as e:
+            # Jeśli nie ma dostępu do bazy danych, eksportuj wszystkie produkty
+            logger.warning(
+                f"Brak dostępu do bazy danych w has_products_to_export: {str(e)} - eksportuję wszystkie produkty")
+            return True
 
     def export(self):
         """Przesłonięta metoda export aby zapisać rekord pliku"""
@@ -1976,7 +1993,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
         xml.append('      </iaiext:navigation>')
         return '\n'.join(xml)
 
-    def generate_xml(self, incremental=True):
+    def generate_xml(self, incremental=False):
         from django.utils.html import escape
         from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths
         from datetime import timedelta

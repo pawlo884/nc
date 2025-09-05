@@ -296,6 +296,14 @@ def generate_full_change_xml(request):
     exporter = FullChangeXMLExporter()
     exporter_result = exporter.export()
 
+    # Sprawdź czy eksport został pominięty (brak produktów do wyeksportowania)
+    if exporter_result.get('skipped', False) or exporter_result.get('local_path') is None:
+        return JsonResponse({
+            'status': 'skipped',
+            'message': 'Brak produktów do wyeksportowania w full_change.xml',
+            'bucket_url': None
+        })
+
     # Automatycznie zaktualizuj wszystkie gateway.xml
     update_all_gateways()
 

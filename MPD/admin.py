@@ -92,7 +92,8 @@ class ProductsAdmin(admin.ModelAdmin):
     @admin.action(description='Oznacz wybrane produkty jako widoczne')
     def make_visible(self, request, queryset):
         """Masowa akcja - oznacz produkty jako widoczne"""
-        updated = queryset.update(visibility=True)
+        from django.utils import timezone
+        updated = queryset.update(visibility=True, updated_at=timezone.now())
         self.message_user(
             request,
             f'{updated} produktów zostało oznaczonych jako widoczne.',
@@ -102,7 +103,8 @@ class ProductsAdmin(admin.ModelAdmin):
     @admin.action(description='Oznacz wybrane produkty jako niewidoczne')
     def make_hidden(self, request, queryset):
         """Masowa akcja - oznacz produkty jako niewidoczne"""
-        updated = queryset.update(visibility=False)
+        from django.utils import timezone
+        updated = queryset.update(visibility=False, updated_at=timezone.now())
         self.message_user(
             request,
             f'{updated} produktów zostało oznaczonych jako niewidoczne.',
