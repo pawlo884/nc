@@ -25,19 +25,20 @@ class ProductsAdmin(admin.ModelAdmin):
     change_form_template = 'admin/MPD/products/change_form.html'
 
     def get_queryset(self, request):
-        return super().get_queryset(request).using('MPD')
+        return super().get_queryset(request).using('MPD').select_related('brand', 'series', 'unit')
 
     @admin.display(description="Edycja cen detalicznych")
     def edit_retail_prices(self, obj):
-        variants = list(ProductVariants.objects.filter(product=obj))
+        variants = list(ProductVariants.objects.filter(product=obj)
+                        .select_related('color', 'size'))
         if not variants:
             return "Brak wariantów produktu"
         variant_ids = [v.variant_id for v in variants]
         # Pobierz EANy i ceny detaliczne jednym zapytaniem
         sources_map = {s.variant.variant_id: s.ean for s in ProductvariantsSources.objects.filter(
-            variant__variant_id__in=variant_ids)}
+            variant__variant_id__in=variant_ids).select_related('variant')}
         retail_map = {r.variant.variant_id: r.retail_price for r in ProductVariantsRetailPrice.objects.using(
-            'MPD').filter(variant__variant_id__in=variant_ids)}
+            'MPD').filter(variant__variant_id__in=variant_ids).select_related('variant')}
         grouped = {}
         for variant in variants:
             color_name = variant.color.name if variant.color else "-"
@@ -56,7 +57,7 @@ class ProductsAdmin(admin.ModelAdmin):
         html += "<button type='button' onclick='setAllRetailPrices()' style='margin-left:8px;'>Ustaw dla wszystkich</button>"
         html += "</div>"
         html += "<table style='border-collapse:collapse; width:100%;'>"
-        html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>kolor</th><th style='border:1px solid #ccc;padding:4px 8px;'>rozmiar</th><th style='border:1px solid #ccc;padding:4px 8px;'>ean</th><th style='border:1px solid #ccc;padding:4px 8px;'>cena detaliczna</th><th style='border:1px solid #ccc;padding:4px 8px;'>VAT</th><th style='border:1px solid #ccc;padding:4px 8px;'>waluta</th></tr>"
+        html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>kolor</th><th style='border:1px solid #ccc;padding:4px 8px;'>rozmiar</th><th style='border:1px solid #ccc;padding:4px 8px;'>ean</th><th style='border:1px solid #ccc;padding:4px 8px;'>cena detaliczna</th><th style='border:1px solid #ccc;padding:4px 8px;'>VAT_id</th><th style='border:1px solid #ccc;padding:4px 8px;'>waluta</th></tr>"
         for (color_name, size_name, ean), variant_ids in grouped.items():
             retail_price = retail_map.get(variant_ids[0], "")
             html += "<tr>"
@@ -155,18 +156,26 @@ class ProductsAdmin(admin.ModelAdmin):
 
     @admin.display(description="Warianty produktu")
     def show_variants(self, obj):
-        variants = list(ProductVariants.objects.filter(product=obj))
+        # Zoptymalizowane zapytanie z select_related i prefetch_related
+        variants = list(ProductVariants.objects.filter(product=obj)
+                        .select_related('color', 'producer_color', 'size')
+                        .prefetch_related('productvariantssources_set__source'))
+
         if not variants:
             return "Brak wariantów"
+
         variant_ids = [v.variant_id for v in variants]
+
         # Pobierz źródła, EANy i ceny detaliczne dla wszystkich wariantów jednym zapytaniem
         sources_qs = ProductvariantsSources.objects.filter(
-            variant__variant_id__in=variant_ids)
+            variant__variant_id__in=variant_ids).select_related('source')
         sources_map = {}
         for s in sources_qs:
             sources_map.setdefault(s.variant.variant_id, []).append(s)
+
         retail_map = {r.variant.variant_id: r.retail_price for r in ProductVariantsRetailPrice.objects.using(
             'MPD').filter(variant__variant_id__in=variant_ids)}
+
         # Pobierz stock_and_prices dla wszystkich variant_id i source_id
         from django.db import connections
         with connections['MPD'].cursor() as cursor:
@@ -228,16 +237,20 @@ class ProductsAdmin(admin.ModelAdmin):
         print(f"\n=== DEBUG: show_images dla produktu {obj.id} ===")
 
         # Grupowanie zdjęć po nazwie koloru producenta lub zwykłego koloru (nie używamy variant_id)
+        # Zoptymalizowane zapytanie z prefetch_related
         images = obj.images.all() if hasattr(obj, 'images') else []
         # Pobierz wszystkie unikalne kolory producenta i zwykłe kolory z wariantów produktu
+        # Zoptymalizowane zapytania z select_related
         producer_colors = (
             ProductVariants.objects.filter(
                 product=obj, producer_color__isnull=False)
+            .select_related('producer_color')
             .values_list('producer_color__id', 'producer_color__name')
             .distinct()
         )
         normal_colors = (
             ProductVariants.objects.filter(product=obj, color__isnull=False)
+            .select_related('color')
             .values_list('color__id', 'color__name')
             .distinct()
         )
@@ -313,20 +326,23 @@ class ProductsAdmin(admin.ModelAdmin):
     def show_related_products(self, obj):
         html = ""
         # Zestawy, do których należy ten produkt
+        # Zoptymalizowane zapytanie
         set_items = list(ProductSetItem.objects.filter(product_id=obj.id))
         set_ids = [si.product_set_id for si in set_items]
         if set_items:
             html += "<b>Zestawy, do których należy ten produkt:</b>"
             for set_id in set_ids:
                 try:
-                    set_obj = ProductSet.objects.get(id=set_id)
+                    set_obj = ProductSet.objects.select_related(
+                        'mapped_product').get(id=set_id)
                     set_products = ProductSetItem.objects.filter(
                         product_set_id=set_id).exclude(product_id=obj.id)
                     html += f"<div style='margin-bottom:8px;'><span style='font-weight:600;'>Zestaw: {set_obj.name} (ID: {set_obj.id})</span></div>"
                     html += "<div style='display:flex; flex-direction:row; flex-wrap:wrap; gap:24px; align-items:flex-start; margin-bottom:16px; width:100%;'>"
                     for sp in set_products:
                         try:
-                            prod = Products.objects.get(id=sp.product_id)
+                            prod = Products.objects.select_related(
+                                'brand').prefetch_related('images').get(id=sp.product_id)
                             admin_url = f"/admin/MPD/products/{prod.id}/change/"
                             img_html = ""
                             images_rel = getattr(prod, 'images', None)
@@ -352,7 +368,10 @@ class ProductsAdmin(admin.ModelAdmin):
         if series and series_products:
             html += f"<b>Produkty z tej samej serii ({series_name}):</b>"
             html += "<div style='display:flex; flex-direction:row; gap:24px; align-items:flex-start; margin-bottom:8px;'>"
-            for p in series_products:
+            # Zoptymalizowane zapytanie dla produktów z serii
+            series_products_optimized = Products.objects.filter(
+                series=series).exclude(id=obj.id).select_related('brand').prefetch_related('images')
+            for p in series_products_optimized:
                 admin_url = f"/admin/MPD/products/{p.id}/change/"
                 img_html = ""
                 images_rel = getattr(p, 'images', None)

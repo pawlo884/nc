@@ -1,5 +1,329 @@
 <?xml version="1.0" encoding="utf-8"?>
-<offer file_format="IOF" version="3.0" generated="2025-09-04 09:15:53" expires="2025-09-05 09:15:53" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+<offer file_format="IOF" version="3.0" generated="2025-09-05 08:14:07" expires="2025-09-06 08:14:07" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
   <products language="pol">
+    <product id="349" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-05 08:10:54"/>
+      <iaiext:modification_date datetime="2025-09-05 08:12:25"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Sofia Big</name>
+        <short_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z ozdobnym pasem to doskonałe połączenie stylu i komfortu.]]></short_desc>
+        <long_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z ozdobnym pasem to doskonałe połączenie stylu i komfortu. Pas w pomarańczowym kolorze, w panterkę, nie tylko zdobi, ale także maskuje ewentualne mankamenty figury, optycznie modelując sylwetkę. Figi mają wyższy stan, co zapewnia komfort noszenia i dodatkowe podparcie dla brzucha, a pełny tył gwarantuje elegancję i dyskrecję.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="48" name="czarny"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="235" code="349-235" name="36" panel_name="36_bielizna" iaiext:code_external="1020-156" code_producer="5905220652426">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="236" code="349-236" name="38" panel_name="38_bielizna" iaiext:code_external="1020-157" code_producer="5905220652433">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="238" code="349-238" name="48" panel_name="48_bielizna" iaiext:code_external="1020-162" code_producer="5905220652488">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="239" code="349-239" name="44" panel_name="44_bielizna" iaiext:code_external="1020-160" code_producer="5905220652464">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="349-240" name="40" panel_name="40_bielizna" iaiext:code_external="1020-158" code_producer="5905220652440">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="349-241" name="42" panel_name="42_bielizna" iaiext:code_external="1020-159" code_producer="5905220652457">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="242" code="349-242" name="46" panel_name="46_bielizna" iaiext:code_external="1020-161" code_producer="5905220652471">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1020/1020_1_Black.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1020/1020_2_Black.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="348" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-05 08:09:23"/>
+      <iaiext:modification_date datetime="2025-09-05 08:09:23"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Coral</name>
+        <short_desc><![CDATA[Figi kąpielowe Coral to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania.]]></short_desc>
+        <long_desc><![CDATA[Figi kąpielowe Coral to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania. Klasyczny krój optycznie wydłuża nogi, podkreśla kobiece kształty i idealnie dopasowuje się do sylwetki. To propozycja dla kobiet, które cenią najwyższą jakość materiałów, komfort użytkowania oraz stylową elegancję w minimalistycznym wydaniu.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="90" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="235" code="348-235" name="36" panel_name="36_bielizna" iaiext:code_external="1019-152" code_producer="5905220656608">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="236" code="348-236" name="38" panel_name="38_bielizna" iaiext:code_external="1019-153" code_producer="5905220656615">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="348-240" name="40" panel_name="40_bielizna" iaiext:code_external="1019-154" code_producer="5905220656622">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="348-241" name="42" panel_name="42_bielizna" iaiext:code_external="1019-155" code_producer="5905220656639">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1019/1019_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1019/1019_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="346" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-05 08:06:30"/>
+      <iaiext:modification_date datetime="2025-09-05 08:06:30"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Mirage Big</name>
+        <short_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z ozdobnym pasem to doskonałe połączenie stylu i komfortu.]]></short_desc>
+        <long_desc><![CDATA[Damskie figi kąpielowe w czarnym kolorze z ozdobnym pasem to doskonałe połączenie stylu i komfortu. Pas z kolorowymi, poziomymi paskami nie tylko zdobi, ale także maskuje ewentualne mankamenty figury, optycznie modelując sylwetkę. Figi mają wyższy stan, co zapewnia komfort noszenia i dodatkowe podparcie dla brzucha, a pełny tył gwarantuje elegancję i dyskrecję.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="48" name="czarny"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="235" code="346-235" name="36" panel_name="36_bielizna" iaiext:code_external="1017-143" code_producer="5905220673889">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="236" code="346-236" name="38" panel_name="38_bielizna" iaiext:code_external="1017-144" code_producer="5905220673896">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="239" code="346-239" name="44" panel_name="44_bielizna" iaiext:code_external="1017-147" code_producer="5905220673926">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="346-240" name="40" panel_name="40_bielizna" iaiext:code_external="1017-145" code_producer="5905220673902">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="346-241" name="42" panel_name="42_bielizna" iaiext:code_external="1017-146" code_producer="5905220673919">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1017/1017_1_Black.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1017/1017_2_Black.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="345" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-05 08:05:07"/>
+      <iaiext:modification_date datetime="2025-09-05 08:05:07"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Ana</name>
+        <short_desc><![CDATA[Figi kąpielowe Ana to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania.]]></short_desc>
+        <long_desc><![CDATA[Figi kąpielowe Ana to fason z niskim stanem, który świetnie sprawdzi się dla miłośniczek opalania. Klasyczny krój optycznie wydłuża nogi, podkreśla kobiece kształty i idealnie dopasowuje się do sylwetki. To propozycja dla kobiet, które cenią najwyższą jakość materiałów, komfort użytkowania oraz stylową elegancję w minimalistycznym wydaniu.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="253" name="różowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="235" code="345-235" name="36" panel_name="36_bielizna" iaiext:code_external="1016-139" code_producer="5905220681327">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="236" code="345-236" name="38" panel_name="38_bielizna" iaiext:code_external="1016-140" code_producer="5905220681334">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="345-240" name="40" panel_name="40_bielizna" iaiext:code_external="1016-141" code_producer="5905220681341">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="345-241" name="42" panel_name="42_bielizna" iaiext:code_external="1016-142" code_producer="5905220681358">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1016/1016_1_Coral.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1016/1016_2_Coral.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="350" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-05 08:12:25"/>
+      <iaiext:modification_date datetime="2025-09-05 08:12:25"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Sofia</name>
+        <short_desc><![CDATA[Klasyczne figi kąpielowe w czarnym kolorze, góra ozdobiona lamówką z motywem panterki.]]></short_desc>
+        <long_desc><![CDATA[Klasyczne figi kąpielowe w czarnym kolorze, góra ozdobiona lamówką z motywem panterki. Po bokach wiązane na troczki, które umożliwiają regulację i idealne dopasowanie do sylwetki.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="48" name="czarny"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="236" code="350-236" name="38" panel_name="38_bielizna" iaiext:code_external="1021-163" code_producer="5905220653355">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+        <size id="240" code="350-240" name="40" panel_name="40_bielizna" iaiext:code_external="1021-164" code_producer="5905220653362">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="350-241" name="42" panel_name="42_bielizna" iaiext:code_external="1021-165" code_producer="5905220653379">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1021/1021_1_Black.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1021/1021_2_Black.jpg"/>
+        </large>
+      </images>
+    </product>
+    <product id="347" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-05 08:07:50"/>
+      <iaiext:modification_date datetime="2025-09-05 08:09:23"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Coral Big</name>
+        <short_desc><![CDATA[Klasyczne figi kąpielowe z motywem rafy koralowej w pięknych i ciepłych kolorach lata.]]></short_desc>
+        <long_desc><![CDATA[Klasyczne figi kąpielowe z motywem rafy koralowej w pięknych i ciepłych kolorach lata. Fason stworzony dla miłośniczek bardziej zabudowanych majteczek, dzięki czemu każda kobieta czuje się w nich komfortowo oraz elegancko.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="90" name="wielokolorowy"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="236" code="347-236" name="38" panel_name="38_bielizna" iaiext:code_external="1018-148" code_producer="5905220656349">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="347-240" name="40" panel_name="40_bielizna" iaiext:code_external="1018-149" code_producer="5905220656356">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="347-241" name="42" panel_name="42_bielizna" iaiext:code_external="1018-150" code_producer="5905220656363">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="242" code="347-242" name="46" panel_name="46_bielizna" iaiext:code_external="1018-151" code_producer="5905220656387">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="0"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1018/1018_1_Multicolor.jpg"/>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1018/1018_2_Multicolor.jpg"/>
+        </large>
+      </images>
+    </product>
   </products>
 </offer>
