@@ -170,25 +170,14 @@ class FullXMLExporter(BaseXMLExporter):
         # Sprawdź czy generować tylko nowe produkty (incremental=True) czy wszystkie
         print(f"FullXMLExporter.generate_xml - incremental={incremental}")
         if incremental:
-            # Pobierz datę ostatniego pliku full.xml
-            last_full_date = get_last_full_xml_date()
-            if last_full_date:
-                # Generuj tylko nowe produkty dodane po ostatnim full.xml
-                variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                    iai_product_id__isnull=False,
-                    product__created_at__gte=last_full_date
-                ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
-                count = variants_with_iai.count()
-                print(
-                    f"Generowanie przyrostowe full.xml - znaleziono {count} nowych produktów od: {last_full_date.strftime('%Y-%m-%d %H:%M:%S')}")
-            else:
-                # Pierwsze uruchomienie - generuj wszystkie produkty
-                variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                    iai_product_id__isnull=False
-                ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
-                count = variants_with_iai.count()
-                print(
-                    f"Pierwsze uruchomienie full.xml - wszystkie produkty ({count} produktów)")
+            # Generuj tylko produkty, które nie były jeszcze wyeksportowane do IAI
+            variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                iai_product_id__isnull=False,
+                product__exported_to_iai=False
+            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+            count = variants_with_iai.count()
+            print(
+                f"Generowanie przyrostowe full.xml - znaleziono {count} nowych produktów (nie wyeksportowanych do IAI)")
         else:
             # Generuj wszystkie produkty
             variants_with_iai = ProductVariants.objects.using('MPD').filter(
@@ -456,17 +445,22 @@ class FullXMLExporter(BaseXMLExporter):
         logger.info(
             f"Eksport zakończony - wyeksportowano {variants_with_iai.count()} produktów")
 
-        return '\n'.join(xml)
+        # Zbierz listę wyeksportowanych produktów (tylko unikalne ID)
+        exported_product_ids = set()
+        for variant in variants_with_iai:
+            exported_product_ids.add(variant.product.id)
+
+        return '\n'.join(xml), exported_product_ids
 
     def export_incremental(self):
         """Eksport przyrostowy - tylko nowe produkty"""
         # Generuj tylko nowe produkty dodane po ostatnim full.xml
-        xml_content = self.generate_xml(incremental=True)
+        xml_content, exported_product_ids = self.generate_xml(incremental=True)
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
 
         # Zapisz rekord o wygenerowanym pliku full.xml (WAŻNE!)
-        self.save_full_record(bucket_url, local_path)
+        self.save_full_record(bucket_url, local_path, exported_product_ids)
 
         result = {'bucket_url': bucket_url, 'local_path': local_path}
 
@@ -482,13 +476,13 @@ class FullXMLExporter(BaseXMLExporter):
 
     def export_full(self):
         """Eksport pełny - wszystkie produkty"""
-        xml_content = self.generate_xml(
+        xml_content, exported_product_ids = self.generate_xml(
             incremental=False)  # Zawsze false - pełna oferta
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
 
         # Zapisz rekord o wygenerowanym pliku full.xml
-        self.save_full_record(bucket_url, local_path)
+        self.save_full_record(bucket_url, local_path, exported_product_ids)
 
         if bucket_url:
             print('✅ Pełny eksport XML zakończony pomyślnie!')
@@ -499,7 +493,7 @@ class FullXMLExporter(BaseXMLExporter):
             print(f'📄 Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
-    def save_full_record(self, bucket_url, local_path):
+    def save_full_record(self, bucket_url, local_path, exported_product_ids=None):
         """Zapisz rekord o wygenerowanym pliku full.xml"""
         from .models import FullChangeFile, Products
         from django.utils import timezone
@@ -517,21 +511,17 @@ class FullXMLExporter(BaseXMLExporter):
                     local_path) if os.path.exists(local_path) else 0
             )
 
-            # Ustaw exported_to_iai=True dla wszystkich produktów, które były eksportowane w full.xml
-            # Pobierz wszystkie produkty, które mają iai_product_id (są gotowe do eksportu)
-            from .models import ProductVariants
-            exported_product_ids = ProductVariants.objects.using('MPD').filter(
-                iai_product_id__isnull=False
-            ).values_list('product_id', flat=True).distinct()
-
-            # Ustaw exported_to_iai=True dla tych produktów
-            Products.objects.using('MPD').filter(
-                id__in=exported_product_ids
-            ).update(exported_to_iai=True)
+            # Ustaw exported_to_iai=True tylko dla produktów, które rzeczywiście zostały wyeksportowane
+            if exported_product_ids:
+                # Użyj batch update dla efektywności przy dużej liczbie produktów
+                updated_count = Products.objects.using('MPD').filter(
+                    id__in=exported_product_ids
+                ).update(exported_to_iai=True)
+                print(f"✅ Oznaczono {updated_count} produktów jako wyeksportowane do IAI")
+            else:
+                print("⚠️ Brak informacji o wyeksportowanych produktach")
 
             print(f"✅ Zapisano rekord pliku full.xml: {timestamp}")
-            print(
-                f"✅ Oznaczono {len(exported_product_ids)} produktów jako wyeksportowane do IAI")
         except Exception as e:
             print(f"❌ Błąd podczas zapisywania rekordu full.xml: {str(e)}")
 
