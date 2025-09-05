@@ -281,6 +281,7 @@ class ProductSeries(models.Model):
         app_label = 'MPD'
         verbose_name = 'Seria'
         verbose_name_plural = 'Serie'
+        ordering = ['name']
 
     def __str__(self):
         return str(self.name) if self.name else f'Seria {self.id}'

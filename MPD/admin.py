@@ -1,6 +1,8 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
+from django.db.models import Exists, OuterRef
+from django.contrib.admin import DateFieldListFilter, SimpleListFilter
 from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductImage, ProductSeries, Categories, Vat, Units, FabricComponent, ProductFabric
 import decimal
 # Register your models here.
@@ -8,6 +10,33 @@ import decimal
 
 # Usuwam ProductVariantsInline i wpis inlines = [ProductVariantsInline] z ProductsAdmin
 # (pozostawiam tylko show_variants jako readonly_field)
+
+
+class HasRetailPricesFilter(SimpleListFilter):
+    title = 'ma ceny detaliczne'
+    parameter_name = 'has_retail_prices'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('yes', 'Tak'),
+            ('no', 'Nie'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'yes':
+            return queryset.filter(
+                Exists(ProductVariants.objects.filter(
+                    product=OuterRef('pk'),
+                    productvariantsretailprice__isnull=False
+                ))
+            )
+        elif self.value() == 'no':
+            return queryset.filter(
+                ~Exists(ProductVariants.objects.filter(
+                    product=OuterRef('pk'),
+                    productvariantsretailprice__isnull=False
+                ))
+            )
 
 
 @admin.register(Products)
@@ -18,14 +47,43 @@ class ProductsAdmin(admin.ModelAdmin):
               'show_images', 'show_related_products', 'edit_retail_prices']  # karta produktu
     list_display = ['id', 'name', 'description',
                     'brand', 'updated_at', 'visibility']  # widok listy produktów
-    list_filter = ['brand']
-    search_fields = ['id', 'name', 'description', 'brand__name']
+    list_filter = [
+        'brand',
+        'series',
+        'visibility',
+        HasRetailPricesFilter,
+        ('created_at', DateFieldListFilter),
+        ('updated_at', DateFieldListFilter),
+    ]
+    search_fields = ['id', 'name', 'description',
+                     'brand__name', 'series__name']
     readonly_fields = ['show_variants', 'show_images',
                        'show_related_products', 'edit_retail_prices']
     change_form_template = 'admin/MPD/products/change_form.html'
+    actions = ['make_visible', 'make_hidden']
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD').select_related('brand', 'series', 'unit')
+
+    @admin.action(description='Oznacz wybrane produkty jako widoczne')
+    def make_visible(self, request, queryset):
+        """Masowa akcja - oznacz produkty jako widoczne"""
+        updated = queryset.update(visibility=True)
+        self.message_user(
+            request,
+            f'{updated} produktów zostało oznaczonych jako widoczne.',
+            level='SUCCESS'
+        )
+
+    @admin.action(description='Oznacz wybrane produkty jako niewidoczne')
+    def make_hidden(self, request, queryset):
+        """Masowa akcja - oznacz produkty jako niewidoczne"""
+        updated = queryset.update(visibility=False)
+        self.message_user(
+            request,
+            f'{updated} produktów zostało oznaczonych jako niewidoczne.',
+            level='SUCCESS'
+        )
 
     @admin.display(description="Edycja cen detalicznych")
     def edit_retail_prices(self, obj):
