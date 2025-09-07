@@ -28,6 +28,8 @@ app.conf.task_queues = {
 # Konfiguracja workerów
 app.conf.worker_prefetch_multiplier = 1
 app.conf.task_acks_late = True
+app.conf.worker_max_memory_per_child = 200000  # 200MB limit pamięci na worker
+app.conf.worker_max_tasks_per_child = 50  # Restart worker po 50 zadaniach
 
 # Konfiguracja brokera i backendu
 redis_password = os.getenv('REDIS_PASSWORD', 'prod_password')
@@ -51,43 +53,23 @@ app.conf.task_ignore_result = False
 app.conf.task_store_eager_result = True
 app.conf.task_events = True
 
-# Konfiguracja workerów
+# Konfiguracja workerów - optymalizacja pamięci
 app.conf.worker_pool_restarts = True
 app.conf.worker_proc_alive_timeout = 60.0
-app.conf.worker_max_tasks_per_child = 1000
 app.conf.worker_state_db = os.getenv(
     'CELERY_STATE_DB', '/var/lib/celery/worker_state')
 app.conf.event_queue_ttl = 5.0
 app.conf.event_queue_expires = 60.0
 app.conf.worker_hijack_root_logger = False
 
-# Dodatkowe ustawienia dla Flower
+# Dodatkowe ustawienia dla Flower - usunięto duplikaty
 app.conf.worker_enable_remote_control = True
 app.conf.worker_send_task_events = True
 app.conf.task_send_sent_event = True
 app.conf.task_events = True
-app.conf.worker_send_task_events = True
-app.conf.task_send_sent_event = True
 app.conf.task_track_started = True
 app.conf.task_ignore_result = False
 app.conf.task_store_eager_result = True
-app.conf.worker_enable_remote_control = True
-app.conf.worker_send_task_events = True
-app.conf.task_send_sent_event = True
-
-# Dodatkowe ustawienia dla inspekcji
-app.conf.worker_enable_remote_control = True
-app.conf.worker_send_task_events = True
-app.conf.task_send_sent_event = True
-app.conf.task_events = True
-app.conf.worker_send_task_events = True
-app.conf.task_send_sent_event = True
-app.conf.task_track_started = True
-app.conf.task_ignore_result = False
-app.conf.task_store_eager_result = True
-app.conf.worker_enable_remote_control = True
-app.conf.worker_send_task_events = True
-app.conf.task_send_sent_event = True
 
 # Konfiguracja heartbeatów i połączenia
 app.conf.broker_heartbeat = 60  # Zwiększony interwał heartbeat do 60 sekund

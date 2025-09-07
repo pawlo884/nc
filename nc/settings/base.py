@@ -42,8 +42,8 @@ LOGGING = {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs/matterhorn/import_all_by_one.log'),
-            'maxBytes': 5 * 1024 * 1024,  # 10MB
-            'backupCount': 5,
+            'maxBytes': 2 * 1024 * 1024,  # 2MB - zmniejszone z 5MB
+            'backupCount': 3,  # Zmniejszone z 5 do 3
             'formatter': 'verbose',
         },
         'console': {
@@ -122,6 +122,10 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
+        'CONN_MAX_AGE': 300,  # 5 minut - automatyczne zamykanie połączeń
+        'OPTIONS': {
+            'MAX_CONNS': 20,  # Maksymalna liczba połączeń
+        }
     },
     'matterhorn': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -130,6 +134,10 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN_DB_HOST'),
         'PORT': os.getenv('MATTERHORN_DB_PORT'),
+        'CONN_MAX_AGE': 300,  # 5 minut - automatyczne zamykanie połączeń
+        'OPTIONS': {
+            'MAX_CONNS': 20,  # Maksymalna liczba połączeń
+        }
     },
     'MPD': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -138,6 +146,10 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
+        'CONN_MAX_AGE': 300,  # 5 minut - automatyczne zamykanie połączeń
+        'OPTIONS': {
+            'MAX_CONNS': 20,  # Maksymalna liczba połączeń
+        }
     }
 }
 

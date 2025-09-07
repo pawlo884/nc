@@ -65,7 +65,7 @@ def get_products_exported_in_full_xml():
     """Pobierz produkty, które były wyeksportowane w full.xml"""
     from .models import Products
     try:
-        # Pobierz produkty, które mają ustawione exported_to_iai=True
+        # Pobierz produkty, które mają ustawione exported_to_iai=True (nie NULL i nie False)
         products_in_full = Products.objects.using('MPD').filter(
             exported_to_iai=True
         ).values_list('id', flat=True).distinct()
@@ -517,7 +517,8 @@ class FullXMLExporter(BaseXMLExporter):
                 updated_count = Products.objects.using('MPD').filter(
                     id__in=exported_product_ids
                 ).update(exported_to_iai=True)
-                print(f"✅ Oznaczono {updated_count} produktów jako wyeksportowane do IAI")
+                print(
+                    f"✅ Oznaczono {updated_count} produktów jako wyeksportowane do IAI")
             else:
                 print("⚠️ Brak informacji o wyeksportowanych produktach")
 
@@ -1919,10 +1920,10 @@ class FullChangeXMLExporter(BaseXMLExporter):
                         f"Pierwsze uruchomienie full_change.xml - znaleziono {variants_count} produktów z full.xml")
                     return variants_count > 0
                 else:
-                    # Jeśli nie ma produktów w full.xml (brak dostępu do bazy), eksportuj wszystkie produkty
-                    logger.warning(
-                        "Brak produktów w full.xml (prawdopodobnie brak dostępu do bazy) - eksportuję wszystkie produkty")
-                    return True
+                    # Jeśli nie ma produktów w full.xml, nie eksportuj nic
+                    logger.info(
+                        "Brak produktów w full.xml (exported_to_iai=False) - nie eksportuję full_change.xml")
+                    return False
         except Exception as e:
             # Jeśli nie ma dostępu do bazy danych, eksportuj wszystkie produkty
             logger.warning(
@@ -2027,18 +2028,20 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 logger.info(
                     f"Eksport przyrostowy full_change.xml - produkty zmienione od: {last_full_change_date.strftime('%Y-%m-%d %H:%M:%S')}, produkty w full.xml: {len(products_in_full)}")
             else:
-                # Pierwsze uruchomienie - generuj wszystkie produkty, które były w full.xml
+                # Pierwsze uruchomienie - generuj tylko produkty, które były w full.xml
                 products_in_full = get_products_exported_in_full_xml()
                 if products_in_full:
                     variants_with_iai = ProductVariants.objects.using('MPD').filter(
                         product_id__in=products_in_full
                     ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+                    logger.info(
+                        f"Pierwsze uruchomienie full_change.xml - produkty z full.xml: {len(products_in_full)}")
                 else:
                     # Jeśli nie ma produktów w full.xml, nie eksportuj nic
                     variants_with_iai = ProductVariants.objects.using(
                         'MPD').none()
-                logger.info(
-                    f"Pierwsze uruchomienie full_change.xml - produkty z full.xml: {len(products_in_full)}")
+                    logger.info(
+                        "Pierwsze uruchomienie full_change.xml - brak produktów w full.xml (exported_to_iai=False), nie eksportuję nic")
         else:
             # Pełny eksport - wszystkie produkty
             variants_with_iai = ProductVariants.objects.using('MPD').select_related(

@@ -1,5 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
-<offer file_format="IOF" version="3.0" generated="2025-09-05 14:29:24" expires="2025-09-06 14:29:24" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+<offer file_format="IOF" version="3.0" generated="2025-09-07 10:44:11" expires="2025-09-08 10:44:11" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
   <products language="pol">
+    <product id="377" currency="PLN" type="regular" vat="0" site="1">
+      <producer id="1" name="Lupo Line"/>
+      <iaiext:deliverer id="1" name="Matterhorn"/>
+      <iaiext:date_created datetime="2025-09-06 22:31:48"/>
+      <iaiext:modification_date datetime="2025-09-06 22:45:43"/>
+      <category id="1214553890" name="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi kąpielowe Bahama</name>
+        <short_desc><![CDATA[Klasyczne, czarne figi bikini z niższym stanem]]></short_desc>
+        <long_desc><![CDATA[Klasyczne, czarne figi bikini z niższym stanem, które idealnie eksponują atuty kobiecego ciała.]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="48" name="czarny"/>
+        </parameter>
+      </parameters>
+      <iaiext:visibility>
+        <iaiext:site visible="yes"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="258" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Dwuczęściowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="235" code="377-235" name="36" panel_name="36_bielizna" iaiext:code_external="1051-13" code_producer="5907665148090">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="241" code="377-241" name="42" panel_name="42_bielizna" iaiext:code_external="1051-14" code_producer="5907665148120">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="240" code="377-240" name="40" panel_name="40_bielizna" iaiext:code_external="1051-15" code_producer="5907665148113">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="236" code="377-236" name="38" panel_name="38_bielizna" iaiext:code_external="1051-16" code_producer="5907665148106">
+          <price gross="0" net="0"/>
+          <stock id="0" quantity="5"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/1051/1051_1_Black.jpg"/>
+        </large>
+      </images>
+    </product>
   </products>
 </offer>
