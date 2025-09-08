@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('MPD', '0008_set_exported_to_iai_default'),
+        ('MPD', '0005_remove_products_exported_in_full'),
     ]
 
     operations = [

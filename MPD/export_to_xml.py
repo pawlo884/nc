@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_last_full_xml_date():
-    """Pobierz datę ostatniego wygenerowanego pliku full.xml"""
+    """ Eksport przyrostowy w FullXMLExporter (linia 175): Funkcja jest używana do określenia, które warianty zostały zmienione od ostatniego pełnego eksportu full.xml. To pozwala na eksport tylko nowych/zmienionych produktów zamiast wszystkich."""
     from .models import FullChangeFile
     try:
         last_full = FullChangeFile.objects.using('MPD').filter(
@@ -48,7 +48,13 @@ def get_last_full_xml_date():
 
 
 def get_last_full_change_xml_date():
-    """Pobierz datę ostatniego wygenerowanego pliku full_change.xml"""
+    """W klasie FullChangeXMLExporter (linie 1896 i 2013): Funkcja jest używana do:
+    Sprawdzania czy są produkty do wyeksportowania w has_products_to_export()
+    Określania które warianty zostały zmienione od ostatniego full_change.xml w generate_xml()
+    Logika eksportu przyrostowego dla full_change.xml:
+    Pobiera datę ostatniego full_change.xml
+    Filtruje warianty zmienione po tej dacie
+    Eksportuje tylko te zmienione warianty, które były już w full.xml"""
     from .models import FullChangeFile
     try:
         last_full_change = FullChangeFile.objects.using('MPD').filter(
@@ -62,17 +68,33 @@ def get_last_full_change_xml_date():
 
 
 def get_products_exported_in_full_xml():
-    """Pobierz produkty, które były wyeksportowane w full.xml"""
-    from .models import Products
+    """Pobierz produkty, które były wyeksportowane w full.xml (wszystkie produkty z wariantami mającymi exported_to_iai=True)"""
+    from .models import ProductVariants
     try:
-        # Pobierz produkty, które mają ustawione exported_to_iai=True (nie NULL i nie False)
-        products_in_full = Products.objects.using('MPD').filter(
+        # Pobierz produkty, które mają warianty z zaznaczonym exported_to_iai=True (oznacza że były w full.xml)
+        products_in_full = ProductVariants.objects.using('MPD').filter(
             exported_to_iai=True
-        ).values_list('id', flat=True).distinct()
+        ).values_list('product_id', flat=True).distinct()
         return set(products_in_full)
     except Exception as e:
         logger.error(f"Błąd podczas pobierania produktów z full.xml: {str(e)}")
         return set()
+
+
+def mark_existing_variants_as_exported():
+    """Zaznacz wszystkie warianty jako exported_to_iai=True (dla istniejących danych)"""
+    from .models import ProductVariants
+    try:
+        updated_count = ProductVariants.objects.using('MPD').filter(
+            exported_to_iai=False
+        ).update(exported_to_iai=True)
+        print(
+            f"✅ Zaznaczono {updated_count} istniejących wariantów jako exported_to_iai=True")
+        return updated_count
+    except Exception as e:
+        logger.error(
+            f"Błąd podczas zaznaczania istniejących wariantów: {str(e)}")
+        return 0
 
 
 class BaseXMLExporter:
@@ -153,6 +175,16 @@ class FullXMLExporter(BaseXMLExporter):
         return '\n'.join(xml)
 
     def generate_xml(self, incremental=True):
+        """
+        Generuj XML dla full.xml
+
+        WAŻNE: full.xml eksportuje produkty z iai_product_id!
+        - Przyrostowy (incremental=True): Tylko warianty z exported_to_iai=False i updated_at >= last_full_date
+        - Pełny (incremental=False): Wszystkie warianty
+        - Po eksporcie: Zaznacza exported_to_iai=True dla wyeksportowanych wariantów
+
+        NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
+        """
         from django.utils.html import escape
         from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths, Vat
         from datetime import timedelta
@@ -170,22 +202,28 @@ class FullXMLExporter(BaseXMLExporter):
         # Sprawdź czy generować tylko nowe produkty (incremental=True) czy wszystkie
         print(f"FullXMLExporter.generate_xml - incremental={incremental}")
         if incremental:
-            # Generuj tylko produkty, które nie były jeszcze wyeksportowane do IAI
-            variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                iai_product_id__isnull=False,
-                product__exported_to_iai=False
-            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+            # Generuj tylko warianty, które nie były jeszcze wyeksportowane do IAI
+            # Używamy daty ostatniego full.xml jako kryterium
+            last_full_date = get_last_full_xml_date()
+            if last_full_date:
+                variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                    exported_to_iai=False,
+                    updated_at__gte=last_full_date
+                ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+            else:
+                # Pierwsze uruchomienie - wszystkie warianty
+                variants_with_iai = ProductVariants.objects.using('MPD').all().select_related(
+                    'product', 'size', 'color', 'producer_color', 'product__brand')
             count = variants_with_iai.count()
             print(
-                f"Generowanie przyrostowe full.xml - znaleziono {count} nowych produktów (nie wyeksportowanych do IAI)")
+                f"Generowanie przyrostowe full.xml - znaleziono {count} nowych wariantów (zmienionych od ostatniego full.xml)")
         else:
             # Generuj wszystkie produkty
-            variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                iai_product_id__isnull=False
-            ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
+            variants_with_iai = ProductVariants.objects.using('MPD').all().select_related(
+                'product', 'size', 'color', 'producer_color', 'product__brand')
             count = variants_with_iai.count()
             print(
-                f"Generowanie pełnej oferty full.xml - wszystkie produkty ({count} produktów)")
+                f"Generowanie pełnej oferty full.xml - wszystkie produkty ({count} wariantów)")
 
         # Grupuj warianty po iai_product_id
         grouped_variants = {}
@@ -445,22 +483,22 @@ class FullXMLExporter(BaseXMLExporter):
         logger.info(
             f"Eksport zakończony - wyeksportowano {variants_with_iai.count()} produktów")
 
-        # Zbierz listę wyeksportowanych produktów (tylko unikalne ID)
-        exported_product_ids = set()
+        # Zbierz listę wyeksportowanych wariantów (ID wariantów)
+        exported_variant_ids = set()
         for variant in variants_with_iai:
-            exported_product_ids.add(variant.product.id)
+            exported_variant_ids.add(variant.variant_id)
 
-        return '\n'.join(xml), exported_product_ids
+        return '\n'.join(xml), exported_variant_ids
 
     def export_incremental(self):
-        """Eksport przyrostowy - tylko nowe produkty"""
-        # Generuj tylko nowe produkty dodane po ostatnim full.xml
-        xml_content, exported_product_ids = self.generate_xml(incremental=True)
+        """Eksport przyrostowy - tylko nowe warianty"""
+        # Generuj tylko nowe warianty dodane po ostatnim full.xml
+        xml_content, exported_variant_ids = self.generate_xml(incremental=True)
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
 
         # Zapisz rekord o wygenerowanym pliku full.xml (WAŻNE!)
-        self.save_full_record(bucket_url, local_path, exported_product_ids)
+        self.save_full_record(bucket_url, local_path, exported_variant_ids)
 
         result = {'bucket_url': bucket_url, 'local_path': local_path}
 
@@ -475,14 +513,14 @@ class FullXMLExporter(BaseXMLExporter):
         return result
 
     def export_full(self):
-        """Eksport pełny - wszystkie produkty"""
-        xml_content, exported_product_ids = self.generate_xml(
+        """Eksport pełny - wszystkie warianty"""
+        xml_content, exported_variant_ids = self.generate_xml(
             incremental=False)  # Zawsze false - pełna oferta
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
 
         # Zapisz rekord o wygenerowanym pliku full.xml
-        self.save_full_record(bucket_url, local_path, exported_product_ids)
+        self.save_full_record(bucket_url, local_path, exported_variant_ids)
 
         if bucket_url:
             print('✅ Pełny eksport XML zakończony pomyślnie!')
@@ -493,9 +531,16 @@ class FullXMLExporter(BaseXMLExporter):
             print(f'📄 Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
-    def save_full_record(self, bucket_url, local_path, exported_product_ids=None):
-        """Zapisz rekord o wygenerowanym pliku full.xml"""
-        from .models import FullChangeFile, Products
+    def save_full_record(self, bucket_url, local_path, exported_variant_ids=None):
+        """
+        Zapisz rekord o wygenerowanym pliku full.xml
+
+        WAŻNE: Ta metoda zaznacza exported_to_iai=True dla wyeksportowanych wariantów!
+        To jest kluczowe dla logiki przyrostowego eksportu.
+
+        NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
+        """
+        from .models import FullChangeFile
         from django.utils import timezone
         try:
             now = timezone.now()
@@ -511,16 +556,18 @@ class FullXMLExporter(BaseXMLExporter):
                     local_path) if os.path.exists(local_path) else 0
             )
 
-            # Ustaw exported_to_iai=True tylko dla produktów, które rzeczywiście zostały wyeksportowane
-            if exported_product_ids:
-                # Użyj batch update dla efektywności przy dużej liczbie produktów
-                updated_count = Products.objects.using('MPD').filter(
-                    id__in=exported_product_ids
+            # Zaznacz wyeksportowane warianty jako exported_to_iai=True
+            if exported_variant_ids:
+                from .models import ProductVariants
+                updated_count = ProductVariants.objects.using('MPD').filter(
+                    variant_id__in=exported_variant_ids
                 ).update(exported_to_iai=True)
                 print(
-                    f"✅ Oznaczono {updated_count} produktów jako wyeksportowane do IAI")
+                    f"✅ Wyeksportowano {len(exported_variant_ids)} wariantów do IAI")
+                print(
+                    f"✅ Zaznaczono {updated_count} wariantów jako exported_to_iai=True")
             else:
-                print("⚠️ Brak informacji o wyeksportowanych produktach")
+                print("⚠️ Brak informacji o wyeksportowanych wariantach")
 
             print(f"✅ Zapisano rekord pliku full.xml: {timestamp}")
         except Exception as e:
@@ -567,6 +614,18 @@ class LightXMLExporter(BaseXMLExporter):
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
     def generate_xml(self):
+        """
+        Generuj XML dla light.xml
+
+        WAŻNE: light.xml monitoruje TYLKO zmiany w cenach i stanach magazynowych!
+        - Monitoruje: stockandprices.last_updated, productvariantsretailprice.updated_at
+        - Czas: Ostatnia godzina (one_hour_ago)
+        - Filtrowanie: Tylko produkty które były już w full.xml
+        - Zawartość: Ceny, stany magazynowe, rozmiary
+        - NIE zawiera: Opisy, parametry, obrazy (to robi full_change.xml)
+
+        NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
+        """
         from django.utils.html import escape
         from .models import Products, ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, Vat, FullChangeFile
         from datetime import timedelta
@@ -599,8 +658,8 @@ class LightXMLExporter(BaseXMLExporter):
             # które były już w full.xml (utworzone przed datą full.xml)
             full_file_created_at = last_full_file.created_at
             products = Products.objects.using('MPD').filter(
-                Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
-                Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago),
+                (Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
+                 Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago)),
                 created_at__lte=full_file_created_at
             ).distinct().select_related('brand')
             logger.info(
@@ -608,8 +667,8 @@ class LightXMLExporter(BaseXMLExporter):
         else:
             # Brak pliku full.xml - eksportuj produkty ze zmienionymi stanami/cenami
             products = Products.objects.using('MPD').filter(
-                Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
-                Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago)
+                (Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
+                 Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago))
             ).distinct().select_related('brand')
             logger.info(
                 "Light.xml: brak pliku full.xml - eksportuję produkty ze zmienionymi stanami/cenami z ostatniej godziny")
@@ -745,6 +804,7 @@ class LightXMLExporter(BaseXMLExporter):
 
                     if stock_price:
                         # Dodaj cenę na poziomie rozmiaru - identycznie jak w FullXMLExporter
+                        retail_price_obj = None
                         try:
                             retail_price_obj = ProductVariantsRetailPrice.objects.using('MPD').filter(
                                 variant=variant
@@ -807,7 +867,18 @@ class LightXMLExporter(BaseXMLExporter):
         return '\n'.join(xml)
 
     def export_incremental(self):
-        """Eksport przyrostowy - tylko produkty zmienione w ciągu ostatniej godziny"""
+        """
+        Eksport przyrostowy - tylko produkty zmienione w ciągu ostatniej godziny
+
+        WAŻNE: light.xml monitoruje TYLKO zmiany w cenach i stanach magazynowych!
+        - Monitoruje: products.updated_at, productvariants.updated_at, stockandprices.last_updated, productvariantsretailprice.updated_at
+        - Czas: Ostatnia godzina (one_hour_ago)
+        - Filtrowanie: Tylko produkty które były już w full.xml
+        - Zawartość: Ceny, stany magazynowe, rozmiary
+        - NIE zawiera: Opisy, parametry, obrazy (to robi full_change.xml)
+
+        NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
+        """
         from datetime import timedelta
         from django.db.models import Q
         from .models import Products, FullChangeFile
@@ -825,10 +896,10 @@ class LightXMLExporter(BaseXMLExporter):
             # które były już w full.xml (utworzone przed datą full.xml)
             full_file_created_at = last_full_file.created_at
             products = Products.objects.using('MPD').filter(
-                Q(updated_at__gte=one_hour_ago) |
-                Q(productvariants__updated_at__gte=one_hour_ago) |
-                Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
-                Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago),
+                (Q(updated_at__gte=one_hour_ago) |
+                 Q(productvariants__updated_at__gte=one_hour_ago) |
+                 Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
+                 Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago)),
                 created_at__lte=full_file_created_at
             ).distinct().select_related('brand')
             logger.info(
@@ -836,10 +907,10 @@ class LightXMLExporter(BaseXMLExporter):
         else:
             # Brak pliku full.xml - eksportuj wszystkie zmienione produkty
             products = Products.objects.using('MPD').filter(
-                Q(updated_at__gte=one_hour_ago) |
-                Q(productvariants__updated_at__gte=one_hour_ago) |
-                Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
-                Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago)
+                (Q(updated_at__gte=one_hour_ago) |
+                 Q(productvariants__updated_at__gte=one_hour_ago) |
+                 Q(productvariants__stockandprices__last_updated__gte=one_hour_ago) |
+                 Q(productvariants__productvariantsretailprice__updated_at__gte=one_hour_ago))
             ).distinct().select_related('brand')
             logger.info(
                 "Light.xml incremental: brak pliku full.xml - eksportuję wszystkie zmienione produkty")
@@ -860,7 +931,15 @@ class LightXMLExporter(BaseXMLExporter):
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
     def _generate_xml_for_products(self, products):
-        """Generuj XML dla określonej listy produktów"""
+        """
+        Generuj XML dla określonej listy produktów
+
+        WAŻNE: Ta metoda generuje XML tylko dla produktów z cenami i stanami magazynowymi!
+        - Zawartość: Ceny, stany magazynowe, rozmiary
+        - NIE zawiera: Opisy, parametry, obrazy (to robi full_change.xml)
+
+        NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
+        """
         from django.utils.html import escape
         from .models import ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, Vat
         from datetime import timedelta
@@ -994,6 +1073,7 @@ class LightXMLExporter(BaseXMLExporter):
 
                     if stock_price:
                         # Dodaj cenę na poziomie rozmiaru
+                        retail_price_obj = None
                         try:
                             retail_price_obj = ProductVariantsRetailPrice.objects.using('MPD').filter(
                                 variant=variant
@@ -1383,9 +1463,9 @@ class GatewayXMLExporter(BaseXMLExporter):
                         # Pobierz liczbę produktów zmienionych w ciągu ostatnich 30 minut (IOF 3.0)
                         thirty_minutes_ago = timezone.now() - timedelta(minutes=30)
                         changed_products_count = Products.objects.using('MPD').filter(
-                            Q(updated_at__gte=thirty_minutes_ago) |
-                            Q(productvariants__updated_at__gte=thirty_minutes_ago) |
-                            Q(productvariants__product__images__updated_at__gte=thirty_minutes_ago)
+                            (Q(updated_at__gte=thirty_minutes_ago) |
+                             Q(productvariants__updated_at__gte=thirty_minutes_ago) |
+                             Q(productvariants__product__images__updated_at__gte=thirty_minutes_ago))
                         ).distinct().count()
 
                         if last_product_change:
@@ -1880,7 +1960,19 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 f"Błąd podczas zapisywania rekordu full_change: {str(e)}")
 
     def has_products_to_export(self):
-        """Sprawdź czy są produkty do wyeksportowania"""
+        """
+        Sprawdź czy są produkty do wyeksportowania
+
+        WAŻNE: full_change.xml monitoruje TYLKO zmiany w opisach, parametrach i obrazach!
+        NIE monitoruje zmian w cenach i stanach magazynowych - to robi light.xml!
+
+        Monitorowane tabele:
+        - ProductVariants.updated_at (wariant zmieniony - opisy, parametry)
+        - Products.updated_at (produkt zmieniony - nazwa, opis, parametry)  
+        - ProductImage.updated_at (obraz zmieniony)
+
+        NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
+        """
         from .models import ProductVariants
         from django.db.models import Q
 
@@ -1892,37 +1984,54 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 products_in_full = get_products_exported_in_full_xml()
 
                 if products_in_full:
-                    # Sprawdź czy są produkty zmienione po ostatnim full_change.xml, które były w full.xml
+                    # Sprawdź czy są warianty zmienione po ostatnim full_change.xml, które były w full.xml
+                    # full_change.xml monitoruje tylko zmiany w opisach, parametrach, obrazach (NIE ceny/stany!)
                     variants_count = ProductVariants.objects.using('MPD').filter(
                         product_id__in=products_in_full
                     ).filter(
-                        # Wariant zmieniony
-                        Q(updated_at__gte=last_full_change_date) |
-                        # Produkt zmieniony
-                        Q(product__updated_at__gte=last_full_change_date) |
-                        # Obraz zmieniony
-                        Q(product__images__updated_at__gte=last_full_change_date)
+                        # Wariant zmieniony (opisy, parametry)
+                        (Q(updated_at__gte=last_full_change_date) |
+                         # Produkt zmieniony (nazwa, opis, parametry)
+                         Q(product__updated_at__gte=last_full_change_date) |
+                         # Obraz zmieniony
+                         Q(product__images__updated_at__gte=last_full_change_date))
                     ).distinct().count()
                 else:
                     variants_count = 0
 
                 logger.info(
-                    f"Sprawdzam produkty do full_change.xml - znaleziono {variants_count} produktów zmienionych od: {last_full_change_date.strftime('%Y-%m-%d %H:%M:%S')}, produkty w full.xml: {len(products_in_full)}")
+                    f"Sprawdzam warianty do full_change.xml - znaleziono {variants_count} wariantów zmienionych od: {last_full_change_date.strftime('%Y-%m-%d %H:%M:%S')}, produkty w full.xml: {len(products_in_full)}")
                 return variants_count > 0
             else:
-                # Pierwsze uruchomienie - sprawdź czy są produkty, które były w full.xml
+                # Pierwsze uruchomienie - sprawdź czy są warianty zmienione od utworzenia full.xml
                 products_in_full = get_products_exported_in_full_xml()
                 if products_in_full:
-                    variants_count = ProductVariants.objects.using('MPD').filter(
-                        product_id__in=products_in_full
-                    ).count()
-                    logger.info(
-                        f"Pierwsze uruchomienie full_change.xml - znaleziono {variants_count} produktów z full.xml")
+                    # Pobierz datę utworzenia ostatniego full.xml jako punkt odniesienia
+                    last_full_date = get_last_full_xml_date()
+                    if last_full_date:
+                        # Sprawdź warianty zmienione po utworzeniu full.xml
+                        variants_count = ProductVariants.objects.using('MPD').filter(
+                            product_id__in=products_in_full
+                        ).filter(
+                            # Wariant zmieniony po utworzeniu full.xml
+                            (Q(updated_at__gte=last_full_date) |
+                             # Produkt zmieniony po utworzeniu full.xml
+                             Q(product__updated_at__gte=last_full_date) |
+                             # Obraz zmieniony po utworzeniu full.xml
+                             Q(product__images__updated_at__gte=last_full_date))
+                        ).distinct().count()
+                        logger.info(
+                            f"Pierwsze uruchomienie full_change.xml - znaleziono {variants_count} wariantów zmienionych od utworzenia full.xml ({last_full_date.strftime('%Y-%m-%d %H:%M:%S')})")
+                    else:
+                        # Brak full.xml - nie eksportuj nic
+                        logger.info(
+                            "Brak pliku full.xml - nie eksportuję full_change.xml")
+                        return False
                     return variants_count > 0
                 else:
-                    # Jeśli nie ma produktów w full.xml, nie eksportuj nic
+                    # Jeśli nie ma wariantów w full.xml, nie eksportuj nic
                     logger.info(
-                        "Brak produktów w full.xml (exported_to_iai=False) - nie eksportuję full_change.xml")
+                        "Brak wariantów w full.xml (brak iai_product_id) - nie eksportuję full_change.xml")
                     return False
         except Exception as e:
             # Jeśli nie ma dostępu do bazy danych, eksportuj wszystkie produkty
@@ -1938,7 +2047,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 'ℹ️ Brak produktów do wyeksportowania w full_change.xml - pomijam generowanie')
             return {'bucket_url': None, 'local_path': None, 'skipped': True}
 
-        xml_content = self.generate_xml()
+        xml_content = self.generate_xml(incremental=True)
 
         # Sprawdź czy XML zawiera produkty (nie jest pusty)
         if '<product id=' not in xml_content:
@@ -1985,6 +2094,19 @@ class FullChangeXMLExporter(BaseXMLExporter):
         return '\n'.join(xml)
 
     def generate_xml(self, incremental=False):
+        """
+        Generuj XML dla full_change.xml
+
+        WAŻNE: full_change.xml monitoruje TYLKO zmiany w opisach, parametrach i obrazach!
+        NIE monitoruje zmian w cenach i stanach magazynowych - to robi light.xml!
+
+        Monitorowane tabele:
+        - ProductVariants.updated_at (wariant zmieniony - opisy, parametry)
+        - Products.updated_at (produkt zmieniony - nazwa, opis, parametry)  
+        - ProductImage.updated_at (obraz zmieniony)
+
+        NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
+        """
         from django.utils.html import escape
         from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths
         from datetime import timedelta
@@ -2009,44 +2131,62 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 products_in_full = get_products_exported_in_full_xml()
 
                 if products_in_full:
-                    # Generuj tylko produkty zmienione po ostatnim full_change.xml, które były w full.xml
+                    # Generuj tylko warianty zmienione po ostatnim full_change.xml, które były w full.xml
+                    # full_change.xml monitoruje tylko zmiany w opisach, parametrach, obrazach (NIE ceny/stany!)
                     variants_with_iai = ProductVariants.objects.using('MPD').filter(
                         product_id__in=products_in_full
                     ).filter(
-                        # Wariant zmieniony
-                        Q(updated_at__gte=last_full_change_date) |
-                        # Produkt zmieniony
-                        Q(product__updated_at__gte=last_full_change_date) |
-                        # Obraz zmieniony
-                        Q(product__images__updated_at__gte=last_full_change_date)
+                        # Wariant zmieniony (opisy, parametry)
+                        (Q(updated_at__gte=last_full_change_date) |
+                         # Produkt zmieniony (nazwa, opis, parametry)
+                         Q(product__updated_at__gte=last_full_change_date) |
+                         # Obraz zmieniony
+                         Q(product__images__updated_at__gte=last_full_change_date))
                     ).select_related('product', 'size', 'color', 'producer_color', 'product__brand').distinct()
                 else:
-                    # Jeśli nie ma produktów w full.xml, nie eksportuj nic
+                    # Jeśli nie ma wariantów w full.xml, nie eksportuj nic
                     variants_with_iai = ProductVariants.objects.using(
                         'MPD').none()
 
                 logger.info(
-                    f"Eksport przyrostowy full_change.xml - produkty zmienione od: {last_full_change_date.strftime('%Y-%m-%d %H:%M:%S')}, produkty w full.xml: {len(products_in_full)}")
+                    f"Eksport przyrostowy full_change.xml - warianty zmienione od: {last_full_change_date.strftime('%Y-%m-%d %H:%M:%S')}, produkty w full.xml: {len(products_in_full)}")
             else:
-                # Pierwsze uruchomienie - generuj tylko produkty, które były w full.xml
+                # Pierwsze uruchomienie - generuj tylko warianty zmienione od utworzenia full.xml
                 products_in_full = get_products_exported_in_full_xml()
                 if products_in_full:
-                    variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                        product_id__in=products_in_full
-                    ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
-                    logger.info(
-                        f"Pierwsze uruchomienie full_change.xml - produkty z full.xml: {len(products_in_full)}")
+                    # Pobierz datę utworzenia ostatniego full.xml jako punkt odniesienia
+                    last_full_date = get_last_full_xml_date()
+                    if last_full_date:
+                        # Generuj tylko warianty zmienione po utworzeniu full.xml
+                        variants_with_iai = ProductVariants.objects.using('MPD').filter(
+                            product_id__in=products_in_full
+                        ).filter(
+                            # Wariant zmieniony po utworzeniu full.xml
+                            (Q(updated_at__gte=last_full_date) |
+                             # Produkt zmieniony po utworzeniu full.xml
+                             Q(product__updated_at__gte=last_full_date) |
+                             # Obraz zmieniony po utworzeniu full.xml
+                             Q(product__images__updated_at__gte=last_full_date))
+                        ).select_related('product', 'size', 'color', 'producer_color', 'product__brand').distinct()
+                        logger.info(
+                            f"Pierwsze uruchomienie full_change.xml - warianty zmienione od utworzenia full.xml ({last_full_date.strftime('%Y-%m-%d %H:%M:%S')}): {len(products_in_full)} produktów w full.xml")
+                    else:
+                        # Brak full.xml - nie eksportuj nic
+                        variants_with_iai = ProductVariants.objects.using(
+                            'MPD').none()
+                        logger.info(
+                            "Brak pliku full.xml - nie eksportuję full_change.xml")
                 else:
-                    # Jeśli nie ma produktów w full.xml, nie eksportuj nic
+                    # Jeśli nie ma wariantów w full.xml, nie eksportuj nic
                     variants_with_iai = ProductVariants.objects.using(
                         'MPD').none()
                     logger.info(
-                        "Pierwsze uruchomienie full_change.xml - brak produktów w full.xml (exported_to_iai=False), nie eksportuję nic")
+                        "Pierwsze uruchomienie full_change.xml - brak wariantów w full.xml (brak iai_product_id), nie eksportuję nic")
         else:
-            # Pełny eksport - wszystkie produkty
+            # Pełny eksport - wszystkie warianty
             variants_with_iai = ProductVariants.objects.using('MPD').select_related(
                 'product', 'size', 'color', 'producer_color', 'product__brand')
-            logger.info("Pełny eksport full_change.xml - wszystkie produkty")
+            logger.info("Pełny eksport full_change.xml - wszystkie warianty")
 
         # Grupuj warianty po iai_product_id
         grouped_variants = {}
@@ -2340,14 +2480,14 @@ def export_incremental_xml():
 def export_full_change_xml():
     """Eksport pełny wszystkich produktów do full_change.xml z datą w nazwie"""
     exporter = FullChangeXMLExporter()
-    result = exporter.export()
+    result = exporter.export(incremental=False)
     return result.get('bucket_url', '') if result else ''
 
 
 def export_incremental_full_change_xml():
     """Eksport przyrostowy - tylko zmienione produkty do full_change.xml z datą w nazwie"""
     exporter = FullChangeXMLExporter()
-    result = exporter.export()
+    result = exporter.export(incremental=True)
     return result.get('bucket_url', '') if result else ''
 
 
@@ -2366,6 +2506,10 @@ def export_gateway_xml():
 def export_all_xml():
     """Eksport wszystkich plików XML"""
     print("🚀 Rozpoczynam eksport wszystkich plików XML...")
+
+    # Zaznacz istniejące warianty jako exported_to_iai=True
+    print("\n📦 Zaznaczanie istniejących wariantów...")
+    mark_existing_variants_as_exported()
 
     # Eksport full.xml
     print("\n📦 Eksport full.xml...")

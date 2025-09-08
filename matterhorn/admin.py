@@ -9,6 +9,7 @@ from rapidfuzz import fuzz
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.core.cache import cache
 from .defs_import import get_popular_products, get_stock_statistics, clean_old_stock_history, get_safe_variant_id
 from MPD.models import ProductvariantsSources
 
@@ -60,15 +61,26 @@ class ProductsAdmin(admin.ModelAdmin):
         queryset = super().get_queryset(request)
         category = request.GET.get('category_name__exact')
 
-        if category:
-            self.brand_choices = list(queryset.filter(
-                category_name=category).values_list('brand', flat=True).distinct())
-        else:
-            self.brand_choices = list(
-                queryset.values_list('brand', flat=True).distinct())
+        # Cache dla brand_choices
+        cache_key = f"brand_choices_{category or 'all'}"
+        self.brand_choices = cache.get(cache_key)
+        if self.brand_choices is None:
+            if category:
+                self.brand_choices = list(queryset.filter(
+                    category_name=category).values_list('brand', flat=True).distinct())
+            else:
+                self.brand_choices = list(
+                    queryset.values_list('brand', flat=True).distinct())
+            # Cache na 5 minut
+            cache.set(cache_key, self.brand_choices, 300)
 
         # Optymalizacja zapytań do relacji używanych w list_display i metodach
-        return queryset.prefetch_related('images', 'variants', 'other_colors', 'product_in_set')
+        return queryset.select_related().prefetch_related(
+            'images',
+            'variants',
+            'other_colors__color_product',
+            'product_in_set__set_product'
+        )
 
     def lookup_allowed(self, lookup, value):
         # Zezwól na filtrowanie po kategorii i marce
@@ -814,7 +826,7 @@ class ProductsAdmin(admin.ModelAdmin):
                             # Sprawdź czy suma procentów nie przekracza 100%
                             total_percentage = 0
                             valid_percentages = []
-                            
+
                             for comp_id, perc in zip(fabric_components, fabric_percentages):
                                 if comp_id and perc and comp_id.strip() and perc.strip():
                                     try:
@@ -822,11 +834,12 @@ class ProductsAdmin(admin.ModelAdmin):
                                         perc_int = int(perc)
                                         if perc_int > 0 and perc_int <= 100:
                                             total_percentage += perc_int
-                                            valid_percentages.append((comp_id_int, perc_int))
+                                            valid_percentages.append(
+                                                (comp_id_int, perc_int))
                                     except (ValueError, TypeError) as e:
                                         logger.error(
                                             f"Błąd parsowania materiału: {comp_id}, {perc}: {e}")
-                            
+
                             # Sprawdź czy suma procentów jest poprawna
                             if total_percentage > 100:
                                 logger.warning(
@@ -834,7 +847,8 @@ class ProductsAdmin(admin.ModelAdmin):
                                 variant_logger.warning(
                                     f"Suma procentów materiałów przekracza 100%: {total_percentage}%. Pomijam zapis materiałów.")
                             elif total_percentage == 0:
-                                logger.info("Brak poprawnych procentów materiałów do zapisu.")
+                                logger.info(
+                                    "Brak poprawnych procentów materiałów do zapisu.")
                             else:
                                 # Zapisz materiały tylko jeśli suma procentów jest poprawna
                                 for comp_id_int, perc_int in valid_percentages:
@@ -843,7 +857,8 @@ class ProductsAdmin(admin.ModelAdmin):
                                             "INSERT INTO product_fabric (product_id, component_id, percentage) VALUES (%s, %s, %s)",
                                             [new_product_id, comp_id_int, perc_int]
                                         )
-                                        logger.info(f"Zapisano materiał: component_id={comp_id_int}, percentage={perc_int}%")
+                                        logger.info(
+                                            f"Zapisano materiał: component_id={comp_id_int}, percentage={perc_int}%")
                                     except Exception as e:
                                         logger.error(
                                             f"Błąd zapisu materiału: {comp_id_int}, {perc_int}: {e}")

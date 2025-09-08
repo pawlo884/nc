@@ -2,6 +2,7 @@ class MatterhornRouter:
     """
     Router dla aplikacji matterhorn
     """
+
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'matterhorn':
             return 'matterhorn'
@@ -26,6 +27,7 @@ class MPDRouter:
     """
     Router dla aplikacji MPD
     """
+
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'MPD':
             return 'MPD'
@@ -45,4 +47,65 @@ class MPDRouter:
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'MPD':
             return db == 'MPD'
+        return None
+
+
+class WebAgentRouter:
+    """
+    Router dla aplikacji web_agent
+    """
+
+    def db_for_read(self, model, **hints):
+        if model._meta.app_label == 'web_agent':
+            return 'zzz_web_agent'
+        return None
+
+    def db_for_write(self, model, **hints):
+        if model._meta.app_label == 'web_agent':
+            return 'zzz_web_agent'
+        return None
+
+    def allow_relation(self, obj1, obj2, **hints):
+        # Zezwalamy na relacje między obiektami z różnych baz danych
+        if obj1._meta.app_label == 'web_agent' or obj2._meta.app_label == 'web_agent':
+            return True
+        return None
+
+    def allow_migrate(self, db, app_label, model_name=None, **hints):
+        if app_label == 'web_agent':
+            return db == 'zzz_web_agent'
+        return None
+
+
+class DefaultRouter:
+    """
+    Router dla aplikacji systemowych Django
+    """
+
+    def db_for_read(self, model, **hints):
+        # Aplikacje systemowe Django idą do bazy default
+        system_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
+                       'django_celery_results', 'admin_interface', 'colorfield']
+        if model._meta.app_label in system_apps:
+            return 'default'
+        return None
+
+    def db_for_write(self, model, **hints):
+        # Aplikacje systemowe Django idą do bazy default
+        system_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
+                       'django_celery_results', 'admin_interface', 'colorfield']
+        if model._meta.app_label in system_apps:
+            return 'default'
+        return None
+
+    def allow_relation(self, obj1, obj2, **hints):
+        # Zezwalamy na relacje między obiektami z różnych baz danych
+        return True
+
+    def allow_migrate(self, db, app_label, model_name=None, **hints):
+        # Aplikacje systemowe Django idą do bazy default
+        system_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
+                       'django_celery_results', 'admin_interface', 'colorfield']
+        if app_label in system_apps:
+            return db == 'default'
         return None

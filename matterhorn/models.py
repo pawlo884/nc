@@ -40,6 +40,20 @@ class Products(models.Model):
         db_table = 'products'
         verbose_name = "Product"
         verbose_name_plural = "Products"
+        indexes = [
+            models.Index(fields=['active']),
+            models.Index(fields=['category_name']),
+            models.Index(fields=['brand']),
+            models.Index(fields=['is_mapped']),
+            models.Index(fields=['mapped_product_id']),
+            models.Index(fields=['last_updated']),
+            models.Index(fields=['timestamp']),
+            models.Index(fields=['category_id']),
+            models.Index(fields=['brand_id']),
+            # Złożone indeksy dla często używanych kombinacji
+            models.Index(fields=['active', 'category_name']),
+            models.Index(fields=['is_mapped', 'mapped_product_id']),
+        ]
 
     @admin.display(description="Product Color ID's")
     def get_product_color_id(self):
@@ -78,6 +92,10 @@ class Images(models.Model):
     class Meta:
         managed = True
         db_table = 'images'
+        indexes = [
+            models.Index(fields=['product']),
+            models.Index(fields=['timestamp']),
+        ]
 
 
 class ProductsProxy(Products):
@@ -198,6 +216,14 @@ class Variants(models.Model):
         db_table = 'variants'
         indexes = [
             models.Index(fields=['product']),
+            models.Index(fields=['is_mapped']),
+            models.Index(fields=['mapped_variant_id']),
+            models.Index(fields=['last_updated']),
+            models.Index(fields=['timestamp']),
+            models.Index(fields=['ean']),
+            # Złożone indeksy
+            models.Index(fields=['product', 'is_mapped']),
+            models.Index(fields=['last_updated', 'product']),
         ]
 
 

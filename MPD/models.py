@@ -77,8 +77,6 @@ class Products(models.Model):
         'Units', on_delete=models.CASCADE, db_column='unit', to_field='unit_id', null=True, blank=True)
     visibility = models.BooleanField(
         default=True, verbose_name='Widoczność w sklepie')
-    exported_to_iai = models.BooleanField(
-        default=False, verbose_name='Wyeksportowany do IAI')
     objects = models.Manager()
 
     class Meta:
@@ -171,6 +169,8 @@ class ProductVariants(models.Model):
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
     producer_code = models.CharField(max_length=255, blank=True, null=True)
     iai_product_id = models.IntegerField(blank=True, null=True)
+    exported_to_iai = models.BooleanField(
+        default=False, verbose_name='Wyeksportowany do IAI')
     updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     objects = models.Manager()
 

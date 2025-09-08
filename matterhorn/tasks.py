@@ -3,11 +3,9 @@ from celery import shared_task, chain
 from celery.utils.log import get_task_logger
 from django.db import connections, transaction
 from matterhorn.defs_import import clean_update_log
-from matterhorn.models import Products, OtherColors
+from matterhorn.models import Products
 from django.utils.timezone import now, timedelta
 from django.core.cache import cache
-from django.db import connection
-from celery.exceptions import Ignore
 from nc.celery import app
 
 logger = get_task_logger(__name__)
@@ -132,32 +130,34 @@ def update_is_mapped_status():
         print("Brak produktów do aktualizacji.")
         return
 
-    updated_count = 0
+    # Optymalizacja: pobierz wszystkie potrzebne dane w jednym zapytaniu
+    products_with_relations = products.prefetch_related(
+        'variants',
+        'other_colors__color_product'
+    )
 
-    for product in products:
+    # Pobierz wszystkie mapped_product_id do sprawdzenia w jednym zapytaniu
+    mapped_ids = [p.mapped_product_id for p in products_with_relations
+                  if p.mapped_product_id and isinstance(p.mapped_product_id, int) and p.mapped_product_id > 0]
+    valid_mapped_ids = set()
+    if mapped_ids:
+        try:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute(
+                    "SELECT id FROM products WHERE id = ANY(%s)", [mapped_ids])
+                valid_mapped_ids = {row[0] for row in cursor.fetchall()}
+        except Exception as e:
+            print(f"❌ Błąd podczas sprawdzania mapped_product_id: {e}")
+
+    updated_count = 0
+    products_to_update = []
+
+    for product in products_with_relations:
         all_mapped = False  # Domyślnie produkt nie jest zmapowany
 
-        # **DEBUG: Sprawdzamy wartości mapped_product_id**
-        print(
-            f"🔍 Produkt ID={product.id}, mapped_product_id={product.mapped_product_id}, is_mapped={product.is_mapped}")
-
         # **Sprawdzamy czy mapped_product_id istnieje w docelowej bazie danych**
-        if product.mapped_product_id and isinstance(product.mapped_product_id, int) and product.mapped_product_id > 0:
-            try:
-                with connections['MPD'].cursor() as cursor:
-                    cursor.execute("SELECT 1 FROM products WHERE id = %s", [
-                                   product.mapped_product_id])
-                    if cursor.fetchone():
-                        print(
-                            f"✅ Produkt {product.id} ma poprawny mapped_product_id ({product.mapped_product_id})")
-                        all_mapped = True
-                    else:
-                        print(
-                            f"❌ Produkt {product.id} ma nieprawidłowy mapped_product_id ({product.mapped_product_id})")
-                        all_mapped = False
-            except Exception as e:
-                print(f"❌ Błąd podczas sprawdzania mapped_product_id: {e}")
-                all_mapped = False
+        if product.mapped_product_id and product.mapped_product_id in valid_mapped_ids:
+            all_mapped = True
 
         # **Sprawdzamy czy wszystkie warianty są zmapowane**
         if all_mapped:
@@ -165,34 +165,28 @@ def update_is_mapped_status():
             if variants.exists():
                 for variant in variants:
                     if not variant.mapped_variant_id:
-                        print(
-                            f"❌ Wariant {variant.variant_uid} nie jest zmapowany")
                         all_mapped = False
                         break
 
         # **Jeśli produkt ma other_colors, wszystkie muszą być zmapowane**
         if all_mapped:
-            other_colors = OtherColors.objects.filter(product=product)
+            other_colors = product.other_colors.all()
             if other_colors.exists():
-                print(
-                    f"🔍 Produkt {product.id} ma powiązane kolory. Sprawdzamy ich mapped_product_id...")
                 for color in other_colors:
                     if not color.color_product or not color.color_product.mapped_product_id:
-                        print(
-                            f"❌ Powiązany produkt {color.color_product_id} nie jest zmapowany")
                         all_mapped = False
                         break
 
-        # **Aktualizujemy `is_mapped` tylko jeśli wartość się zmieniła**
+        # **Zbieramy produkty do aktualizacji**
         if product.is_mapped != all_mapped:
-            print(
-                f"🔄 Aktualizacja: Produkt {product.id} zmienia is_mapped z {product.is_mapped} na {all_mapped}")
             product.is_mapped = all_mapped
-            product.save(update_fields=['is_mapped'])
+            products_to_update.append(product)
             updated_count += 1
-        else:
-            print(
-                f"✅ Produkt {product.id} nie wymaga zmiany (is_mapped={product.is_mapped})")
+
+    # Bulk update dla lepszej wydajności
+    if products_to_update:
+        Products.objects.bulk_update(
+            products_to_update, ['is_mapped'], batch_size=100)
 
     print(
         f"✅ Celery task zakończony. Zaktualizowano {updated_count} rekordów.")

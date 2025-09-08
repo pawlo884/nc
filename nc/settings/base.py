@@ -122,9 +122,8 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 300,  # 5 minut - automatyczne zamykanie połączeń
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'MAX_CONNS': 20,  # Maksymalna liczba połączeń
         }
     },
     'matterhorn': {
@@ -134,9 +133,8 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN_DB_HOST'),
         'PORT': os.getenv('MATTERHORN_DB_PORT'),
-        'CONN_MAX_AGE': 300,  # 5 minut - automatyczne zamykanie połączeń
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'MAX_CONNS': 20,  # Maksymalna liczba połączeń
         }
     },
     'MPD': {
@@ -146,9 +144,19 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
-        'CONN_MAX_AGE': 300,  # 5 minut - automatyczne zamykanie połączeń
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'MAX_CONNS': 20,  # Maksymalna liczba połączeń
+        }
+    },
+    'zzz_web_agent': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('WEB_AGENT_NAME'),
+        'USER': os.getenv('WEB_AGENT_USER'),
+        'PASSWORD': os.getenv('WEB_AGENT_PASSWORD'),
+        'HOST': os.getenv('WEB_AGENT_DB_HOST'),
+        'PORT': os.getenv('WEB_AGENT_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
         }
     }
 }
@@ -156,7 +164,10 @@ DATABASES = {
 # Database routers
 DATABASE_ROUTERS = [
     'nc.db_routers.MatterhornRouter',
-    'nc.db_routers.MPDRouter',]
+    'nc.db_routers.MPDRouter',
+    'nc.db_routers.WebAgentRouter',
+    'nc.db_routers.DefaultRouter',
+]
 
 WSGI_APPLICATION = 'nc.wsgi.application'
 
