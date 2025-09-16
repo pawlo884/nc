@@ -22,6 +22,13 @@ else:
 # API URL configuration
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
 
+# Matterhorn API configuration
+MATTERHORN_API_URL = os.getenv(
+    'MATTERHORN_API_URL', 'https://api.matterhorn-wholesale.com')
+MATTERHORN_API_USERNAME = os.getenv('MATTERHORN_API_USERNAME', '')
+MATTERHORN_API_PASSWORD = os.getenv('MATTERHORN_API_PASSWORD', '')
+MATTERHORN_API_KEY = os.getenv('MATTERHORN_API_KEY', '')
+
 # Konfiguracja logowania
 LOGGING = {
     'version': 1,
@@ -78,6 +85,7 @@ INSTALLED_APPS = [
     'matterhorn',
     'MPD',
     'web_agent',
+    'matterhorn1',
 ]
 
 MIDDLEWARE = [
@@ -158,6 +166,17 @@ DATABASES = {
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
         }
+    },
+    'matterhorn1': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('MATTERHORN1_DB_NAME'),
+        'USER': os.getenv('MATTERHORN1_DB_USER'),
+        'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
+        'HOST': os.getenv('MATTERHORN1_DB_HOST'),
+        'PORT': os.getenv('MATTERHORN1_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+        }
     }
 }
 
@@ -166,6 +185,7 @@ DATABASE_ROUTERS = [
     'nc.db_routers.MatterhornRouter',
     'nc.db_routers.MPDRouter',
     'nc.db_routers.WebAgentRouter',
+    'nc.db_routers.Matterhorn1Router',
     'nc.db_routers.DefaultRouter',
 ]
 
@@ -229,6 +249,29 @@ CELERY_TASK_TRACK_STARTED = True
 
 # Celery Beat Configuration
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Celery Task Configuration
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Europe/Warsaw'
+CELERY_ENABLE_UTC = True
+
+# Celery Task Routes
+CELERY_TASK_ROUTES = {
+    'matterhorn1.tasks.*': {'queue': 'matterhorn1_queue'},
+}
+
+# Celery Beat Schedule
+CELERY_BEAT_SCHEDULE = {
+    'scheduled-import-and-update': {
+        'task': 'matterhorn1.tasks.scheduled_import_and_update',
+        'schedule': 600.0,  # 10 minut
+        'options': {
+            'queue': 'matterhorn1_queue',
+        }
+    },
+}
 
 # WhiteNoise Configuration
 WHITENOISE_USE_FINDERS = True

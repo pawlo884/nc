@@ -77,6 +77,31 @@ class WebAgentRouter:
         return None
 
 
+class Matterhorn1Router:
+    """
+    Router dla aplikacji matterhorn1
+    """
+
+    def db_for_read(self, model, **hints):
+        if model._meta.app_label == 'matterhorn1':
+            return 'matterhorn1'
+        return None
+
+    def db_for_write(self, model, **hints):
+        if model._meta.app_label == 'matterhorn1':
+            return 'matterhorn1'
+        return None
+
+    def allow_relation(self, obj1, obj2, **hints):
+        # Zezwalamy na relacje między obiektami z różnych baz danych
+        return True
+
+    def allow_migrate(self, db, app_label, model_name=None, **hints):
+        if app_label == 'matterhorn1':
+            return db == 'matterhorn1'
+        return None
+
+
 class DefaultRouter:
     """
     Router dla aplikacji systemowych Django
