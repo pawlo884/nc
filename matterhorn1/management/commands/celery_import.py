@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseAPICommand):
     """
-    Komenda do zarządzania głównym Celery task - pełny import i aktualizacja
+    Komenda do zarządzania głównym Celery task - import i aktualizacja
     """
 
     help = 'Zarządzanie głównym Celery task - import ITEMS + aktualizacja INVENTORY'
@@ -22,8 +22,8 @@ class Command(BaseAPICommand):
         parser.add_argument(
             '--action',
             type=str,
-            choices=['full-import', 'status'],
-            help='Akcja do wykonania: full-import, status',
+            choices=['import', 'status'],
+            help='Akcja do wykonania: import, status',
             required=True
         )
         parser.add_argument(
@@ -65,8 +65,8 @@ class Command(BaseAPICommand):
         async_mode = options.get('async', False)
 
         try:
-            if action == 'full-import':
-                self.handle_full_import_action(options, async_mode)
+            if action == 'import':
+                self.handle_import_action(options, async_mode)
             elif action == 'status':
                 self.handle_status_action(options)
             else:
@@ -76,8 +76,8 @@ class Command(BaseAPICommand):
             logger.error(f"Błąd zarządzania Celery tasks: {e}")
             raise CommandError(f"Błąd: {e}")
 
-    def handle_full_import_action(self, options, async_mode):
-        """Obsługa akcji full-import"""
+    def handle_import_action(self, options, async_mode):
+        """Obsługa akcji import"""
         from matterhorn1.tasks import full_import_and_update
 
         start_id = options.get('start_id')
@@ -89,8 +89,7 @@ class Command(BaseAPICommand):
         batch_size = options.get('batch_size', 100)
         dry_run = options.get('dry_run', False)
 
-        self.stdout.write(
-            "🚀 Uruchamianie pełnego importu (ITEMS + INVENTORY)...")
+        self.stdout.write("🚀 Uruchamianie importu (ITEMS + INVENTORY)...")
         self.stdout.write(f"📊 Parametry:")
         self.stdout.write(f"   - Start ID: {start_id or 'ostatni w bazie'}")
         self.stdout.write(f"   - Max produkty na iterację: {max_products}")
@@ -134,7 +133,7 @@ class Command(BaseAPICommand):
                 dry_run=dry_run
             )
 
-            self.stdout.write(f"✅ Pełny import zakończony: {result}")
+            self.stdout.write(f"✅ Import zakończony: {result}")
 
     def handle_status_action(self, options):
         """Obsługa akcji status"""

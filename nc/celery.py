@@ -30,16 +30,8 @@ app.conf.task_routes = {
 app.conf.task_acks_late = True
 app.conf.task_reject_on_worker_lost = True
 
-# Konfiguracja beat
-app.conf.beat_schedule = {
-    'scheduled-import-and-update': {
-        'task': 'matterhorn1.tasks.scheduled_import_and_update',
-        'schedule': 600.0,  # 10 minut
-        'options': {
-            'queue': 'matterhorn1_queue',
-        }
-    },
-}
+# Konfiguracja beat - używaj Django periodic tasks zamiast tego
+# app.conf.beat_schedule = {}
 
 
 @app.task(bind=True)

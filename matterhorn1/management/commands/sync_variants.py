@@ -293,7 +293,8 @@ class Command(BaseAPICommand):
                         continue
 
                     try:
-                        product = Product.objects.get(product_id=product_id)
+                        product = Product.objects.get(
+                            product_id=int(product_id))
                         variant_data['product'] = product.id
                     except Product.DoesNotExist:
                         error_count += 1

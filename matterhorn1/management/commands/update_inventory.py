@@ -1,7 +1,9 @@
-import time
 from datetime import datetime, timedelta
 from django.core.management.base import CommandError
 from .base_api_command import BaseAPICommand
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseAPICommand):
@@ -146,22 +148,36 @@ class Command(BaseAPICommand):
         """Pobiera ostatni czas aktualizacji z bazy danych"""
         try:
             from matterhorn1.models import ApiSyncLog
+            import pytz
+
             last_sync = ApiSyncLog.objects.using('matterhorn1').filter(
                 sync_type__in=['inventory_update', 'inventory_sync'],
                 status__in=['success', 'partial']
             ).order_by('-started_at').first()
 
             if last_sync and last_sync.completed_at:
-                return last_sync.completed_at.strftime("%Y-%m-%d %H:%M:%S")
+                # Konwertuj na strefę czasową Polski (UTC+1/UTC+2)
+                poland_tz = pytz.timezone('Europe/Warsaw')
+                if last_sync.completed_at.tzinfo is None:
+                    # Jeśli data jest naive, załóż że to UTC
+                    utc_dt = pytz.utc.localize(last_sync.completed_at)
+                else:
+                    utc_dt = last_sync.completed_at.astimezone(pytz.utc)
+
+                # Konwertuj na strefę czasową Polski
+                poland_dt = utc_dt.astimezone(poland_tz)
+                return poland_dt.strftime("%Y-%m-%d %H:%M:%S")
             else:
-                # Domyślny czas - 1 dzień temu
-                default_time = datetime.now() - timedelta(days=1)
+                # Domyślny czas - 1 dzień temu w strefie czasowej Polski
+                poland_tz = pytz.timezone('Europe/Warsaw')
+                default_time = datetime.now(poland_tz) - timedelta(days=1)
                 return default_time.strftime("%Y-%m-%d %H:%M:%S")
         except Exception as e:
             logger.error(
                 f"Błąd podczas pobierania ostatniego czasu aktualizacji: {e}")
-            # Domyślny czas - 1 dzień temu
-            default_time = datetime.now() - timedelta(days=1)
+            # Domyślny czas - 1 dzień temu w strefie czasowej Polski
+            poland_tz = pytz.timezone('Europe/Warsaw')
+            default_time = datetime.now(poland_tz) - timedelta(days=1)
             return default_time.strftime("%Y-%m-%d %H:%M:%S")
 
     def process_inventory_batch(self, inventory_data):
@@ -171,6 +187,27 @@ class Command(BaseAPICommand):
         updated_count = 0
         error_count = 0
         error_details = []
+
+        # Debug: sprawdź strukturę pierwszych kilku elementów
+        if inventory_data:
+            logger.info(
+                f"🔍 Sprawdzam strukturę {min(5, len(inventory_data))} pierwszych elementów inventory:")
+            for i, item in enumerate(inventory_data[:5]):
+                logger.info(f"  Element {i+1}: {list(item.keys())}")
+                if 'active' in item:
+                    logger.info(
+                        f"    ✅ Pole 'active': {item['active']} (typ: {type(item['active'])})")
+                else:
+                    logger.info(f"    ❌ Brak pola 'active'")
+
+            # Sprawdź czy jakikolwiek element ma pole active
+            has_active = any('active' in item for item in inventory_data)
+            if has_active:
+                logger.info(
+                    "🔍 ✅ Znaleziono produkty z polem 'active' w inventory")
+            else:
+                logger.info(
+                    "🔍 ❌ Żaden produkt nie ma pola 'active' w inventory")
 
         for item in inventory_data:
             try:
@@ -186,7 +223,7 @@ class Command(BaseAPICommand):
                 # Znajdź produkt w bazie
                 try:
                     product = Product.objects.using(
-                        'matterhorn1').get(product_id=product_id)
+                        'matterhorn1').get(product_id=int(product_id))
                 except Product.DoesNotExist:
                     error_count += 1
                     error_details.append({
@@ -201,6 +238,17 @@ class Command(BaseAPICommand):
                     product.save()
                     self.stdout.write(
                         f"  ✅ Zaktualizowano ceny dla produktu {product_id}")
+
+                # Aktualizuj active jeśli jest dostępne
+                if 'active' in item:
+                    active_value = item['active']
+                    # Konwersja string na boolean (jak w starym kodzie)
+                    if isinstance(active_value, str):
+                        active_value = active_value.lower() in ('true', '1', 'yes', 'y')
+                    product.active = active_value
+                    product.save()
+                    self.stdout.write(
+                        f"  ✅ Zaktualizowano active dla produktu {product_id}: {active_value}")
 
                 # Aktualizuj stany magazynowe wariantów
                 if 'inventory' in item and item['inventory']:

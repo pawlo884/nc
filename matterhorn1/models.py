@@ -37,7 +37,7 @@ class Category(models.Model):
 
 class Product(models.Model):
     """Główny model produktu - tylko najważniejsze pola"""
-    product_id = models.CharField(max_length=50, unique=True, db_index=True)
+    product_id = models.IntegerField(unique=True, db_index=True)
     active = models.BooleanField(default=True)
     name = models.CharField(max_length=500)
     description = models.TextField(blank=True)
@@ -86,10 +86,10 @@ class ProductDetails(models.Model):
     """Szczegóły techniczne produktu - rzadko używane pola"""
     product = models.OneToOneField(
         Product, on_delete=models.CASCADE, related_name='details')
-    weight = models.CharField(max_length=20, blank=True)
-    size_table = models.TextField(blank=True)
-    size_table_txt = models.TextField(blank=True)
-    size_table_html = models.TextField(blank=True)
+    weight = models.CharField(max_length=20, blank=True, null=True)
+    size_table = models.TextField(blank=True, null=True)
+    size_table_txt = models.TextField(blank=True, null=True)
+    size_table_html = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

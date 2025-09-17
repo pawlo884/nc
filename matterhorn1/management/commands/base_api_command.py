@@ -5,7 +5,6 @@ import time
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from django.db import transaction
-from datetime import datetime
 
 from matterhorn1.models import ApiSyncLog
 
@@ -24,6 +23,7 @@ class BaseAPICommand(BaseCommand):
         self.api_base_url = None
         self.api_username = None
         self.api_password = None
+        self.api_key = None
         self.sync_log = None
 
     def add_common_arguments(self, parser):
@@ -93,12 +93,23 @@ class BaseAPICommand(BaseCommand):
             settings, 'MATTERHORN_API_USERNAME', None)
         self.api_password = options.get('password') or getattr(
             settings, 'MATTERHORN_API_PASSWORD', None)
+        self.api_key = getattr(settings, 'MATTERHORN_API_KEY', None)
 
-        if not all([self.api_base_url, self.api_username, self.api_password]):
+        # Sprawdź czy mamy API key lub username/password
+        has_api_key = bool(self.api_key)
+        has_credentials = bool(self.api_username and self.api_password)
+
+        if not self.api_base_url:
             raise CommandError(
-                "Brak konfiguracji API. Ustaw MATTERHORN_API_URL, "
-                "MATTERHORN_API_USERNAME, MATTERHORN_API_PASSWORD w settings "
-                "lub użyj argumentów --api-url, --username, --password"
+                "Brak konfiguracji API URL. Ustaw MATTERHORN_API_URL w settings "
+                "lub użyj argumentu --api-url"
+            )
+
+        if not (has_api_key or has_credentials):
+            raise CommandError(
+                "Brak konfiguracji API. Ustaw MATTERHORN_API_KEY lub "
+                "MATTERHORN_API_USERNAME + MATTERHORN_API_PASSWORD w settings "
+                "lub użyj argumentów --username, --password"
             )
 
     def create_sync_log(self, sync_type, status='started'):
@@ -134,11 +145,20 @@ class BaseAPICommand(BaseCommand):
         """Wykonaj żądanie do API"""
         url = f"{self.api_base_url.rstrip('/')}/{endpoint.lstrip('/')}"
 
-        auth = (self.api_username, self.api_password)
-        headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
+        # Użyj API key jeśli dostępny, w przeciwnym razie username/password
+        if hasattr(self, 'api_key') and self.api_key:
+            auth = None
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': self.api_key
+            }
+        else:
+            auth = (self.api_username, self.api_password)
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
 
         try:
             if method.upper() == 'GET':

@@ -3,7 +3,7 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from .models import (
-    Brand, Category, Product, ProductDetails, ProductImage, 
+    Brand, Category, Product, ProductDetails, ProductImage,
     ProductVariant, ApiSyncLog
 )
 
@@ -15,7 +15,7 @@ class BrandAdmin(admin.ModelAdmin):
     search_fields = ['brand_id', 'name']
     readonly_fields = ['brand_id', 'created_at', 'updated_at']
     ordering = ['name']
-    
+
     fieldsets = (
         ('Podstawowe informacje', {
             'fields': ('brand_id', 'name')
@@ -34,7 +34,7 @@ class CategoryAdmin(admin.ModelAdmin):
     search_fields = ['category_id', 'name', 'path']
     readonly_fields = ['category_id', 'created_at', 'updated_at']
     ordering = ['name']
-    
+
     fieldsets = (
         ('Podstawowe informacje', {
             'fields': ('category_id', 'name', 'path')
@@ -69,7 +69,7 @@ class ProductVariantInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = [
-        'product_id', 'name', 'brand', 'category', 'active', 
+        'product_id', 'name', 'brand', 'category', 'active',
         'stock_total', 'created_at', 'updated_at'
     ]
     list_filter = [
@@ -83,7 +83,7 @@ class ProductAdmin(admin.ModelAdmin):
     ]
     ordering = ['-created_at']
     inlines = [ProductDetailsInline, ProductImageInline, ProductVariantInline]
-    
+
     fieldsets = (
         ('Podstawowe informacje', {
             'fields': (
@@ -104,13 +104,13 @@ class ProductAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
+
     def stock_total(self, obj):
         """Wyświetl całkowity stan magazynowy"""
         return obj.stock_total
     stock_total.short_description = 'Stan magazynowy'
     stock_total.admin_order_field = 'productvariant__stock'
-    
+
     def get_queryset(self, request):
         """Optymalizacja zapytań"""
         return super().get_queryset(request).select_related(
@@ -125,7 +125,7 @@ class ProductDetailsAdmin(admin.ModelAdmin):
     search_fields = ['product__name', 'product__product_id']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-created_at']
-    
+
     fieldsets = (
         ('Produkt', {
             'fields': ('product',)
@@ -142,7 +142,7 @@ class ProductDetailsAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
+
     def has_size_table(self, obj):
         """Sprawdź czy ma tabelę rozmiarów"""
         return bool(obj.size_table or obj.size_table_txt or obj.size_table_html)
@@ -157,7 +157,7 @@ class ProductImageAdmin(admin.ModelAdmin):
     search_fields = ['product__name', 'product__product_id', 'image_url']
     readonly_fields = ['created_at']
     ordering = ['-created_at']
-    
+
     fieldsets = (
         ('Produkt', {
             'fields': ('product',)
@@ -175,7 +175,7 @@ class ProductImageAdmin(admin.ModelAdmin):
 @admin.register(ProductVariant)
 class ProductVariantAdmin(admin.ModelAdmin):
     list_display = [
-        'variant_uid', 'product', 'name', 'stock', 'ean', 
+        'variant_uid', 'product', 'name', 'stock', 'ean',
         'max_processing_time', 'created_at'
     ]
     list_filter = ['created_at', 'updated_at', 'max_processing_time']
@@ -184,7 +184,7 @@ class ProductVariantAdmin(admin.ModelAdmin):
     ]
     readonly_fields = ['variant_uid', 'created_at', 'updated_at']
     ordering = ['-created_at']
-    
+
     fieldsets = (
         ('Podstawowe informacje', {
             'fields': ('variant_uid', 'product', 'name')
@@ -205,7 +205,7 @@ class ProductVariantAdmin(admin.ModelAdmin):
 @admin.register(ApiSyncLog)
 class ApiSyncLogAdmin(admin.ModelAdmin):
     list_display = [
-        'id', 'sync_type', 'status', 'started_at', 'completed_at', 
+        'id', 'sync_type', 'status', 'started_at', 'completed_at',
         'duration', 'records_created', 'records_updated', 'records_errors'
     ]
     list_filter = ['sync_type', 'status', 'started_at', 'completed_at']
@@ -215,7 +215,7 @@ class ApiSyncLogAdmin(admin.ModelAdmin):
         'records_updated', 'records_errors', 'error_details'
     ]
     ordering = ['-started_at']
-    
+
     fieldsets = (
         ('Podstawowe informacje', {
             'fields': ('id', 'sync_type', 'status')
@@ -231,7 +231,7 @@ class ApiSyncLogAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
+
     def duration(self, obj):
         """Oblicz czas trwania synchronizacji"""
         if obj.started_at and obj.completed_at:
@@ -239,7 +239,7 @@ class ApiSyncLogAdmin(admin.ModelAdmin):
             total_seconds = int(delta.total_seconds())
             hours, remainder = divmod(total_seconds, 3600)
             minutes, seconds = divmod(remainder, 60)
-            
+
             if hours > 0:
                 return f"{hours}h {minutes}m {seconds}s"
             elif minutes > 0:
@@ -248,15 +248,15 @@ class ApiSyncLogAdmin(admin.ModelAdmin):
                 return f"{seconds}s"
         return "-"
     duration.short_description = 'Czas trwania'
-    
+
     def has_add_permission(self, request):
         """Wyłącz dodawanie nowych logów przez admin"""
         return False
-    
+
     def has_change_permission(self, request, obj=None):
         """Wyłącz edycję logów przez admin"""
         return False
-    
+
     def has_delete_permission(self, request, obj=None):
         """Zezwól na usuwanie starych logów"""
         return True
@@ -268,10 +268,12 @@ admin.site.site_title = "Matterhorn1 Admin"
 admin.site.index_title = "Zarządzanie danymi Matterhorn1"
 
 # Dodatkowe filtry i akcje
+
+
 class ProductStatusFilter(admin.SimpleListFilter):
     title = 'Status produktu'
     parameter_name = 'status'
-    
+
     def lookups(self, request, model_admin):
         return (
             ('active', 'Aktywne'),
@@ -279,7 +281,7 @@ class ProductStatusFilter(admin.SimpleListFilter):
             ('no_stock', 'Brak stanu'),
             ('with_stock', 'Ze stanem'),
         )
-    
+
     def queryset(self, request, queryset):
         if self.value() == 'active':
             return queryset.filter(active=True)
@@ -290,18 +292,25 @@ class ProductStatusFilter(admin.SimpleListFilter):
         elif self.value() == 'with_stock':
             return queryset.filter(variants__stock__gt=0).distinct()
 
+
 # Dodaj filtr do ProductAdmin
 ProductAdmin.list_filter.append(ProductStatusFilter)
 
 # Akcje masowe
+
+
 @admin.action(description='Oznacz jako aktywne')
 def make_active(modeladmin, request, queryset):
     queryset.update(active=True)
-    modeladmin.message_user(request, f"Oznaczono {queryset.count()} produktów jako aktywne.")
+    modeladmin.message_user(
+        request, f"Oznaczono {queryset.count()} produktów jako aktywne.")
+
 
 @admin.action(description='Oznacz jako nieaktywne')
 def make_inactive(modeladmin, request, queryset):
     queryset.update(active=False)
-    modeladmin.message_user(request, f"Oznaczono {queryset.count()} produktów jako nieaktywne.")
+    modeladmin.message_user(
+        request, f"Oznaczono {queryset.count()} produktów jako nieaktywne.")
+
 
 ProductAdmin.actions = [make_active, make_inactive]

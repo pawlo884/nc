@@ -175,7 +175,7 @@ class Command(BaseAPICommand):
 
                 # Znajdź produkt w bazie
                 try:
-                    product = Product.objects.get(product_id=product_id)
+                    product = Product.objects.get(product_id=int(product_id))
                 except Product.DoesNotExist:
                     error_count += 1
                     error_details.append({

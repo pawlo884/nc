@@ -175,7 +175,7 @@ class Command(BaseAPICommand):
                 try:
                     # Sprawdź czy produkt istnieje w bazie
                     try:
-                        Product.objects.get(product_id=product_id)
+                        Product.objects.get(product_id=int(product_id))
                         # Produkt istnieje - użyj endpoint do aktualizacji
                         if not create_only:
                             data = self.make_api_request(

@@ -262,16 +262,8 @@ CELERY_TASK_ROUTES = {
     'matterhorn1.tasks.*': {'queue': 'matterhorn1_queue'},
 }
 
-# Celery Beat Schedule
-CELERY_BEAT_SCHEDULE = {
-    'scheduled-import-and-update': {
-        'task': 'matterhorn1.tasks.scheduled_import_and_update',
-        'schedule': 600.0,  # 10 minut
-        'options': {
-            'queue': 'matterhorn1_queue',
-        }
-    },
-}
+# Celery Beat Schedule - używaj Django periodic tasks zamiast tego
+# CELERY_BEAT_SCHEDULE = {}
 
 # WhiteNoise Configuration
 WHITENOISE_USE_FINDERS = True
