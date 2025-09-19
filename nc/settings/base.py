@@ -24,7 +24,7 @@ API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
 
 # Matterhorn API configuration
 MATTERHORN_API_URL = os.getenv(
-    'MATTERHORN_API_URL', 'https://api.matterhorn-wholesale.com')
+    'MATTERHORN_API_URL', 'https://matterhorn.pl')
 MATTERHORN_API_USERNAME = os.getenv('MATTERHORN_API_USERNAME', '')
 MATTERHORN_API_PASSWORD = os.getenv('MATTERHORN_API_PASSWORD', '')
 MATTERHORN_API_KEY = os.getenv('MATTERHORN_API_KEY', '')
@@ -82,6 +82,8 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'debug_toolbar',
+    'rest_framework',
+    'drf_spectacular',
     'matterhorn',
     'MPD',
     'web_agent',
@@ -245,6 +247,14 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Warsaw'
 CELERY_TASK_ACKS_LATE = True
+
+# Cache Configuration - Redis dla blokad między workerami
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': 'redis://:dev_password@redis:6379/1',  # Używamy bazy 1 dla cache
+    }
+}
 CELERY_TASK_TRACK_STARTED = True
 
 # Celery Beat Configuration
@@ -257,9 +267,10 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Warsaw'
 CELERY_ENABLE_UTC = True
 
-# Celery Task Routes
+# Celery Task Routes - uproszczone do jednej kolejki
 CELERY_TASK_ROUTES = {
-    'matterhorn1.tasks.*': {'queue': 'matterhorn1_queue'},
+    # Wszystkie taski używają domyślnej kolejki
+    'matterhorn1.tasks.*': {'queue': 'default'},
 }
 
 # Celery Beat Schedule - używaj Django periodic tasks zamiast tego
@@ -292,3 +303,38 @@ DEBUG_TOOLBAR_PANELS = [
     'debug_toolbar.panels.redirects.RedirectsPanel',
     'debug_toolbar.panels.profiling.ProfilingPanel',
 ]
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
+    ],
+}
+
+# drf-spectacular Configuration
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'NC Project API',
+    'DESCRIPTION': 'API dla zarządzania produktami, wariantami i eksportu XML',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'TAGS': [
+        {'name': 'Products', 'description': 'Operacje na produktach'},
+        {'name': 'Variants', 'description': 'Operacje na wariantach produktów'},
+        {'name': 'Brands', 'description': 'Operacje na markach'},
+        {'name': 'Categories', 'description': 'Operacje na kategoriach'},
+        {'name': 'Images', 'description': 'Operacje na obrazach produktów'},
+        {'name': 'XML Export', 'description': 'Eksport i generowanie plików XML'},
+        {'name': 'Sync', 'description': 'Synchronizacja z zewnętrznymi API'},
+    ],
+}

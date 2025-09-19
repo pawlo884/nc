@@ -21,9 +21,10 @@ app.conf.update(
     enable_utc=True,
 )
 
-# Konfiguracja routingu tasków
+# Konfiguracja routingu tasków - uproszczona do jednej kolejki
 app.conf.task_routes = {
-    'matterhorn1.tasks.*': {'queue': 'matterhorn1_queue'},
+    # Wszystkie taski używają domyślnej kolejki
+    'matterhorn1.tasks.*': {'queue': 'default'},
 }
 
 # Konfiguracja retry

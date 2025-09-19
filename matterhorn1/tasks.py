@@ -5,6 +5,7 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.core.management import call_command
 from django.conf import settings
+from django.core.cache import cache
 
 logger = get_task_logger(__name__)
 
@@ -31,9 +32,50 @@ def full_import_and_update(self, start_id=None, max_products=200000,
         dry_run: Tryb testowy
         auto_continue: Kontynuuj import aż skończą się produkty
     """
+    # BLOKADA - zapobiega równoległemu wykonaniu (działa dla Celery i bezpośrednich wywołań)
+    lock_id = 'matterhorn1_full_import_lock'
+    lock_timeout = 3600  # 1 godzina
+
+    # Użyj task_id jeśli dostępny (Celery), w przeciwnym razie 'direct_call'
+    task_identifier = getattr(self, 'request', None)
+    task_id_value = task_identifier.id if task_identifier else 'direct_call'
+
+    # CZYŚĆ STARE RUNNING REKORDY (starsze niż 2 godziny)
+    _cleanup_old_running_imports()
+
+    # CZYŚĆ WSZYSTKIE RUNNING REKORDY (rozwiązuje problem z ręcznym przerywaniem)
+    _cleanup_all_running_imports()
+
+    # SPRAWDŹ CZY BLOKADA JUŻ ISTNIEJE (jeśli tak, to task już działa)
+    existing_lock = cache.get(lock_id)
+    if existing_lock and existing_lock != task_id_value:
+        logger.warning(
+            f"❌ Import już w trakcie wykonywania (lock: {existing_lock}). Pominięty.")
+        return {
+            'status': 'skipped',
+            'reason': 'already_running',
+            'current_lock': existing_lock,
+            'task_id': task_id_value
+        }
+
+    acquired = cache.add(lock_id, task_id_value, lock_timeout)
+
+    if not acquired:
+        current_lock = cache.get(lock_id)
+        logger.warning(
+            f"❌ Import już w trakcie wykonywania (lock: {current_lock}). Pominięty.")
+        return {
+            'status': 'skipped',
+            'reason': 'already_running',
+            'current_lock': current_lock,
+            'task_id': task_id_value
+        }
+
     try:
         logger.info(
-            f"🚀 ROZPOCZYNAM PEŁNY IMPORT I AKTUALIZACJĘ (task_id: {self.request.id})")
+            f"🚀 ROZPOCZYNAM PEŁNY IMPORT I AKTUALIZACJĘ (task_id: {task_id_value})")
+        logger.info(
+            f"📊 Parametry: start_id={start_id}, max_products={max_products}, api_url={api_url}")
 
         # Pobierz parametry z settings jeśli nie podano
         if not api_url:
@@ -106,8 +148,8 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                     "📊 Auto-continue wyłączone - kończę po pierwszej iteracji")
                 break
 
-            # Ustaw start_id na ostatni zaimportowany + 1
-            start_id = items_result.get('last_imported_id', 0) + 1
+            # Kontynuuj import od następnej strony
+            # (start_id nie jest już potrzebny bo używamy page)
 
             # Sprawdź czy nie przekraczamy maksymalnej liczby iteracji
             if iteration >= 100:  # Bezpiecznik
@@ -125,7 +167,7 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             'total_imported': total_imported,
             'total_updated': total_updated,
             'iterations': iteration,
-            'task_id': self.request.id
+            'task_id': task_id_value
         }
 
     except Exception as e:
@@ -135,8 +177,20 @@ def full_import_and_update(self, start_id=None, max_products=200000,
         return {
             'status': 'error',
             'error': str(e),
-            'task_id': self.request.id
+            'task_id': task_id_value
         }
+
+    finally:
+        # Zawsze zwalniaj blokadę i zaktualizuj status
+        if cache.get(lock_id) == task_id_value:
+            cache.delete(lock_id)
+            logger.info(f"🔓 Blokada zwolniona dla {task_id_value}")
+
+        # Upewnij się, że status jest zaktualizowany na końcu
+        try:
+            _update_items_import_status('completed', 0)
+        except Exception as e:
+            logger.error(f"❌ Błąd podczas aktualizacji statusu na końcu: {e}")
 
 
 def _import_products_from_items(start_id, max_products, api_url, username, password, batch_size, dry_run):
@@ -146,15 +200,18 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         last_update = _get_last_items_update_time()
         logger.info(f"📅 Używam last_update: {last_update}")
 
+        # Pobierz ostatnią stronę z przerwanego importu
+        start_page = _get_last_items_page()
+        logger.info(f"🔄 Kontynuuję od strony: {start_page}")
+
         # WAŻNE: Zapisz czas ROZPOCZĘCIA importu PRZED rozpoczęciem
         if not dry_run:
             _save_items_import_start_time()
 
         # Użyj bulk API z last_update
         imported_count = 0
-        last_imported_id = 0
-        page = 1
-        limit = 500  # Limit 500 dla importu ITEMS
+        page = start_page
+        limit = 1000  # Limit 1000 dla importu ITEMS
 
         logger.info(f"🔍 Używam bulk API ITEMS z last_update i limit={limit}")
 
@@ -205,7 +262,6 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                             if not dry_run:
                                 bulk_result = _bulk_import_products(items)
                                 imported_count += bulk_result['imported_count']
-                                last_imported_id = bulk_result['last_imported_id']
                             else:
                                 # Dry run - tylko zlicz
                                 for item in items:
@@ -213,10 +269,12 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                                         break
                                     if item.get("creation_date") is not None:
                                         imported_count += 1
-                                        last_imported_id = int(
-                                            item.get('id', 0))
 
                             page += 1
+                            # Aktualizuj current_page w bazie danych
+                            if not dry_run:
+                                _update_items_import_status(
+                                    'running', imported_count, page)
                             break  # Sukces - wyjdź z retry loop
 
                         except Exception as e:
@@ -275,12 +333,11 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
             _update_items_import_status('success', imported_count)
 
         logger.info(
-            f"📊 Import zakończony: {imported_count} nowych produktów, ostatni ID: {last_imported_id}")
+            f"📊 Import zakończony: {imported_count} nowych produktów")
 
         return {
             'status': 'success',
-            'imported_count': imported_count,
-            'last_imported_id': last_imported_id
+            'imported_count': imported_count
         }
 
     except Exception as e:
@@ -327,6 +384,30 @@ def _get_last_items_update_time():
         return "2015-01-01 00:00:00"
 
 
+def _get_last_items_page():
+    """Pobiera ostatnią stronę z ostatniego importu ITEMS (niezależnie od statusu)"""
+    try:
+        from matterhorn1.models import ApiSyncLog
+
+        # Pobierz rekord z najwyższą stroną (niezależnie od statusu i daty)
+        last_import = ApiSyncLog.objects.using('matterhorn1').filter(
+            sync_type='items_import',
+            current_page__isnull=False
+        ).order_by('-current_page').first()
+
+        if last_import and last_import.current_page:
+            logger.info(
+                f"📄 Najwyższa strona: status={last_import.status}, strona={last_import.current_page}, data={last_import.started_at}")
+            return last_import.current_page
+        else:
+            # Brak poprzednich importów - zacznij od strony 1
+            logger.info("📄 Brak poprzednich importów - zaczynam od strony 1")
+            return 1
+    except Exception as e:
+        logger.error(f"Błąd podczas pobierania ostatniej strony: {e}")
+        return 1
+
+
 def _save_items_import_start_time():
     """Zapisuje czas ROZPOCZĘCIA importu ITEMS - to będzie last_update dla następnego importu"""
     try:
@@ -342,7 +423,8 @@ def _save_items_import_start_time():
             records_processed=0,
             records_created=0,
             records_updated=0,
-            records_errors=0
+            records_errors=0,
+            current_page=1  # Rozpoczynamy od strony 1
         )
         logger.info("✅ Zapisano czas ROZPOCZĘCIA importu ITEMS")
     except Exception as e:
@@ -350,7 +432,7 @@ def _save_items_import_start_time():
             f"Błąd podczas zapisywania czasu rozpoczęcia importu ITEMS: {e}")
 
 
-def _update_items_import_status(status, imported_count):
+def _update_items_import_status(status, imported_count, current_page=None):
     """Aktualizuje status ostatniego importu ITEMS"""
     try:
         from matterhorn1.models import ApiSyncLog
@@ -367,6 +449,11 @@ def _update_items_import_status(status, imported_count):
             last_running.status = status
             last_running.completed_at = timezone.now()
             last_running.records_created = imported_count
+
+            # Aktualizuj current_page jeśli podane
+            if current_page is not None:
+                last_running.current_page = current_page
+
             last_running.save()
             logger.info(f"✅ Zaktualizowano status importu ITEMS na: {status}")
         else:
@@ -425,7 +512,6 @@ def _bulk_import_products(items):
         from django.db import transaction
 
         imported_count = 0
-        last_imported_id = 0
 
         # Przygotuj dane do bulk operations
         products_to_create = []
@@ -453,7 +539,6 @@ def _bulk_import_products(items):
                 products_to_create.append(product_data)
 
             imported_count += 1
-            last_imported_id = int(product_id)
 
         # Bulk operations w transakcji
         with transaction.atomic(using='matterhorn1'):
@@ -483,27 +568,14 @@ def _bulk_import_products(items):
                 _create_related_objects_for_products(products_to_update)
 
         return {
-            'imported_count': imported_count,
-            'last_imported_id': last_imported_id
+            'imported_count': imported_count
         }
 
     except Exception as e:
         logger.error(f"❌ Błąd bulk import: {e}")
-        # Fallback do pojedynczego importu
-        imported_count = 0
-        last_imported_id = 0
-        for item in items:
-            if item.get("creation_date") is None:
-                continue
-            try:
-                _import_single_product_with_retry(item)
-                imported_count += 1
-                last_imported_id = int(item.get('id', 0))
-            except Exception as e:
-                logger.error(f"❌ Błąd importu produktu {item.get('id')}: {e}")
+        # Nie ma fallback - tylko bulk operations
         return {
-            'imported_count': imported_count,
-            'last_imported_id': last_imported_id
+            'imported_count': 0
         }
 
 
@@ -605,11 +677,28 @@ def _create_related_objects_for_products(products):
             logger.info(
                 f"🔄 Zaktualizowano {len(variants_to_update)} wariantów")
 
-        # Bulk operations dla obrazków
+        # Bulk operations dla obrazków - sprawdź duplikaty
         if images_to_create:
-            ProductImage.objects.using('matterhorn1').bulk_create(
-                images_to_create, batch_size=100)
-            logger.info(f"✅ Utworzono {len(images_to_create)} nowych obrazków")
+            # Filtruj duplikaty - sprawdź które obrazki już istnieją
+            unique_images_to_create = []
+            for image in images_to_create:
+                # Sprawdź czy obrazek już istnieje (product + image_url)
+                image_exists = ProductImage.objects.using('matterhorn1').filter(
+                    product=image.product,
+                    image_url=image.image_url
+                ).exists()
+
+                if not image_exists:
+                    unique_images_to_create.append(image)
+
+            if unique_images_to_create:
+                ProductImage.objects.using('matterhorn1').bulk_create(
+                    unique_images_to_create, batch_size=100)
+                logger.info(
+                    f"✅ Utworzono {len(unique_images_to_create)} nowych obrazków (pominięto {len(images_to_create) - len(unique_images_to_create)} duplikatów)")
+            else:
+                logger.info(
+                    f"ℹ️ Wszystkie {len(images_to_create)} obrazków już istnieją - pominięto")
 
         # Bulk operations dla szczegółów
         if details_to_create:
@@ -806,141 +895,7 @@ def _prepare_product_update(product, item):
         }
 
 
-def _import_single_product_with_retry(item_data, max_attempts=5):
-    """Importuje pojedynczy produkt z retry dla błędów bazy danych"""
-    for attempt in range(1, max_attempts + 1):
-        try:
-            _import_single_product(item_data)
-            return  # Sukces
-        except Exception as e:
-            if attempt < max_attempts:
-                logger.warning(
-                    f"⚠️ Błąd bazy danych dla produktu {item_data.get('id')} (próba {attempt}/{max_attempts}): {e}")
-                logger.warning(f"⚠️ Ponawiam za 20 sekund...")
-                time.sleep(20)
-            else:
-                logger.error(
-                    f"❌ Osiągnięto maksymalną liczbę prób dla produktu {item_data.get('id')}: {e}")
-                raise
-
-
-def _import_single_product(item_data):
-    """Importuje pojedynczy produkt do bazy danych"""
-    try:
-        from matterhorn1.models import Product, Brand, Category, ProductVariant, ProductImage, ProductDetails
-
-        # Pobierz lub utwórz markę
-        brand_id = item_data.get('brand_id') or 'unknown'
-        brand_name = item_data.get('brand') or 'Unknown'
-        brand, _ = Brand.objects.using('matterhorn1').get_or_create(
-            brand_id=brand_id,
-            defaults={'name': brand_name}
-        )
-
-        # Pobierz lub utwórz kategorię
-        category_id = item_data.get('category_id') or 'unknown'
-        category_name = item_data.get('category_name') or 'Unknown'
-        category_path = item_data.get('category_path') or ''
-        category, _ = Category.objects.using('matterhorn1').get_or_create(
-            category_id=category_id,
-            defaults={
-                'name': category_name,
-                'path': category_path
-            }
-        )
-
-        # Konwersja active z string na boolean
-        active_value = item_data.get('active', True)
-        if isinstance(active_value, str):
-            active_value = active_value.lower() in ('true', '1', 'yes', 'y')
-
-        # Konwersja new_collection z string na boolean
-        new_collection_value = item_data.get('new_collection', False)
-        if isinstance(new_collection_value, str):
-            new_collection_value = new_collection_value.upper() in ('Y', 'YES', 'TRUE', '1')
-
-        # Utwórz lub zaktualizuj produkt
-        product, created = Product.objects.using('matterhorn1').get_or_create(
-            product_id=int(item_data.get('id')),
-            defaults={
-                'active': active_value,
-                'name': item_data.get('name', ''),
-                'description': item_data.get('description', ''),
-                'creation_date': _parse_creation_date(item_data.get('creation_date')),
-                'color': item_data.get('color', ''),
-                'url': item_data.get('url', ''),
-                'new_collection': new_collection_value,
-                'brand': brand,
-                'category': category,
-                'prices': item_data.get('prices') or {},
-                'products_in_set': item_data.get('products_in_set') or [],
-                'other_colors': item_data.get('other_colors') or []
-            }
-        )
-
-        if not created:
-            # Aktualizuj istniejący produkt - wszystkie pola z ITEMS
-            from django.utils import timezone
-            product.active = active_value
-            product.name = item_data.get('name', product.name)
-            product.description = item_data.get(
-                'description', product.description)
-            product.creation_date = _parse_creation_date(
-                item_data.get('creation_date')) or product.creation_date
-            product.color = item_data.get('color', product.color)
-            product.url = item_data.get('url', product.url)
-            product.new_collection = new_collection_value
-            product.brand = brand
-            product.category = category
-            product.prices = item_data.get('prices') or product.prices
-            product.products_in_set = item_data.get(
-                'products_in_set') or product.products_in_set
-            product.other_colors = item_data.get(
-                'other_colors') or product.other_colors
-            product.last_api_sync = timezone.now()
-            product.save(using='matterhorn1')
-
-        # Importuj warianty
-        if item_data.get('variants'):
-            for variant_data in item_data['variants']:
-                ProductVariant.objects.using('matterhorn1').update_or_create(
-                    variant_uid=variant_data.get('variant_uid'),
-                    defaults={
-                        'product': product,
-                        'name': variant_data.get('name', ''),
-                        'stock': int(variant_data.get('stock', 0)),
-                        'max_processing_time': int(variant_data.get('max_processing_time', 0)),
-                        'ean': variant_data.get('ean', '')
-                    }
-                )
-
-        # Importuj obrazy
-        if item_data.get('images'):
-            for i, image_url in enumerate(item_data['images']):
-                ProductImage.objects.using('matterhorn1').get_or_create(
-                    product=product,
-                    image_url=image_url,
-                    defaults={'order': i}
-                )
-
-        # Importuj szczegóły produktu
-        if any([item_data.get('weight'), item_data.get('size_table'),
-                item_data.get('size_table_txt'), item_data.get('size_table_html')]):
-            ProductDetails.objects.using('matterhorn1').update_or_create(
-                product=product,
-                defaults={
-                    'weight': item_data.get('weight') or '',
-                    'size_table': item_data.get('size_table') or '',
-                    'size_table_txt': item_data.get('size_table_txt') or '',
-                    'size_table_html': item_data.get('size_table_html') or ''
-                }
-            )
-
-        logger.debug(f"✅ Zaimportowano produkt ID {product.product_id}")
-
-    except Exception as e:
-        logger.error(f"❌ Błąd importu pojedynczego produktu: {e}")
-        raise
+# Usunięto funkcje single import - używamy tylko bulk operations
 
 
 def _update_inventory_from_api(api_url, username, password, batch_size, dry_run):
@@ -1018,3 +973,118 @@ def get_import_status(self, task_id):
             'error': str(e),
             'task_id': task_id
         }
+
+
+@shared_task(name='matterhorn1.tasks.test_periodic_task')
+def test_periodic_task():
+    """
+    Prosty task do testowania periodic tasks
+    """
+    import logging
+    import sys
+    logger = logging.getLogger(__name__)
+
+    # Log na różne sposoby
+    logger.info("🧪 TEST PERIODIC TASK - WYKONANY!")
+    logger.error("🧪 TEST PERIODIC TASK - WYKONANY!")  # ERROR będzie widoczny
+    print("🧪 TEST PERIODIC TASK - WYKONANY!", file=sys.stderr)
+    print("🧪 TEST PERIODIC TASK - WYKONANY!", file=sys.stdout)
+
+    return "Test periodic task completed"
+
+
+# simple_import_task usunięty - był redundantny z full_import_and_update
+
+
+def _cleanup_old_running_imports():
+    """
+    Czyści stare rekordy 'running' starsze niż 2 godziny.
+    To zapobiega kumulowaniu się zawieszonych importów.
+    """
+    try:
+        from matterhorn1.models import ApiSyncLog
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # Znajdź stare running rekordy (starsze niż 2 godziny)
+        cutoff_time = timezone.now() - timedelta(hours=2)
+        old_running = ApiSyncLog.objects.using('matterhorn1').filter(
+            sync_type='items_import',
+            status='running',
+            started_at__lt=cutoff_time
+        )
+
+        count = old_running.count()
+        if count > 0:
+            logger.warning(
+                f"🧹 Znaleziono {count} starych 'running' rekordów - oznaczam jako 'error'")
+
+            # Oznacz jako 'error' zamiast usuwać
+            old_running.update(
+                status='error',
+                completed_at=timezone.now(),
+                error_details='Zawieszone - automatycznie oznaczone jako błąd po 2 godzinach'
+            )
+
+    except Exception as e:
+        logger.error(
+            f"❌ Błąd podczas czyszczenia starych running rekordów: {e}")
+
+
+def _cleanup_all_running_imports():
+    """
+    Czyści WSZYSTKIE rekordy 'running' i blokady Redis przy starcie nowego importu.
+    To rozwiązuje problem z ręcznym przerywaniem tasków.
+    """
+    try:
+        from matterhorn1.models import ApiSyncLog
+        from django.utils import timezone
+        from django.core.cache import cache
+
+        # Znajdź WSZYSTKIE running rekordy (niezależnie od wieku)
+        all_running = ApiSyncLog.objects.using('matterhorn1').filter(
+            sync_type='items_import',
+            status='running'
+        )
+
+        count = all_running.count()
+        if count > 0:
+            logger.warning(
+                f"🧹 Znaleziono {count} aktywnych 'running' rekordów - oznaczam jako 'error' (restart systemu)")
+
+            # Oznacz jako 'error' zamiast usuwać
+            all_running.update(
+                status='error',
+                completed_at=timezone.now(),
+                error_details='Zawieszone - poprzedni import został przerwany (restart/stop systemu)'
+            )
+
+            logger.info(f"✅ Oznaczono {count} starych rekordów jako 'error'")
+        else:
+            logger.info("✅ Brak starych 'running' rekordów do wyczyszczenia")
+
+        # CZYŚĆ BLOKADĘ REDIS TYLKO JEŚLI NIE MA AKTYWNYCH TASKÓW
+        # (po restarcie Docker blokada może pozostać bez aktywnego taska)
+        lock_id = 'matterhorn1_full_import_lock'
+        current_lock = cache.get(lock_id)
+
+        if current_lock and count > 0:
+            # Jeśli są running rekordy w DB ale blokada Redis istnieje
+            # to znaczy że task został przerwany (restart Docker)
+            logger.warning(
+                f"🔒 Znaleziono blokadę Redis bez aktywnych tasków: {current_lock}")
+            logger.info(
+                "🗑️  Usuwam blokadę Redis (task został przerwany przez restart)")
+
+            cache.delete(lock_id)
+
+            if not cache.get(lock_id):
+                logger.info("✅ Blokada Redis została usunięta")
+            else:
+                logger.error("❌ Nie udało się usunąć blokady Redis")
+        else:
+            logger.info(
+                "✅ Blokada Redis pozostaje aktywna (brak przerwanych tasków)")
+
+    except Exception as e:
+        logger.error(f"❌ Błąd podczas czyszczenia running rekordów: {e}")

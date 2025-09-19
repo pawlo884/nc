@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from datetime import datetime
 import json
+from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
 
 from .models import (
     Product, Brand, Category, ProductDetails,
@@ -9,6 +10,19 @@ from .models import (
 )
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            'Brand Example',
+            summary='Przykład marki',
+            description='Przykład danych marki',
+            value={
+                'brand_id': 'BRAND001',
+                'name': 'Lupo Line'
+            }
+        )
+    ]
+)
 class BrandSerializer(serializers.ModelSerializer):
     """Serializer dla marek"""
 
@@ -29,6 +43,20 @@ class BrandSerializer(serializers.ModelSerializer):
         return value.strip()
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            'Category Example',
+            summary='Przykład kategorii',
+            description='Przykład danych kategorii',
+            value={
+                'category_id': 'CAT001',
+                'name': 'Stroje kąpielowe',
+                'path': 'odziez/stroje-kapielowe'
+            }
+        )
+    ]
+)
 class CategorySerializer(serializers.ModelSerializer):
     """Serializer dla kategorii"""
 
@@ -63,6 +91,19 @@ class ProductDetailsSerializer(serializers.ModelSerializer):
         return value
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            'Product Image Example',
+            summary='Przykład obrazu produktu',
+            description='Przykład danych obrazu produktu',
+            value={
+                'image_url': 'https://example.com/images/product1.jpg',
+                'order': 1
+            }
+        )
+    ]
+)
 class ProductImageSerializer(serializers.ModelSerializer):
     """Serializer dla obrazów produktu"""
 
@@ -86,6 +127,22 @@ class ProductImageSerializer(serializers.ModelSerializer):
         return value
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            'Product Variant Example',
+            summary='Przykład wariantu produktu',
+            description='Przykład danych wariantu produktu',
+            value={
+                'variant_uid': 'VAR001',
+                'name': 'Rozmiar M - Czarny',
+                'stock': 10,
+                'max_processing_time': 5,
+                'ean': '1234567890123'
+            }
+        )
+    ]
+)
 class ProductVariantSerializer(serializers.ModelSerializer):
     """Serializer dla wariantów produktu"""
 
@@ -120,6 +177,50 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         return value
 
 
+@extend_schema_serializer(
+    examples=[
+        OpenApiExample(
+            'Product Example',
+            summary='Przykład produktu',
+            description='Przykład danych produktu z wariantami i obrazami',
+            value={
+                'product_id': 'PROD001',
+                'active': True,
+                'name': 'strój kąpielowy model 123 - Lupo Line',
+                'description': 'Elegancki strój kąpielowy z wysokiej jakości materiału',
+                'creation_date': '2024-01-15T10:30:00Z',
+                'color': 'Czarny',
+                'url': 'https://example.com/products/prod001',
+                'new_collection': False,
+                'products_in_set': 1,
+                'other_colors': ['Biały', 'Niebieski'],
+                'prices': {'PLN': 299.99, 'EUR': 69.99},
+                'brand_id': 'BRAND001',
+                'category_id': 'CAT001',
+                'details': {
+                    'weight': '0.5',
+                    'size_table': 'M,L,XL',
+                    'size_table_txt': 'M: 80-85cm, L: 85-90cm, XL: 90-95cm'
+                },
+                'images': [
+                    {
+                        'image_url': 'https://example.com/images/prod001_1.jpg',
+                        'order': 1
+                    }
+                ],
+                'variants': [
+                    {
+                        'variant_uid': 'VAR001',
+                        'name': 'Rozmiar M - Czarny',
+                        'stock': 10,
+                        'max_processing_time': 5,
+                        'ean': '1234567890123'
+                    }
+                ]
+            }
+        )
+    ]
+)
 class ProductSerializer(serializers.ModelSerializer):
     """Główny serializer dla produktów"""
 

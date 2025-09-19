@@ -666,3 +666,266 @@ def manage_product_attributes(request):
     except Exception as e:
         logger.error(f"Błąd podczas zarządzania atrybutami produktu: {str(e)}")
         return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
+
+
+@csrf_exempt
+def create_product(request):
+    """
+    Endpoint do tworzenia nowego produktu w MPD
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+
+        # Wymagane pola
+        name = data.get('name')
+        if not name:
+            return JsonResponse({'status': 'error', 'message': 'Nazwa produktu jest wymagana'}, status=400)
+
+        # Opcjonalne pola
+        description = data.get('description', '')
+        short_description = data.get('short_description', '')
+        brand_id = data.get('brand_id')
+        unit_id = data.get('unit_id')
+        series_id = data.get('series_id')
+        visibility = data.get('visibility', True)
+
+        # Utwórz produkt
+        product = Products.objects.using('MPD').create(
+            name=name,
+            description=description,
+            short_description=short_description,
+            brand_id=brand_id,
+            unit_id=unit_id,
+            series_id=series_id,
+            visibility=visibility
+        )
+
+        # Dodaj warianty jeśli podano
+        variants = data.get('variants', [])
+        created_variants = []
+
+        for variant_data in variants:
+            from .models import ProductVariants, Colors
+            from .models import ProductVariantsRetailPrice
+
+            # Pobierz lub utwórz kolor
+            color_id = variant_data.get('color_id')
+            producer_color_id = variant_data.get('producer_color_id')
+
+            if variant_data.get('producer_color_name'):
+                producer_color, _ = Colors.objects.using('MPD').get_or_create(
+                    name=variant_data['producer_color_name']
+                )
+                producer_color_id = producer_color.id
+
+            # Pobierz rozmiar
+            size_id = variant_data.get('size_id')
+
+            # Utwórz wariant
+            variant = ProductVariants.objects.using('MPD').create(
+                product=product,
+                color_id=color_id,
+                producer_color_id=producer_color_id,
+                size_id=size_id,
+                producer_code=variant_data.get('producer_code', ''),
+                iai_product_id=variant_data.get('iai_product_id')
+            )
+
+            # Dodaj cenę jeśli podano
+            if variant_data.get('price'):
+                ProductVariantsRetailPrice.objects.using('MPD').create(
+                    variant=variant,
+                    retail_price=variant_data['price'],
+                    vat=variant_data.get('vat', 23.0),
+                    currency=variant_data.get('currency', 'PLN'),
+                    net_price=variant_data.get('net_price')
+                )
+
+            created_variants.append(variant.variant_id)
+
+        # Dodaj ścieżki jeśli podano
+        path_ids = data.get('path_ids', [])
+        for path_id in path_ids:
+            ProductPaths.objects.using('MPD').create(
+                product_id=product.id,
+                path_id=path_id
+            )
+
+        # Dodaj atrybuty jeśli podano
+        attribute_ids = data.get('attribute_ids', [])
+        for attribute_id in attribute_ids:
+            ProductAttribute.objects.using('MPD').create(
+                product=product,
+                attribute_id=attribute_id
+            )
+
+        logger.info("Utworzono produkt MPD: %s (ID: %s)",
+                    product.name, product.id)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Produkt został utworzony pomyślnie',
+            'product_id': product.id,
+            'product_name': product.name,
+            'variants_created': len(created_variants),
+            'variants': created_variants
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Błąd podczas tworzenia produktu MPD: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+def update_product(request, product_id):
+    """
+    Endpoint do aktualizacji produktu w MPD
+    """
+    if request.method not in ['PUT', 'PATCH']:
+        return JsonResponse({'status': 'error', 'message': 'Tylko metody PUT/PATCH są obsługiwane'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+
+        # Sprawdź czy produkt istnieje
+        try:
+            product = Products.objects.using('MPD').get(id=product_id)
+        except Products.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Produkt nie istnieje'}, status=404)
+
+        # Aktualizuj podstawowe pola produktu
+        if 'name' in data:
+            product.name = data['name']
+        if 'description' in data:
+            product.description = data['description']
+        if 'short_description' in data:
+            product.short_description = data['short_description']
+        if 'brand_id' in data:
+            product.brand_id = data['brand_id']
+        if 'unit_id' in data:
+            product.unit_id = data['unit_id']
+        if 'series_id' in data:
+            product.series_id = data['series_id']
+        if 'visibility' in data:
+            product.visibility = data['visibility']
+
+        product.save(using='MPD')
+
+        # Aktualizuj ścieżki jeśli podano
+        if 'path_ids' in data:
+            # Usuń istniejące ścieżki
+            ProductPaths.objects.using('MPD').filter(
+                product_id=product_id).delete()
+            # Dodaj nowe
+            for path_id in data['path_ids']:
+                ProductPaths.objects.using('MPD').create(
+                    product_id=product_id,
+                    path_id=path_id
+                )
+
+        # Aktualizuj atrybuty jeśli podano
+        if 'attribute_ids' in data:
+            # Usuń istniejące atrybuty
+            ProductAttribute.objects.using('MPD').filter(
+                product_id=product_id).delete()
+            # Dodaj nowe
+            for attribute_id in data['attribute_ids']:
+                ProductAttribute.objects.using('MPD').create(
+                    product_id=product_id,
+                    attribute_id=attribute_id
+                )
+
+        logger.info("Zaktualizowano produkt MPD: %s (ID: %s)",
+                    product.name, product.id)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Produkt został zaktualizowany pomyślnie',
+            'product_id': product.id,
+            'product_name': product.name
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Błąd podczas aktualizacji produktu MPD: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+def get_product(request, product_id):
+    """
+    Endpoint do pobierania danych produktu z MPD
+    """
+    if request.method != 'GET':
+        return JsonResponse({'status': 'error', 'message': 'Tylko metoda GET jest obsługiwana'}, status=405)
+
+    try:
+        # Sprawdź czy produkt istnieje
+        try:
+            product = Products.objects.using('MPD').get(id=product_id)
+        except Products.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Produkt nie istnieje'}, status=404)
+
+        # Pobierz warianty
+        variants = []
+        for variant in product.productvariants_set.all():
+            variant_data = {
+                'variant_id': variant.variant_id,
+                'color_id': variant.color_id,
+                'producer_color_id': variant.producer_color_id,
+                'size_id': variant.size_id,
+                'producer_code': variant.producer_code,
+                'iai_product_id': variant.iai_product_id,
+                'exported_to_iai': variant.exported_to_iai
+            }
+
+            # Pobierz cenę jeśli istnieje
+            try:
+                price = variant.productvariantsretailprice
+                variant_data['price'] = {
+                    'retail_price': float(price.retail_price) if price.retail_price else None,
+                    'vat': float(price.vat) if price.vat else None,
+                    'currency': price.currency,
+                    'net_price': float(price.net_price) if price.net_price else None
+                }
+            except Exception:
+                variant_data['price'] = None
+
+            variants.append(variant_data)
+
+        # Pobierz ścieżki
+        paths = list(ProductPaths.objects.using('MPD').filter(
+            product_id=product_id).values_list('path_id', flat=True))
+
+        # Pobierz atrybuty
+        attributes = list(ProductAttribute.objects.using('MPD').filter(
+            product_id=product_id).values_list('attribute_id', flat=True))
+
+        return JsonResponse({
+            'status': 'success',
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'description': product.description,
+                'short_description': product.short_description,
+                'brand_id': product.brand_id,
+                'unit_id': product.unit_id,
+                'series_id': product.series_id,
+                'visibility': product.visibility,
+                'created_at': product.created_at.isoformat() if product.created_at else None,
+                'updated_at': product.updated_at.isoformat() if product.updated_at else None,
+                'variants': variants,
+                'paths': paths,
+                'attributes': attributes
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Błąd podczas pobierania produktu MPD: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)

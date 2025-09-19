@@ -8,6 +8,8 @@ from django.utils import timezone
 import json
 import logging
 from datetime import datetime
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 
 from .models import (
     Product, Brand, Category, ProductDetails,
@@ -95,6 +97,42 @@ class ProductBulkView(BaseBulkView):
         return prepared_data
 
 
+@extend_schema(
+    operation_id='products_bulk_create',
+    summary='Masowe tworzenie produktów',
+    description='Tworzy wiele produktów jednocześnie. Wymaga tablicy obiektów produktów.',
+    tags=['Products'],
+    request=BulkProductSerializer,
+    responses={
+        200: {'description': 'Produkty zostały pomyślnie utworzone'},
+        400: {'description': 'Błąd walidacji danych'},
+        500: {'description': 'Błąd serwera'}
+    },
+    examples=[
+        OpenApiExample(
+            'Bulk Create Products',
+            summary='Przykład masowego tworzenia produktów',
+            description='Przykład żądania do masowego tworzenia produktów',
+            value=[
+                {
+                    'product_id': 'PROD001',
+                    'active': True,
+                    'name': 'strój kąpielowy model 123 - Lupo Line',
+                    'description': 'Elegancki strój kąpielowy',
+                    'creation_date': '2024-01-15T10:30:00Z',
+                    'color': 'Czarny',
+                    'url': 'https://example.com/products/prod001',
+                    'new_collection': False,
+                    'products_in_set': 1,
+                    'other_colors': ['Biały', 'Niebieski'],
+                    'prices': {'PLN': 299.99, 'EUR': 69.99},
+                    'brand_id': 'BRAND001',
+                    'category_id': 'CAT001'
+                }
+            ]
+        )
+    ]
+)
 class ProductBulkCreateView(ProductBulkView):
     """Bulk create dla produktów"""
 
@@ -175,6 +213,18 @@ class ProductBulkCreateView(ProductBulkView):
             }, status=500)
 
 
+@extend_schema(
+    operation_id='products_bulk_update',
+    summary='Masowe aktualizowanie produktów',
+    description='Aktualizuje wiele produktów jednocześnie. Wymaga tablicy obiektów produktów z product_id.',
+    tags=['Products'],
+    request=BulkProductSerializer,
+    responses={
+        200: {'description': 'Produkty zostały pomyślnie zaktualizowane'},
+        400: {'description': 'Błąd walidacji danych'},
+        500: {'description': 'Błąd serwera'}
+    }
+)
 class ProductBulkUpdateView(ProductBulkView):
     """Bulk update dla produktów"""
 
@@ -288,6 +338,18 @@ class VariantBulkView(BaseBulkView):
         return ProductVariant
 
 
+@extend_schema(
+    operation_id='variants_bulk_create',
+    summary='Masowe tworzenie wariantów',
+    description='Tworzy wiele wariantów produktów jednocześnie.',
+    tags=['Variants'],
+    request=BulkVariantSerializer,
+    responses={
+        200: {'description': 'Warianty zostały pomyślnie utworzone'},
+        400: {'description': 'Błąd walidacji danych'},
+        500: {'description': 'Błąd serwera'}
+    }
+)
 class VariantBulkCreateView(View):
     """Bulk create dla wariantów"""
 
@@ -501,6 +563,18 @@ class BrandBulkView(BaseBulkView):
         return Brand
 
 
+@extend_schema(
+    operation_id='brands_bulk_create',
+    summary='Masowe tworzenie marek',
+    description='Tworzy wiele marek jednocześnie.',
+    tags=['Brands'],
+    request=BulkBrandSerializer,
+    responses={
+        200: {'description': 'Marki zostały pomyślnie utworzone'},
+        400: {'description': 'Błąd walidacji danych'},
+        500: {'description': 'Błąd serwera'}
+    }
+)
 class BrandBulkCreateView(View):
     """Bulk create dla marek"""
 
@@ -796,11 +870,29 @@ class VariantSyncView(View):
         return JsonResponse({'message': 'VariantSyncView - do implementacji'})
 
 
+@extend_schema(
+    operation_id='api_status',
+    summary='Status API',
+    description='Sprawdza status API i zwraca podstawowe informacje o systemie.',
+    tags=['Sync'],
+    responses={
+        200: {'description': 'Status API został pobrany pomyślnie'}
+    }
+)
 class APIStatusView(View):
     def get(self, request):
         return JsonResponse({'message': 'APIStatusView - do implementacji'})
 
 
+@extend_schema(
+    operation_id='api_logs',
+    summary='Logi API',
+    description='Zwraca logi operacji API i synchronizacji.',
+    tags=['Sync'],
+    responses={
+        200: {'description': 'Logi zostały pobrane pomyślnie'}
+    }
+)
 class APILogsView(View):
     def get(self, request):
         return JsonResponse({'message': 'APILogsView - do implementacji'})

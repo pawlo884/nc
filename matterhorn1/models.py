@@ -1,5 +1,4 @@
 from django.db import models
-from django.core.validators import MinValueValidator
 
 
 class Brand(models.Model):
@@ -57,6 +56,9 @@ class Product(models.Model):
     other_colors = models.JSONField(default=list, blank=True)
     prices = models.JSONField(default=dict, blank=True)
 
+    # Mapowanie do MPD
+    mapped_product_id = models.IntegerField(
+        null=True, blank=True, help_text="ID produktu w bazie MPD")
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -115,6 +117,7 @@ class ProductImage(models.Model):
         verbose_name = 'Obraz produktu'
         verbose_name_plural = 'Obrazy produktów'
         ordering = ['order']
+        unique_together = [['product', 'image_url']]
 
     def __str__(self):
         return f"Obraz {self.order} - {self.product.name}"
@@ -159,6 +162,8 @@ class ApiSyncLog(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     duration_seconds = models.FloatField(null=True, blank=True)
+    current_page = models.PositiveIntegerField(
+        default=1, help_text="Aktualna strona podczas importu")
 
     class Meta:
         db_table = 'apisynclog'
