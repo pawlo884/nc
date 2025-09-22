@@ -71,36 +71,36 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
             logger.info(
                 f"Rozpoczęto usuwanie mapowań dla produktu MPD ID: {instance.id}")
 
-            # Usunięcie produktu z tabeli products w matterhorn
-            with connections['matterhorn'].cursor() as cursor:
+            # Usunięcie produktu z tabeli products w matterhorn1
+            with connections['matterhorn1'].cursor() as cursor:
                 cursor.execute(
                     """
-                    UPDATE products 
+                    UPDATE product 
                     SET mapped_product_id = NULL,
                         is_mapped = False,
-                        last_updated = NOW()
+                        updated_at = NOW()
                     WHERE mapped_product_id = %s
                     """, [instance.id]
                 )
                 products_updated = cursor.rowcount
                 logger.info(
-                    f"Zaktualizowano {products_updated} rekordów w tabeli products")
+                    f"Zaktualizowano {products_updated} rekordów w tabeli product")
 
-            # Usunięcie wartości variant_id z mapped_variant_id w tabeli variants w matterhorn
+            # Usunięcie wartości variant_id z mapped_variant_id w tabeli product_variants w matterhorn1
             if hasattr(instance, 'variant_ids') and instance.variant_ids:
-                with connections['matterhorn'].cursor() as cursor:
+                with connections['matterhorn1'].cursor() as cursor:
                     placeholders = ', '.join(
                         ['%s'] * len(instance.variant_ids))
                     cursor.execute(f"""
-                        UPDATE variants
+                        UPDATE product_variants
                         SET mapped_variant_id = NULL,
                             is_mapped = False,
-                            last_updated = NOW()
+                            updated_at = NOW()
                         WHERE mapped_variant_id IN ({placeholders})
                         """, instance.variant_ids)
                     variants_updated = cursor.rowcount
                     logger.info(
-                        f"Zaktualizowano {variants_updated} rekordów w tabeli variants")
+                        f"Zaktualizowano {variants_updated} rekordów w tabeli product_variants")
             else:
                 logger.info("Brak variant_id do usunięcia")
 

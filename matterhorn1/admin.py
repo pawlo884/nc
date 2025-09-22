@@ -91,8 +91,8 @@ class ProductAdmin(admin.ModelAdmin):
     ]
     ordering = ['-product_id']
     inlines = [ProductDetailsInline, ProductImageInline, ProductVariantInline]
-    actions = ['bulk_map_to_mpd_action',
-               'bulk_create_mpd_action', 'sync_with_mpd_action']
+    actions = ('bulk_map_to_mpd_action',
+               'bulk_create_mpd_action', 'sync_with_mpd_action')
 
     fieldsets = (
         ('Podstawowe informacje', {
@@ -169,10 +169,14 @@ class ProductAdmin(admin.ModelAdmin):
             mpd_data = {}
             suggested_products = []
             main_colors = []
-            producer_colors = []
             mpd_paths = []
             selected_paths = []
             units = []
+
+            # Inicjalizuj zmienne
+            producer_color_name = ''
+            producer_code = ''
+            series_name = ''
 
             if is_mapped:
                 # Pobierz dane produktu z MPD
@@ -180,7 +184,7 @@ class ProductAdmin(admin.ModelAdmin):
                     cursor.execute("""
                         SELECT p.name, p.description, p.short_description, b.name as brand_name
                         FROM products p 
-                        LEFT JOIN brands b ON p.brand = b.id 
+                        LEFT JOIN brands b ON p.brand_id = b.id 
                         WHERE p.id = %s
                     """, [product.mapped_product_id])
                     result = cursor.fetchone()
@@ -192,33 +196,82 @@ class ProductAdmin(admin.ModelAdmin):
                             'brand': result[3] or ''
                         }
 
-                    # Pobierz kolory
-                    cursor.execute("SELECT id, name FROM colors ORDER BY name")
+                    # Pobierz główne kolory (bez parent_id)
+                    cursor.execute(
+                        "SELECT id, name FROM colors WHERE parent_id IS NULL ORDER BY name")
                     main_colors = [{'id': row[0], 'name': row[1]}
                                    for row in cursor.fetchall()]
 
-                    # Pobierz ścieżki
+                    # Pobierz kolory producenta (z parent_id - podkolory)
                     cursor.execute(
-                        "SELECT id, name, path FROM path ORDER BY name")
-                    mpd_paths = [{'id': row[0], 'name': row[1],
-                                  'path': row[2]} for row in cursor.fetchall()]
+                        "SELECT id, name, parent_id FROM colors WHERE parent_id IS NOT NULL ORDER BY name")
+                    producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]}
+                                       for row in cursor.fetchall()]
 
-                    # Pobierz przypisane ścieżki
+                    # Pobierz producer_color_name z pierwszego wariantu
+                    cursor.execute("""
+                        SELECT c.name 
+                        FROM product_variants pv
+                        LEFT JOIN colors c ON pv.producer_color_id = c.id
+                        WHERE pv.product_id = %s
+                        LIMIT 1
+                    """, [product.mapped_product_id])
+                    result = cursor.fetchone()
+                    if result:
+                        producer_color_name = result[0] or ''
+            else:
+                # Jeśli produkt nie jest zmapowany, pobierz tylko kolory
+                with connections['MPD'].cursor() as cursor:
+                    # Pobierz główne kolory (bez parent_id)
+                    cursor.execute(
+                        "SELECT id, name FROM colors WHERE parent_id IS NULL ORDER BY name")
+                    main_colors = [{'id': row[0], 'name': row[1]}
+                                   for row in cursor.fetchall()]
+
+                    # Pobierz kolory producenta (z parent_id - podkolory)
+                    cursor.execute(
+                        "SELECT id, name, parent_id FROM colors WHERE parent_id IS NOT NULL ORDER BY name")
+                    producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]}
+                                       for row in cursor.fetchall()]
+
+            # Pobierz ścieżki (dla wszystkich produktów)
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, name, path FROM path ORDER BY name")
+                mpd_paths = [{'id': row[0], 'name': row[1],
+                              'path': row[2]} for row in cursor.fetchall()]
+
+                # Pobierz przypisane ścieżki (tylko dla zmapowanych produktów)
+                if is_mapped:
                     cursor.execute("SELECT path_id FROM product_path WHERE product_id = %s", [
                                    product.mapped_product_id])
                     selected_paths = [row[0] for row in cursor.fetchall()]
 
-                    # Pobierz jednostki
-                    cursor.execute("SELECT id, name FROM units ORDER BY name")
-                    units = [{'id': row[0], 'name': row[1]}
-                             for row in cursor.fetchall()]
-            else:
-                # Pobierz sugerowane produkty
+                    # Pobierz przypisane atrybuty
+                    cursor.execute("SELECT attribute_id FROM product_attributes WHERE product_id = %s", [
+                                   product.mapped_product_id])
+                    selected_attributes = [row[0] for row in cursor.fetchall()]
+                else:
+                    selected_paths = []
+                    selected_attributes = []
+
+                # Pobierz jednostki
+                cursor.execute("SELECT id, name FROM units ORDER BY name")
+                units = [{'id': row[0], 'name': row[1]}
+                         for row in cursor.fetchall()]
+
+                # Pobierz atrybuty
+                cursor.execute("SELECT id, name FROM attributes ORDER BY name")
+                mpd_attributes = [{'id': row[0], 'name': row[1]}
+                                  for row in cursor.fetchall()]
+
+            # Pobierz sugerowane produkty (tylko dla niezmapowanych produktów)
+            if not is_mapped:
                 with connections['MPD'].cursor() as cursor:
                     cursor.execute("""
                         SELECT p.id, p.name, b.name as brand_name
                         FROM products p 
-                        LEFT JOIN brands b ON p.brand = b.id 
+                        LEFT JOIN brands b ON p.brand_id = b.id 
                         WHERE LOWER(p.name) LIKE LOWER(%s)
                         ORDER BY p.name
                         LIMIT 10
@@ -243,7 +296,9 @@ class ProductAdmin(admin.ModelAdmin):
                 'mpd_paths': mpd_paths,
                 'selected_paths': selected_paths,
                 'units': units,
-                'producer_color_name': '',
+                'mpd_attributes': mpd_attributes,
+                'selected_attributes': selected_attributes,
+                'producer_color_name': producer_color_name,
                 'producer_code': '',
                 'series_name': '',
                 'selected_unit_id': None
@@ -251,16 +306,47 @@ class ProductAdmin(admin.ModelAdmin):
 
         except Exception as e:
             logger.error("Błąd podczas pobierania danych MPD: %s", e)
+            # Pobierz kolory i jednostki dla niezmapowanych produktów
+            with connections['MPD'].cursor() as cursor:
+                # Pobierz główne kolory (bez parent_id)
+                cursor.execute(
+                    "SELECT id, name FROM colors WHERE parent_id IS NULL ORDER BY name")
+                main_colors = [{'id': row[0], 'name': row[1]}
+                               for row in cursor.fetchall()]
+
+                # Pobierz kolory producenta (z parent_id - podkolory)
+                cursor.execute(
+                    "SELECT id, name, parent_id FROM colors WHERE parent_id IS NOT NULL ORDER BY name")
+                producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]}
+                                   for row in cursor.fetchall()]
+
+                # Pobierz jednostki
+                cursor.execute("SELECT id, name FROM units ORDER BY name")
+                units = [{'id': row[0], 'name': row[1]}
+                         for row in cursor.fetchall()]
+
+                # Pobierz atrybuty
+                cursor.execute("SELECT id, name FROM attributes ORDER BY name")
+                mpd_attributes = [{'id': row[0], 'name': row[1]}
+                                  for row in cursor.fetchall()]
+
+                # Pobierz ścieżki
+                cursor.execute("SELECT id, name, path FROM path ORDER BY name")
+                mpd_paths = [{'id': row[0], 'name': row[1], 'path': row[2]}
+                             for row in cursor.fetchall()]
+
             extra_context.update({
                 'is_mapped': False,
                 'mpd_data': {},
                 'suggested_products': [],
-                'main_colors': [],
-                'producer_colors': [],
-                'mpd_paths': [],
+                'main_colors': main_colors,
+                'producer_colors': producer_colors,
+                'mpd_paths': mpd_paths,
                 'selected_paths': [],
-                'units': [],
-                'producer_color_name': '',
+                'units': units,
+                'mpd_attributes': mpd_attributes,
+                'selected_attributes': [],
+                'producer_color_name': producer_color_name,
                 'producer_code': '',
                 'series_name': '',
                 'selected_unit_id': None
@@ -288,42 +374,72 @@ class ProductAdmin(admin.ModelAdmin):
                 producer_color_name = request.POST.get('producer_color_name')
                 unit_id = request.POST.get('unit_id')
 
+                logger.info(
+                    f"Form data: name='{name}', description='{description}', brand='{brand}', main_color_id='{main_color_id}', unit_id='{unit_id}'")
+
                 if not name:
                     return JsonResponse({'success': False, 'error': 'Nazwa jest wymagana'})
 
-                # Przygotuj dane do wysłania do API MPD
+                # KROK 3: Nazwa + Opis + Krótki opis (inne pola wyłączone)
                 mpd_data = {
                     'name': name,
                     'description': description or '',
                     'short_description': short_description or '',
-                    'brand_id': brand,
-                    'unit_id': unit_id,
+                    'brand_name': '',  # Wyłączone na razie
+                    'unit_id': None,   # Wyłączone na razie
                     'visibility': True
                 }
 
-                # Dodaj warianty jeśli podano kolor
-                if main_color_id or producer_color_name or producer_code:
-                    variants = [{
-                        'color_id': main_color_id,
-                        'producer_color_name': producer_color_name,
-                        'producer_code': producer_code
-                    }]
-                    mpd_data['variants'] = variants
+                # Warianty wyłączone na razie
+                # variants = []
 
-                # Wyślij żądanie do API MPD
-                mpd_api_url = f"{settings.MPD_API_URL}/products/create/"
+                # Wyślij żądanie do API MPD (bulk create)
+                mpd_api_url = f"{settings.MPD_API_URL}/bulk-create/"
+                logger.info(f"Sending data to MPD: {mpd_data}")
                 response = requests.post(
-                    mpd_api_url, json=mpd_data, timeout=30)
+                    mpd_api_url, json={'products': [mpd_data]}, timeout=30)
 
                 if response.status_code == 200:
                     result = response.json()
+                    logger.info(f"Bulk create response: {result}")
+                    logger.info(f"Response status: {result.get('status')}")
+                    logger.info(
+                        f"Created products count: {len(result.get('created_products', []))}")
+                    logger.info(
+                        f"Errors count: {len(result.get('errors', []))}")
+                    logger.info(
+                        f"Total created: {result.get('total_created', 0)}")
+
                     if result.get('status') == 'success':
-                        mpd_product_id = result.get('product_id')
+                        created_products = result.get('created_products', [])
+                        errors = result.get('errors', [])
+                        logger.info(f"Created products: {created_products}")
+                        logger.info(f"Errors: {errors}")
+
+                        if created_products:
+                            mpd_product_id = created_products[0].get('id')
+                            logger.info(f"MPD product ID: {mpd_product_id}")
+                        else:
+                            logger.error("No products created in response")
+                            error_msg = "Nie utworzono produktu"
+                            if errors:
+                                error_msg += f". Błędy: {', '.join(errors)}"
+                            return JsonResponse({'success': False, 'error': error_msg})
 
                         # Zaktualizuj mapped_product_id w matterhorn1
                         product = Product.objects.get(id=product_id)
                         product.mapped_product_id = mpd_product_id
                         product.save()
+
+                        # Dodaj atrybuty jeśli podano
+                        mpd_attributes = request.POST.getlist('mpd_attributes')
+                        if mpd_attributes:
+                            with connections['MPD'].cursor() as cursor:
+                                for attribute_id in mpd_attributes:
+                                    cursor.execute(
+                                        "INSERT INTO product_attributes (product_id, attribute_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                                        [mpd_product_id, attribute_id]
+                                    )
 
                         return JsonResponse({
                             'success': True,
@@ -374,6 +490,27 @@ class ProductAdmin(admin.ModelAdmin):
                             [product.mapped_product_id, remove_path_id]
                         )
                     return JsonResponse({'success': True, 'message': 'Usunięto ścieżkę.'})
+
+                # Dodawanie atrybutów
+                mpd_attributes = request.POST.getlist('mpd_attributes')
+                if mpd_attributes and len(request.POST) == 1:
+                    with connections['MPD'].cursor() as cursor:
+                        for attribute_id in mpd_attributes:
+                            cursor.execute(
+                                "INSERT INTO product_attributes (product_id, attribute_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                                [product.mapped_product_id, attribute_id]
+                            )
+                    return JsonResponse({'success': True, 'message': 'Dodano atrybuty.'})
+
+                # Usuwanie atrybutu
+                remove_attribute_id = request.POST.get('remove_attribute_id')
+                if remove_attribute_id and len(request.POST) == 1:
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute(
+                            "DELETE FROM product_attributes WHERE product_id = %s AND attribute_id = %s",
+                            [product.mapped_product_id, remove_attribute_id]
+                        )
+                    return JsonResponse({'success': True, 'message': 'Usunięto atrybut.'})
 
                 return JsonResponse({'success': False, 'error': 'Brak danych do aktualizacji'})
 
@@ -590,7 +727,7 @@ class ProductAdmin(admin.ModelAdmin):
                 errors = []
 
                 # Użyj API MPD do bulk create
-                mpd_api_url = f"{request.scheme}://{request.get_host()}/mpd/matterhorn1/bulk-map/"
+                mpd_api_url = f"{request.scheme}://{request.get_host()}/mpd/bulk-create/"
                 response = requests.post(
                     mpd_api_url, json={'products': products_data}, timeout=60)
 
@@ -1086,4 +1223,4 @@ def make_inactive(modeladmin, request, queryset):
         request, f"Oznaczono {queryset.count()} produktów jako nieaktywne.")
 
 
-ProductAdmin.actions = [make_active, make_inactive]
+ProductAdmin.actions = (make_active, make_inactive)

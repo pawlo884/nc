@@ -3,6 +3,344 @@
 
 const { useState, useEffect } = React;
 
+// SingleProductCreate Component
+function SingleProductCreate({ productId, productData, onComplete }) {
+  const [editedProduct, setEditedProduct] = useState({
+    matterhorn_product_id: productData.product_id,
+    name: productData.name || '',
+    description: productData.description || '',
+    brand_name: productData.brand?.name || '',
+    variants: productData.variants || []
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
+
+  const showMessage = (text, type) => {
+    setMessage(text);
+    setMessageType(type);
+    setTimeout(() => setMessage(''), 5000);
+  };
+
+  const updateProduct = (field, value) => {
+    setEditedProduct(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updateVariant = (variantIndex, field, value) => {
+    setEditedProduct(prev => ({
+      ...prev,
+      variants: prev.variants.map((variant, j) => 
+        j === variantIndex ? { ...variant, [field]: value } : variant
+      )
+    }));
+  };
+
+  const addVariant = () => {
+    setEditedProduct(prev => ({
+      ...prev,
+      variants: [...prev.variants, {
+        size_name: '',
+        stock: 0,
+        ean: '',
+        producer_code: ''
+      }]
+    }));
+  };
+
+  const removeVariant = (variantIndex) => {
+    setEditedProduct(prev => ({
+      ...prev,
+      variants: prev.variants.filter((_, j) => j !== variantIndex)
+    }));
+  };
+
+  const submitProduct = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/admin/matterhorn1/product/bulk-create-mpd/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ products: [editedProduct] })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        showMessage(data.message, 'success');
+        setTimeout(() => {
+          if (onComplete) onComplete();
+          else window.location.reload();
+        }, 2000);
+      } else {
+        showMessage(data.error || 'Wystąpił błąd', 'error');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showMessage('Wystąpił błąd podczas tworzenia produktu', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return React.createElement('div', {
+    style: { marginTop: '20px', padding: '20px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f9f9f9' }
+  }, [
+    React.createElement('h3', { key: 'title' }, 'Edytuj dane przed utworzeniem w MPD'),
+    
+    message && React.createElement('div', {
+      key: 'message',
+      className: `status-message ${messageType}`,
+      style: {
+        margin: '10px 0',
+        padding: '10px',
+        borderRadius: '4px',
+        backgroundColor: messageType === 'success' ? '#d4edda' : '#f8d7da',
+        color: messageType === 'success' ? '#155724' : '#721c24',
+        border: `1px solid ${messageType === 'success' ? '#c3e6cb' : '#f5c6cb'}`
+      }
+    }, message),
+
+    React.createElement('div', { key: 'form' }, [
+      // Nazwa produktu
+      React.createElement('div', { key: 'name', style: { marginBottom: '15px' } }, [
+        React.createElement('label', {
+          key: 'label',
+          style: { display: 'block', marginBottom: '5px', fontWeight: 'bold' }
+        }, 'Nazwa:'),
+        React.createElement('input', {
+          key: 'input',
+          type: 'text',
+          value: editedProduct.name,
+          onChange: (e) => updateProduct('name', e.target.value),
+          style: {
+            width: '100%',
+            padding: '8px',
+            border: '1px solid #ccc',
+            borderRadius: '4px'
+          }
+        })
+      ]),
+
+      // Opis produktu
+      React.createElement('div', { key: 'description', style: { marginBottom: '15px' } }, [
+        React.createElement('label', {
+          key: 'label',
+          style: { display: 'block', marginBottom: '5px', fontWeight: 'bold' }
+        }, 'Opis:'),
+        React.createElement('textarea', {
+          key: 'textarea',
+          value: editedProduct.description,
+          onChange: (e) => updateProduct('description', e.target.value),
+          rows: 3,
+          style: {
+            width: '100%',
+            padding: '8px',
+            border: '1px solid #ccc',
+            borderRadius: '4px'
+          }
+        })
+      ]),
+
+      // Marka
+      React.createElement('div', { key: 'brand', style: { marginBottom: '15px' } }, [
+        React.createElement('label', {
+          key: 'label',
+          style: { display: 'block', marginBottom: '5px', fontWeight: 'bold' }
+        }, 'Marka:'),
+        React.createElement('input', {
+          key: 'input',
+          type: 'text',
+          value: editedProduct.brand_name,
+          onChange: (e) => updateProduct('brand_name', e.target.value),
+          style: {
+            width: '100%',
+            padding: '8px',
+            border: '1px solid #ccc',
+            borderRadius: '4px'
+          }
+        })
+      ]),
+
+      // Warianty
+      React.createElement('div', { key: 'variants' }, [
+        React.createElement('div', {
+          key: 'header',
+          style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }
+        }, [
+          React.createElement('h4', { key: 'title' }, 'Warianty:'),
+          React.createElement('button', {
+            key: 'add',
+            onClick: addVariant,
+            style: {
+              background: '#28a745',
+              color: 'white',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }
+          }, '+ Dodaj wariant')
+        ]),
+
+        editedProduct.variants.map((variant, variantIndex) =>
+          React.createElement('div', {
+            key: variantIndex,
+            style: {
+              border: '1px solid #e0e0e0',
+              borderRadius: '4px',
+              padding: '15px',
+              marginBottom: '10px',
+              backgroundColor: 'white'
+            }
+          }, [
+            React.createElement('div', {
+              key: 'header',
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }
+            }, [
+              React.createElement('h5', { key: 'title' }, `Wariant ${variantIndex + 1}`),
+              React.createElement('button', {
+                key: 'remove',
+                onClick: () => removeVariant(variantIndex),
+                style: {
+                  background: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }
+              }, 'Usuń')
+            ]),
+
+            React.createElement('div', {
+              key: 'fields',
+              style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }
+            }, [
+              React.createElement('div', { key: 'size' }, [
+                React.createElement('label', {
+                  key: 'label',
+                  style: { display: 'block', marginBottom: '5px', fontSize: '0.9em' }
+                }, 'Rozmiar:'),
+                React.createElement('input', {
+                  key: 'input',
+                  type: 'text',
+                  value: variant.size_name,
+                  onChange: (e) => updateVariant(variantIndex, 'size_name', e.target.value),
+                  style: {
+                    width: '100%',
+                    padding: '6px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px'
+                  }
+                })
+              ]),
+
+              React.createElement('div', { key: 'stock' }, [
+                React.createElement('label', {
+                  key: 'label',
+                  style: { display: 'block', marginBottom: '5px', fontSize: '0.9em' }
+                }, 'Stan magazynowy:'),
+                React.createElement('input', {
+                  key: 'input',
+                  type: 'number',
+                  value: variant.stock,
+                  onChange: (e) => updateVariant(variantIndex, 'stock', parseInt(e.target.value) || 0),
+                  style: {
+                    width: '100%',
+                    padding: '6px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px'
+                  }
+                })
+              ]),
+
+              React.createElement('div', { key: 'ean' }, [
+                React.createElement('label', {
+                  key: 'label',
+                  style: { display: 'block', marginBottom: '5px', fontSize: '0.9em' }
+                }, 'EAN:'),
+                React.createElement('input', {
+                  key: 'input',
+                  type: 'text',
+                  value: variant.ean,
+                  onChange: (e) => updateVariant(variantIndex, 'ean', e.target.value),
+                  style: {
+                    width: '100%',
+                    padding: '6px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px'
+                  }
+                })
+              ]),
+
+              React.createElement('div', { key: 'producer' }, [
+                React.createElement('label', {
+                  key: 'label',
+                  style: { display: 'block', marginBottom: '5px', fontSize: '0.9em' }
+                }, 'Kod producenta:'),
+                React.createElement('input', {
+                  key: 'input',
+                  type: 'text',
+                  value: variant.producer_code,
+                  onChange: (e) => updateVariant(variantIndex, 'producer_code', e.target.value),
+                  style: {
+                    width: '100%',
+                    padding: '6px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px'
+                  }
+                })
+              ])
+            ])
+          ])
+        )
+      ])
+    ]),
+
+    // Przyciski
+    React.createElement('div', {
+      key: 'actions',
+      style: { marginTop: '15px' }
+    }, [
+      React.createElement('button', {
+        key: 'submit',
+        onClick: submitProduct,
+        disabled: isLoading,
+        style: {
+          background: '#28a745',
+          color: 'white',
+          border: 'none',
+          padding: '10px 20px',
+          borderRadius: '4px',
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          marginRight: '10px',
+          opacity: isLoading ? 0.6 : 1
+        }
+      }, isLoading ? 'Tworzenie...' : 'Utwórz w MPD'),
+      
+      React.createElement('button', {
+        key: 'cancel',
+        onClick: () => {
+          const container = document.getElementById('bulk-create-single-container');
+          if (container) container.style.display = 'none';
+        },
+        disabled: isLoading,
+        style: {
+          background: '#6c757d',
+          color: 'white',
+          border: 'none',
+          padding: '10px 20px',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }
+      }, 'Anuluj')
+    ])
+  ]);
+}
+
 // ProductMapping Component
 function ProductMapping({ productId, isMapped, mappedProductId }) {
   const [isLoading, setIsLoading] = useState(false);

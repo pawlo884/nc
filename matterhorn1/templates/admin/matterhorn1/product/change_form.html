@@ -79,9 +79,122 @@
     .mpd-form textarea,
     .mpd-form select {
         width: 100%;
-        padding: 8px;
+        padding: 8px 12px;
         border: 1px solid #ccc;
         border-radius: 4px;
+        color: #333;
+        background-color: #fff;
+        line-height: 1.2;
+        height: auto;
+        min-height: 36px;
+        vertical-align: top;
+    }
+    
+    .mpd-form select option {
+        color: #333 !important;
+        background-color: #fff !important;
+    }
+    
+    .mpd-form select {
+        color: #333 !important;
+        background-color: #fff !important;
+    }
+    
+    #main_color_id, #unit_id {
+        color: #333 !important;
+        background-color: #fff !important;
+        font-size: 14px !important;
+        line-height: 1.2 !important;
+        padding: 8px 12px !important;
+        height: auto !important;
+        min-height: 36px !important;
+        vertical-align: top !important;
+    }
+    
+    #main_color_id option, #unit_id option {
+        color: #333 !important;
+        background-color: #fff !important;
+        font-size: 14px !important;
+        padding: 5px !important;
+    }
+    
+    select#main_color_id, select#unit_id {
+        color: #333 !important;
+        background-color: #fff !important;
+        font-size: 14px !important;
+    }
+    
+    select#main_color_id option, select#unit_id option {
+        color: #333 !important;
+        background-color: #fff !important;
+        font-size: 14px !important;
+        padding: 5px !important;
+    }
+    
+    /* Override Django admin styles */
+    .form-row select {
+        color: #333 !important;
+        background-color: #fff !important;
+        font-size: 14px !important;
+    }
+    
+    .form-row select option {
+        color: #333 !important;
+        background-color: #fff !important;
+        font-size: 14px !important;
+    }
+    
+    /* Force visibility */
+    select, select option {
+        color: #333 !important;
+        background-color: #fff !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    
+    /* Specific fix for selected text visibility */
+    select:focus {
+        color: #333 !important;
+        background-color: #fff !important;
+        border-color: #007cba !important;
+    }
+    
+    select:focus option {
+        color: #333 !important;
+        background-color: #fff !important;
+    }
+    
+    /* Override any inherited styles */
+    .mpd-form select, .mpd-form select:focus, .mpd-form select:active {
+        color: #333 !important;
+        background-color: #fff !important;
+        text-shadow: none !important;
+        -webkit-text-fill-color: #333 !important;
+        -moz-text-fill-color: #333 !important;
+    }
+    
+    /* Ensure text is visible in all states */
+    select option:checked, select option:selected {
+        color: #333 !important;
+        background-color: #fff !important;
+    }
+    
+    /* Style dla zaznaczonych atrybutów - wyróżnij je */
+    #mpd_attributes option:checked {
+        background-color: #28a745 !important;
+        color: white !important;
+        font-weight: bold !important;
+        border: 2px solid #1e7e34 !important;
+    }
+    
+    #mpd_attributes option:hover {
+        background-color: #e9ecef !important;
+        color: #333 !important;
+    }
+    
+    #mpd_attributes option:checked:hover {
+        background-color: #218838 !important;
+        color: white !important;
     }
     
     .mpd-form textarea {
@@ -216,27 +329,63 @@
             <form id="mpd-form">
                 {% csrf_token %}
                 <input type="hidden" name="product_id" value="{{ original.id }}">
+                
+                <!-- KROK 1: NAZWA -->
                 <div class="form-row">
                     <label for="mpd_name">Nazwa:</label>
-                    <input type="text" id="mpd_name" name="mpd_name" value="{{ mpd_data.name }}">
+                    <input type="text" id="mpd_name" name="mpd_name" value="{{ original.name }}">
                     <button type="button" onclick="updateField('name', 'mpd_name')">Zapisz</button>
                 </div>
+                
+                <!-- KROK 2: OPIS -->
                 <div class="form-row">
                     <label for="mpd_description">Opis:</label>
-                    <textarea id="mpd_description" name="mpd_description">{{ mpd_data.description }}</textarea>
+                    <textarea id="mpd_description" name="mpd_description">{{ original.description }}</textarea>
                     <button type="button" onclick="updateField('description', 'mpd_description')">Zapisz</button>
                 </div>
+                
+                <!-- KROK 3: KRÓTKI OPIS -->
                 <div class="form-row">
                     <label for="mpd_short_description">Krótki opis:</label>
                     <textarea id="mpd_short_description" name="mpd_short_description" style="height: 60px;">{{ mpd_data.short_description }}</textarea>
                     <button type="button" onclick="updateField('short_description', 'mpd_short_description')">Zapisz</button>
                 </div>
+                
+                <!-- KROK 4: ATRYBUTY -->
                 <div class="form-row">
-                    <label for="mpd_brand">Marka:</label>
-                    <input type="text" id="mpd_brand" name="mpd_brand" value="{{ mpd_data.brand }}">
-                    <button type="button" onclick="updateField('brand_id', 'mpd_brand')">Zapisz</button>
+                    <label for="mpd_attributes">Atrybuty:</label>
+                    <select multiple name="mpd_attributes" id="mpd_attributes" size="10" style="width: 100%;" onchange="saveAttributeSelection()" onblur="saveAttributeSelection()" onfocus="restoreAttributeSelection()" onclick="saveAttributeSelection()">
+                        {% for attribute in mpd_attributes %}
+                        <option value="{{ attribute.id }}" {% if attribute.id in selected_attributes %}selected{% endif %}>
+                            {{ attribute.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="updateAttributes()" style="margin-left:10px;">Zapisz atrybuty</button>
                 </div>
                 <div class="form-row">
+                    <label>Przypisane atrybuty:</label>
+                    <ul style="list-style: none; padding: 0;">
+                        {% for attribute in mpd_attributes %}
+                            {% if attribute.id in selected_attributes %}
+                                <li style="display: flex; align-items: center; margin-bottom: 5px;">
+                                    <span style="flex-grow: 1;">{{ attribute.name }}</span>
+                                    <button type="button" class="remove-attribute-btn" data-attribute-id="{{ attribute.id }}" style="background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 8px; cursor: pointer; margin-left: 10px;">×</button>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <!-- KROK 5: MARKA (wyłączony) -->
+                <div class="form-row" style="display: none;">
+                    <label for="mpd_brand">Marka:</label>
+                    <input type="text" id="mpd_brand" name="mpd_brand" value="{{ original.brand.name|default:'' }}">
+                    <button type="button" onclick="updateField('brand_id', 'mpd_brand')">Zapisz</button>
+                </div>
+                
+                <!-- KROK 6: GŁÓWNY KOLOR (wyłączony) -->
+                <div class="form-row" style="display: none;">
                     <label for="main_color_id">Główny kolor:</label>
                     <select id="main_color_id" name="main_color_id">
                         <option value="">-- wybierz kolor --</option>
@@ -246,9 +395,11 @@
                     </select>
                     <button type="button" onclick="updateField('color_id', 'main_color_id')">Zapisz</button>
                 </div>
-                <div class="form-row">
+                
+                <!-- KROK 7: KOLOR PRODUCENTA (wyłączony) -->
+                <div class="form-row" style="display: none;">
                     <label for="producer_color_name">Kolor producenta:</label>
-                    <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off" value="{{ producer_color_name }}" placeholder="Kolor producenta">
+                    <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off" value="{{ original.color|default:producer_color_name }}" placeholder="Kolor producenta">
                     <button type="button" onclick="updateField('producer_color_id', 'producer_color_name')">Zapisz</button>
                     <datalist id="producer_colors_list">
                         {% for color in producer_colors %}
@@ -256,17 +407,23 @@
                         {% endfor %}
                     </datalist>
                 </div>
-                <div class="form-row">
+                
+                <!-- KROK 8: KOD PRODUCENTA (wyłączony) -->
+                <div class="form-row" style="display: none;">
                     <label for="producer_code">Kod producenta:</label>
-                    <input type="text" id="producer_code" name="producer_code" value="{{ producer_code }}" placeholder="Kod producenta">
+                    <input type="text" id="producer_code" name="producer_code" value="{{ original.product_id|default:producer_code }}" placeholder="Kod producenta">
                     <button type="button" onclick="updateField('producer_code', 'producer_code')">Zapisz</button>
                 </div>
-                <div class="form-row">
+                
+                <!-- KROK 9: NAZWA SERII (wyłączony) -->
+                <div class="form-row" style="display: none;">
                     <label for="series_name">Nazwa serii (opcjonalnie):</label>
                     <input type="text" id="series_name" name="series_name" value="{{ series_name }}" placeholder="Nazwa serii">
                     <button type="button" onclick="updateField('series_id', 'series_name')">Zapisz</button>
                 </div>
-                <div class="form-row">
+                
+                <!-- KROK 10: ŚCIEŻKI (wyłączony) -->
+                <div class="form-row" style="display: none;">
                     <label for="mpd_paths">Ścieżki produktu (możesz wybrać wiele):</label>
                     <select id="mpd_paths" name="mpd_paths" multiple size="5">
                         {% for path in mpd_paths %}
@@ -277,20 +434,9 @@
                     </select>
                     <button type="button" onclick="addPaths()" style="margin-left:10px;">Dodaj</button>
                 </div>
-                <div class="form-row">
-                    <label>Przypisane ścieżki:</label>
-                    <ul style="list-style: none; padding: 0;">
-                        {% for path in mpd_paths %}
-                            {% if path.id in selected_paths %}
-                                <li style="display: flex; align-items: center; margin-bottom: 5px;">
-                                    <span style="flex-grow: 1;">{{ path.name }} ({{ path.path }})</span>
-                                    <button type="button" class="remove-path-btn" data-path-id="{{ path.id }}" style="background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 8px; cursor: pointer; margin-left: 10px;">×</button>
-                                </li>
-                            {% endif %}
-                        {% endfor %}
-                    </ul>
-                </div>
-                <div class="form-row">
+                
+                <!-- KROK 11: JEDNOSTKA (wyłączony) -->
+                <div class="form-row" style="display: none;">
                     <label for="unit_id">Jednostka:</label>
                     <select id="unit_id" name="unit_id">
                         <option value="">-- wybierz jednostkę --</option>
@@ -299,12 +445,22 @@
                         {% endfor %}
                     </select>
                 </div>
+                
                 <div class="form-row" style="margin-bottom: 10px;">
                     <b>ID w MPD:</b> {{ original.mapped_product_id|default:'-' }}
                 </div>
             </form>
             {% if not is_mapped %}
             <button type="button" id="create-mpd-product-btn" class="mpd-form-btn" style="margin-top:20px; background:#417690; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Utwórz nowy produkt w MPD</button>
+            <div id="bulk-create-single-container" style="display:none; margin-top:20px;">
+                <div id="single-product-create-container" 
+                     data-product-id="{{ original.product_id }}"
+                     data-product-name="{{ original.name }}"
+                     data-product-description="{{ original.description }}"
+                     data-brand-name="{{ original.brand.name|default:'' }}"
+                     data-variants="[{% for variant in original.variants.all %}{'name': '{{ variant.name|escapejs }}', 'stock': {{ variant.stock }}, 'ean': '{{ variant.ean|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}]">
+                </div>
+            </div>
             {% else %}
             <div id="product-mapping-container" 
                  data-product-id="{{ original.id }}"
@@ -390,16 +546,105 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+    
+    // Add event listeners for select elements to force text visibility
+    const selectElements = document.querySelectorAll('select');
+    selectElements.forEach(select => {
+        select.addEventListener('change', function() {
+            this.style.color = '#333';
+            this.style.backgroundColor = '#fff';
+            this.style.textShadow = 'none';
+            this.style.webkitTextFillColor = '#333';
+            this.style.mozTextFillColor = '#333';
+            this.style.lineHeight = '1.2';
+            this.style.padding = '8px 12px';
+            this.style.height = 'auto';
+            this.style.minHeight = '36px';
+            this.style.verticalAlign = 'top';
+        });
+        
+        select.addEventListener('focus', function() {
+            this.style.color = '#333';
+            this.style.backgroundColor = '#fff';
+            this.style.textShadow = 'none';
+            this.style.webkitTextFillColor = '#333';
+            this.style.mozTextFillColor = '#333';
+            this.style.lineHeight = '1.2';
+            this.style.padding = '8px 12px';
+            this.style.height = 'auto';
+            this.style.minHeight = '36px';
+            this.style.verticalAlign = 'top';
+        });
+    });
+
+    // Dodaj obsługę przycisków usuwania atrybutów
+    document.querySelectorAll('.remove-attribute-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const attributeId = this.getAttribute('data-attribute-id');
+            removeAttribute(attributeId);
+        });
+    });
+
+    // Inicjalizuj zaznaczenie atrybutów
+    const attributesSelect = document.getElementById('mpd_attributes');
+    if (attributesSelect) {
+        const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
+        window.lastAttributeSelection = selectedAttributes;
+        
+        // Aktualizuj style wizualne
+        updateAttributeVisualStyles();
+    }
+
 });
 
 function updateField(field, inputId) {
     const value = document.getElementById(inputId).value;
     const productId = {{ original.mapped_product_id|default:'null' }};
+    
+    // Force text visibility for select elements
+    const selectElement = document.getElementById(inputId);
+    if (selectElement && selectElement.tagName === 'SELECT') {
+        selectElement.style.color = '#333';
+        selectElement.style.backgroundColor = '#fff';
+        selectElement.style.textShadow = 'none';
+        selectElement.style.webkitTextFillColor = '#333';
+        selectElement.style.mozTextFillColor = '#333';
+        selectElement.style.lineHeight = '1.2';
+        selectElement.style.padding = '8px 12px';
+        selectElement.style.height = 'auto';
+        selectElement.style.minHeight = '36px';
+        selectElement.style.verticalAlign = 'top';
+    }
+    
     if (!productId) {
-        showInlineStatus('Brak mapped_product_id!', false);
+        // Dla niezmapowanych produktów - użyj mpd-create
+        const matterhornProductId = {{ original.id }};
+        const formData = new FormData(document.getElementById('mpd-form'));
+        
+        fetch(`/admin/matterhorn1/product/mpd-create/${matterhornProductId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showInlineStatus('Produkt utworzony w MPD!', true);
+                // Odśwież stronę żeby pokazać zmapowany produkt
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showInlineStatus('Błąd: ' + data.error, false);
+            }
+        })
+        .catch(error => {
+            showInlineStatus('Błąd: ' + error, false);
+        });
         return;
     }
     
+    // Dla zmapowanych produktów - użyj mpd-update-field
     const requestData = { value: value };
     
     fetch(`/admin/matterhorn1/product/mpd-update-field/${productId}/${field}/`, {
@@ -413,6 +658,9 @@ function updateField(field, inputId) {
     .then(response => response.json())
     .then(data => {
         showInlineStatus(data.success ? 'Zaktualizowano!' : 'Błąd: ' + data.error, data.success);
+    })
+    .catch(error => {
+        showInlineStatus('Błąd: ' + error, false);
     });
 }
 
@@ -463,6 +711,115 @@ function removePath(pathId) {
         if(data.success) window.location.reload();
     });
 }
+
+function removeAttribute(attributeId) {
+    const productId = {{ original.id }};
+    const formData = new FormData();
+    formData.append('remove_attribute_id', attributeId);
+    
+    fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        showInlineStatus(data.success ? 'Usunięto atrybut!' : (data.error || 'Błąd usuwania atrybutu.'), data.success);
+        if(data.success) window.location.reload();
+    });
+}
+
+
+function saveAttributeSelection() {
+    const attributesSelect = document.getElementById('mpd_attributes');
+    const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
+    window.lastAttributeSelection = selectedAttributes;
+    
+    // Aktualizuj style wizualne
+    updateAttributeVisualStyles();
+}
+
+function updateAttributeVisualStyles() {
+    const attributesSelect = document.getElementById('mpd_attributes');
+    if (attributesSelect) {
+        Array.from(attributesSelect.options).forEach(option => {
+            if (option.selected) {
+                option.style.backgroundColor = '#28a745';
+                option.style.color = 'white';
+                option.style.fontWeight = 'bold';
+            } else {
+                option.style.backgroundColor = '';
+                option.style.color = '';
+                option.style.fontWeight = '';
+            }
+        });
+    }
+}
+
+function restoreAttributeSelection() {
+    if (window.lastAttributeSelection) {
+        const attributesSelect = document.getElementById('mpd_attributes');
+        Array.from(attributesSelect.options).forEach(option => {
+            option.selected = window.lastAttributeSelection.includes(option.value);
+        });
+        
+        // Aktualizuj style wizualne
+        updateAttributeVisualStyles();
+    }
+}
+
+function updateAttributes() {
+    const attributesSelect = document.getElementById('mpd_attributes');
+    const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
+    const productId = {{ original.mapped_product_id|default:'null' }};
+    
+    if (!productId) {
+        // Dla niezmapowanych produktów - użyj mpd-create z całym formularzem
+        const matterhornProductId = {{ original.id }};
+        const formData = new FormData(document.getElementById('mpd-form'));
+        
+        fetch(`/admin/matterhorn1/product/mpd-create/${matterhornProductId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showInlineStatus('Produkt utworzony w MPD z atrybutami!', true);
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showInlineStatus('Błąd: ' + data.error, false);
+            }
+        });
+    } else {
+        // Dla zmapowanych produktów - użyj mpd-update
+        fetch(`/admin/matterhorn1/product/mpd-update/{{ original.id }}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: new URLSearchParams({
+                'mpd_attributes': selectedAttributes
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            showInlineStatus(data.success ? 'Zaktualizowano atrybuty!' : (data.error || 'Błąd aktualizacji atrybutów.'), data.success);
+            if(data.success) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            }
+        });
+    }
+}
+
 
 function changeSort() {
     const sortBy = document.getElementById('sort-select').value;
@@ -550,6 +907,48 @@ function syncWithMpd() {
         statusMessage.textContent = 'Wystąpił błąd podczas synchronizacji.';
     });
 }
+
+// Inicjalizacja React komponentów
+document.addEventListener('DOMContentLoaded', function() {
+  // SingleProductCreate - dla tworzenia pojedynczego produktu
+  const singleProductCreateContainer = document.getElementById('single-product-create-container');
+  if (singleProductCreateContainer) {
+    const productData = {
+      product_id: parseInt(singleProductCreateContainer.dataset.productId),
+      name: singleProductCreateContainer.dataset.productName,
+      description: singleProductCreateContainer.dataset.productDescription,
+      brand: {
+        name: singleProductCreateContainer.dataset.brandName
+      },
+      variants: JSON.parse(singleProductCreateContainer.dataset.variants || '[]').map(v => ({
+        size_name: v.name || '',
+        stock: v.stock || 0,
+        ean: v.ean || '',
+        producer_code: `${singleProductCreateContainer.dataset.productId}_${v.name || ''}`
+      }))
+    };
+    
+    ReactDOM.render(
+      React.createElement(SingleProductCreate, {
+        productId: productData.product_id,
+        productData: productData,
+        onComplete: () => window.location.reload()
+      }),
+      singleProductCreateContainer
+    );
+  }
+
+  // Obsługa przycisku "Utwórz nowy produkt w MPD"
+  const createBtn = document.getElementById('create-mpd-product-btn');
+  const bulkCreateContainer = document.getElementById('bulk-create-single-container');
+  
+  if (createBtn && bulkCreateContainer) {
+    createBtn.addEventListener('click', function() {
+      bulkCreateContainer.style.display = 'block';
+      createBtn.style.display = 'none';
+    });
+  }
+});
 </script>
 {% endblock %}
 

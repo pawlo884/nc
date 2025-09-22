@@ -941,6 +941,80 @@ def get_product(request, product_id):
 
 
 @csrf_exempt
+def bulk_create_products(request):
+    """
+    Endpoint do bulk tworzenia produktów w MPD
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        products_data = data.get('products', [])
+
+        if not products_data:
+            return JsonResponse({'status': 'error', 'message': 'Brak danych produktów'}, status=400)
+
+        created_products = []
+        errors = []
+
+        for product_data in products_data:
+            try:
+                # Wymagane pola
+                name = product_data.get('name')
+                if not name:
+                    errors.append(f"Brak nazwy produktu")
+                    continue
+
+                # KROK 3: Nazwa + Opis + Krótki opis (inne pola wyłączone)
+                description = product_data.get('description', '')
+                short_description = product_data.get('short_description', '')
+                brand_name = product_data.get('brand_name', '')
+                unit_id = product_data.get('unit_id')
+                series_id = product_data.get('series_id')
+                visibility = product_data.get('visibility', True)
+
+                # Utwórz produkt z nazwą, opisem i krótkim opisem
+                product = Products.objects.using('MPD').create(
+                    name=name,
+                    description=description or '',
+                    short_description=short_description or '',
+                    brand_id=None,  # Wyłączone na razie
+                    unit_id=None,   # Wyłączone na razie
+                    series_id=None,  # Wyłączone na razie
+                    visibility=visibility
+                )
+
+                # Warianty wyłączone na razie
+                created_variants = []
+
+                created_products.append({
+                    'id': product.id,
+                    'name': product.name,
+                    'variants': created_variants
+                })
+
+            except Exception as e:
+                errors.append(
+                    f"Błąd tworzenia produktu {product_data.get('name', 'Unknown')}: {str(e)}")
+                continue
+
+        logger.info(
+            f"Bulk create result: created={len(created_products)}, errors={len(errors)}")
+        logger.info(f"Created products: {created_products}")
+        logger.info(f"Errors: {errors}")
+
+        return JsonResponse({
+            'status': 'success',
+            'created_products': created_products,
+            'errors': errors,
+            'total_created': len(created_products)
+        })
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
 def bulk_map_from_matterhorn1(request):
     """
     Endpoint do bulk mapowania produktów z matterhorn1 do MPD

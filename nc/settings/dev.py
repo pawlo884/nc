@@ -11,7 +11,7 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.109', '*']
 
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://212.127.93.27:8000')
-MPD_API_URL = os.getenv('MPD_API_URL', 'http://localhost:8000/MPD')
+MPD_API_URL = os.getenv('MPD_API_URL', 'http://localhost:8000/mpd')
 
 # Security settings for development
 CORS_REPLACE_HTTPS_REFERER = False

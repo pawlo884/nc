@@ -158,7 +158,7 @@ class Sources(models.Model):
 
 
 class ProductVariants(models.Model):
-    variant_id = models.IntegerField(db_column='variant_id', primary_key=True)
+    variant_id = models.AutoField(db_column='variant_id', primary_key=True)
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id')
     color = models.ForeignKey(
