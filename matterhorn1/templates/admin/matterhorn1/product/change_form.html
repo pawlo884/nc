@@ -377,10 +377,15 @@
                     </ul>
                 </div>
 
-                <!-- KROK 5: MARKA (wyłączony) -->
-                <div class="form-row" style="display: none;">
+                <!-- KROK 5: MARKA -->
+                <div class="form-row">
                     <label for="mpd_brand">Marka:</label>
-                    <input type="text" id="mpd_brand" name="mpd_brand" value="{{ original.brand.name|default:'' }}">
+                    <select id="mpd_brand" name="mpd_brand" onchange="updateField('brand_id', 'mpd_brand')">
+                        <option value="">-- wybierz markę --</option>
+                        {% for brand in mpd_brands %}
+                        <option value="{{ brand.name }}" {% if brand.name == original.brand.name %}selected{% endif %}>{{ brand.name }}</option>
+                        {% endfor %}
+                    </select>
                     <button type="button" onclick="updateField('brand_id', 'mpd_brand')">Zapisz</button>
                 </div>
                 

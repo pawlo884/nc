@@ -966,7 +966,7 @@ def bulk_create_products(request):
                     errors.append(f"Brak nazwy produktu")
                     continue
 
-                # KROK 3: Nazwa + Opis + Krótki opis (inne pola wyłączone)
+                # KROK 5: Nazwa + Opis + Krótki opis + Atrybuty + Marka (inne pola wyłączone)
                 description = product_data.get('description', '')
                 short_description = product_data.get('short_description', '')
                 brand_name = product_data.get('brand_name', '')
@@ -974,12 +974,19 @@ def bulk_create_products(request):
                 series_id = product_data.get('series_id')
                 visibility = product_data.get('visibility', True)
 
-                # Utwórz produkt z nazwą, opisem i krótkim opisem
+                # Pobierz lub utwórz markę
+                brand_id = None
+                if brand_name:
+                    brand, _ = Brands.objects.using(
+                        'MPD').get_or_create(name=brand_name)
+                    brand_id = brand.id
+
+                # Utwórz produkt z nazwą, opisem, krótkim opisem i marką
                 product = Products.objects.using('MPD').create(
                     name=name,
                     description=description or '',
                     short_description=short_description or '',
-                    brand_id=None,  # Wyłączone na razie
+                    brand_id=brand_id,
                     unit_id=None,   # Wyłączone na razie
                     series_id=None,  # Wyłączone na razie
                     visibility=visibility

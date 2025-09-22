@@ -265,6 +265,11 @@ class ProductAdmin(admin.ModelAdmin):
                 mpd_attributes = [{'id': row[0], 'name': row[1]}
                                   for row in cursor.fetchall()]
 
+                # Pobierz marki
+                cursor.execute("SELECT id, name FROM brands ORDER BY name")
+                mpd_brands = [{'id': row[0], 'name': row[1]}
+                              for row in cursor.fetchall()]
+
             # Pobierz sugerowane produkty (tylko dla niezmapowanych produktów)
             if not is_mapped:
                 with connections['MPD'].cursor() as cursor:
@@ -298,6 +303,7 @@ class ProductAdmin(admin.ModelAdmin):
                 'units': units,
                 'mpd_attributes': mpd_attributes,
                 'selected_attributes': selected_attributes,
+                'mpd_brands': mpd_brands,
                 'producer_color_name': producer_color_name,
                 'producer_code': '',
                 'series_name': '',
@@ -329,6 +335,11 @@ class ProductAdmin(admin.ModelAdmin):
                 cursor.execute("SELECT id, name FROM attributes ORDER BY name")
                 mpd_attributes = [{'id': row[0], 'name': row[1]}
                                   for row in cursor.fetchall()]
+
+                # Pobierz marki
+                cursor.execute("SELECT id, name FROM brands ORDER BY name")
+                mpd_brands = [{'id': row[0], 'name': row[1]}
+                              for row in cursor.fetchall()]
 
                 # Pobierz ścieżki
                 cursor.execute("SELECT id, name, path FROM path ORDER BY name")
@@ -368,24 +379,24 @@ class ProductAdmin(admin.ModelAdmin):
                 name = request.POST.get('mpd_name')
                 description = request.POST.get('mpd_description')
                 short_description = request.POST.get('mpd_short_description')
-                brand = request.POST.get('mpd_brand')
+                brand_name = request.POST.get('mpd_brand')
                 main_color_id = request.POST.get('main_color_id')
                 producer_code = request.POST.get('producer_code')
                 producer_color_name = request.POST.get('producer_color_name')
                 unit_id = request.POST.get('unit_id')
 
                 logger.info(
-                    f"Form data: name='{name}', description='{description}', brand='{brand}', main_color_id='{main_color_id}', unit_id='{unit_id}'")
+                    f"Form data: name='{name}', description='{description}', brand_name='{brand_name}', main_color_id='{main_color_id}', unit_id='{unit_id}'")
 
                 if not name:
                     return JsonResponse({'success': False, 'error': 'Nazwa jest wymagana'})
 
-                # KROK 3: Nazwa + Opis + Krótki opis (inne pola wyłączone)
+                # KROK 5: Nazwa + Opis + Krótki opis + Atrybuty + Marka (inne pola wyłączone)
                 mpd_data = {
                     'name': name,
                     'description': description or '',
                     'short_description': short_description or '',
-                    'brand_name': '',  # Wyłączone na razie
+                    'brand_name': brand_name or '',
                     'unit_id': None,   # Wyłączone na razie
                     'visibility': True
                 }
