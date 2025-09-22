@@ -1,8 +1,10 @@
 from django.shortcuts import render
 from .models import Products, ProductSet, ProductSetItem, ProductPaths, ProductAttribute
+from .models import Brands, Colors, Sizes, ProductVariants, ProductVariantsRetailPrice
 from django.http import JsonResponse
-from django.db import connections
+from django.db import connections, transaction
 from django.utils import timezone
+from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -63,6 +65,13 @@ def products(request):
     for product in products:
         setattr(product, 'variants', variants_by_product.get(product.id, []))
     return render(request, 'MPD/mpd.html', {'products': products})
+
+
+def product_mapping(request):
+    """
+    Widok do mapowania produktów z matterhorn1 do MPD
+    """
+    return render(request, 'MPD/product_mapping.html')
 
 
 def test_connection(request):
@@ -928,4 +937,261 @@ def get_product(request, product_id):
 
     except Exception as e:
         logger.error(f"Błąd podczas pobierania produktu MPD: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+def bulk_map_from_matterhorn1(request):
+    """
+    Endpoint do bulk mapowania produktów z matterhorn1 do MPD
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        products_data = data.get('products', [])
+
+        if not products_data:
+            return JsonResponse({'status': 'error', 'message': 'Brak danych produktów'}, status=400)
+
+        # Importuj modele matterhorn1
+        from matterhorn1.models import Product as MatterhornProduct
+
+        created_products = []
+        errors = []
+
+        with transaction.atomic():
+            for product_data in products_data:
+                try:
+                    matterhorn_product_id = product_data.get(
+                        'matterhorn_product_id')
+                    if not matterhorn_product_id:
+                        errors.append(
+                            {'error': 'Brak matterhorn_product_id', 'data': product_data})
+                        continue
+
+                    # Pobierz produkt z matterhorn1
+                    try:
+                        matterhorn_product = MatterhornProduct.objects.get(
+                            product_id=matterhorn_product_id)
+                    except MatterhornProduct.DoesNotExist:
+                        errors.append(
+                            {'error': f'Produkt matterhorn1 o ID {matterhorn_product_id} nie istnieje', 'data': product_data})
+                        continue
+
+                    # Sprawdź czy marka istnieje w MPD, jeśli nie - utwórz
+                    brand = None
+                    if matterhorn_product.brand:
+                        brand, created = Brands.objects.using('MPD').get_or_create(
+                            name=matterhorn_product.brand.name,
+                            defaults={
+                                'logo_url': '',
+                                'opis': '',
+                                'url': '',
+                                'iai_brand_id': None
+                            }
+                        )
+                        if created:
+                            logger.info(
+                                f"Utworzono nową markę w MPD: {brand.name}")
+
+                    # Utwórz produkt w MPD
+                    mpd_product = Products.objects.using('MPD').create(
+                        name=product_data.get('name', matterhorn_product.name),
+                        description=product_data.get(
+                            'description', matterhorn_product.description),
+                        short_description=product_data.get(
+                            'short_description', ''),
+                        brand=brand,
+                        visibility=product_data.get('visibility', True)
+                    )
+
+                    # Zaktualizuj mapped_product_id w matterhorn1
+                    matterhorn_product.mapped_product_id = mpd_product.id
+                    matterhorn_product.save()
+
+                    # Utwórz warianty jeśli istnieją
+                    created_variants = []
+                    for variant_data in product_data.get('variants', []):
+                        # Pobierz lub utwórz kolor
+                        color = None
+                        if variant_data.get('color_name'):
+                            color, created = Colors.objects.using('MPD').get_or_create(
+                                name=variant_data['color_name'],
+                                defaults={
+                                    'hex_code': variant_data.get('hex_code', '')}
+                            )
+
+                        # Pobierz rozmiar
+                        size = None
+                        if variant_data.get('size_name'):
+                            size, created = Sizes.objects.using('MPD').get_or_create(
+                                name=variant_data['size_name'],
+                                defaults={'category': 'default'}
+                            )
+
+                        # Utwórz wariant
+                        variant = ProductVariants.objects.using('MPD').create(
+                            product=mpd_product,
+                            color=color,
+                            size=size,
+                            producer_code=variant_data.get(
+                                'producer_code', ''),
+                            iai_product_id=variant_data.get('iai_product_id')
+                        )
+
+                        # Dodaj cenę jeśli podano
+                        if variant_data.get('price'):
+                            ProductVariantsRetailPrice.objects.using('MPD').create(
+                                variant=variant,
+                                retail_price=variant_data['price'],
+                                vat=variant_data.get('vat', 23.0),
+                                currency=variant_data.get('currency', 'PLN'),
+                                net_price=variant_data.get('net_price')
+                            )
+
+                        created_variants.append(variant.variant_id)
+
+                    # Dodaj ścieżki jeśli podano
+                    for path_id in product_data.get('path_ids', []):
+                        ProductPaths.objects.using('MPD').create(
+                            product_id=mpd_product.id,
+                            path_id=path_id
+                        )
+
+                    # Dodaj atrybuty jeśli podano
+                    for attribute_id in product_data.get('attribute_ids', []):
+                        ProductAttribute.objects.using('MPD').create(
+                            product_id=mpd_product.id,
+                            attribute_id=attribute_id
+                        )
+
+                    created_products.append({
+                        'mpd_product_id': mpd_product.id,
+                        'matterhorn_product_id': matterhorn_product_id,
+                        'name': mpd_product.name,
+                        'variants_created': len(created_variants)
+                    })
+
+                except Exception as e:
+                    errors.append({
+                        'error': f'Błąd podczas tworzenia produktu: {str(e)}',
+                        'data': product_data
+                    })
+                    logger.error(f"Błąd podczas mapowania produktu: {str(e)}")
+
+        logger.info(
+            f"Zamapowano {len(created_products)} produktów z matterhorn1 do MPD")
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Zamapowano {len(created_products)} produktów',
+            'created_products': created_products,
+            'errors': errors,
+            'total_processed': len(products_data),
+            'success_count': len(created_products),
+            'error_count': len(errors)
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Błąd podczas bulk mapowania produktów: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+def get_matterhorn1_products(request):
+    """
+    Endpoint do pobierania produktów z matterhorn1 do mapowania
+    """
+    if request.method != 'GET':
+        return JsonResponse({'status': 'error', 'message': 'Tylko metoda GET jest obsługiwana'}, status=405)
+
+    try:
+        # Importuj modele matterhorn1
+        from matterhorn1.models import Product as MatterhornProduct
+
+        # Pobierz parametry
+        search = request.GET.get('search', '')
+        page = int(request.GET.get('page', 1))
+        per_page = int(request.GET.get('per_page', 20))
+
+        # Pobierz produkty
+        products = MatterhornProduct.objects.select_related(
+            'brand', 'category').all()
+
+        # Filtruj jeśli podano wyszukiwanie
+        if search:
+            products = products.filter(
+                Q(name__icontains=search) |
+                Q(description__icontains=search) |
+                Q(brand__name__icontains=search) |
+                Q(category__name__icontains=search)
+            )
+
+        # Paginacja
+        from django.core.paginator import Paginator
+        paginator = Paginator(products, per_page)
+        page_obj = paginator.get_page(page)
+
+        # Przygotuj dane
+        products_data = []
+        for product in page_obj:
+            # Pobierz warianty
+            variants = []
+            for variant in product.variants.all():
+                variants.append({
+                    'variant_uid': variant.variant_uid,
+                    'name': variant.name,
+                    'stock': variant.stock,
+                    'ean': variant.ean
+                })
+
+            # Pobierz obrazy
+            images = []
+            for image in product.images.all().order_by('order'):
+                images.append({
+                    'image_url': image.image_url,
+                    'order': image.order
+                })
+
+            products_data.append({
+                'product_id': product.product_id,
+                'name': product.name,
+                'description': product.description,
+                'active': product.active,
+                'color': product.color,
+                'new_collection': product.new_collection,
+                'prices': product.prices,
+                'brand': {
+                    'brand_id': product.brand.brand_id,
+                    'name': product.brand.name
+                } if product.brand else None,
+                'category': {
+                    'category_id': product.category.category_id,
+                    'name': product.category.name,
+                    'path': product.category.path
+                } if product.category else None,
+                'variants': variants,
+                'images': images,
+                'mapped_product_id': product.mapped_product_id
+            })
+
+        return JsonResponse({
+            'status': 'success',
+            'products': products_data,
+            'pagination': {
+                'current_page': page_obj.number,
+                'total_pages': paginator.num_pages,
+                'total_products': paginator.count,
+                'has_next': page_obj.has_next(),
+                'has_previous': page_obj.has_previous()
+            }
+        })
+
+    except Exception as e:
+        logger.error(
+            f"Błąd podczas pobierania produktów matterhorn1: {str(e)}")
         return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)

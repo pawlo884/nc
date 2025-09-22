@@ -59,6 +59,7 @@ class Product(models.Model):
     # Mapowanie do MPD
     mapped_product_id = models.IntegerField(
         null=True, blank=True, help_text="ID produktu w bazie MPD")
+    is_mapped = models.BooleanField(default=False, help_text="Czy produkt jest zmapowany do MPD")
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

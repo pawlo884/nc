@@ -334,7 +334,9 @@ SPECTACULAR_SETTINGS = {
         {'name': 'Brands', 'description': 'Operacje na markach'},
         {'name': 'Categories', 'description': 'Operacje na kategoriach'},
         {'name': 'Images', 'description': 'Operacje na obrazach produktów'},
+        {'name': 'Product Sets', 'description': 'Zarządzanie zestawami produktów'},
         {'name': 'XML Export', 'description': 'Eksport i generowanie plików XML'},
+        {'name': 'Database', 'description': 'Operacje na bazie danych'},
         {'name': 'Sync', 'description': 'Synchronizacja z zewnętrznymi API'},
     ],
 }

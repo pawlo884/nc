@@ -1,10 +1,13 @@
 from django.contrib import admin
 from django.http import JsonResponse
-from django.db import connections
+from django.db import connections, transaction
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.shortcuts import render
 import json
 import logging
+import requests
+from rapidfuzz import fuzz
 from .models import (
     Brand, Category, Product, ProductDetails, ProductImage,
     ProductVariant, ApiSyncLog
@@ -75,10 +78,10 @@ class ProductVariantInline(admin.TabularInline):
 class ProductAdmin(admin.ModelAdmin):
     list_display = [
         'product_id', 'name', 'brand', 'category', 'active',
-        'stock_total', 'created_at', 'updated_at'
+        'stock_total', 'is_mapped', 'mapped_product_id', 'created_at', 'updated_at'
     ]
     list_filter = [
-        'brand', 'category', 'active', 'created_at', 'updated_at'
+        'brand', 'category', 'active', 'is_mapped', 'created_at', 'updated_at'
     ]
     search_fields = [
         'product_id', 'name', 'description', 'brand__name', 'category__name'
@@ -86,8 +89,10 @@ class ProductAdmin(admin.ModelAdmin):
     readonly_fields = [
         'product_id', 'mapped_product_id', 'created_at', 'updated_at', 'stock_total'
     ]
-    ordering = ['-created_at']
+    ordering = ['-product_id']
     inlines = [ProductDetailsInline, ProductImageInline, ProductVariantInline]
+    actions = ['bulk_map_to_mpd_action',
+               'bulk_create_mpd_action', 'sync_with_mpd_action']
 
     fieldsets = (
         ('Podstawowe informacje', {
@@ -138,6 +143,17 @@ class ProductAdmin(admin.ModelAdmin):
                      self.admin_site.admin_view(self.assign_mapping), name='assign-mapping'),
             url_path('mpd-update-field/<int:product_id>/<str:field_name>/',
                      self.admin_site.admin_view(self.mpd_update_field), name='mpd-update-field'),
+            # Nowe zaawansowane funkcjonalności
+            url_path('bulk-map-to-mpd/',
+                     self.admin_site.admin_view(self.bulk_map_to_mpd), name='bulk-map-to-mpd'),
+            url_path('bulk-create-mpd/',
+                     self.admin_site.admin_view(self.bulk_create_mpd), name='bulk-create-mpd'),
+            url_path('upload-images/<int:product_id>/',
+                     self.admin_site.admin_view(self.upload_images), name='upload-images'),
+            url_path('auto-map-variants/<int:product_id>/',
+                     self.admin_site.admin_view(self.auto_map_variants), name='auto-map-variants'),
+            url_path('sync-with-mpd/<int:product_id>/',
+                     self.admin_site.admin_view(self.sync_with_mpd), name='sync-with-mpd'),
         ]
         return custom_urls + urls
 
@@ -431,6 +447,448 @@ class ProductAdmin(admin.ModelAdmin):
                 return JsonResponse({'success': False, 'error': str(e)})
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
+
+    # ===== ZAAWANSOWANE FUNKCJONALNOŚCI =====
+
+    def bulk_map_to_mpd_action(self, request, queryset):
+        """Akcja masowa - mapuj wybrane produkty do istniejących w MPD"""
+        if request.POST.get('post'):
+            # Pobierz sugerowane mapowania
+            mappings = []
+            for product in queryset.filter(is_mapped=False):
+                suggestions = self._get_suggested_mappings(product)
+                mappings.append({
+                    'product': product,
+                    'suggestions': suggestions
+                })
+
+            # Przygotuj dane dla React
+            mappings_data = []
+            for mapping in mappings:
+                mappings_data.append({
+                    'product': {
+                        'id': mapping['product'].id,
+                        'product_id': mapping['product'].product_id,
+                        'name': mapping['product'].name,
+                        'brand': {
+                            'name': mapping['product'].brand.name if mapping['product'].brand else None
+                        },
+                        'category': {
+                            'name': mapping['product'].category.name if mapping['product'].category else None
+                        }
+                    },
+                    'suggestions': mapping['suggestions']
+                })
+
+            return render(request, 'admin/matterhorn1/product/bulk_map_confirm.html', {
+                'mappings': json.dumps(mappings_data),
+                'queryset': queryset,
+                'action_name': 'bulk_map_to_mpd_action'
+            })
+        else:
+            return render(request, 'admin/matterhorn1/product/bulk_map_confirm.html', {
+                'mappings': [],
+                'queryset': queryset,
+                'action_name': 'bulk_map_to_mpd_action'
+            })
+    bulk_map_to_mpd_action.short_description = "Mapuj do istniejących produktów MPD"
+
+    def bulk_create_mpd_action(self, request, queryset):
+        """Akcja masowa - utwórz nowe produkty w MPD"""
+        if request.POST.get('post'):
+            # Pobierz dane do tworzenia
+            products_data = []
+            for product in queryset.filter(is_mapped=False):
+                products_data.append({
+                    'matterhorn_product_id': product.product_id,
+                    'name': product.name,
+                    'description': product.description,
+                    'brand_name': product.brand.name if product.brand else '',
+                    'variants': self._prepare_variants_data(product)
+                })
+
+            return render(request, 'admin/matterhorn1/product/bulk_create_confirm.html', {
+                'products_data': json.dumps(products_data),
+                'queryset': queryset,
+                'action_name': 'bulk_create_mpd_action'
+            })
+        else:
+            return render(request, 'admin/matterhorn1/product/bulk_create_confirm.html', {
+                'products_data': [],
+                'queryset': queryset,
+                'action_name': 'bulk_create_mpd_action'
+            })
+    bulk_create_mpd_action.short_description = "Utwórz nowe produkty w MPD"
+
+    def sync_with_mpd_action(self, request, queryset):
+        """Akcja masowa - synchronizuj z MPD"""
+        synced_count = 0
+        for product in queryset.filter(is_mapped=True):
+            if self._sync_product_with_mpd(product):
+                synced_count += 1
+
+        self.message_user(
+            request, f"Zsynchronizowano {synced_count} produktów z MPD.")
+    sync_with_mpd_action.short_description = "Synchronizuj z MPD"
+
+    def bulk_map_to_mpd(self, request):
+        """Endpoint do masowego mapowania produktów"""
+        if request.method == 'POST':
+            try:
+                data = json.loads(request.body)
+                mappings = data.get('mappings', [])
+
+                success_count = 0
+                errors = []
+
+                with transaction.atomic():
+                    for mapping in mappings:
+                        try:
+                            product_id = mapping.get('product_id')
+                            mpd_product_id = mapping.get('mpd_product_id')
+
+                            if not product_id or not mpd_product_id:
+                                continue
+
+                            # Zaktualizuj mapowanie
+                            product = Product.objects.get(id=product_id)
+                            product.mapped_product_id = mpd_product_id
+                            product.is_mapped = True
+                            product.save()
+
+                            # Automatycznie zmapuj warianty
+                            self._auto_map_variants(product, mpd_product_id)
+
+                            success_count += 1
+
+                        except Exception as e:
+                            errors.append(
+                                f"Błąd mapowania produktu {product_id}: {str(e)}")
+
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Zamapowano {success_count} produktów',
+                    'errors': errors
+                })
+
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+
+        return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
+
+    def bulk_create_mpd(self, request):
+        """Endpoint do masowego tworzenia produktów w MPD"""
+        if request.method == 'POST':
+            try:
+                data = json.loads(request.body)
+                products_data = data.get('products', [])
+
+                created_products = []
+                errors = []
+
+                # Użyj API MPD do bulk create
+                mpd_api_url = f"{request.scheme}://{request.get_host()}/mpd/matterhorn1/bulk-map/"
+                response = requests.post(
+                    mpd_api_url, json={'products': products_data}, timeout=60)
+
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get('status') == 'success':
+                        # Zaktualizuj mapped_product_id w matterhorn1
+                        for created_product in result.get('created_products', []):
+                            try:
+                                product = Product.objects.get(
+                                    product_id=created_product['matterhorn_product_id']
+                                )
+                                product.mapped_product_id = created_product['mpd_product_id']
+                                product.is_mapped = True
+                                product.save()
+                                created_products.append(created_product)
+                            except Product.DoesNotExist:
+                                errors.append(
+                                    f"Nie znaleziono produktu {created_product['matterhorn_product_id']}")
+                    else:
+                        errors.append(result.get('message', 'Błąd API MPD'))
+                else:
+                    errors.append(f"Błąd API MPD: {response.status_code}")
+
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Utworzono {len(created_products)} produktów w MPD',
+                    'created_products': created_products,
+                    'errors': errors
+                })
+
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+
+        return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
+
+    def upload_images(self, request, product_id):
+        """Upload obrazów produktu do bucketa i zapis do MPD"""
+        if request.method == 'POST':
+            try:
+                product = Product.objects.get(id=product_id)
+                if not product.is_mapped:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Produkt musi być zmapowany do MPD'
+                    })
+
+                uploaded_images = []
+                for i, image in enumerate(product.images.all().order_by('order'), 1):
+                    if image.image_url:
+                        # Upload do bucketa
+                        bucket_url = self._upload_image_to_bucket(
+                            image_url=image.image_url,
+                            product_id=product.mapped_product_id,
+                            color_name=product.color,
+                            image_number=i
+                        )
+                        if bucket_url:
+                            # Zapisz do MPD
+                            self._save_image_to_mpd(
+                                product.mapped_product_id, bucket_url)
+                            uploaded_images.append({
+                                'original_url': image.image_url,
+                                'uploaded_url': bucket_url,
+                                'order': image.order
+                            })
+
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Uploadowano {len(uploaded_images)} obrazów',
+                    'images': uploaded_images
+                })
+
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+
+        return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
+
+    def auto_map_variants(self, request, product_id):
+        """Automatyczne mapowanie wariantów produktu"""
+        if request.method == 'POST':
+            try:
+                product = Product.objects.get(id=product_id)
+                if not product.is_mapped:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Produkt musi być zmapowany do MPD'
+                    })
+
+                mapped_variants = self._auto_map_variants(
+                    product, product.mapped_product_id)
+
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Zamapowano {len(mapped_variants)} wariantów',
+                    'variants': mapped_variants
+                })
+
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+
+        return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
+
+    def sync_with_mpd(self, request, product_id):
+        """Synchronizacja produktu z MPD"""
+        if request.method == 'POST':
+            try:
+                product = Product.objects.get(id=product_id)
+                if not product.is_mapped:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Produkt musi być zmapowany do MPD'
+                    })
+
+                # Pobierz aktualne dane z MPD
+                mpd_data = self._get_mpd_product_data(
+                    product.mapped_product_id)
+                if mpd_data:
+                    # Zaktualizuj dane w matterhorn1
+                    product.name = mpd_data.get('name', product.name)
+                    product.description = mpd_data.get(
+                        'description', product.description)
+                    product.save()
+
+                    return JsonResponse({
+                        'success': True,
+                        'message': 'Zsynchronizowano z MPD'
+                    })
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Nie można pobrać danych z MPD'
+                    })
+
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                })
+
+        return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
+
+    # ===== METODY POMOCNICZE =====
+
+    def _get_suggested_mappings(self, product):
+        """Pobierz sugerowane mapowania produktu"""
+        suggestions = []
+
+        with connections['MPD'].cursor() as cursor:
+            # Wyszukaj podobne produkty w MPD
+            cursor.execute("""
+                SELECT p.id, p.name, b.name as brand_name
+                FROM products p 
+                LEFT JOIN brands b ON p.brand = b.id 
+                WHERE LOWER(p.name) LIKE LOWER(%s)
+                ORDER BY p.name
+                LIMIT 5
+            """, [f'%{product.name[:20]}%'])
+
+            for row in cursor.fetchall():
+                similarity = fuzz.ratio(product.name.lower(), row[1].lower())
+                suggestions.append({
+                    'id': row[0],
+                    'name': row[1],
+                    'brand': row[2] or '',
+                    'similarity': similarity
+                })
+
+        return sorted(suggestions, key=lambda x: x['similarity'], reverse=True)
+
+    def _prepare_variants_data(self, product):
+        """Przygotuj dane wariantów do mapowania"""
+        variants = []
+        for variant in product.variants.all():
+            variants.append({
+                'size_name': variant.name,
+                'stock': variant.stock,
+                'ean': variant.ean,
+                'producer_code': f"{product.product_id}_{variant.name}"
+            })
+        return variants
+
+    def _auto_map_variants(self, product, mpd_product_id):
+        """Automatyczne mapowanie wariantów"""
+        mapped_variants = []
+
+        with connections['MPD'].cursor() as cursor:
+            for variant in product.variants.all():
+                # Znajdź lub utwórz rozmiar
+                size_id = self._get_or_create_size(variant.name)
+
+                # Znajdź lub utwórz kolor
+                color_id = self._get_or_create_color(
+                    product.color or 'Brak koloru')
+
+                # Utwórz wariant w MPD
+                cursor.execute("""
+                    INSERT INTO product_variants (product_id, size_id, color_id, producer_code)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING variant_id
+                """, [mpd_product_id, size_id, color_id, f"{product.product_id}_{variant.name}"])
+
+                variant_id = cursor.fetchone()[0]
+                mapped_variants.append(variant_id)
+
+        return mapped_variants
+
+    def _get_or_create_size(self, size_name):
+        """Pobierz lub utwórz rozmiar w MPD"""
+        with connections['MPD'].cursor() as cursor:
+            cursor.execute("SELECT id FROM sizes WHERE name = %s", [size_name])
+            result = cursor.fetchone()
+
+            if result:
+                return result[0]
+            else:
+                cursor.execute("""
+                    INSERT INTO sizes (name, category, name_lower)
+                    VALUES (%s, %s, %s)
+                    RETURNING id
+                """, [size_name, 'default', size_name.lower()])
+                return cursor.fetchone()[0]
+
+    def _get_or_create_color(self, color_name):
+        """Pobierz lub utwórz kolor w MPD"""
+        with connections['MPD'].cursor() as cursor:
+            cursor.execute(
+                "SELECT id FROM colors WHERE name = %s", [color_name])
+            result = cursor.fetchone()
+
+            if result:
+                return result[0]
+            else:
+                cursor.execute("""
+                    INSERT INTO colors (name)
+                    VALUES (%s)
+                    RETURNING id
+                """, [color_name])
+                return cursor.fetchone()[0]
+
+    def _upload_image_to_bucket(self, image_url, product_id, color_name=None, image_number=1):
+        """Upload obrazu do bucketa"""
+        from .defs_db import upload_image_to_bucket_and_get_url
+        return upload_image_to_bucket_and_get_url(
+            image_url=image_url,
+            product_id=product_id,
+            color_name=color_name,
+            image_number=image_number
+        )
+
+    def _save_image_to_mpd(self, mpd_product_id, image_url):
+        """Zapisz obraz do MPD"""
+        with connections['MPD'].cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO product_images (product_id, file_path)
+                VALUES (%s, %s)
+            """, [mpd_product_id, image_url])
+
+    def _get_mpd_product_data(self, mpd_product_id):
+        """Pobierz dane produktu z MPD"""
+        with connections['MPD'].cursor() as cursor:
+            cursor.execute("""
+                SELECT p.name, p.description, p.short_description
+                FROM products p 
+                WHERE p.id = %s
+            """, [mpd_product_id])
+
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'name': result[0],
+                    'description': result[1],
+                    'short_description': result[2]
+                }
+        return None
+
+    def _sync_product_with_mpd(self, product):
+        """Synchronizuj pojedynczy produkt z MPD"""
+        try:
+            mpd_data = self._get_mpd_product_data(product.mapped_product_id)
+            if mpd_data:
+                product.name = mpd_data.get('name', product.name)
+                product.description = mpd_data.get(
+                    'description', product.description)
+                product.save()
+                return True
+        except Exception as e:
+            logger.error(f"Błąd synchronizacji produktu {product.id}: {e}")
+        return False
 
 
 @admin.register(ProductDetails)

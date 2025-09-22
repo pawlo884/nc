@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -8,16 +7,15 @@ from django.utils import timezone
 import json
 import logging
 from datetime import datetime
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
-from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiExample
 
 from .models import (
-    Product, Brand, Category, ProductDetails,
+    Product, Brand, Category,
     ProductImage, ProductVariant, ApiSyncLog
 )
 from .serializers import (
     ProductSerializer, BrandSerializer, CategorySerializer,
-    ProductVariantSerializer, ProductImageSerializer, ApiSyncLogSerializer,
+    ProductVariantSerializer, ProductImageSerializer,
     BulkProductSerializer, BulkBrandSerializer, BulkCategorySerializer,
     BulkVariantSerializer, BulkImageSerializer
 )
@@ -84,7 +82,7 @@ class ProductBulkView(BaseBulkView):
                 try:
                     item['creation_date'] = datetime.fromisoformat(
                         item['creation_date'].replace('Z', '+00:00'))
-                except:
+                except (ValueError, TypeError):
                     item['creation_date'] = None
 
             # Konwertuj boolean
@@ -660,6 +658,18 @@ class CategoryBulkView(BaseBulkView):
         return Category
 
 
+@extend_schema(
+    operation_id='categories_bulk_create',
+    summary='Masowe tworzenie kategorii',
+    description='Tworzy wiele kategorii jednocześnie.',
+    tags=['Categories'],
+    request=BulkCategorySerializer,
+    responses={
+        200: {'description': 'Kategorie zostały pomyślnie utworzone'},
+        400: {'description': 'Błąd walidacji danych'},
+        500: {'description': 'Błąd serwera'}
+    }
+)
 class CategoryBulkCreateView(View):
     """Bulk create dla kategorii"""
 
@@ -745,6 +755,18 @@ class ImageBulkView(BaseBulkView):
         return ProductImage
 
 
+@extend_schema(
+    operation_id='images_bulk_create',
+    summary='Masowe tworzenie obrazów',
+    description='Tworzy wiele obrazów produktów jednocześnie.',
+    tags=['Images'],
+    request=BulkImageSerializer,
+    responses={
+        200: {'description': 'Obrazy zostały pomyślnie utworzone'},
+        400: {'description': 'Błąd walidacji danych'},
+        500: {'description': 'Błąd serwera'}
+    }
+)
 class ImageBulkCreateView(View):
     """Bulk create dla obrazów"""
 
@@ -843,6 +865,15 @@ class ImageBulkCreateView(View):
             }, status=500)
 
 
+@extend_schema(
+    operation_id='api_sync',
+    summary='Synchronizacja z API',
+    description='Endpoint do synchronizacji z zewnętrznym API (do implementacji).',
+    tags=['Sync'],
+    responses={
+        200: {'description': 'Synchronizacja została uruchomiona'}
+    }
+)
 class APISyncView(View):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
@@ -852,6 +883,15 @@ class APISyncView(View):
         return JsonResponse({'message': 'APISyncView - do implementacji'})
 
 
+@extend_schema(
+    operation_id='product_sync',
+    summary='Synchronizacja produktów',
+    description='Endpoint do synchronizacji produktów z zewnętrznym API (do implementacji).',
+    tags=['Sync'],
+    responses={
+        200: {'description': 'Synchronizacja produktów została uruchomiona'}
+    }
+)
 class ProductSyncView(View):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
@@ -861,6 +901,15 @@ class ProductSyncView(View):
         return JsonResponse({'message': 'ProductSyncView - do implementacji'})
 
 
+@extend_schema(
+    operation_id='variant_sync',
+    summary='Synchronizacja wariantów',
+    description='Endpoint do synchronizacji wariantów produktów z zewnętrznym API (do implementacji).',
+    tags=['Sync'],
+    responses={
+        200: {'description': 'Synchronizacja wariantów została uruchomiona'}
+    }
+)
 class VariantSyncView(View):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
@@ -896,3 +945,85 @@ class APIStatusView(View):
 class APILogsView(View):
     def get(self, request):
         return JsonResponse({'message': 'APILogsView - do implementacji'})
+
+
+@csrf_exempt
+def get_product_details(request, product_id):
+    """
+    API endpoint do pobierania szczegółów produktu z matterhorn1
+    """
+    try:
+        product = Product.objects.select_related(
+            'brand', 'category').get(product_id=product_id)
+
+        # Pobierz warianty
+        variants = []
+        for variant in product.variants.all():
+            variants.append({
+                'variant_uid': variant.variant_uid,
+                'name': variant.name,
+                'stock': variant.stock,
+                'ean': variant.ean,
+                'max_processing_time': variant.max_processing_time
+            })
+
+        # Pobierz obrazy
+        images = []
+        for image in product.images.all().order_by('order'):
+            images.append({
+                'image_url': image.image_url,
+                'order': image.order
+            })
+
+        # Pobierz szczegóły produktu
+        details = None
+        if hasattr(product, 'details'):
+            details = {
+                'weight': product.details.weight,
+                'size_table': product.details.size_table,
+                'size_table_txt': product.details.size_table_txt,
+                'size_table_html': product.details.size_table_html
+            }
+
+        return JsonResponse({
+            'success': True,
+            'product': {
+                'product_id': product.product_id,
+                'name': product.name,
+                'description': product.description,
+                'active': product.active,
+                'creation_date': product.creation_date.isoformat() if product.creation_date else None,
+                'color': product.color,
+                'url': product.url,
+                'new_collection': product.new_collection,
+                'products_in_set': product.products_in_set,
+                'other_colors': product.other_colors,
+                'prices': product.prices,
+                'brand': {
+                    'brand_id': product.brand.brand_id,
+                    'name': product.brand.name
+                } if product.brand else None,
+                'category': {
+                    'category_id': product.category.category_id,
+                    'name': product.category.name,
+                    'path': product.category.path
+                } if product.category else None,
+                'variants': variants,
+                'images': images,
+                'details': details,
+                'mapped_product_id': product.mapped_product_id
+            }
+        })
+
+    except Product.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Produkt nie został znaleziony'
+        }, status=404)
+
+    except Exception as e:
+        logger.error(f"Błąd podczas pobierania produktu: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Błąd serwera: {str(e)}'
+        }, status=500)

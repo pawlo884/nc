@@ -3,6 +3,9 @@
 
 {% block extrahead %}
 {{ block.super }}
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="/static/matterhorn1/js/components-simple.js"></script>
 <style>
     .container {
         display: flex;
@@ -302,6 +305,12 @@
             </form>
             {% if not is_mapped %}
             <button type="button" id="create-mpd-product-btn" class="mpd-form-btn" style="margin-top:20px; background:#417690; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Utwórz nowy produkt w MPD</button>
+            {% else %}
+            <div id="product-mapping-container" 
+                 data-product-id="{{ original.id }}"
+                 data-is-mapped="{{ is_mapped|yesno:'true,false' }}"
+                 data-mapped-product-id="{{ original.mapped_product_id|default:'' }}">
+            </div>
             {% endif %}
         </div>
     </div>
@@ -460,6 +469,86 @@ function changeSort() {
     const currentUrl = new URL(window.location);
     currentUrl.searchParams.set('sort_by', sortBy);
     window.location.href = currentUrl.toString();
+}
+
+// ===== NOWE ZAAWANSOWANE FUNKCJE =====
+
+function uploadImages() {
+    const productId = {{ original.id }};
+    const statusMessage = document.getElementById('status-message');
+    statusMessage.className = 'status-message';
+    statusMessage.textContent = 'Uploadowanie obrazów...';
+    
+    fetch(`/admin/matterhorn1/product/upload-images/${productId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+        statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        statusMessage.className = 'status-message error';
+        statusMessage.textContent = 'Wystąpił błąd podczas uploadowania obrazów.';
+    });
+}
+
+function autoMapVariants() {
+    const productId = {{ original.id }};
+    const statusMessage = document.getElementById('status-message');
+    statusMessage.className = 'status-message';
+    statusMessage.textContent = 'Mapowanie wariantów...';
+    
+    fetch(`/admin/matterhorn1/product/auto-map-variants/${productId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+        statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+        if (data.success) {
+            setTimeout(() => { window.location.reload(); }, 1500);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        statusMessage.className = 'status-message error';
+        statusMessage.textContent = 'Wystąpił błąd podczas mapowania wariantów.';
+    });
+}
+
+function syncWithMpd() {
+    const productId = {{ original.id }};
+    const statusMessage = document.getElementById('status-message');
+    statusMessage.className = 'status-message';
+    statusMessage.textContent = 'Synchronizacja z MPD...';
+    
+    fetch(`/admin/matterhorn1/product/sync-with-mpd/${productId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+        statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+        if (data.success) {
+            setTimeout(() => { window.location.reload(); }, 1500);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        statusMessage.className = 'status-message error';
+        statusMessage.textContent = 'Wystąpił błąd podczas synchronizacji.';
+    });
 }
 </script>
 {% endblock %}

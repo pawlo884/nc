@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ProductSetViewSet, products, test_connection, test_table_structure, export_xml, export_full_xml, get_xml_file, xml_links, get_gateway_xml, generate_full_xml, generate_full_change_xml, generate_gateway_xml, generate_gateway_xml_api, empty_xml, generate_light_xml, generate_producers_xml, generate_stocks_xml, generate_units_xml, generate_categories_xml, generate_sizes_xml, generate_parameters_xml, generate_series_xml, generate_warranties_xml, generate_preset_xml, manage_product_paths, manage_product_attributes, create_product, update_product, get_product
+from .views import ProductSetViewSet, products, test_connection, test_table_structure, export_xml, export_full_xml, get_xml_file, xml_links, get_gateway_xml, generate_full_xml, generate_full_change_xml, generate_gateway_xml, generate_gateway_xml_api, empty_xml, generate_light_xml, generate_producers_xml, generate_stocks_xml, generate_units_xml, generate_categories_xml, generate_sizes_xml, generate_parameters_xml, generate_series_xml, generate_warranties_xml, generate_preset_xml, manage_product_paths, manage_product_attributes, create_product, update_product, get_product, bulk_map_from_matterhorn1, get_matterhorn1_products, product_mapping
 
 router = DefaultRouter()
 router.register(r'product-sets', ProductSetViewSet)
@@ -8,6 +8,7 @@ router.register(r'product-sets', ProductSetViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('products/', products, name='products'),
+    path('product-mapping/', product_mapping, name='product_mapping'),
     path('test-connection/', test_connection, name='test_connection'),
     path('test-structure/', test_table_structure, name='test_structure'),
     path('export-xml/<str:source_name>/', export_xml, name='export_xml'),
@@ -45,4 +46,9 @@ urlpatterns = [
     path('products/<int:product_id>/', get_product, name='get_product'),
     path('products/<int:product_id>/update/',
          update_product, name='update_product'),
+    # Mapowanie produktów z matterhorn1
+    path('matterhorn1/products/', get_matterhorn1_products,
+         name='get_matterhorn1_products'),
+    path('matterhorn1/bulk-map/', bulk_map_from_matterhorn1,
+         name='bulk_map_from_matterhorn1'),
 ]

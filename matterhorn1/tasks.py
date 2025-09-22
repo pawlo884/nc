@@ -96,6 +96,10 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                 dry_run=dry_run
             )
 
+            # Aktualizuj total_imported PRZED sprawdzeniem statusu
+            imported_count = items_result.get('imported_count', 0)
+            total_imported += imported_count
+
             if items_result['status'] == 'completed':
                 logger.info(
                     f"✅ Import ITEMS zakończony - {items_result.get('reason')}")
@@ -124,9 +128,6 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                 logger.error(
                     f"❌ Błąd importu ITEMS w iteracji {iteration}: {items_result.get('error')}")
                 break
-
-            imported_count = items_result.get('imported_count', 0)
-            total_imported += imported_count
 
             logger.info(
                 f"✅ Iteracja {iteration} - Zaimportowano {imported_count} produktów")
@@ -945,7 +946,8 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
     try:
         # Użyj tej samej daty startu co ITEMS z poprawnym formatowaniem
         last_update = _get_last_items_update_time()
-        logger.info(f"📅 INVENTORY używam tej samej daty co ITEMS: {last_update}")
+        logger.info(
+            f"📅 INVENTORY używam tej samej daty co ITEMS: {last_update}")
 
         # Pobierz dane uwierzytelniające
         from django.conf import settings

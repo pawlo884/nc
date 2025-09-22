@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="/static/matterhorn1/js/components-simple.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="bulk-create-container" 
+     data-products-data="{{ products_data|safe }}">
+</div>
+{% endblock %}

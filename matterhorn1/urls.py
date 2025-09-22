@@ -44,5 +44,9 @@ urlpatterns = [
         # Status i logi
         path('status/', views.APIStatusView.as_view(), name='api_status'),
         path('logs/', views.APILogsView.as_view(), name='api_logs'),
+
+        # Pojedyncze produkty
+        path('products/<int:product_id>/',
+             views.get_product_details, name='get_product_details'),
     ])),
 ]

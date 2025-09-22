@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapowanie Produktów - Matterhorn1 → MPD</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: calc(100vh - 200px);
+        }
+
+        .left-panel, .right-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .panel-header h2 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+
+        .search-section {
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .product-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .product-item {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .product-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        .product-item.selected {
+            border-color: #667eea;
+            background-color: #f8f9ff;
+        }
+
+        .product-item.mapped {
+            border-color: #28a745;
+            background-color: #f8fff9;
+        }
+
+        .product-item.mapped::after {
+            content: "✓ Zamapowany";
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .product-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .product-details {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .product-brand {
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .mapping-form {
+            display: none;
+        }
+
+        .mapping-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .variants-section {
+            margin-top: 20px;
+        }
+
+        .variant-item {
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+        }
+
+        .variant-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .variant-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .remove-variant {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .add-variant {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 10px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #f8f9fa;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .current-page {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Mapowanie Produktów</h1>
+            <p>Wybierz produkt z Matterhorn1 i zamapuj go do bazy MPD</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Lewa strona - Lista produktów z Matterhorn1 -->
+            <div class="left-panel">
+                <div class="panel-header">
+                    <h2>Produkty z Matterhorn1</h2>
+                </div>
+
+                <div class="search-section">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Szukaj produktów...">
+                </div>
+
+                <div class="loading" id="loadingProducts">
+                    <div class="spinner"></div>
+                    <p>Ładowanie produktów...</p>
+                </div>
+
+                <div class="product-list" id="productList">
+                    <!-- Produkty będą ładowane dynamicznie -->
+                </div>
+
+                <div class="pagination" id="pagination">
+                    <!-- Paginacja będzie generowana dynamicznie -->
+                </div>
+            </div>
+
+            <!-- Prawa strona - Formularz mapowania -->
+            <div class="right-panel">
+                <div class="panel-header">
+                    <h2>Mapowanie do MPD</h2>
+                </div>
+
+                <div id="noProductSelected" style="text-align: center; padding: 40px; color: #666;">
+                    <h3>Wybierz produkt z listy po lewej stronie</h3>
+                    <p>Aby rozpocząć mapowanie produktu do bazy MPD</p>
+                </div>
+
+                <div class="mapping-form" id="mappingForm">
+                    <div class="alert" id="alertMessage" style="display: none;"></div>
+
+                    <div class="form-group">
+                        <label for="productName">Nazwa produktu:</label>
+                        <input type="text" id="productName" name="name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productDescription">Opis:</label>
+                        <textarea id="productDescription" name="description" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productShortDescription">Krótki opis:</label>
+                        <input type="text" id="productShortDescription" name="short_description">
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="productVisibility" name="visibility" checked>
+                            Widoczny w sklepie
+                        </label>
+                    </div>
+
+                    <div class="variants-section">
+                        <h3>Warianty produktu</h3>
+                        <div id="variantsContainer">
+                            <!-- Warianty będą dodawane dynamicznie -->
+                        </div>
+                        <button type="button" class="add-variant" onclick="addVariant()">Dodaj wariant</button>
+                    </div>
+
+                    <div class="buttons">
+                        <button type="button" class="btn btn-primary" onclick="saveMapping()">
+                            Zapisz do MPD
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="clearForm()">
+                            Wyczyść
+                        </button>
+                    </div>
+                </div>
+
+                <div class="loading" id="loadingMapping">
+                    <div class="spinner"></div>
+                    <p>Zapisywanie do MPD...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentProduct = null;
+        let currentPage = 1;
+        let totalPages = 1;
+
+        // Inicjalizacja
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProducts();
+            
+            // Wyszukiwanie
+            document.getElementById('searchInput').addEventListener('input', function() {
+                currentPage = 1;
+                loadProducts();
+            });
+        });
+
+        // Ładowanie produktów
+        async function loadProducts() {
+            const searchQuery = document.getElementById('searchInput').value;
+            const loading = document.getElementById('loadingProducts');
+            const productList = document.getElementById('productList');
+            
+            loading.classList.add('active');
+            productList.innerHTML = '';
+
+            try {
+                const response = await fetch(`/mpd/matterhorn1/products/?search=${encodeURIComponent(searchQuery)}&page=${currentPage}&per_page=20`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    displayProducts(data.products);
+                    updatePagination(data.pagination);
+                } else {
+                    showAlert('Błąd podczas ładowania produktów: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Błąd połączenia: ' + error.message, 'error');
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        // Wyświetlanie produktów
+        function displayProducts(products) {
+            const productList = document.getElementById('productList');
+            
+            if (products.length === 0) {
+                productList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">Brak produktów do wyświetlenia</p>';
+                return;
+            }
+
+            productList.innerHTML = products.map(product => `
+                <div class="product-item ${product.mapped_product_id ? 'mapped' : ''}" 
+                     onclick="selectProduct(${product.product_id})" 
+                     data-product-id="${product.product_id}">
+                    <div class="product-name">${product.name}</div>
+                    <div class="product-details">
+                        ${product.brand ? `<span class="product-brand">${product.brand.name}</span> • ` : ''}
+                        ${product.category ? product.category.name : 'Brak kategorii'} • 
+                        ${product.variants.length} wariantów
+                        ${product.mapped_product_id ? ` • ID MPD: ${product.mapped_product_id}` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Aktualizacja paginacji
+        function updatePagination(pagination) {
+            const paginationContainer = document.getElementById('pagination');
+            totalPages = pagination.total_pages;
+            
+            let paginationHTML = '';
+            
+            // Przycisk poprzednia strona
+            paginationHTML += `<button onclick="changePage(${currentPage - 1})" ${!pagination.has_previous ? 'disabled' : ''}>‹ Poprzednia</button>`;
+            
+            // Numery stron
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                paginationHTML += `<button onclick="changePage(${i})" ${i === currentPage ? 'class="current-page"' : ''}>${i}</button>`;
+            }
+            
+            // Przycisk następna strona
+            paginationHTML += `<button onclick="changePage(${currentPage + 1})" ${!pagination.has_next ? 'disabled' : ''}>Następna ›</button>`;
+            
+            paginationContainer.innerHTML = paginationHTML;
+        }
+
+        // Zmiana strony
+        function changePage(page) {
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                loadProducts();
+            }
+        }
+
+        // Wybór produktu
+        async function selectProduct(productId) {
+            // Usuń poprzedni wybór
+            document.querySelectorAll('.product-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Zaznacz aktualny
+            document.querySelector(`[data-product-id="${productId}"]`).classList.add('selected');
+
+            try {
+                const response = await fetch(`/matterhorn1/api/products/${productId}/`);
+                const data = await response.json();
+
+                if (data.success) {
+                    currentProduct = data.product;
+                    populateForm(data.product);
+                    document.getElementById('noProductSelected').style.display = 'none';
+                    document.getElementById('mappingForm').classList.add('active');
+                } else {
+                    showAlert('Błąd podczas ładowania produktu: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Błąd połączenia: ' + error.message, 'error');
+            }
+        }
+
+        // Wypełnienie formularza
+        function populateForm(product) {
+            document.getElementById('productName').value = product.name || '';
+            document.getElementById('productDescription').value = product.description || '';
+            document.getElementById('productShortDescription').value = '';
+            document.getElementById('productVisibility').checked = true;
+
+            // Wyczyść warianty
+            document.getElementById('variantsContainer').innerHTML = '';
+            
+            // Dodaj warianty z produktu
+            product.variants.forEach((variant, index) => {
+                addVariant(variant, index);
+            });
+        }
+
+        // Dodawanie wariantu
+        function addVariant(variantData = null, index = null) {
+            const container = document.getElementById('variantsContainer');
+            const variantIndex = index !== null ? index : container.children.length;
+            
+            const variantHTML = `
+                <div class="variant-item" data-index="${variantIndex}">
+                    <div class="variant-header">
+                        <span class="variant-name">Wariant ${variantIndex + 1}</span>
+                        <button type="button" class="remove-variant" onclick="removeVariant(${variantIndex})">Usuń</button>
+                    </div>
+                    <div class="form-group">
+                        <label>Nazwa rozmiaru:</label>
+                        <input type="text" name="variants[${variantIndex}][size_name]" value="${variantData ? variantData.name : ''}" placeholder="np. S, M, L">
+                    </div>
+                    <div class="form-group">
+                        <label>Kolor:</label>
+                        <input type="text" name="variants[${variantIndex}][color_name]" value="" placeholder="np. Czerwony">
+                    </div>
+                    <div class="form-group">
+                        <label>Kod producenta:</label>
+                        <input type="text" name="variants[${variantIndex}][producer_code]" value="" placeholder="Kod producenta">
+                    </div>
+                    <div class="form-group">
+                        <label>Cena (PLN):</label>
+                        <input type="number" step="0.01" name="variants[${variantIndex}][price]" value="" placeholder="0.00">
+                    </div>
+                </div>
+            `;
+            
+            if (index !== null) {
+                container.insertAdjacentHTML('beforeend', variantHTML);
+            } else {
+                container.insertAdjacentHTML('beforeend', variantHTML);
+            }
+        }
+
+        // Usuwanie wariantu
+        function removeVariant(index) {
+            const variant = document.querySelector(`[data-index="${index}"]`);
+            if (variant) {
+                variant.remove();
+            }
+        }
+
+        // Zapisywanie mapowania
+        async function saveMapping() {
+            if (!currentProduct) {
+                showAlert('Nie wybrano produktu do mapowania', 'error');
+                return;
+            }
+
+            const loading = document.getElementById('loadingMapping');
+            loading.classList.add('active');
+
+            try {
+                // Zbierz dane z formularza
+                const formData = {
+                    matterhorn_product_id: currentProduct.product_id,
+                    name: document.getElementById('productName').value,
+                    description: document.getElementById('productDescription').value,
+                    short_description: document.getElementById('productShortDescription').value,
+                    visibility: document.getElementById('productVisibility').checked,
+                    variants: []
+                };
+
+                // Zbierz warianty
+                document.querySelectorAll('.variant-item').forEach((variant, index) => {
+                    const variantData = {
+                        size_name: variant.querySelector(`[name="variants[${index}][size_name]"]`).value,
+                        color_name: variant.querySelector(`[name="variants[${index}][color_name]"]`).value,
+                        producer_code: variant.querySelector(`[name="variants[${index}][producer_code]"]`).value,
+                        price: parseFloat(variant.querySelector(`[name="variants[${index}][price]"]`).value) || null
+                    };
+                    
+                    if (variantData.size_name || variantData.color_name) {
+                        formData.variants.push(variantData);
+                    }
+                });
+
+                const response = await fetch('/mpd/matterhorn1/bulk-map/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ products: [formData] })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    showAlert(`Produkt został pomyślnie zamapowany do MPD (ID: ${data.created_products[0].mpd_product_id})`, 'success');
+                    
+                    // Zaktualizuj listę produktów
+                    loadProducts();
+                    
+                    // Wyczyść formularz
+                    clearForm();
+                } else {
+                    showAlert('Błąd podczas mapowania: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Błąd połączenia: ' + error.message, 'error');
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        // Czyszczenie formularza
+        function clearForm() {
+            document.getElementById('mappingForm').classList.remove('active');
+            document.getElementById('noProductSelected').style.display = 'block';
+            document.getElementById('variantsContainer').innerHTML = '';
+            currentProduct = null;
+            
+            // Usuń zaznaczenie z listy
+            document.querySelectorAll('.product-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+        }
+
+        // Wyświetlanie alertów
+        function showAlert(message, type) {
+            const alert = document.getElementById('alertMessage');
+            alert.textContent = message;
+            alert.className = `alert alert-${type}`;
+            alert.style.display = 'block';
+            
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        // Pobieranie CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>
