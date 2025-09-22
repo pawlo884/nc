@@ -270,6 +270,10 @@ class ProductAdmin(admin.ModelAdmin):
                 mpd_brands = [{'id': row[0], 'name': row[1]}
                               for row in cursor.fetchall()]
 
+                # Pobierz kategorie rozmiarów
+                cursor.execute("SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
+                size_categories = [row[0] for row in cursor.fetchall()]
+
             # Pobierz sugerowane produkty (tylko dla niezmapowanych produktów)
             if not is_mapped:
                 with connections['MPD'].cursor() as cursor:
@@ -304,6 +308,7 @@ class ProductAdmin(admin.ModelAdmin):
                 'mpd_attributes': mpd_attributes,
                 'selected_attributes': selected_attributes,
                 'mpd_brands': mpd_brands,
+                'size_categories': size_categories,
                 'producer_color_name': producer_color_name,
                 'producer_code': '',
                 'series_name': '',
@@ -340,6 +345,10 @@ class ProductAdmin(admin.ModelAdmin):
                 cursor.execute("SELECT id, name FROM brands ORDER BY name")
                 mpd_brands = [{'id': row[0], 'name': row[1]}
                               for row in cursor.fetchall()]
+
+                # Pobierz kategorie rozmiarów
+                cursor.execute("SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
+                size_categories = [row[0] for row in cursor.fetchall()]
 
                 # Pobierz ścieżki
                 cursor.execute("SELECT id, name, path FROM path ORDER BY name")
@@ -380,23 +389,25 @@ class ProductAdmin(admin.ModelAdmin):
                 description = request.POST.get('mpd_description')
                 short_description = request.POST.get('mpd_short_description')
                 brand_name = request.POST.get('mpd_brand')
+                size_category = request.POST.get('mpd_size_category')
                 main_color_id = request.POST.get('main_color_id')
                 producer_code = request.POST.get('producer_code')
                 producer_color_name = request.POST.get('producer_color_name')
                 unit_id = request.POST.get('unit_id')
 
                 logger.info(
-                    f"Form data: name='{name}', description='{description}', brand_name='{brand_name}', main_color_id='{main_color_id}', unit_id='{unit_id}'")
+                    f"Form data: name='{name}', description='{description}', brand_name='{brand_name}', size_category='{size_category}', main_color_id='{main_color_id}', unit_id='{unit_id}'")
 
                 if not name:
                     return JsonResponse({'success': False, 'error': 'Nazwa jest wymagana'})
 
-                # KROK 5: Nazwa + Opis + Krótki opis + Atrybuty + Marka (inne pola wyłączone)
+                # KROK 6: Nazwa + Opis + Krótki opis + Atrybuty + Marka + Grupa rozmiarowa (inne pola wyłączone)
                 mpd_data = {
                     'name': name,
                     'description': description or '',
                     'short_description': short_description or '',
                     'brand_name': brand_name or '',
+                    'size_category': size_category or '',
                     'unit_id': None,   # Wyłączone na razie
                     'visibility': True
                 }

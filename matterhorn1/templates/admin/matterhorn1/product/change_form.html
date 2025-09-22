@@ -380,7 +380,7 @@
                 <!-- KROK 5: MARKA -->
                 <div class="form-row">
                     <label for="mpd_brand">Marka:</label>
-                    <select id="mpd_brand" name="mpd_brand" onchange="updateField('brand_id', 'mpd_brand')">
+                    <select id="mpd_brand" name="mpd_brand">
                         <option value="">-- wybierz markę --</option>
                         {% for brand in mpd_brands %}
                         <option value="{{ brand.name }}" {% if brand.name == original.brand.name %}selected{% endif %}>{{ brand.name }}</option>
@@ -389,7 +389,19 @@
                     <button type="button" onclick="updateField('brand_id', 'mpd_brand')">Zapisz</button>
                 </div>
                 
-                <!-- KROK 6: GŁÓWNY KOLOR (wyłączony) -->
+                <!-- KROK 6: GRUPA ROZMIAROWA -->
+                <div class="form-row">
+                    <label for="mpd_size_category">Grupa rozmiarowa:</label>
+                    <select id="mpd_size_category" name="mpd_size_category">
+                        <option value="">-- wybierz grupę --</option>
+                        {% for cat in size_categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="updateField('size_category', 'mpd_size_category')">Zapisz</button>
+                </div>
+                
+                <!-- KROK 7: GŁÓWNY KOLOR (wyłączony) -->
                 <div class="form-row" style="display: none;">
                     <label for="main_color_id">Główny kolor:</label>
                     <select id="main_color_id" name="main_color_id">
@@ -401,7 +413,7 @@
                     <button type="button" onclick="updateField('color_id', 'main_color_id')">Zapisz</button>
                 </div>
                 
-                <!-- KROK 7: KOLOR PRODUCENTA (wyłączony) -->
+                <!-- KROK 8: KOLOR PRODUCENTA (wyłączony) -->
                 <div class="form-row" style="display: none;">
                     <label for="producer_color_name">Kolor producenta:</label>
                     <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off" value="{{ original.color|default:producer_color_name }}" placeholder="Kolor producenta">
@@ -413,21 +425,21 @@
                     </datalist>
                 </div>
                 
-                <!-- KROK 8: KOD PRODUCENTA (wyłączony) -->
+                <!-- KROK 9: KOD PRODUCENTA (wyłączony) -->
                 <div class="form-row" style="display: none;">
                     <label for="producer_code">Kod producenta:</label>
                     <input type="text" id="producer_code" name="producer_code" value="{{ original.product_id|default:producer_code }}" placeholder="Kod producenta">
                     <button type="button" onclick="updateField('producer_code', 'producer_code')">Zapisz</button>
                 </div>
                 
-                <!-- KROK 9: NAZWA SERII (wyłączony) -->
+                <!-- KROK 10: NAZWA SERII (wyłączony) -->
                 <div class="form-row" style="display: none;">
                     <label for="series_name">Nazwa serii (opcjonalnie):</label>
                     <input type="text" id="series_name" name="series_name" value="{{ series_name }}" placeholder="Nazwa serii">
                     <button type="button" onclick="updateField('series_id', 'series_name')">Zapisz</button>
                 </div>
                 
-                <!-- KROK 10: ŚCIEŻKI (wyłączony) -->
+                <!-- KROK 11: ŚCIEŻKI (wyłączony) -->
                 <div class="form-row" style="display: none;">
                     <label for="mpd_paths">Ścieżki produktu (możesz wybrać wiele):</label>
                     <select id="mpd_paths" name="mpd_paths" multiple size="5">
@@ -440,7 +452,7 @@
                     <button type="button" onclick="addPaths()" style="margin-left:10px;">Dodaj</button>
                 </div>
                 
-                <!-- KROK 11: JEDNOSTKA (wyłączony) -->
+                <!-- KROK 12: JEDNOSTKA (wyłączony) -->
                 <div class="form-row" style="display: none;">
                     <label for="unit_id">Jednostka:</label>
                     <select id="unit_id" name="unit_id">
