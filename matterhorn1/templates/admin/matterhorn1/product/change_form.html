@@ -401,8 +401,8 @@
                     <button type="button" onclick="updateField('size_category', 'mpd_size_category')">Zapisz</button>
                 </div>
                 
-                <!-- KROK 7: GŁÓWNY KOLOR (wyłączony) -->
-                <div class="form-row" style="display: none;">
+                <!-- KROK 7: GŁÓWNY KOLOR -->
+                <div class="form-row">
                     <label for="main_color_id">Główny kolor:</label>
                     <select id="main_color_id" name="main_color_id">
                         <option value="">-- wybierz kolor --</option>
@@ -413,10 +413,10 @@
                     <button type="button" onclick="updateField('color_id', 'main_color_id')">Zapisz</button>
                 </div>
                 
-                <!-- KROK 8: KOLOR PRODUCENTA (wyłączony) -->
-                <div class="form-row" style="display: none;">
+                <!-- KROK 8: KOLOR PRODUCENTA -->
+                <div class="form-row">
                     <label for="producer_color_name">Kolor producenta:</label>
-                    <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off" value="{{ original.color|default:producer_color_name }}" placeholder="Kolor producenta">
+                    <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off" placeholder="Kolor producenta">
                     <button type="button" onclick="updateField('producer_color_id', 'producer_color_name')">Zapisz</button>
                     <datalist id="producer_colors_list">
                         {% for color in producer_colors %}

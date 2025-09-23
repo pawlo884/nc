@@ -407,13 +407,16 @@ class ProductAdmin(admin.ModelAdmin):
                 if not name:
                     return JsonResponse({'success': False, 'error': 'Nazwa jest wymagana'})
 
-                # KROK 6: Nazwa + Opis + Krótki opis + Atrybuty + Marka + Grupa rozmiarowa (inne pola wyłączone)
+                # KROK 6: Nazwa + Opis + Krótki opis + Atrybuty + Marka + Grupa rozmiarowa + Główny kolor + Kolor producenta
                 mpd_data = {
                     'name': name,
                     'description': description or '',
                     'short_description': short_description or '',
                     'brand_name': brand_name or '',
                     'size_category': size_category or '',
+                    'main_color_id': main_color_id or None,
+                    'producer_color_name': producer_color_name or '',
+                    'producer_code': producer_code or '',
                     'unit_id': None,   # Wyłączone na razie
                     'visibility': False
                 }
@@ -475,9 +478,35 @@ class ProductAdmin(admin.ModelAdmin):
                         if size_category:
                             logger.info(
                                 f"Dodawanie wariantów dla produktu {product_id} z kategorią rozmiarów: {size_category}")
+
+                            # Utwórz producer_color_id z producer_color_name i main_color_id
+                            producer_color_id_to_use = None
+                            if producer_color_name and main_color_id:
+                                try:
+                                    with connections['MPD'].cursor() as cursor:
+                                        # Sprawdź czy kolor producenta już istnieje
+                                        cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s",
+                                                       [producer_color_name, main_color_id])
+                                        pc_row = cursor.fetchone()
+                                        if pc_row:
+                                            producer_color_id_to_use = pc_row[0]
+                                        else:
+                                            # Utwórz nowy kolor producenta
+                                            cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id",
+                                                           [producer_color_name, main_color_id])
+                                            row = cursor.fetchone()
+                                            if row:
+                                                producer_color_id_to_use = row[0]
+                                                connections['MPD'].commit()
+                                                logger.info(
+                                                    f"Utworzono nowy kolor producenta: {producer_color_name} (ID: {producer_color_id_to_use})")
+                                except Exception as e:
+                                    logger.error(
+                                        f"Błąd podczas tworzenia koloru producenta: {e}")
+
                             variant_info = self.add_new_variants_to_mpd(
                                 product_id, mpd_product_id, size_category,
-                                producer_color_id=None, producer_code=None
+                                producer_color_id=producer_color_id_to_use, producer_code=producer_code
                             )
                             logger.info(
                                 f"Wynik dodawania wariantów: {variant_info}")
@@ -559,6 +588,61 @@ class ProductAdmin(admin.ModelAdmin):
                             [product.mapped_product_id, remove_attribute_id]
                         )
                     return JsonResponse({'success': True, 'message': 'Usunięto atrybut.'})
+
+                # Aktualizacja koloru producenta
+                if 'producer_color_name' in request.POST and len(request.POST) == 1:
+                    producer_color_name = request.POST.get(
+                        'producer_color_name')
+                    main_color_id = request.POST.get('main_color_id')
+
+                    if not main_color_id:
+                        return JsonResponse({'success': False, 'error': 'Brak głównego koloru'})
+
+                    with connections['MPD'].cursor() as cursor:
+                        # Pobierz kolor aktualnego produktu z matterhorn1
+                        with connections['matterhorn1'].cursor() as matterhorn_cursor:
+                            matterhorn_cursor.execute(
+                                "SELECT color FROM product WHERE id = %s", [product_id])
+                            color_result = matterhorn_cursor.fetchone()
+                            if not color_result:
+                                return JsonResponse({'success': False, 'error': 'Brak koloru dla produktu'})
+                            product_color = color_result[0]
+
+                        # Pobierz ID koloru w MPD
+                        cursor.execute(
+                            "SELECT id FROM colors WHERE name = %s", [product_color])
+                        color_row = cursor.fetchone()
+                        if not color_row:
+                            return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
+                        color_id = color_row[0]
+
+                        # Sprawdź czy kolor producenta już istnieje
+                        cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s",
+                                       [producer_color_name, color_id])
+                        pc_row = cursor.fetchone()
+                        if pc_row:
+                            producer_color_id = pc_row[0]
+                        else:
+                            # Utwórz nowy kolor producenta
+                            cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id",
+                                           [producer_color_name, color_id])
+                            row = cursor.fetchone()
+                            if row:
+                                producer_color_id = row[0]
+                            else:
+                                return JsonResponse({'success': False, 'error': 'Nie udało się utworzyć koloru producenta'})
+
+                        # Aktualizuj tylko warianty z tym samym color_id (tym samym kolorem produktu)
+                        cursor.execute("""
+                            UPDATE product_variants 
+                            SET producer_color_id = %s, updated_at = NOW() 
+                            WHERE product_id = %s AND color_id = %s
+                        """, [producer_color_id, product.mapped_product_id, color_id])
+
+                        updated_count = cursor.rowcount
+                        connections['MPD'].commit()
+
+                    return JsonResponse({'success': True, 'message': f'Zaktualizowano kolor producenta dla {updated_count} wariantów.'})
 
                 return JsonResponse({'success': False, 'error': 'Brak danych do aktualizacji'})
 
