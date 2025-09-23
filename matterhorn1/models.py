@@ -139,7 +139,7 @@ class ProductVariant(models.Model):
     mapped_variant_id = models.IntegerField(
         null=True, blank=True, help_text="ID wariantu w bazie MPD")
     is_mapped = models.BooleanField(
-        default=False, help_text="Czy wariant jest zmapowany do MPD")
+        null=True, blank=True, help_text="Czy wariant jest zmapowany do MPD")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
