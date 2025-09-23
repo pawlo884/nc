@@ -4,6 +4,7 @@ from django.db import connections, transaction
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.shortcuts import render
+from django.urls import path
 import json
 import logging
 import requests
@@ -70,8 +71,9 @@ class ProductImageInline(admin.TabularInline):
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 0
-    fields = ['variant_uid', 'name', 'stock', 'ean', 'max_processing_time']
-    readonly_fields = ['variant_uid']
+    fields = ['variant_uid', 'name', 'stock', 'ean',
+              'max_processing_time', 'is_mapped', 'mapped_variant_id']
+    readonly_fields = ['variant_uid', 'mapped_variant_id']
 
 
 @admin.register(Product)
@@ -152,8 +154,10 @@ class ProductAdmin(admin.ModelAdmin):
                      self.admin_site.admin_view(self.upload_images), name='upload-images'),
             url_path('auto-map-variants/<int:product_id>/',
                      self.admin_site.admin_view(self.auto_map_variants), name='auto-map-variants'),
-            url_path('sync-with-mpd/<int:product_id>/',
-                     self.admin_site.admin_view(self.sync_with_mpd), name='sync-with-mpd'),
+            path('sync-with-mpd/<int:product_id>/',
+                 self.admin_site.admin_view(self.sync_with_mpd), name='sync-with-mpd'),
+            path('add-variants/<int:product_id>/',
+                 self.admin_site.admin_view(self.add_variants), name='add-variants'),
         ]
         return custom_urls + urls
 
@@ -271,7 +275,8 @@ class ProductAdmin(admin.ModelAdmin):
                               for row in cursor.fetchall()]
 
                 # Pobierz kategorie rozmiarów
-                cursor.execute("SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
+                cursor.execute(
+                    "SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
                 size_categories = [row[0] for row in cursor.fetchall()]
 
             # Pobierz sugerowane produkty (tylko dla niezmapowanych produktów)
@@ -347,7 +352,8 @@ class ProductAdmin(admin.ModelAdmin):
                               for row in cursor.fetchall()]
 
                 # Pobierz kategorie rozmiarów
-                cursor.execute("SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
+                cursor.execute(
+                    "SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
                 size_categories = [row[0] for row in cursor.fetchall()]
 
                 # Pobierz ścieżki
@@ -409,7 +415,7 @@ class ProductAdmin(admin.ModelAdmin):
                     'brand_name': brand_name or '',
                     'size_category': size_category or '',
                     'unit_id': None,   # Wyłączone na razie
-                    'visibility': True
+                    'visibility': False
                 }
 
                 # Warianty wyłączone na razie
@@ -451,6 +457,7 @@ class ProductAdmin(admin.ModelAdmin):
                         # Zaktualizuj mapped_product_id w matterhorn1
                         product = Product.objects.get(id=product_id)
                         product.mapped_product_id = mpd_product_id
+                        product.is_mapped = True
                         product.save()
 
                         # Dodaj atrybuty jeśli podano
@@ -463,9 +470,28 @@ class ProductAdmin(admin.ModelAdmin):
                                         [mpd_product_id, attribute_id]
                                     )
 
+                        # Dodaj warianty jeśli podano size_category
+                        variant_info = None
+                        if size_category:
+                            logger.info(
+                                f"Dodawanie wariantów dla produktu {product_id} z kategorią rozmiarów: {size_category}")
+                            variant_info = self.add_new_variants_to_mpd(
+                                product_id, mpd_product_id, size_category,
+                                producer_color_id=None, producer_code=None
+                            )
+                            logger.info(
+                                f"Wynik dodawania wariantów: {variant_info}")
+
+                        message = f'Utworzono produkt w MPD (ID: {mpd_product_id})'
+                        if variant_info:
+                            message += f'. Dodano {variant_info.get("added", 0)} wariantów'
+                            if variant_info.get('missing_sizes'):
+                                message += f'. Brakujące rozmiary: {", ".join(variant_info["missing_sizes"])}'
+
                         return JsonResponse({
                             'success': True,
-                            'message': f'Utworzono produkt w MPD (ID: {mpd_product_id})'
+                            'message': message,
+                            'variant_info': variant_info
                         })
                     else:
                         return JsonResponse({
@@ -1049,6 +1075,283 @@ class ProductAdmin(admin.ModelAdmin):
             logger.error(f"Błąd synchronizacji produktu {product.id}: {e}")
         return False
 
+    def add_new_variants_to_mpd(self, product_id, mapped_product_id, size_category, producer_color_id=None, producer_code=None):
+        """Dodaje nowe warianty do MPD z filtrowaniem według kategorii rozmiarów"""
+        variant_logger = logging.getLogger('matterhorn1.variants')
+        variant_logger.info(
+            f"[add_new_variants_to_mpd] START: product_id={product_id}, mapped_product_id={mapped_product_id}, size_category={size_category}, producer_color_id={producer_color_id}, producer_code={producer_code}")
+
+        missing_sizes = []
+        missing_colors = False
+        added_variants = 0
+        skipped_existing = 0
+        total_variants = 0
+
+        try:
+            with connections['matterhorn1'].cursor() as matterhorn_cursor, connections['MPD'].cursor() as mpd_cursor:
+                # Pobierz kolor i cenę produktu z matterhorn1
+                matterhorn_cursor.execute("""
+                    SELECT color, prices FROM product WHERE id = %s
+                """, [product_id])
+                color_result = matterhorn_cursor.fetchone()
+                if not color_result:
+                    variant_logger.error(
+                        f"[add_new_variants_to_mpd] Brak koloru dla produktu {product_id}")
+                    return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': True, 'total': 0}
+
+                product_color, product_prices = color_result
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] Raw color_result: {color_result}")
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] product_prices typ: {type(product_prices)}, wartość: {product_prices}")
+
+                # Wyciągnij cenę PLN z JSON
+                if isinstance(product_prices, str):
+                    try:
+                        import json
+                        product_prices = json.loads(product_prices)
+                    except (json.JSONDecodeError, ValueError):
+                        product_prices = {}
+
+                product_price = product_prices.get(
+                    'PLN', 0) if isinstance(product_prices, dict) else 0
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] product_price przed konwersją: {product_price}, typ: {type(product_price)}")
+
+                # Konwertuj na float jeśli to string
+                if isinstance(product_price, str):
+                    try:
+                        product_price = float(product_price)
+                    except ValueError:
+                        product_price = 0
+
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] Kolor produktu: {product_color}, cena PLN: {product_price}")
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] Pełne dane prices: {product_prices}, typ: {type(product_prices)}")
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] product_price po konwersji: {product_price}, typ: {type(product_price)}")
+
+                # Sprawdź czy cena jest większa od 0 (tymczasowo włączone dla debugowania)
+                if product_price <= 0:
+                    variant_logger.warning(
+                        f"[add_new_variants_to_mpd] Produkt {product_id} ma cenę {product_price} - pomijam dodawanie wariantów")
+                    return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': False, 'total': 0, 'error': 'Cena produktu wynosi 0'}
+
+                # Pobierz ID koloru w MPD
+                mpd_cursor.execute(
+                    "SELECT id FROM colors WHERE name = %s", [product_color])
+                color_result = mpd_cursor.fetchone()
+                if not color_result:
+                    variant_logger.error(
+                        f"[add_new_variants_to_mpd] Brak koloru {product_color} w bazie MPD")
+                    missing_colors = True
+                    return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': True, 'total': 0}
+
+                color_id = color_result[0]
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] ID koloru w MPD: {color_id}")
+
+                # Generuj nowy iai_product_id dla tego koloru produktu
+                mpd_cursor.execute("""
+                    INSERT INTO iai_product_counter (counter_value) 
+                    VALUES (1) 
+                    ON CONFLICT (id) 
+                    DO UPDATE SET counter_value = iai_product_counter.counter_value + 1 
+                    RETURNING counter_value
+                """)
+                iai_product_id_result = mpd_cursor.fetchone()
+                iai_product_id = iai_product_id_result[0] if iai_product_id_result else 1
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] Wygenerowano nowy iai_product_id: {iai_product_id} dla koloru {product_color}")
+
+                # Pobierz warianty produktu z matterhorn1
+                matterhorn_cursor.execute("""
+                    SELECT name, stock, ean, variant_uid FROM productvariant WHERE product_id = %s
+                """, [product_id])
+                variants = matterhorn_cursor.fetchall()
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] Znaleziono {len(variants)} wariantów do sprawdzenia dla produktu {product_id}")
+                total_variants = len(variants)
+
+                for size_name, stock, ean, variant_uid in variants:
+                    variant_logger.info(
+                        f"[add_new_variants_to_mpd] Próba dodania wariantu: size_name={size_name}, stock={stock}, ean={ean}, variant_uid={variant_uid}")
+
+                    # Pobierz ID rozmiaru tylko z wybranej kategorii
+                    mpd_cursor.execute("SELECT id FROM sizes WHERE UPPER(name) = UPPER(%s) AND category = %s", [
+                                       size_name, size_category])
+                    size_result = mpd_cursor.fetchone()
+                    if not size_result:
+                        variant_logger.warning(
+                            f"[add_new_variants_to_mpd] Brak rozmiaru {size_name} w grupie {size_category} w bazie MPD")
+                        missing_sizes.append(size_name)
+                        continue
+
+                    size_id = size_result[0]
+                    variant_logger.info(
+                        f"[add_new_variants_to_mpd] Znaleziono rozmiar: {size_name} (id={size_id}) w kategorii {size_category}")
+
+                    # Sprawdź, czy wariant już istnieje w MPD
+                    mpd_cursor.execute("""
+                        SELECT variant_id FROM product_variants_sources WHERE variant_uid = %s AND source_id = %s
+                    """, [variant_uid, 2])
+                    variant_result = mpd_cursor.fetchone()
+                    if variant_result:
+                        variant_logger.info(
+                            f"[add_new_variants_to_mpd] Wariant {variant_uid} już istnieje w MPD - pomijam")
+                        skipped_existing += 1
+                        continue
+
+                    # Dodaj nowy wariant
+                    mpd_cursor.execute(
+                        "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
+                    row = mpd_cursor.fetchone()
+                    variant_id = row[0] if row else 1
+
+                    variant_logger.info(
+                        f"[add_new_variants_to_mpd] Dodaję nowy wariant {variant_uid} jako variant_id {variant_id} (product_id={mapped_product_id}, color_id={color_id}, size_id={size_id}, ean={ean}, producer_color_id={producer_color_id}, producer_code={producer_code})")
+
+                    try:
+                        if producer_color_id:
+                            mpd_cursor.execute("""
+                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                            """, [variant_id, mapped_product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id])
+                        else:
+                            mpd_cursor.execute("""
+                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, producer_code, iai_product_id, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                            """, [variant_id, mapped_product_id, color_id, size_id, producer_code, iai_product_id])
+
+                        # Dodaj wpis do product_variants_sources
+                        mpd_cursor.execute("""
+                            INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id)
+                            VALUES (%s, %s, %s, %s)
+                        """, [variant_id, ean, variant_uid, 2])
+                        variant_logger.info(
+                            f"[add_new_variants_to_mpd] Dodano wariant {variant_uid} do product_variants i product_variants_sources")
+                    except Exception as e:
+                        variant_logger.error(
+                            f"[add_new_variants_to_mpd] Błąd podczas dodawania wariantu {variant_uid} do product_variants: {e}")
+                        continue
+
+                    # Aktualizuj mapped_variant_id w matterhorn1 (przed stock_and_prices)
+                    try:
+                        matterhorn_cursor.execute("""
+                            UPDATE productvariant SET mapped_variant_id = %s, is_mapped = true, updated_at = NOW() WHERE variant_uid = %s
+                        """, [variant_id, variant_uid])
+                        variant_logger.info(
+                            f"[add_new_variants_to_mpd] Zaktualizowano mapped_variant_id w matterhorn1 dla wariantu {variant_uid}")
+                    except Exception as e:
+                        variant_logger.error(
+                            f"[add_new_variants_to_mpd] Błąd podczas aktualizacji mapped_variant_id w matterhorn1 dla wariantu {variant_uid}: {e}")
+                        continue
+
+                    try:
+                        # Sprawdź czy rekord już istnieje
+                        mpd_cursor.execute("""
+                            SELECT variant_id FROM stock_and_prices 
+                            WHERE variant_id = %s AND source_id = %s
+                        """, [variant_id, 2])
+                        existing_record = mpd_cursor.fetchone()
+
+                        variant_logger.info(
+                            f"[add_new_variants_to_mpd] Dodawanie do stock_and_prices: variant_id={variant_id}, stock={stock}, price={product_price}")
+                        variant_logger.info(
+                            f"[add_new_variants_to_mpd] product_price w momencie zapisywania: {product_price}, typ: {type(product_price)}")
+
+                        if existing_record:
+                            # Aktualizuj istniejący rekord
+                            mpd_cursor.execute("""
+                                UPDATE stock_and_prices 
+                                SET stock = %s, price = %s, currency = 'PLN'
+                                WHERE variant_id = %s AND source_id = %s
+                            """, [stock, product_price, variant_id, 2])
+                            variant_logger.info(
+                                f"[add_new_variants_to_mpd] Zaktualizowano istniejący rekord w stock_and_prices")
+                        else:
+                            # Dodaj nowy rekord
+                            mpd_cursor.execute("""
+                                INSERT INTO stock_and_prices 
+                                (variant_id, source_id, stock, price, currency)
+                                VALUES (%s, %s, %s, %s, 'PLN')
+                            """, [variant_id, 2, stock, product_price])
+                            variant_logger.info(
+                                f"[add_new_variants_to_mpd] Dodano nowy rekord do stock_and_prices")
+                    except Exception as e:
+                        variant_logger.error(
+                            f"[add_new_variants_to_mpd] Błąd podczas dodawania/uzupełniania stock_and_prices dla wariantu {variant_uid}: {e}")
+                        # Nie continue tutaj - mapped_variant_id już zostało zaktualizowane
+
+                    added_variants += 1
+                    variant_logger.info(
+                        f"[add_new_variants_to_mpd] Pomyślnie dodano wariant {variant_uid}")
+
+                # Zatwierdź transakcje
+                connections['MPD'].commit()
+                connections['matterhorn1'].commit()
+                variant_logger.info(
+                    f"[add_new_variants_to_mpd] Zatwierdzono transakcje MPD i matterhorn1")
+
+        except Exception as e:
+            variant_logger.error(f"[add_new_variants_to_mpd] Błąd ogólny: {e}")
+            connections['MPD'].rollback()
+            connections['matterhorn1'].rollback()
+            return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': True, 'total': 0}
+
+        finally:
+            variant_logger.info(
+                f"[add_new_variants_to_mpd] END: product_id={product_id}, mapped_product_id={mapped_product_id}, size_category={size_category}, producer_color_id={producer_color_id}, producer_code={producer_code}")
+
+        return {'added': added_variants, 'skipped_existing': skipped_existing, 'missing_sizes': missing_sizes, 'missing_color': missing_colors, 'total': total_variants, 'iai_product_id': None}
+
+    def add_variants(self, request, product_id):
+        """Dodaje warianty do istniejącego produktu w MPD"""
+        if request.method != 'POST':
+            return JsonResponse({'success': False, 'error': 'Tylko metoda POST jest obsługiwana'})
+
+        try:
+            size_category = request.POST.get('size_category')
+            producer_color_id = request.POST.get('producer_color_id')
+            producer_code = request.POST.get('producer_code')
+
+            if not size_category:
+                return JsonResponse({'success': False, 'error': 'Wybierz grupę rozmiarową'})
+
+            # Pobierz produkt
+            product = Product.objects.get(id=product_id)
+            if not product.is_mapped or not product.mapped_product_id:
+                return JsonResponse({'success': False, 'error': 'Produkt nie jest zmapowany do MPD'})
+
+            logger.info("Dodawanie wariantów dla produktu %s (MPD ID: %s) z kategorią: %s",
+                        product_id, product.mapped_product_id, size_category)
+
+            # Wywołaj add_new_variants_to_mpd
+            variant_info = self.add_new_variants_to_mpd(
+                product_id, product.mapped_product_id, size_category,
+                producer_color_id, producer_code
+            )
+
+            message = f'Dodano {variant_info.get("added", 0)} wariantów'
+            if variant_info.get('missing_sizes'):
+                message += f'. Brakujące rozmiary: {", ".join(variant_info["missing_sizes"])}'
+            if variant_info.get('skipped_existing', 0) > 0:
+                message += f'. Pominięto {variant_info["skipped_existing"]} istniejących wariantów'
+
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'variant_info': variant_info
+            })
+
+        except Product.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Produkt nie istnieje'})
+        except Exception as e:
+            logger.error(
+                f"Błąd dodawania wariantów dla produktu {product_id}: {e}")
+            return JsonResponse({'success': False, 'error': str(e)})
+
 
 @admin.register(ProductDetails)
 class ProductDetailsAdmin(admin.ModelAdmin):
@@ -1108,13 +1411,15 @@ class ProductImageAdmin(admin.ModelAdmin):
 class ProductVariantAdmin(admin.ModelAdmin):
     list_display = [
         'variant_uid', 'product', 'name', 'stock', 'ean',
-        'max_processing_time', 'created_at'
+        'max_processing_time', 'is_mapped', 'mapped_variant_id', 'created_at'
     ]
-    list_filter = ['created_at', 'updated_at', 'max_processing_time']
+    list_filter = ['created_at', 'updated_at',
+                   'max_processing_time', 'is_mapped']
     search_fields = [
         'variant_uid', 'name', 'ean', 'product__name', 'product__product_id'
     ]
-    readonly_fields = ['variant_uid', 'created_at', 'updated_at']
+    readonly_fields = ['variant_uid',
+                       'mapped_variant_id', 'created_at', 'updated_at']
     ordering = ['-created_at']
 
     fieldsets = (
@@ -1126,6 +1431,10 @@ class ProductVariantAdmin(admin.ModelAdmin):
         }),
         ('Przetwarzanie', {
             'fields': ('max_processing_time',)
+        }),
+        ('Mapowanie do MPD', {
+            'fields': ('is_mapped', 'mapped_variant_id'),
+            'classes': ('collapse',)
         }),
         ('Metadane', {
             'fields': ('created_at', 'updated_at'),

@@ -424,6 +424,35 @@ function ProductMapping({ productId, isMapped, mappedProductId }) {
     }
   };
 
+  const addVariants = async () => {
+    const sizeCategory = prompt('Wybierz grupę rozmiarową (np. "bielizna"):');
+    if (!sizeCategory) return;
+
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('size_category', sizeCategory);
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+      const response = await fetch(`/admin/matterhorn1/product/add-variants/${productId}/`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await response.json();
+      showMessage(data.message || data.error || 'Wystąpił nieznany błąd', data.success ? 'success' : 'error');
+      
+      if (data.success) {
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showMessage('Wystąpił błąd podczas dodawania wariantów', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (!isMapped) {
     return null;
   }
@@ -479,6 +508,21 @@ function ProductMapping({ productId, isMapped, mappedProductId }) {
           opacity: isLoading ? 0.6 : 1
         }
       }, isLoading ? 'Przetwarzanie...' : 'Auto-mapuj warianty'),
+      
+      React.createElement('button', {
+        key: 'add-variants',
+        onClick: addVariants,
+        disabled: isLoading,
+        style: {
+          background: '#6f42c1',
+          color: 'white',
+          border: 'none',
+          padding: '8px 16px',
+          borderRadius: '4px',
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          opacity: isLoading ? 0.6 : 1
+        }
+      }, isLoading ? 'Przetwarzanie...' : 'Dodaj warianty'),
       
       React.createElement('button', {
         key: 'sync',

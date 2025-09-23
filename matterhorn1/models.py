@@ -59,7 +59,8 @@ class Product(models.Model):
     # Mapowanie do MPD
     mapped_product_id = models.IntegerField(
         null=True, blank=True, help_text="ID produktu w bazie MPD")
-    is_mapped = models.BooleanField(default=False, help_text="Czy produkt jest zmapowany do MPD")
+    is_mapped = models.BooleanField(
+        default=False, help_text="Czy produkt jest zmapowany do MPD")
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -133,6 +134,13 @@ class ProductVariant(models.Model):
     stock = models.PositiveIntegerField(default=0)
     max_processing_time = models.PositiveIntegerField(default=0)
     ean = models.CharField(max_length=20, blank=True)
+
+    # Mapowanie do MPD
+    mapped_variant_id = models.IntegerField(
+        null=True, blank=True, help_text="ID wariantu w bazie MPD")
+    is_mapped = models.BooleanField(
+        default=False, help_text="Czy wariant jest zmapowany do MPD")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -144,6 +152,8 @@ class ProductVariant(models.Model):
             models.Index(fields=['variant_uid']),
             models.Index(fields=['product']),
             models.Index(fields=['ean']),
+            models.Index(fields=['is_mapped']),
+            models.Index(fields=['mapped_variant_id']),
         ]
 
     def __str__(self):

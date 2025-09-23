@@ -92,7 +92,7 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                     placeholders = ', '.join(
                         ['%s'] * len(instance.variant_ids))
                     cursor.execute(f"""
-                        UPDATE product_variants
+                        UPDATE productvariant
                         SET mapped_variant_id = NULL,
                             is_mapped = False,
                             updated_at = NOW()
