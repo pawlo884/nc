@@ -386,36 +386,54 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
 
 
 def _get_last_items_update_time():
-    """Pobiera ostatni czas importu ITEMS lub zwraca domyślny (2015-01-01)"""
-    try:
-        from matterhorn1.models import ApiSyncLog
-        import pytz
-        from datetime import datetime
+    """Pobiera ostatni czas importu ITEMS z retry logic lub zwraca domyślny (2015-01-01)"""
+    max_retries = 10
+    retry_delay = 30  # 30 sekund między próbami
 
-        last_sync = ApiSyncLog.objects.using('matterhorn1').filter(
-            sync_type__in=['items_import', 'items_sync'],
-            status__in=['success', 'partial', 'completed']
-        ).order_by('-started_at').first()
+    for attempt in range(max_retries):
+        try:
+            from matterhorn1.models import ApiSyncLog
+            import pytz
 
-        if last_sync and last_sync.started_at:
-            # Konwertuj na strefę czasową Polski (UTC+1/UTC+2)
-            poland_tz = pytz.timezone('Europe/Warsaw')
-            if last_sync.started_at.tzinfo is None:
-                # Jeśli data jest naive, załóż że to UTC
-                utc_dt = pytz.utc.localize(last_sync.started_at)
+            last_sync = ApiSyncLog.objects.using('matterhorn1').filter(
+                sync_type__in=['items_import', 'items_sync'],
+                status__in=['success', 'partial', 'completed']
+            ).order_by('-started_at').first()
+
+            if last_sync and last_sync.started_at:
+                # Konwertuj na strefę czasową Polski (UTC+1/UTC+2)
+                poland_tz = pytz.timezone('Europe/Warsaw')
+                if last_sync.started_at.tzinfo is None:
+                    # Jeśli data jest naive, załóż że to UTC
+                    utc_dt = pytz.utc.localize(last_sync.started_at)
+                else:
+                    utc_dt = last_sync.started_at.astimezone(pytz.utc)
+
+                # Konwertuj na strefę czasową Polski
+                poland_dt = utc_dt.astimezone(poland_tz)
+                logger.info(
+                    f"✅ Pobrano last_update z bazy danych: {poland_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                return poland_dt.strftime("%Y-%m-%d %H:%M:%S")
             else:
-                utc_dt = last_sync.started_at.astimezone(pytz.utc)
+                # Domyślny czas - 2015-01-01 00:00:00
+                logger.info(
+                    "📅 Brak poprzednich importów - używam domyślnej daty 2015-01-01")
+                return "2015-01-01 00:00:00"
 
-            # Konwertuj na strefę czasową Polski
-            poland_dt = utc_dt.astimezone(poland_tz)
-            return poland_dt.strftime("%Y-%m-%d %H:%M:%S")
-        else:
-            # Domyślny czas - 2015-01-01 00:00:00
-            return "2015-01-01 00:00:00"
-    except Exception as e:
-        logger.error(
-            f"Błąd podczas pobierania ostatniego czasu importu ITEMS: {e}")
-        return "2015-01-01 00:00:00"
+        except Exception as e:
+            logger.error(
+                f"❌ Błąd podczas pobierania ostatniego czasu importu ITEMS (próba {attempt + 1}/{max_retries}): {e}")
+
+            if attempt < max_retries - 1:
+                logger.warning(
+                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą połączenia z bazą danych...")
+                time.sleep(retry_delay)
+            else:
+                logger.error(
+                    "❌ Osiągnięto maksymalną liczbę prób połączenia z bazą danych")
+                logger.error(
+                    "❌ Używam domyślnej daty 2015-01-01 - import rozpocznie się od początku")
+                return "2015-01-01 00:00:00"
 
 
 def _get_last_items_page():
@@ -431,59 +449,90 @@ def _get_last_items_page():
 
 def _save_items_import_start_time():
     """Zapisuje czas ROZPOCZĘCIA importu ITEMS - to będzie last_update dla następnego importu"""
-    try:
-        from matterhorn1.models import ApiSyncLog
-        from django.utils import timezone
+    max_retries = 5
+    retry_delay = 10  # 10 sekund między próbami
 
-        # Zapisz log rozpoczęcia importu ITEMS
-        ApiSyncLog.objects.using('matterhorn1').create(
-            sync_type='items_import',
-            status='running',  # Status 'running' podczas importu
-            started_at=timezone.now(),
-            completed_at=None,  # Będzie ustawione po zakończeniu
-            records_processed=0,
-            records_created=0,
-            records_updated=0,
-            records_errors=0,
-            current_page=1  # Rozpoczynamy od strony 1
-        )
-        logger.info("✅ Zapisano czas ROZPOCZĘCIA importu ITEMS")
-    except Exception as e:
-        logger.error(
-            f"Błąd podczas zapisywania czasu rozpoczęcia importu ITEMS: {e}")
+    for attempt in range(max_retries):
+        try:
+            from matterhorn1.models import ApiSyncLog
+            from django.utils import timezone
+
+            # Zapisz log rozpoczęcia importu ITEMS
+            ApiSyncLog.objects.using('matterhorn1').create(
+                sync_type='items_import',
+                status='running',  # Status 'running' podczas importu
+                started_at=timezone.now(),
+                completed_at=None,  # Będzie ustawione po zakończeniu
+                records_processed=0,
+                records_created=0,
+                records_updated=0,
+                records_errors=0,
+                current_page=1  # Rozpoczynamy od strony 1
+            )
+            logger.info("✅ Zapisano czas ROZPOCZĘCIA importu ITEMS")
+            return  # Sukces - wyjdź z funkcji
+
+        except Exception as e:
+            logger.error(
+                f"❌ Błąd podczas zapisywania czasu rozpoczęcia importu ITEMS (próba {attempt + 1}/{max_retries}): {e}")
+
+            if attempt < max_retries - 1:
+                logger.warning(
+                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą...")
+                time.sleep(retry_delay)
+            else:
+                logger.error(
+                    "❌ Osiągnięto maksymalną liczbę prób zapisywania czasu rozpoczęcia importu")
 
 
 def _update_items_import_status(status, imported_count, current_page=None, updated_count=0, processed_count=0):
-    """Aktualizuje status ostatniego importu ITEMS"""
-    try:
-        from matterhorn1.models import ApiSyncLog
-        from django.utils import timezone
+    """Aktualizuje status ostatniego importu ITEMS z retry logic"""
+    max_retries = 5
+    retry_delay = 10  # 10 sekund między próbami
 
-        # Znajdź ostatni rekord z statusem 'running'
-        last_running = ApiSyncLog.objects.using('matterhorn1').filter(
-            sync_type='items_import',
-            status='running'
-        ).order_by('-started_at').first()
+    for attempt in range(max_retries):
+        try:
+            from matterhorn1.models import ApiSyncLog
+            from django.utils import timezone
 
-        if last_running:
-            # Aktualizuj status i completed_at
-            last_running.status = status
-            last_running.completed_at = timezone.now()
-            last_running.records_created = imported_count
-            last_running.records_updated = updated_count
-            last_running.records_processed = processed_count
+            # Znajdź ostatni rekord z statusem 'running'
+            last_running = ApiSyncLog.objects.using('matterhorn1').filter(
+                sync_type='items_import',
+                status='running'
+            ).order_by('-started_at').first()
 
-            # Aktualizuj current_page jeśli podane
-            if current_page is not None:
-                last_running.current_page = current_page
+            if last_running:
+                # Aktualizuj status i completed_at
+                last_running.status = status
+                last_running.completed_at = timezone.now()
+                last_running.records_created = imported_count
+                last_running.records_updated = updated_count
+                last_running.records_processed = processed_count
 
-            last_running.save()
-            logger.info(f"✅ Zaktualizowano status importu ITEMS na: {status}")
-        else:
-            logger.warning(
-                "⚠️ Nie znaleziono rekordu 'running' do aktualizacji")
-    except Exception as e:
-        logger.error(f"Błąd podczas aktualizacji statusu importu ITEMS: {e}")
+                # Aktualizuj current_page jeśli podane
+                if current_page is not None:
+                    last_running.current_page = current_page
+
+                last_running.save()
+                logger.info(
+                    f"✅ Zaktualizowano status importu ITEMS na: {status}")
+            else:
+                logger.warning(
+                    "⚠️ Nie znaleziono rekordu 'running' do aktualizacji")
+
+            return  # Sukces - wyjdź z funkcji
+
+        except Exception as e:
+            logger.error(
+                f"❌ Błąd podczas aktualizacji statusu importu ITEMS (próba {attempt + 1}/{max_retries}): {e}")
+
+            if attempt < max_retries - 1:
+                logger.warning(
+                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą...")
+                time.sleep(retry_delay)
+            else:
+                logger.error(
+                    "❌ Osiągnięto maksymalną liczbę prób aktualizacji statusu importu")
 
 
 def _save_last_items_update_time():
@@ -1172,97 +1221,134 @@ def _cleanup_old_running_imports():
     """
     Czyści stare rekordy 'running' starsze niż 2 godziny.
     To zapobiega kumulowaniu się zawieszonych importów.
+    Z retry logic dla połączenia z bazą danych.
     """
-    try:
-        from matterhorn1.models import ApiSyncLog
-        from django.utils import timezone
-        from datetime import timedelta
+    max_retries = 5
+    retry_delay = 10  # 10 sekund między próbami
 
-        # Znajdź stare running rekordy (starsze niż 2 godziny)
-        cutoff_time = timezone.now() - timedelta(hours=2)
-        old_running = ApiSyncLog.objects.using('matterhorn1').filter(
-            sync_type='items_import',
-            status='running',
-            started_at__lt=cutoff_time
-        )
+    for attempt in range(max_retries):
+        try:
+            from matterhorn1.models import ApiSyncLog
+            from django.utils import timezone
+            from datetime import timedelta
 
-        count = old_running.count()
-        if count > 0:
-            logger.warning(
-                f"🧹 Znaleziono {count} starych 'running' rekordów - oznaczam jako 'error'")
-
-            # Oznacz jako 'error' zamiast usuwać
-            old_running.update(
-                status='error',
-                completed_at=timezone.now(),
-                error_details='Zawieszone - automatycznie oznaczone jako błąd po 2 godzinach'
+            # Znajdź stare running rekordy (starsze niż 2 godziny)
+            cutoff_time = timezone.now() - timedelta(hours=2)
+            old_running = ApiSyncLog.objects.using('matterhorn1').filter(
+                sync_type='items_import',
+                status='running',
+                started_at__lt=cutoff_time
             )
 
-    except Exception as e:
-        logger.error(
-            f"❌ Błąd podczas czyszczenia starych running rekordów: {e}")
+            count = old_running.count()
+            if count > 0:
+                logger.warning(
+                    f"🧹 Znaleziono {count} starych 'running' rekordów - oznaczam jako 'error'")
+
+                # Oznacz jako 'error' zamiast usuwać
+                old_running.update(
+                    status='error',
+                    completed_at=timezone.now(),
+                    error_details='Zawieszone - automatycznie oznaczone jako błąd po 2 godzinach'
+                )
+                logger.info(
+                    f"✅ Oznaczono {count} starych rekordów jako 'error'")
+            else:
+                logger.info("✅ Brak starych 'running' rekordów do czyszczenia")
+
+            # Jeśli dotarliśmy tutaj, operacja się powiodła
+            return
+
+        except Exception as e:
+            logger.error(
+                f"❌ Błąd podczas czyszczenia starych running rekordów (próba {attempt + 1}/{max_retries}): {e}")
+
+            if attempt < max_retries - 1:
+                logger.warning(
+                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą...")
+                time.sleep(retry_delay)
+            else:
+                logger.error(
+                    "❌ Osiągnięto maksymalną liczbę prób czyszczenia starych rekordów")
 
 
 def _cleanup_all_running_imports():
     """
     Sprawdza czy są zawieszone taski i czyści blokadę Redis tylko jeśli task został przerwany.
     NIE czyści aktywnych tasków - tylko sprawdza czy blokada Redis jest spójna z DB.
+    Z retry logic dla połączenia z bazą danych.
     """
-    try:
-        from matterhorn1.models import ApiSyncLog
-        from django.utils import timezone
-        from django.core.cache import cache
+    max_retries = 5
+    retry_delay = 10  # 10 sekund między próbami
 
-        # Znajdź WSZYSTKIE running rekordy (niezależnie od wieku)
-        all_running = ApiSyncLog.objects.using('matterhorn1').filter(
-            sync_type='items_import',
-            status='running'
-        )
+    for attempt in range(max_retries):
+        try:
+            from matterhorn1.models import ApiSyncLog
+            from django.utils import timezone
+            from django.core.cache import cache
 
-        count = all_running.count()
-
-        # Sprawdź blokadę Redis
-        lock_id = 'matterhorn1_full_import_lock'
-        current_lock = cache.get(lock_id)
-
-        if count > 0 and current_lock:
-            # Są running rekordy w DB I blokada Redis - task działa normalnie
-            logger.info(
-                f"✅ Znaleziono {count} aktywnych 'running' rekordów - task działa normalnie")
-            logger.info(
-                "✅ Blokada Redis pozostaje aktywna - task nie został przerwany")
-
-        elif count > 0 and not current_lock:
-            # Są running rekordy w DB ale BRAK blokady Redis - task został przerwany
-            logger.warning(
-                f"🧹 Znaleziono {count} 'running' rekordów bez blokady Redis - task został przerwany")
-
-            # Oznacz jako 'error' - task został przerwany
-            all_running.update(
-                status='error',
-                completed_at=timezone.now(),
-                error_details='Zawieszone - task został przerwany (restart/stop systemu)'
+            # Znajdź WSZYSTKIE running rekordy (niezależnie od wieku)
+            all_running = ApiSyncLog.objects.using('matterhorn1').filter(
+                sync_type='items_import',
+                status='running'
             )
 
-            logger.info(
-                f"✅ Oznaczono {count} przerwanych rekordów jako 'error'")
+            count = all_running.count()
 
-        elif count == 0 and current_lock:
-            # BRAK running rekordów w DB ale jest blokada Redis - ghost lock
-            logger.warning(
-                f"🔒 Znaleziono blokadę Redis bez aktywnych tasków: {current_lock}")
-            logger.info("🗑️  Usuwam ghost lock Redis")
+            # Sprawdź blokadę Redis
+            lock_id = 'matterhorn1_full_import_lock'
+            current_lock = cache.get(lock_id)
 
-            cache.delete(lock_id)
+            if count > 0 and current_lock:
+                # Są running rekordy w DB I blokada Redis - task działa normalnie
+                logger.info(
+                    f"✅ Znaleziono {count} aktywnych 'running' rekordów - task działa normalnie")
+                logger.info(
+                    "✅ Blokada Redis pozostaje aktywna - task nie został przerwany")
 
-            if not cache.get(lock_id):
-                logger.info("✅ Ghost lock Redis został usunięty")
+            elif count > 0 and not current_lock:
+                # Są running rekordy w DB ale BRAK blokady Redis - task został przerwany
+                logger.warning(
+                    f"🧹 Znaleziono {count} 'running' rekordów bez blokady Redis - task został przerwany")
+
+                # Oznacz jako 'error' - task został przerwany
+                all_running.update(
+                    status='error',
+                    completed_at=timezone.now(),
+                    error_details='Zawieszone - task został przerwany (restart/stop systemu)'
+                )
+
+                logger.info(
+                    f"✅ Oznaczono {count} przerwanych rekordów jako 'error'")
+
+            elif count == 0 and current_lock:
+                # BRAK running rekordów w DB ale jest blokada Redis - ghost lock
+                logger.warning(
+                    f"🔒 Znaleziono blokadę Redis bez aktywnych tasków: {current_lock}")
+                logger.info("🗑️  Usuwam ghost lock Redis")
+
+                cache.delete(lock_id)
+
+                if not cache.get(lock_id):
+                    logger.info("✅ Ghost lock Redis został usunięty")
+                else:
+                    logger.error("❌ Nie udało się usunąć ghost lock Redis")
+
             else:
-                logger.error("❌ Nie udało się usunąć ghost lock Redis")
+                # Brak running rekordów i brak blokady Redis - wszystko OK
+                logger.info("✅ Brak aktywnych tasków - system gotowy")
 
-        else:
-            # Brak running rekordów i brak blokady Redis - wszystko OK
-            logger.info("✅ Brak aktywnych tasków - system gotowy")
+            # Jeśli dotarliśmy tutaj, operacja się powiodła
+            return
 
-    except Exception as e:
-        logger.error(f"❌ Błąd podczas sprawdzania running rekordów: {e}")
+        except Exception as e:
+            logger.error(
+                f"❌ Błąd podczas sprawdzania running rekordów (próba {attempt + 1}/{max_retries}): {e}")
+
+            if attempt < max_retries - 1:
+                logger.warning(
+                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą...")
+                time.sleep(retry_delay)
+            else:
+                logger.error(
+                    "❌ Osiągnięto maksymalną liczbę prób sprawdzania running rekordów")
