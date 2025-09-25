@@ -1,9 +1,6 @@
 import time
-import logging
-from datetime import datetime, timedelta
 from celery import shared_task
 from celery.utils.log import get_task_logger
-from django.core.management import call_command
 from django.conf import settings
 from django.core.cache import cache
 
@@ -32,6 +29,15 @@ def full_import_and_update(self, start_id=None, max_products=200000,
         dry_run: Tryb testowy
         auto_continue: Kontynuuj import aż skończą się produkty
     """
+    # SPRAWDŹ DOSTĘPNOŚĆ BAZY DANYCH PRZED ROZPOCZĘCIEM
+    if not _check_database_connection():
+        logger.error("❌ Baza danych nie jest dostępna - przerywam import")
+        return {
+            'status': 'error',
+            'error': 'Database connection failed - cannot start import',
+            'task_id': getattr(getattr(self, 'request', None), 'id', 'direct_call')
+        }
+
     # BLOKADA - zapobiega równoległemu wykonaniu (działa dla Celery i bezpośrednich wywołań)
     lock_id = 'matterhorn1_full_import_lock'
     lock_timeout = 3600  # 1 godzina
@@ -173,10 +179,11 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                     "⚠️ Osiągnięto maksymalną liczbę iteracji (100) - kończę")
                 break
 
-            logger.info(f"🎉 PEŁNY IMPORT ZAKOŃCZONY!")
-            logger.info(f"📊 Łącznie zaimportowano: {total_imported} produktów")
+            logger.info("🎉 PEŁNY IMPORT ZAKOŃCZONY!")
+            logger.info("📊 Łącznie zaimportowano: %s produktów",
+                        total_imported)
             logger.info(
-                f"📊 Łącznie zaktualizowano: {total_updated} produktów w INVENTORY")
+                "📊 Łącznie zaktualizowano: %s produktów w INVENTORY", total_updated)
 
         task_completed_successfully = True
 
@@ -223,6 +230,16 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
     try:
         # Pobierz ostatni czas importu lub użyj domyślnego
         last_update = _get_last_items_update_time()
+
+        # Jeśli nie można pobrać daty ostatniego importu, przerwij
+        if last_update is None:
+            logger.error(
+                "❌ Nie można pobrać daty ostatniego importu - przerywam import")
+            return {
+                'status': 'error',
+                'error': 'Cannot get last import date - database unavailable'
+            }
+
         logger.info(f"📅 Używam last_update: {last_update}")
 
         # Pobierz ostatnią stronę z przerwanego importu
@@ -320,7 +337,7 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                                 continue
                             else:
                                 logger.error(
-                                    f"❌ Osiągnięto maksymalną liczbę prób parsowania JSON")
+                                    "❌ Osiągnięto maksymalną liczbę prób parsowania JSON")
                                 break
 
                     elif response.status_code == 404:
@@ -336,7 +353,7 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                             continue
                         else:
                             logger.error(
-                                f"❌ Osiągnięto maksymalną liczbę prób API")
+                                "❌ Osiągnięto maksymalną liczbę prób API")
                             break
 
                 except Exception as e:
@@ -354,7 +371,7 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                         continue
                     else:
                         logger.error(
-                            f"❌ Osiągnięto maksymalną liczbę prób połączenia")
+                            "❌ Osiągnięto maksymalną liczbę prób połączenia")
                         break
 
             # Jeśli osiągnięto maksymalną liczbę prób, przerwij główną pętlę
@@ -385,10 +402,45 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         }
 
 
+def _check_database_connection():
+    """Sprawdza czy baza danych jest dostępna"""
+    max_retries = 3
+    retry_delay = 5  # 5 sekund między próbami
+
+    for attempt in range(max_retries):
+        try:
+            from django.db import connection
+            from matterhorn1.models import ApiSyncLog
+
+            # Sprawdź połączenie z bazą danych
+            connection.ensure_connection()
+
+            # Spróbuj wykonać prostą kwerendę
+            ApiSyncLog.objects.using('matterhorn1').exists()
+
+            logger.info("✅ Połączenie z bazą danych działa poprawnie")
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"❌ Błąd połączenia z bazą danych (próba {attempt + 1}/{max_retries}): {e}")
+
+            if attempt < max_retries - 1:
+                logger.warning(
+                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą...")
+                time.sleep(retry_delay)
+            else:
+                logger.error(
+                    "❌ Baza danych nie jest dostępna po wszystkich próbach")
+                return False
+
+    return False
+
+
 def _get_last_items_update_time():
-    """Pobiera ostatni czas importu ITEMS z retry logic lub zwraca domyślny (2015-01-01)"""
-    max_retries = 10
-    retry_delay = 30  # 30 sekund między próbami
+    """Pobiera ostatni czas importu ITEMS z retry logic lub zwraca None jeśli baza niedostępna"""
+    max_retries = 3
+    retry_delay = 10  # 10 sekund między próbami
 
     for attempt in range(max_retries):
         try:
@@ -415,10 +467,10 @@ def _get_last_items_update_time():
                     f"✅ Pobrano last_update z bazy danych: {poland_dt.strftime('%Y-%m-%d %H:%M:%S')}")
                 return poland_dt.strftime("%Y-%m-%d %H:%M:%S")
             else:
-                # Domyślny czas - 2015-01-01 00:00:00
+                # Brak poprzednich importów - zwróć None zamiast 2015-01-01
                 logger.info(
-                    "📅 Brak poprzednich importów - używam domyślnej daty 2015-01-01")
-                return "2015-01-01 00:00:00"
+                    "📅 Brak poprzednich importów - nie można określić daty startu")
+                return None
 
         except Exception as e:
             logger.error(
@@ -432,8 +484,8 @@ def _get_last_items_update_time():
                 logger.error(
                     "❌ Osiągnięto maksymalną liczbę prób połączenia z bazą danych")
                 logger.error(
-                    "❌ Używam domyślnej daty 2015-01-01 - import rozpocznie się od początku")
-                return "2015-01-01 00:00:00"
+                    "❌ Nie można pobrać daty ostatniego importu - przerywam import")
+                return None
 
 
 def _get_last_items_page():
@@ -995,6 +1047,16 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
     try:
         # Użyj tej samej daty startu co ITEMS z poprawnym formatowaniem
         last_update = _get_last_items_update_time()
+
+        # Jeśli nie można pobrać daty ostatniego importu, przerwij
+        if last_update is None:
+            logger.error(
+                "❌ Nie można pobrać daty ostatniego importu dla INVENTORY - przerywam")
+            return {
+                'status': 'error',
+                'error': 'Cannot get last import date for INVENTORY - database unavailable'
+            }
+
         logger.info(
             f"📅 INVENTORY używam tej samej daty co ITEMS: {last_update}")
 
