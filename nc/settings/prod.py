@@ -32,5 +32,5 @@ USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = None
 
 # Celery Configuration
-CELERY_BROKER_URL = f'redis://:{os.getenv("REDIS_PASSWORD", "prod_password")}@redis:6379/0'
-CELERY_RESULT_BACKEND = f'redis://:{os.getenv("REDIS_PASSWORD", "prod_password")}@redis:6379/0'
+CELERY_BROKER_URL = f'redis://:{os.getenv("REDIS_PASSWORD", "Relisys17!!")}@redis:6379/0'
+CELERY_RESULT_BACKEND = f'redis://:{os.getenv("REDIS_PASSWORD", "Relisys17!!")}@redis:6379/0'
