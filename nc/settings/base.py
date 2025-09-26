@@ -169,6 +169,17 @@ DATABASES = {
         'OPTIONS': {
         }
     },
+    'web_agent': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('WEB_AGENT_NAME'),
+        'USER': os.getenv('WEB_AGENT_USER'),
+        'PASSWORD': os.getenv('WEB_AGENT_PASSWORD'),
+        'HOST': os.getenv('WEB_AGENT_DB_HOST'),
+        'PORT': os.getenv('WEB_AGENT_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+        }
+    },
     'matterhorn1': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('MATTERHORN1_DB_NAME'),
