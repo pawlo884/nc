@@ -1,0 +1,74 @@
+---
+description: Reguły środowiska dla projektu Django z PostgreSQL, Celery i Redis
+globs: ["**/*.py", "**/*.html", "**/*.js", "**/*.css", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.md", "**/*.sql"]
+alwaysApply: true
+---
+
+# Reguły środowiska dla projektu NC
+
+## Architektura projektu
+- **Framework**: Django 5.2.4 z PostgreSQL
+- **Bazy danych**: 5 baz PostgreSQL (zzz_default, zzz_matterhorn, zzz_MPD, zzz_web_agent, zzz_matterhorn1)
+- **Cache/Broker**: Redis
+- **Task Queue**: Celery z django-celery-beat
+- **API**: Django REST Framework z drf-spectacular
+- **Frontend**: HTML templates z JavaScript
+
+## Konfiguracja środowiska
+- **Plik .env.dev** jest w .cursorignore - łączysz się z bazą przez settings.dev
+- **Ustawienia**: nc/settings/dev.py dla development
+- **Baza danych**: PostgreSQL z wieloma bazami danych
+- **Redis**: Używany dla Celery i cache
+
+## Struktura aplikacji Django
+- **matterhorn**: Główna aplikacja do zarządzania produktami
+- **matterhorn1**: Nowa wersja aplikacji z ulepszeniami
+- **MPD**: Aplikacja do eksportu XML
+- **web_agent**: Aplikacja do automatyzacji
+
+## Zasady kodowania
+- **Język**: Zawsze odpowiadaj po polsku
+- **Framework**: Django + PostgreSQL + Celery
+- **Nie pytaj o przygotowanie** - od razu wprowadzaj zmiany
+- **Nie usuwaj logiki** - jeśli nie ma wyraźnego polecenia
+- **Skupiaj się na naprawie** konkretnych błędów bez "ulepszania"
+
+## Bazy danych
+- **default**: Główna baza aplikacji
+- **matterhorn**: Dane produktów z API Matterhorn
+- **MPD**: Dane do eksportu XML
+- **zzz_web_agent**: Dane dla agenta web (prefiks zzz dla dev)
+- **matterhorn1**: Nowa wersja danych
+- **Wszystkie bazy dev mają prefiks zzz** (np. zzz_default, zzz_matterhorn, zzz_MPD)
+
+## Taski Celery
+- **Kolejki**: Wszystkie taski używają domyślnej kolejki
+- **Scheduler**: django-celery-beat z bazą danych
+- **Redis**: Broker i result backend
+
+## API i dokumentacja
+- **REST API**: Django REST Framework
+- **Dokumentacja**: drf-spectacular (Swagger/OpenAPI)
+- **Endpointy**: /api/ z różnymi tagami
+
+## Logowanie
+- **Pliki logów**: logs/matterhorn/import_all_by_one.log
+- **Rotacja**: 2MB max, 3 backup files
+- **Poziom**: INFO
+
+## Bezpieczeństwo
+- **CORS**: Skonfigurowany dla development
+- **CSRF**: Wyłączony dla API
+- **Debug**: Włączony w development
+- **Secret Key**: Django-insecure dla dev
+
+## Statyczne pliki
+- **WhiteNoise**: Kompresja i serwowanie
+- **Katalogi**: static/, staticfiles/
+- **Manifest**: CompressedManifestStaticFilesStorage
+
+## Docker i deployment
+- **Docker Compose**: docker-compose.dev.yml, docker-compose.yml
+- **Nginx**: nginx.conf
+- **Redis**: redis.conf
+- **Entrypoint**: docker-entrypoint.sh

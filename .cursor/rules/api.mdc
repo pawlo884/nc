@@ -1,0 +1,98 @@
+---
+description: Reguły dla API - REST Framework, dokumentacja, endpointy
+globs: ["**/serializers.py", "**/views.py", "**/urls.py", "**/api/*.py"]
+alwaysApply: true
+---
+
+# Reguły API
+
+## Django REST Framework
+- **ModelSerializer** zamiast Serializer gdy możliwe
+- **ViewSet** zamiast APIView gdy możliwe
+- **Router** dla automatycznych URL patterns
+- **Pagination** dla list views
+- **Filtering** i **search** dla list views
+- **Permission classes** dla autoryzacji
+- **Throttling** dla rate limiting
+
+## Dokumentacja API
+- **drf-spectacular** dla OpenAPI/Swagger
+- **@extend_schema** dla custom documentation
+- **Tags** dla grupowania endpointów
+- **Examples** dla request/response
+- **Descriptions** po polsku
+- **Versioning** dla API versions
+
+## Endpointy
+- **/api/** prefix dla wszystkich API
+- **Namespace** dla każdej aplikacji
+- **Versioning** w URL lub header
+- **Trailing slash** consistency
+- **HTTP methods** zgodne z REST
+- **Status codes** odpowiednie dla operacji
+
+## Serializers
+- **ModelSerializer** dla modeli Django
+- **fields** lub **exclude** zawsze określone
+- **read_only_fields** dla auto-generated
+- **write_only_fields** dla haseł
+- **validators** dla custom validation
+- **to_representation** dla custom output
+- **to_internal_value** dla custom input
+
+## Views i ViewSets
+- **GenericViewSet** dla CRUD operations
+- **ModelViewSet** dla pełnego CRUD
+- **ReadOnlyModelViewSet** dla read-only
+- **Custom actions** z @action decorator
+- **Permission classes** dla autoryzacji
+- **Filtering** z django-filter
+- **Search** z SearchFilter
+
+## Autoryzacja i bezpieczeństwo
+- **Authentication** z Token lub Session
+- **Permission classes** dla dostępu
+- **Throttling** dla rate limiting
+- **CORS** dla cross-origin requests
+- **CSRF** wyłączony dla API
+- **Input validation** w serializers
+
+## Filtrowanie i wyszukiwanie
+- **DjangoFilterBackend** dla filtrowania
+- **SearchFilter** dla wyszukiwania
+- **OrderingFilter** dla sortowania
+- **Custom filters** dla complex queries
+- **Query parameters** dla filtering
+- **Full-text search** dla PostgreSQL
+
+## Paginacja
+- **PageNumberPagination** dla standardowej
+- **LimitOffsetPagination** dla limit/offset
+- **CursorPagination** dla performance
+- **Custom pagination** gdy potrzebne
+- **Page size** konfigurowalny
+- **Max page size** dla protection
+
+## Error handling
+- **Exception handling** w views
+- **Custom exceptions** dla business logic
+- **Validation errors** w serializers
+- **HTTP status codes** odpowiednie
+- **Error messages** po polsku
+- **Logging** dla errors
+
+## Performance
+- **select_related** dla ForeignKey
+- **prefetch_related** dla ManyToManyField
+- **only()** i **defer()** dla fields
+- **Database routing** dla multi-database
+- **Caching** dla expensive operations
+- **Async operations** gdzie możliwe
+
+## Testing API
+- **APITestCase** dla API tests
+- **Client** dla HTTP requests
+- **Authentication** w tests
+- **Fixtures** dla test data
+- **Mock** dla external APIs
+- **Coverage** dla test coverage

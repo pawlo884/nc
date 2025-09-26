@@ -36,7 +36,7 @@ class Category(models.Model):
 
 class Product(models.Model):
     """Główny model produktu - tylko najważniejsze pola"""
-    product_id = models.IntegerField(unique=True, db_index=True)
+    product_uid = models.IntegerField(unique=True, db_index=True)
     active = models.BooleanField(default=True)
     name = models.CharField(max_length=500)
     description = models.TextField(blank=True)
@@ -57,8 +57,8 @@ class Product(models.Model):
     prices = models.JSONField(default=dict, blank=True)
 
     # Mapowanie do MPD
-    mapped_product_id = models.IntegerField(
-        null=True, blank=True, help_text="ID produktu w bazie MPD")
+    mapped_product_uid = models.IntegerField(
+        null=True, blank=True, help_text="UID produktu w bazie MPD")
     is_mapped = models.BooleanField(
         default=False, help_text="Czy produkt jest zmapowany do MPD")
     # Timestamps
@@ -71,19 +71,24 @@ class Product(models.Model):
         verbose_name = 'Produkt'
         verbose_name_plural = 'Produkty'
         indexes = [
-            models.Index(fields=['product_id']),
+            models.Index(fields=['product_uid']),
             models.Index(fields=['active']),
             models.Index(fields=['brand']),
             models.Index(fields=['category']),
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.product_id})"
+        return f"{self.name} ({self.product_uid})"
 
     @property
     def stock_total(self):
         """Oblicza całkowity stan magazynowy z wariantów"""
         return sum(variant.stock for variant in self.variants.all())
+
+    def get_absolute_url(self):
+        """Zwraca URL do szczegółów produktu w admin"""
+        from django.urls import reverse
+        return reverse('admin:matterhorn1_product_change', args=[self.pk])
 
 
 class ProductDetails(models.Model):
@@ -136,8 +141,8 @@ class ProductVariant(models.Model):
     ean = models.CharField(max_length=20, blank=True)
 
     # Mapowanie do MPD
-    mapped_variant_id = models.IntegerField(
-        null=True, blank=True, help_text="ID wariantu w bazie MPD")
+    mapped_variant_uid = models.IntegerField(
+        null=True, blank=True, help_text="UID wariantu w bazie MPD")
     is_mapped = models.BooleanField(
         null=True, blank=True, help_text="Czy wariant jest zmapowany do MPD")
 
@@ -153,7 +158,7 @@ class ProductVariant(models.Model):
             models.Index(fields=['product']),
             models.Index(fields=['ean']),
             models.Index(fields=['is_mapped']),
-            models.Index(fields=['mapped_variant_id']),
+            models.Index(fields=['mapped_variant_uid']),
         ]
 
     def __str__(self):
@@ -184,3 +189,131 @@ class ApiSyncLog(models.Model):
 
     def __str__(self):
         return f"{self.sync_type} - {self.status} ({self.started_at})"
+
+
+# Saga Pattern Models
+class SagaStatus(models.TextChoices):
+    """Statusy Saga"""
+    PENDING = "pending", "Pending"
+    RUNNING = "running", "Running"
+    COMPLETED = "completed", "Completed"
+    FAILED = "failed", "Failed"
+    COMPENSATING = "compensating", "Compensating"
+    COMPENSATED = "compensated", "Compensated"
+
+
+class Saga(models.Model):
+    """Model do logowania Saga operations"""
+
+    saga_id = models.CharField(max_length=100, unique=True, db_index=True)
+    # np. 'product_creation', 'variant_creation'
+    saga_type = models.CharField(max_length=100)
+    status = models.CharField(
+        max_length=20, choices=SagaStatus.choices, default=SagaStatus.PENDING)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    # Metadata
+    input_data = models.JSONField(default=dict, blank=True)
+    output_data = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True, null=True)
+
+    # Stats
+    total_steps = models.IntegerField(default=0)
+    completed_steps = models.IntegerField(default=0)
+    failed_step = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        db_table = 'saga_logs'
+        ordering = ['-created_at']
+        verbose_name = 'Saga Log'
+        verbose_name_plural = 'Saga Logs'
+        app_label = 'matterhorn1'
+
+    def __str__(self):
+        return f"Saga {self.saga_id} ({self.saga_type}) - {self.status}"
+
+
+class SagaStep(models.Model):
+    """Model do logowania poszczególnych kroków Saga"""
+
+    saga = models.ForeignKey(
+        Saga, on_delete=models.CASCADE, related_name='steps')
+    step_name = models.CharField(max_length=100)
+    step_order = models.IntegerField()
+
+    # Status i timestamps
+    status = models.CharField(
+        max_length=20, choices=SagaStatus.choices, default=SagaStatus.PENDING)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    compensated_at = models.DateTimeField(null=True, blank=True)
+
+    # Data
+    input_data = models.JSONField(default=dict, blank=True)
+    output_data = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True, null=True)
+
+    # Compensation
+    compensation_attempted = models.BooleanField(default=False)
+    compensation_successful = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'saga_steps'
+        ordering = ['saga', 'step_order']
+        unique_together = ['saga', 'step_order']
+        verbose_name = 'Saga Step'
+        verbose_name_plural = 'Saga Steps'
+        app_label = 'matterhorn1'
+
+    def __str__(self):
+        return f"{self.saga.saga_id} - Step {self.step_order}: {self.step_name} ({self.status})"
+
+
+class StockHistory(models.Model):
+    """Model do śledzenia historii zmian stanów magazynowych"""
+    id = models.AutoField(primary_key=True)
+    variant_uid = models.CharField(max_length=50, db_index=True)
+    product_uid = models.IntegerField(
+        db_index=True, help_text="ID produktu z API Matterhorn")
+    product_name = models.CharField(max_length=500, blank=True, null=True)
+    variant_name = models.CharField(max_length=50, blank=True, null=True)
+    old_stock = models.PositiveIntegerField(blank=True, null=True)
+    new_stock = models.PositiveIntegerField(blank=True, null=True)
+    stock_change = models.IntegerField(
+        blank=True, null=True)  # new_stock - old_stock
+    # 'increase', 'decrease', 'no_change'
+    change_type = models.CharField(max_length=20, blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'stock_history'
+        verbose_name = 'Historia stanów magazynowych'
+        verbose_name_plural = 'Historia stanów magazynowych'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['variant_uid'], name='mh1_sh_variant_idx'),
+            models.Index(fields=['product_uid'], name='mh1_sh_product_idx'),
+            models.Index(fields=['timestamp'], name='mh1_sh_timestamp_idx'),
+            models.Index(fields=['change_type'], name='mh1_sh_change_idx'),
+            models.Index(fields=['product_uid', 'timestamp'],
+                         name='mh1_sh_prod_time_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.product_name} - {self.variant_name}: {self.old_stock} → {self.new_stock} ({self.timestamp})"
+
+    def get_product_url(self):
+        """Zwraca URL do produktu w admin na podstawie product_uid"""
+        from django.urls import reverse
+        try:
+            # Znajdź produkt po product_uid
+            from .models import Product
+            product = Product.objects.using('matterhorn1').get(
+                product_uid=self.product_uid)
+            return reverse('admin:matterhorn1_product_change', args=[product.pk])
+        except Product.DoesNotExist:
+            return None

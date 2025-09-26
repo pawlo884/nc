@@ -3,6 +3,7 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.cache import cache
+from .stock_tracker import track_stock_change, track_bulk_stock_changes, sync_stock_changes_from_api
 
 logger = get_task_logger(__name__)
 
@@ -646,14 +647,14 @@ def _bulk_import_products(items):
             if item.get("creation_date") is None:
                 continue
 
-            product_id = item.get('id')
-            if not product_id:
+            product_uid = item.get('id')
+            if not product_uid:
                 continue
 
             # Sprawdź czy produkt istnieje - użyj get_or_create dla bezpieczeństwa
             try:
                 existing_product = Product.objects.using(
-                    'matterhorn1').get(product_id=int(product_id))
+                    'matterhorn1').get(product_uid=int(product_uid))
                 # Aktualizuj istniejący
                 _prepare_product_update(existing_product, item)
                 products_to_update.append(existing_product)
@@ -669,13 +670,13 @@ def _bulk_import_products(items):
             # Utwórz nowe produkty
             if products_to_create:
                 # Sprawdź które produkty już istnieją
-                existing_product_ids = set(Product.objects.using('matterhorn1').filter(
-                    product_id__in=[p.product_id for p in products_to_create]
-                ).values_list('product_id', flat=True))
+                existing_product_uids = set(Product.objects.using('matterhorn1').filter(
+                    product_uid__in=[p.product_uid for p in products_to_create]
+                ).values_list('product_uid', flat=True))
 
                 # Filtruj tylko nowe produkty
                 new_products = [
-                    p for p in products_to_create if p.product_id not in existing_product_ids]
+                    p for p in products_to_create if p.product_uid not in existing_product_uids]
 
                 if new_products:
                     Product.objects.using('matterhorn1').bulk_create(
@@ -684,9 +685,10 @@ def _bulk_import_products(items):
                         f"✅ Utworzono {len(new_products)} nowych produktów")
 
                     # Pobierz utworzone produkty z bazy (z id)
-                    created_product_ids = [p.product_id for p in new_products]
+                    created_product_uids = [
+                        p.product_uid for p in new_products]
                     created_products = list(Product.objects.using('matterhorn1').filter(
-                        product_id__in=created_product_ids))
+                        product_uid__in=created_product_uids))
 
                     # Użyj oryginalnych obiektów (z atrybutami) do tworzenia powiązanych obiektów
                     _create_related_objects_for_products(new_products)
@@ -904,7 +906,7 @@ def _prepare_product_create(item):
     )
 
     product = Product(
-        product_id=int(item.get('id')),
+        product_uid=int(item.get('id')),
         active=active_value,
         name=item.get('name', ''),
         description=item.get('description', ''),
@@ -1154,23 +1156,58 @@ def _bulk_update_inventory(inventory_data):
         from matterhorn1.models import Product, ProductVariant
         from django.db import transaction
 
+        # Sprawdź czy dane są dostępne
+        if not inventory_data:
+            logger.warning("Brak danych inventory do aktualizacji")
+            return 0
+
+        # Debug: sprawdź typ i zawartość
+        logger.info(
+            f"INVENTORY DEBUG: typ danych: {type(inventory_data)}, długość: {len(inventory_data) if hasattr(inventory_data, '__len__') else 'N/A'}")
+
         updated_count = 0
         variants_to_update = []
 
         # Przygotuj dane do bulk update
-        for item in inventory_data:
-            product_id = item.get('id')
-            if not product_id:
+        for i, item in enumerate(inventory_data):
+            logger.info(
+                f"INVENTORY DEBUG: item {i}: typ={type(item)}, wartość={item}")
+
+            if item is None:
+                logger.warning(f"Pominięto None item na pozycji {i}")
+                continue
+            if not isinstance(item, dict):
+                continue
+
+            product_uid = item.get('id')
+            if not product_uid:
                 continue
 
             # Znajdź produkt
             try:
                 product = Product.objects.using(
-                    'matterhorn1').get(product_id=int(product_id))
+                    'matterhorn1').get(product_uid=int(product_uid))
 
                 # Aktualizuj warianty (w INVENTORY API dane są w 'inventory')
                 variants_data = item.get('inventory', [])
-                for variant_data in variants_data:
+                logger.info(
+                    f"INVENTORY DEBUG: variants_data dla produktu {product_uid}: typ={type(variants_data)}, wartość={variants_data}")
+
+                if not variants_data:
+                    logger.info(f"Brak wariantów dla produktu {product_uid}")
+                    continue
+
+                for j, variant_data in enumerate(variants_data):
+                    logger.info(
+                        f"INVENTORY DEBUG: variant {j} dla produktu {product_uid}: typ={type(variant_data)}, wartość={variant_data}")
+
+                    if variant_data is None:
+                        logger.warning(
+                            f"Pominięto None variant {j} dla produktu {product_uid}")
+                        continue
+                    if not isinstance(variant_data, dict):
+                        continue
+
                     variant_uid = variant_data.get('variant_uid')
                     if not variant_uid:
                         continue
@@ -1186,6 +1223,16 @@ def _bulk_update_inventory(inventory_data):
                         new_stock = int(variant_data.get('stock', 0)) if variant_data.get(
                             'stock', '0').isdigit() else 0
                         if variant.stock != new_stock:
+                            # Śledź zmianę stanu przed aktualizacją
+                            track_stock_change(
+                                variant_uid=variant.variant_uid,
+                                product_uid=variant.product.product_uid,
+                                old_stock=variant.stock,
+                                new_stock=new_stock,
+                                product_name=variant.product.name,
+                                variant_name=variant.name
+                            )
+
                             variant.stock = new_stock
                             variants_to_update.append(variant)
 
@@ -1414,3 +1461,140 @@ def _cleanup_all_running_imports():
             else:
                 logger.error(
                     "❌ Osiągnięto maksymalną liczbę prób sprawdzania running rekordów")
+
+
+@shared_task(bind=True, name='matterhorn1.tasks.track_stock_changes', queue='default')
+def track_stock_changes(self, variant_uid, product_uid, old_stock, new_stock, product_name=None, variant_name=None):
+    """
+    Celery task do śledzenia zmian stanów magazynowych
+
+    Args:
+        variant_uid: ID wariantu
+        product_uid: ID produktu
+        old_stock: Poprzedni stan magazynowy
+        new_stock: Nowy stan magazynowy
+        product_name: Nazwa produktu (opcjonalne)
+        variant_name: Nazwa wariantu (opcjonalne)
+    """
+    try:
+        logger.info(
+            f"📊 Śledzenie zmiany stanu: {product_name} - {variant_name}: {old_stock} → {new_stock}")
+
+        stock_history = track_stock_change(
+            variant_uid=variant_uid,
+            product_uid=product_uid,
+            old_stock=old_stock,
+            new_stock=new_stock,
+            product_name=product_name,
+            variant_name=variant_name
+        )
+
+        if stock_history:
+            logger.info(
+                f"✅ Zapisano zmianę stanu w StockHistory (ID: {stock_history.id})")
+            return {
+                'status': 'success',
+                'stock_history_id': stock_history.id,
+                'variant_uid': variant_uid,
+                'product_uid': product_uid,
+                'stock_change': new_stock - old_stock
+            }
+        else:
+            logger.error(
+                f"❌ Nie udało się zapisać zmiany stanu dla wariantu {variant_uid}")
+            return {
+                'status': 'error',
+                'error': 'Failed to save stock change'
+            }
+
+    except Exception as e:
+        logger.error(f"❌ Błąd podczas śledzenia zmiany stanu: {e}")
+        return {
+            'status': 'error',
+            'error': str(e)
+        }
+
+
+@shared_task(bind=True, name='matterhorn1.tasks.track_bulk_stock_changes', queue='default')
+def track_bulk_stock_changes_task(self, changes_data):
+    """
+    Celery task do śledzenia masowych zmian stanów magazynowych
+
+    Args:
+        changes_data: Lista słowników z danymi zmian
+    """
+    try:
+        logger.info(
+            f"📊 Śledzenie masowych zmian stanów: {len(changes_data)} zmian")
+
+        created_records = track_bulk_stock_changes(changes_data)
+
+        logger.info(
+            f"✅ Zapisano {len(created_records)} zmian stanów w StockHistory")
+        return {
+            'status': 'success',
+            'created_count': len(created_records),
+            'changes_data': changes_data
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Błąd podczas śledzenia masowych zmian stanów: {e}")
+        return {
+            'status': 'error',
+            'error': str(e)
+        }
+
+
+@shared_task(bind=True, name='matterhorn1.tasks.sync_stock_changes_from_api', queue='default')
+def sync_stock_changes_from_api_task(self):
+    """
+    Celery task do synchronizacji zmian stanów z API i śledzenia ich w StockHistory
+    """
+    try:
+        logger.info("🔄 Rozpoczynam synchronizację stanów z API")
+
+        changes_count = sync_stock_changes_from_api()
+
+        logger.info(f"✅ Zsynchronizowano {changes_count} zmian stanów z API")
+        return {
+            'status': 'success',
+            'changes_count': changes_count
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Błąd podczas synchronizacji stanów z API: {e}")
+        return {
+            'status': 'error',
+            'error': str(e)
+        }
+
+
+@shared_task(bind=True, name='matterhorn1.tasks.clean_old_stock_history', queue='default')
+def clean_old_stock_history_task(self, days_to_keep=90):
+    """
+    Celery task do czyszczenia starych rekordów z historii stanów magazynowych
+
+    Args:
+        days_to_keep: Liczba dni do zachowania
+    """
+    try:
+        from .stock_tracker import clean_old_stock_history
+
+        logger.info(
+            f"🧹 Rozpoczynam czyszczenie historii stanów starszej niż {days_to_keep} dni")
+
+        result = clean_old_stock_history(days_to_keep)
+
+        logger.info(f"✅ {result}")
+        return {
+            'status': 'success',
+            'message': result,
+            'days_to_keep': days_to_keep
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Błąd podczas czyszczenia historii stanów: {e}")
+        return {
+            'status': 'error',
+            'error': str(e)
+        }

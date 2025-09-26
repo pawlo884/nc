@@ -658,7 +658,7 @@ function BulkMapping({ mappings, onComplete }) {
                 fontSize: '0.9em',
                 marginTop: '5px'
               }
-            }, `ID: ${mapping.product.product_id} | Marka: ${mapping.product.brand?.name || 'Brak'} | Kategoria: ${mapping.product.category?.name || 'Brak'}`)
+            }, `ID: ${mapping.product.product_uid} | Marka: ${mapping.product.brand?.name || 'Brak'} | Kategoria: ${mapping.product.category?.name || 'Brak'}`)
           ])
         ]),
         

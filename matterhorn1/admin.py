@@ -5,14 +5,17 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.shortcuts import render
 from django.urls import path
+from django.utils.html import format_html
 import json
 import logging
 import requests
 from rapidfuzz import fuzz
 from .models import (
     Brand, Category, Product, ProductDetails, ProductImage,
-    ProductVariant, ApiSyncLog
+    ProductVariant, ApiSyncLog, Saga, SagaStep, StockHistory
 )
+from .transaction_logger import logged_transaction, DatabaseOperationTracker
+from .database_utils import DatabaseUtils, SafeCrossDatabaseOperations
 
 logger = logging.getLogger(__name__)
 
@@ -72,26 +75,27 @@ class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 0
     fields = ['variant_uid', 'name', 'stock', 'ean',
-              'max_processing_time', 'is_mapped', 'mapped_variant_id']
-    readonly_fields = ['variant_uid', 'mapped_variant_id']
+              'max_processing_time', 'is_mapped', 'mapped_variant_uid']
+    readonly_fields = ['variant_uid', 'mapped_variant_uid']
 
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = [
-        'product_id', 'name', 'brand', 'category', 'active',
-        'stock_total', 'is_mapped', 'mapped_product_id', 'created_at', 'updated_at'
+        'product_uid', 'name', 'brand', 'category', 'active',
+        'stock_total', 'is_mapped', 'mapped_product_uid', 'created_at', 'updated_at'
     ]
+    list_display_links = ['product_uid', 'name']
     list_filter = [
         'brand', 'category', 'active', 'is_mapped', 'created_at', 'updated_at'
     ]
     search_fields = [
-        'product_id', 'name', 'description', 'brand__name', 'category__name'
+        'product_uid', 'name', 'description', 'brand__name', 'category__name'
     ]
     readonly_fields = [
-        'product_id', 'mapped_product_id', 'created_at', 'updated_at', 'stock_total'
+        'product_uid', 'mapped_product_uid', 'created_at', 'updated_at', 'stock_total'
     ]
-    ordering = ['-product_id']
+    ordering = ['-product_uid']
     inlines = [ProductDetailsInline, ProductImageInline, ProductVariantInline]
     actions = ('bulk_map_to_mpd_action',
                'bulk_create_mpd_action', 'sync_with_mpd_action')
@@ -99,7 +103,7 @@ class ProductAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Podstawowe informacje', {
             'fields': (
-                'product_id', 'name', 'description', 'brand', 'category'
+                'product_uid', 'name', 'description', 'brand', 'category'
             )
         }),
         ('Ceny i dostępność', {
@@ -112,7 +116,7 @@ class ProductAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Mapowanie MPD', {
-            'fields': ('mapped_product_id',),
+            'fields': ('mapped_product_uid',),
             'classes': ('collapse',)
         }),
         ('Metadane', {
@@ -167,7 +171,7 @@ class ProductAdmin(admin.ModelAdmin):
 
         try:
             product = Product.objects.get(id=object_id)
-            is_mapped = bool(product.mapped_product_id)
+            is_mapped = bool(product.mapped_product_uid)
 
             # Pobierz dane MPD jeśli produkt jest zmapowany
             mpd_data = {}
@@ -190,7 +194,7 @@ class ProductAdmin(admin.ModelAdmin):
                         FROM products p 
                         LEFT JOIN brands b ON p.brand_id = b.id 
                         WHERE p.id = %s
-                    """, [product.mapped_product_id])
+                    """, [product.mapped_product_uid])
                     result = cursor.fetchone()
                     if result:
                         mpd_data = {
@@ -219,7 +223,7 @@ class ProductAdmin(admin.ModelAdmin):
                         LEFT JOIN colors c ON pv.producer_color_id = c.id
                         WHERE pv.product_id = %s
                         LIMIT 1
-                    """, [product.mapped_product_id])
+                    """, [product.mapped_product_uid])
                     result = cursor.fetchone()
                     if result:
                         producer_color_name = result[0] or ''
@@ -248,12 +252,12 @@ class ProductAdmin(admin.ModelAdmin):
                 # Pobierz przypisane ścieżki (tylko dla zmapowanych produktów)
                 if is_mapped:
                     cursor.execute("SELECT path_id FROM product_path WHERE product_id = %s", [
-                                   product.mapped_product_id])
+                                   product.mapped_product_uid])
                     selected_paths = [row[0] for row in cursor.fetchall()]
 
                     # Pobierz przypisane atrybuty
                     cursor.execute("SELECT attribute_id FROM product_attributes WHERE product_id = %s", [
-                                   product.mapped_product_id])
+                                   product.mapped_product_uid])
                     selected_attributes = [row[0] for row in cursor.fetchall()]
                 else:
                     selected_paths = []
@@ -457,21 +461,28 @@ class ProductAdmin(admin.ModelAdmin):
                                 error_msg += f". Błędy: {', '.join(errors)}"
                             return JsonResponse({'success': False, 'error': error_msg})
 
-                        # Zaktualizuj mapped_product_id w matterhorn1
-                        product = Product.objects.get(id=product_id)
-                        product.mapped_product_id = mpd_product_id
-                        product.is_mapped = True
-                        product.save()
+                        # Użyj Saga Pattern do bezpiecznej operacji między bazami
+                        from matterhorn1.saga import SagaService
 
-                        # Dodaj atrybuty jeśli podano
-                        mpd_attributes = request.POST.getlist('mpd_attributes')
-                        if mpd_attributes:
-                            with connections['MPD'].cursor() as cursor:
-                                for attribute_id in mpd_attributes:
-                                    cursor.execute(
-                                        "INSERT INTO product_attributes (product_id, attribute_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                                        [mpd_product_id, attribute_id]
-                                    )
+                        # Przygotuj dane dla Saga
+                        matterhorn_data = {
+                            'product_id': product_id,
+                            'mpd_product_id': mpd_product_id
+                        }
+
+                        mpd_data = {
+                            'mpd_product_id': mpd_product_id,
+                            'attributes': request.POST.getlist('mpd_attributes')
+                        }
+
+                        # Wykonaj operację używając Saga Pattern
+                        saga_result = SagaService.create_product_with_mapping(
+                            matterhorn_data, mpd_data)
+
+                        if saga_result.status.value != 'completed':
+                            error_msg = f"Saga failed: {saga_result.error}"
+                            logger.error(error_msg)
+                            return JsonResponse({'success': False, 'error': error_msg})
 
                         # Dodaj warianty jeśli podano size_category
                         variant_info = None
@@ -497,7 +508,6 @@ class ProductAdmin(admin.ModelAdmin):
                                             row = cursor.fetchone()
                                             if row:
                                                 producer_color_id_to_use = row[0]
-                                                connections['MPD'].commit()
                                                 logger.info(
                                                     f"Utworzono nowy kolor producenta: {producer_color_name} (ID: {producer_color_id_to_use})")
                                 except Exception as e:
@@ -544,7 +554,7 @@ class ProductAdmin(admin.ModelAdmin):
         if request.method == 'POST':
             try:
                 product = Product.objects.get(id=product_id)
-                if not product.mapped_product_id:
+                if not product.mapped_product_uid:
                     return JsonResponse({'success': False, 'error': 'Produkt nie jest zmapowany'})
 
                 # Dodawanie ścieżek
@@ -554,7 +564,7 @@ class ProductAdmin(admin.ModelAdmin):
                         for path_id in mpd_paths:
                             cursor.execute(
                                 "INSERT INTO product_path (product_id, path_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                                [product.mapped_product_id, path_id]
+                                [product.mapped_product_uid, path_id]
                             )
                     return JsonResponse({'success': True, 'message': 'Dodano ścieżki.'})
 
@@ -564,7 +574,7 @@ class ProductAdmin(admin.ModelAdmin):
                     with connections['MPD'].cursor() as cursor:
                         cursor.execute(
                             "DELETE FROM product_path WHERE product_id = %s AND path_id = %s",
-                            [product.mapped_product_id, remove_path_id]
+                            [product.mapped_product_uid, remove_path_id]
                         )
                     return JsonResponse({'success': True, 'message': 'Usunięto ścieżkę.'})
 
@@ -575,7 +585,7 @@ class ProductAdmin(admin.ModelAdmin):
                         for attribute_id in mpd_attributes:
                             cursor.execute(
                                 "INSERT INTO product_attributes (product_id, attribute_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                                [product.mapped_product_id, attribute_id]
+                                [product.mapped_product_uid, attribute_id]
                             )
                     return JsonResponse({'success': True, 'message': 'Dodano atrybuty.'})
 
@@ -585,7 +595,7 @@ class ProductAdmin(admin.ModelAdmin):
                     with connections['MPD'].cursor() as cursor:
                         cursor.execute(
                             "DELETE FROM product_attributes WHERE product_id = %s AND attribute_id = %s",
-                            [product.mapped_product_id, remove_attribute_id]
+                            [product.mapped_product_uid, remove_attribute_id]
                         )
                     return JsonResponse({'success': True, 'message': 'Usunięto atrybut.'})
 
@@ -637,10 +647,9 @@ class ProductAdmin(admin.ModelAdmin):
                             UPDATE product_variants 
                             SET producer_color_id = %s, updated_at = NOW() 
                             WHERE product_id = %s AND color_id = %s
-                        """, [producer_color_id, product.mapped_product_id, color_id])
+                        """, [producer_color_id, product.mapped_product_uid, color_id])
 
                         updated_count = cursor.rowcount
-                        connections['MPD'].commit()
 
                     return JsonResponse({'success': True, 'message': f'Zaktualizowano kolor producenta dla {updated_count} wariantów.'})
 
@@ -659,7 +668,7 @@ class ProductAdmin(admin.ModelAdmin):
                 # Zaktualizuj mapped_product_id
                 with connections['default'].cursor() as cursor:
                     cursor.execute(
-                        "UPDATE product SET mapped_product_id = %s WHERE id = %s",
+                        "UPDATE product SET mapped_product_uid = %s WHERE id = %s",
                         [mpd_product_id, product_id]
                     )
 
@@ -685,14 +694,14 @@ class ProductAdmin(admin.ModelAdmin):
                 value = data.get('value')
 
                 product = Product.objects.get(id=product_id)
-                if not product.mapped_product_id:
+                if not product.mapped_product_uid:
                     return JsonResponse({'success': False, 'error': 'Produkt nie jest zmapowany'})
 
                 # Przygotuj dane do aktualizacji
                 update_data = {field_name: value}
 
                 # Wyślij żądanie do API MPD
-                mpd_api_url = f"{settings.MPD_API_URL}/products/{product.mapped_product_id}/update/"
+                mpd_api_url = f"{settings.MPD_API_URL}/products/{product.mapped_product_uid}/update/"
                 response = requests.patch(
                     mpd_api_url, json=update_data, timeout=30)
 
@@ -769,7 +778,7 @@ class ProductAdmin(admin.ModelAdmin):
             products_data = []
             for product in queryset.filter(is_mapped=False):
                 products_data.append({
-                    'matterhorn_product_id': product.product_id,
+                    'matterhorn_product_id': product.product_uid,
                     'name': product.name,
                     'description': product.description,
                     'brand_name': product.brand.name if product.brand else '',
@@ -821,7 +830,7 @@ class ProductAdmin(admin.ModelAdmin):
 
                             # Zaktualizuj mapowanie
                             product = Product.objects.get(id=product_id)
-                            product.mapped_product_id = mpd_product_id
+                            product.mapped_product_uid = mpd_product_id
                             product.is_mapped = True
                             product.save()
 
@@ -866,13 +875,13 @@ class ProductAdmin(admin.ModelAdmin):
                 if response.status_code == 200:
                     result = response.json()
                     if result.get('status') == 'success':
-                        # Zaktualizuj mapped_product_id w matterhorn1
+                        # Zaktualizuj mapped_product_uid w matterhorn1
                         for created_product in result.get('created_products', []):
                             try:
                                 product = Product.objects.get(
                                     product_id=created_product['matterhorn_product_id']
                                 )
-                                product.mapped_product_id = created_product['mpd_product_id']
+                                product.mapped_product_uid = created_product['mpd_product_id']
                                 product.is_mapped = True
                                 product.save()
                                 created_products.append(created_product)
@@ -916,14 +925,14 @@ class ProductAdmin(admin.ModelAdmin):
                         # Upload do bucketa
                         bucket_url = self._upload_image_to_bucket(
                             image_url=image.image_url,
-                            product_id=product.mapped_product_id,
+                            product_id=product.mapped_product_uid,
                             color_name=product.color,
                             image_number=i
                         )
                         if bucket_url:
                             # Zapisz do MPD
                             self._save_image_to_mpd(
-                                product.mapped_product_id, bucket_url)
+                                product.mapped_product_uid, bucket_url)
                             uploaded_images.append({
                                 'original_url': image.image_url,
                                 'uploaded_url': bucket_url,
@@ -956,7 +965,7 @@ class ProductAdmin(admin.ModelAdmin):
                     })
 
                 mapped_variants = self._auto_map_variants(
-                    product, product.mapped_product_id)
+                    product, product.mapped_product_uid)
 
                 return JsonResponse({
                     'success': True,
@@ -985,7 +994,7 @@ class ProductAdmin(admin.ModelAdmin):
 
                 # Pobierz aktualne dane z MPD
                 mpd_data = self._get_mpd_product_data(
-                    product.mapped_product_id)
+                    product.mapped_product_uid)
                 if mpd_data:
                     # Zaktualizuj dane w matterhorn1
                     product.name = mpd_data.get('name', product.name)
@@ -1047,7 +1056,7 @@ class ProductAdmin(admin.ModelAdmin):
                 'size_name': variant.name,
                 'stock': variant.stock,
                 'ean': variant.ean,
-                'producer_code': f"{product.product_id}_{variant.name}"
+                'producer_code': f"{product.product_uid}_{variant.name}"
             })
         return variants
 
@@ -1069,7 +1078,7 @@ class ProductAdmin(admin.ModelAdmin):
                     INSERT INTO product_variants (product_id, size_id, color_id, producer_code)
                     VALUES (%s, %s, %s, %s)
                     RETURNING variant_id
-                """, [mpd_product_id, size_id, color_id, f"{product.product_id}_{variant.name}"])
+                """, [mpd_product_id, size_id, color_id, f"{product.product_uid}_{variant.name}"])
 
                 variant_id = cursor.fetchone()[0]
                 mapped_variants.append(variant_id)
@@ -1148,7 +1157,7 @@ class ProductAdmin(admin.ModelAdmin):
     def _sync_product_with_mpd(self, product):
         """Synchronizuj pojedynczy produkt z MPD"""
         try:
-            mpd_data = self._get_mpd_product_data(product.mapped_product_id)
+            mpd_data = self._get_mpd_product_data(product.mapped_product_uid)
             if mpd_data:
                 product.name = mpd_data.get('name', product.name)
                 product.description = mpd_data.get(
@@ -1162,22 +1171,40 @@ class ProductAdmin(admin.ModelAdmin):
     def add_new_variants_to_mpd(self, product_id, mapped_product_id, size_category, producer_color_id=None, producer_code=None):
         """Dodaje nowe warianty do MPD z filtrowaniem według kategorii rozmiarów"""
         variant_logger = logging.getLogger('matterhorn1.variants')
-        variant_logger.info(
-            f"[add_new_variants_to_mpd] START: product_id={product_id}, mapped_product_id={mapped_product_id}, size_category={size_category}, producer_color_id={producer_color_id}, producer_code={producer_code}")
 
-        missing_sizes = []
-        missing_colors = False
-        added_variants = 0
-        skipped_existing = 0
-        total_variants = 0
+        # Użyj nowego systemu logowania transakcji
+        with logged_transaction("add_new_variants_to_mpd", "matterhorn1.variants") as tx_logger:
+            tx_logger.log_cross_database_operation(
+                "matterhorn1", "MPD",
+                "add_variants",
+                {
+                    'product_id': product_id,
+                    'mapped_product_id': mapped_product_id,
+                    'size_category': size_category,
+                    'producer_color_id': producer_color_id,
+                    'producer_code': producer_code
+                }
+            )
 
-        try:
-            with connections['matterhorn1'].cursor() as matterhorn_cursor, connections['MPD'].cursor() as mpd_cursor:
-                # Pobierz kolor i cenę produktu z matterhorn1
-                matterhorn_cursor.execute("""
-                    SELECT color, prices FROM product WHERE id = %s
-                """, [product_id])
-                color_result = matterhorn_cursor.fetchone()
+            variant_logger.info(
+                "[add_new_variants_to_mpd] START: product_id=%s, mapped_product_id=%s, size_category=%s, producer_color_id=%s, producer_code=%s",
+                product_id, mapped_product_id, size_category, producer_color_id, producer_code)
+
+            missing_sizes = []
+            missing_colors = False
+            added_variants = 0
+            skipped_existing = 0
+            total_variants = 0
+
+            try:
+                with connections['matterhorn1'].cursor() as matterhorn_cursor, connections['MPD'].cursor() as mpd_cursor:
+                    # Pobierz kolor i cenę produktu z matterhorn1
+                    tx_logger.log_operation("SELECT", "matterhorn1", "product", "get_product_color_price", {
+                                            "product_id": product_id})
+                    matterhorn_cursor.execute("""
+                        SELECT color, prices FROM product WHERE id = %s
+                    """, [product_id])
+                    color_result = matterhorn_cursor.fetchone()
                 if not color_result:
                     variant_logger.error(
                         f"[add_new_variants_to_mpd] Brak koloru dla produktu {product_id}")
@@ -1372,23 +1399,18 @@ class ProductAdmin(admin.ModelAdmin):
                     variant_logger.info(
                         f"[add_new_variants_to_mpd] Pomyślnie dodano wariant {variant_uid}")
 
-                # Zatwierdź transakcje
-                connections['MPD'].commit()
-                connections['matterhorn1'].commit()
+                # Transakcje zostaną automatycznie zatwierdzone przez Django ORM
                 variant_logger.info(
-                    f"[add_new_variants_to_mpd] Zatwierdzono transakcje MPD i matterhorn1")
+                    "[add_new_variants_to_mpd] Wszystkie operacje zakończone pomyślnie")
 
-        except Exception as e:
-            variant_logger.error(f"[add_new_variants_to_mpd] Błąd ogólny: {e}")
-            connections['MPD'].rollback()
-            connections['matterhorn1'].rollback()
-            return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': True, 'total': 0}
+            except Exception as e:
+                variant_logger.error(
+                    f"[add_new_variants_to_mpd] Błąd ogólny: {e}")
+                connections['MPD'].rollback()
+                connections['matterhorn1'].rollback()
+                return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': True, 'total': 0}
 
-        finally:
-            variant_logger.info(
-                f"[add_new_variants_to_mpd] END: product_id={product_id}, mapped_product_id={mapped_product_id}, size_category={size_category}, producer_color_id={producer_color_id}, producer_code={producer_code}")
-
-        return {'added': added_variants, 'skipped_existing': skipped_existing, 'missing_sizes': missing_sizes, 'missing_color': missing_colors, 'total': total_variants, 'iai_product_id': None}
+            return {'added': added_variants, 'skipped_existing': skipped_existing, 'missing_sizes': missing_sizes, 'missing_color': missing_colors, 'total': total_variants, 'iai_product_id': None}
 
     def add_variants(self, request, product_id):
         """Dodaje warianty do istniejącego produktu w MPD"""
@@ -1405,15 +1427,15 @@ class ProductAdmin(admin.ModelAdmin):
 
             # Pobierz produkt
             product = Product.objects.get(id=product_id)
-            if not product.is_mapped or not product.mapped_product_id:
+            if not product.is_mapped or not product.mapped_product_uid:
                 return JsonResponse({'success': False, 'error': 'Produkt nie jest zmapowany do MPD'})
 
             logger.info("Dodawanie wariantów dla produktu %s (MPD ID: %s) z kategorią: %s",
-                        product_id, product.mapped_product_id, size_category)
+                        product_id, product.mapped_product_uid, size_category)
 
             # Wywołaj add_new_variants_to_mpd
             variant_info = self.add_new_variants_to_mpd(
-                product_id, product.mapped_product_id, size_category,
+                product_id, product.mapped_product_uid, size_category,
                 producer_color_id, producer_code
             )
 
@@ -1441,7 +1463,7 @@ class ProductAdmin(admin.ModelAdmin):
 class ProductDetailsAdmin(admin.ModelAdmin):
     list_display = ['product', 'weight', 'has_size_table', 'created_at']
     list_filter = ['created_at', 'updated_at']
-    search_fields = ['product__name', 'product__product_id']
+    search_fields = ['product__name', 'product__product_uid']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-created_at']
 
@@ -1473,7 +1495,7 @@ class ProductDetailsAdmin(admin.ModelAdmin):
 class ProductImageAdmin(admin.ModelAdmin):
     list_display = ['product', 'image_url', 'order', 'created_at']
     list_filter = ['created_at']
-    search_fields = ['product__name', 'product__product_id', 'image_url']
+    search_fields = ['product__name', 'product__product_uid', 'image_url']
     readonly_fields = ['created_at']
     ordering = ['-created_at']
 
@@ -1495,15 +1517,15 @@ class ProductImageAdmin(admin.ModelAdmin):
 class ProductVariantAdmin(admin.ModelAdmin):
     list_display = [
         'variant_uid', 'product', 'name', 'stock', 'ean',
-        'max_processing_time', 'is_mapped', 'mapped_variant_id', 'created_at'
+        'max_processing_time', 'is_mapped', 'mapped_variant_uid', 'created_at'
     ]
     list_filter = ['created_at', 'updated_at',
                    'max_processing_time', 'is_mapped']
     search_fields = [
-        'variant_uid', 'name', 'ean', 'product__name', 'product__product_id'
+        'variant_uid', 'name', 'ean', 'product__name', 'product__product_uid'
     ]
     readonly_fields = ['variant_uid',
-                       'mapped_variant_id', 'created_at', 'updated_at']
+                       'mapped_variant_uid', 'created_at', 'updated_at']
     ordering = ['-created_at']
 
     fieldsets = (
@@ -1517,7 +1539,7 @@ class ProductVariantAdmin(admin.ModelAdmin):
             'fields': ('max_processing_time',)
         }),
         ('Mapowanie do MPD', {
-            'fields': ('is_mapped', 'mapped_variant_id'),
+            'fields': ('is_mapped', 'mapped_variant_uid'),
             'classes': ('collapse',)
         }),
         ('Metadane', {
@@ -1639,3 +1661,361 @@ def make_inactive(modeladmin, request, queryset):
 
 
 ProductAdmin.actions = (make_active, make_inactive)
+
+
+# Saga Pattern Admin Interface
+@admin.register(Saga)
+class SagaAdmin(admin.ModelAdmin):
+    """Admin interface dla Saga operations"""
+
+    list_display = [
+        'saga_id', 'saga_type', 'status', 'created_at',
+        'completed_at', 'total_steps', 'completed_steps'
+    ]
+    list_filter = ['status', 'saga_type', 'created_at']
+    search_fields = ['saga_id', 'saga_type', 'error_message']
+    readonly_fields = [
+        'saga_id', 'created_at', 'started_at', 'completed_at',
+        'total_steps', 'completed_steps', 'failed_step'
+    ]
+    ordering = ['-created_at']
+
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('saga_id', 'saga_type', 'status')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'started_at', 'completed_at')
+        }),
+        ('Statistics', {
+            'fields': ('total_steps', 'completed_steps', 'failed_step')
+        }),
+        ('Data', {
+            'fields': ('input_data', 'output_data'),
+            'classes': ('collapse',)
+        }),
+        ('Error Info', {
+            'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        """Użyj bazy matterhorn1"""
+        return super().get_queryset(request).using('matterhorn1')
+
+
+@admin.register(SagaStep)
+class SagaStepAdmin(admin.ModelAdmin):
+    """Admin interface dla Saga steps"""
+
+    list_display = [
+        'saga', 'step_order', 'step_name', 'status',
+        'started_at', 'completed_at', 'compensation_attempted'
+    ]
+    list_filter = ['status', 'compensation_attempted',
+                   'compensation_successful']
+    search_fields = ['step_name', 'error_message']
+    readonly_fields = [
+        'saga', 'step_order', 'step_name', 'started_at',
+        'completed_at', 'compensated_at', 'compensation_attempted',
+        'compensation_successful'
+    ]
+    ordering = ['saga', 'step_order']
+
+    fieldsets = (
+        ('Step Info', {
+            'fields': ('saga', 'step_order', 'step_name', 'status')
+        }),
+        ('Timestamps', {
+            'fields': ('started_at', 'completed_at', 'compensated_at')
+        }),
+        ('Compensation', {
+            'fields': ('compensation_attempted', 'compensation_successful')
+        }),
+        ('Data', {
+            'fields': ('input_data', 'output_data'),
+            'classes': ('collapse',)
+        }),
+        ('Error Info', {
+            'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        """Użyj bazy matterhorn1"""
+        return super().get_queryset(request).using('matterhorn1')
+
+    def has_add_permission(self, request):
+        """Nie pozwalaj na ręczne dodawanie kroków"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Nie pozwalaj na usuwanie kroków"""
+        return False
+
+
+@admin.register(StockHistory)
+class StockHistoryAdmin(admin.ModelAdmin):
+    """Admin interface dla historii stanów magazynowych"""
+
+    list_display = [
+        'id', 'product_uid_link', 'product_name', 'variant_uid', 'variant_name',
+        'old_stock', 'new_stock', 'stock_change', 'change_type', 'timestamp'
+    ]
+    list_display_links = ['product_uid_link']
+
+    def product_uid_link(self, obj):
+        """Renderuje product_uid jako link do produktu"""
+        if obj.product_uid:
+            product_url = obj.get_product_url()
+            if product_url:
+                return format_html(
+                    '<a href="{}" target="_blank">{}</a>',
+                    product_url,
+                    obj.product_uid
+                )
+        return obj.product_uid
+    product_uid_link.short_description = 'Product UID'
+    product_uid_link.admin_order_field = 'product_uid'
+    list_filter = ['change_type', 'timestamp', 'product_uid']
+    search_fields = [
+        'product_uid', 'product_name', 'variant_uid', 'variant_name'
+    ]
+    readonly_fields = [
+        'id', 'variant_uid', 'product_uid', 'product_name', 'variant_name',
+        'old_stock', 'new_stock', 'stock_change', 'change_type', 'timestamp'
+    ]
+    ordering = ['-timestamp']
+    list_per_page = 50
+
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('id', 'product_uid', 'product_name', 'variant_uid', 'variant_name')
+        }),
+        ('Zmiany stanu', {
+            'fields': ('old_stock', 'new_stock', 'stock_change', 'change_type')
+        }),
+        ('Metadane', {
+            'fields': ('timestamp',),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        """Użyj bazy matterhorn1"""
+        return super().get_queryset(request).using('matterhorn1')
+
+    def has_add_permission(self, request):
+        """Wyłącz dodawanie nowych rekordów przez admin"""
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """Wyłącz edycję rekordów przez admin"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Zezwól na usuwanie starych rekordów"""
+        return True
+
+    def get_urls(self):
+        """Dodaj custom URLs dla stock history"""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('popular-products/', self.admin_site.admin_view(
+                self.popular_products_view), name='popular-products'),
+            path('stock-statistics/', self.admin_site.admin_view(
+                self.stock_statistics_view), name='stock-statistics'),
+            path('clean-history/', self.admin_site.admin_view(self.clean_history_view),
+                 name='clean-history'),
+        ]
+        return custom_urls + urls
+
+    def popular_products_view(self, request):
+        """Widok popularnych produktów"""
+        from django.shortcuts import render
+        days = int(request.GET.get('days', 30))
+        popular_products = self._get_popular_products(days=days, limit=50)
+
+        context = {
+            'popular_products': popular_products,
+            'days': days,
+            'title': f'Najbardziej popularne produkty (ostatnie {days} dni)'
+        }
+        return render(request, 'admin/matterhorn1/stock_history/popular_products.html', context)
+
+    def stock_statistics_view(self, request):
+        """Widok statystyk stanów magazynowych"""
+        from django.shortcuts import render
+        days = int(request.GET.get('days', 30))
+        stats = self._get_stock_statistics(days=days)
+
+        context = {
+            'stats': stats,
+            'days': days,
+            'title': f'Statystyki stanów magazynowych (ostatnie {days} dni)'
+        }
+        return render(request, 'admin/matterhorn1/stock_history/statistics.html', context)
+
+    def clean_history_view(self, request):
+        """Widok czyszczenia historii"""
+        from django.shortcuts import redirect
+        from django.contrib import messages
+
+        if request.method == 'POST':
+            days_to_keep = int(request.POST.get('days_to_keep', 90))
+            result = self._clean_old_stock_history(days_to_keep)
+            messages.success(request, result)
+
+        return redirect('admin:matterhorn1_stockhistory_changelist')
+
+    def changelist_view(self, request, extra_context=None):
+        """Dodaj akcje do changelist"""
+        extra_context = extra_context or {}
+        extra_context['show_actions'] = True
+        extra_context['actions'] = [
+            {
+                'name': 'popular_products',
+                'url': 'popular-products/',
+                'label': 'Popularne produkty',
+                'description': 'Pokaż najbardziej popularne produkty'
+            },
+            {
+                'name': 'statistics',
+                'url': 'stock-statistics/',
+                'label': 'Statystyki',
+                'description': 'Pokaż statystyki stanów magazynowych'
+            },
+            {
+                'name': 'clean_history',
+                'url': 'clean-history/',
+                'label': 'Wyczyść historię',
+                'description': 'Usuń stare rekordy z historii'
+            },
+        ]
+        return super().changelist_view(request, extra_context)
+
+    def _get_popular_products(self, days=30, limit=20):
+        """Pobierz popularne produkty na podstawie spadków stanów"""
+        from django.db import connections
+        from django.utils import timezone
+        from datetime import timedelta
+
+        try:
+            with connections['matterhorn1'].cursor() as cursor:
+                cutoff_date = timezone.now() - timedelta(days=days)
+
+                query = """
+                    SELECT 
+                        sh.product_uid,
+                        sh.product_name,
+                        COUNT(*) as total_decreases,
+                        SUM(ABS(sh.stock_change)) as total_stock_sold,
+                        AVG(ABS(sh.stock_change)) as avg_stock_sold_per_change,
+                        MAX(sh.timestamp) as last_activity
+                    FROM stock_history sh
+                    WHERE sh.change_type = 'decrease'
+                        AND sh.timestamp >= %s
+                    GROUP BY sh.product_uid, sh.product_name
+                    ORDER BY total_stock_sold DESC, total_decreases DESC
+                    LIMIT %s
+                """
+
+                cursor.execute(query, [cutoff_date, limit])
+                results = cursor.fetchall()
+
+                popular_products = []
+                for row in results:
+                    popular_products.append({
+                        'product_uid': row[0],
+                        'product_name': row[1],
+                        'total_decreases': row[2],
+                        'total_stock_sold': row[3],
+                        'avg_stock_sold_per_change': float(row[4]) if row[4] else 0,
+                        'last_activity': row[5]
+                    })
+
+                return popular_products
+
+        except Exception as e:
+            logger.error(f"Błąd podczas pobierania popularnych produktów: {e}")
+            return []
+
+    def _get_stock_statistics(self, days=30):
+        """Pobierz statystyki stanów magazynowych"""
+        from django.db import connections
+        from django.utils import timezone
+        from datetime import timedelta
+
+        try:
+            with connections['matterhorn1'].cursor() as cursor:
+                cutoff_date = timezone.now() - timedelta(days=days)
+
+                query = """
+                    SELECT 
+                        COUNT(*) as total_changes,
+                        COUNT(CASE WHEN change_type = 'increase' THEN 1 END) as increases,
+                        COUNT(CASE WHEN change_type = 'decrease' THEN 1 END) as decreases,
+                        COUNT(CASE WHEN change_type = 'no_change' THEN 1 END) as no_changes,
+                        SUM(CASE WHEN change_type = 'decrease' THEN ABS(stock_change) ELSE 0 END) as total_sold,
+                        SUM(CASE WHEN change_type = 'increase' THEN stock_change ELSE 0 END) as total_added,
+                        AVG(CASE WHEN change_type = 'decrease' THEN ABS(stock_change) ELSE NULL END) as avg_sold_per_decrease,
+                        COUNT(DISTINCT product_uid) as unique_products,
+                        COUNT(DISTINCT variant_uid) as unique_variants
+                    FROM stock_history
+                    WHERE timestamp >= %s
+                """
+
+                cursor.execute(query, [cutoff_date])
+                result = cursor.fetchone()
+
+                if result:
+                    stats = {
+                        'total_changes': result[0],
+                        'increases': result[1],
+                        'decreases': result[2],
+                        'no_changes': result[3],
+                        'total_sold': result[4] or 0,
+                        'total_added': result[5] or 0,
+                        'avg_sold_per_decrease': float(result[6]) if result[6] else 0,
+                        'unique_products': result[7],
+                        'unique_variants': result[8]
+                    }
+                else:
+                    stats = {}
+
+                return stats
+
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas pobierania statystyk stanów magazynowych: {e}")
+            return {}
+
+    def _clean_old_stock_history(self, days_to_keep=90):
+        """Usuń stare rekordy z historii stanów magazynowych"""
+        from django.db import connections
+        from django.utils import timezone
+        from datetime import timedelta
+
+        try:
+            with connections['matterhorn1'].cursor() as cursor:
+                cutoff_date = timezone.now() - timedelta(days=days_to_keep)
+
+                delete_query = """
+                    DELETE FROM stock_history
+                    WHERE timestamp < %s
+                """
+
+                cursor.execute(delete_query, [cutoff_date])
+                deleted_count = cursor.rowcount
+
+                logger.info(
+                    f"Usunięto {deleted_count} starych rekordów z historii stanów magazynowych")
+                return f"Usunięto {deleted_count} starych rekordów z historii stanów magazynowych"
+
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas czyszczenia historii stanów magazynowych: {e}")
+            return f"Błąd podczas czyszczenia historii: {e}"

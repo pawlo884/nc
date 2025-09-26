@@ -1,0 +1,82 @@
+---
+description: Reguły dla środowiska development - prefiksy baz, konfiguracja
+globs: ["**/settings/*.py", "**/.env.dev*", "**/docker-compose.dev.yml"]
+alwaysApply: true
+---
+
+# Reguły środowiska Development
+
+## Prefiksy baz danych
+- **Wszystkie bazy dev mają prefiks zzz**
+- **zzz_default**: Główna baza aplikacji dev
+- **zzz_matterhorn**: Dane produktów z API Matterhorn dev
+- **zzz_MPD**: Dane do eksportu XML dev
+- **zzz_web_agent**: Dane dla agenta web dev
+- **zzz_matterhorn1**: Nowa wersja danych dev
+
+## Konfiguracja .env.dev
+- **Plik .env.dev** jest w .cursorignore
+- **Łączysz się z bazą przez settings.dev**
+- **Wszystkie zmienne DB_NAME** mają prefiks zzz
+- **Environment variables** dla każdej bazy z prefiksem
+
+## Aktywacja środowiska
+- **Środowisko wirtualne**: `.\.venv\Scripts\Activate.ps1`
+- **Uruchomienie**: PowerShell z aktywacją venv
+- **Python path**: Wskazuje na venv po aktywacji
+- **Dependencies**: Z requirements.txt w venv
+
+## Docker development
+- **docker-compose.dev.yml** dla development
+- **Redis** z hasłem dev_password
+- **PostgreSQL** z wieloma bazami dev
+- **Nginx** dla reverse proxy
+- **Celery worker** dla tasków
+
+## Ustawienia Django dev
+- **DEBUG = True** w development
+- **ALLOWED_HOSTS** z localhost i IP
+- **CORS** skonfigurowany dla dev
+- **CSRF** wyłączony dla API
+- **Secret key** django-insecure dla dev
+
+## Logowanie dev
+- **Poziom INFO** dla development
+- **Rotacja logów** 2MB max, 3 backup
+- **Pliki logów** w logs/matterhorn/
+- **Console output** dla debugging
+
+## Celery dev
+- **CELERY_TASK_ALWAYS_EAGER=True** dla testing
+- **Redis** jako broker i result backend
+- **Database scheduler** dla periodic tasks
+- **Flower** dla monitoring (port 5555)
+
+## API development
+- **drf-spectacular** dla dokumentacji
+- **Swagger UI** na /api/schema/swagger-ui/
+- **ReDoc** na /api/schema/redoc/
+- **Browsable API** dla testing
+
+## Statyczne pliki dev
+- **WhiteNoise** dla serwowania
+- **CompressedManifestStaticFilesStorage**
+- **DEBUG_TOOLBAR** dla debugging
+- **Static files** w static/ i staticfiles/
+
+## Bezpieczeństwo dev
+- **CORS** dla cross-origin requests
+- **CSRF** wyłączony dla API
+- **Debug toolbar** włączony
+- **Internal IPs** skonfigurowane
+
+## Komendy Django z bazami danych
+- **Zawsze określaj bazę danych i settings** w komendach:
+  - `python manage.py migrate --database=zzz_matterhorn1 --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_default --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_matterhorn --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_MPD --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_web_agent --settings=nc.settings.dev`
+- **makemigrations** z określeniem aplikacji i bazy
+- **shell** z określeniem bazy: `python manage.py shell --settings=nc.settings.dev`
+- **dbshell** dla konkretnej bazy: `python manage.py dbshell --database=matterhorn1 --settings=nc.settings.dev`

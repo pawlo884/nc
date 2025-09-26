@@ -988,7 +988,7 @@ def get_product_details(request, product_id):
         return JsonResponse({
             'success': True,
             'product': {
-                'product_id': product.product_id,
+                'product_id': product.product_uid,
                 'name': product.name,
                 'description': product.description,
                 'active': product.active,

@@ -1,0 +1,106 @@
+---
+description: Reguły dla PostgreSQL - bazy danych, optymalizacja, migracje
+globs: ["**/migrations/*.py", "**/models.py", "**/*.sql"]
+alwaysApply: true
+---
+
+# Reguły PostgreSQL
+
+## Konfiguracja baz danych
+- **5 baz danych**: default, matterhorn, MPD, zzz_web_agent, matterhorn1
+- **Wszystkie bazy dev mają prefiks zzz** (np. zzz_default, zzz_matterhorn, zzz_MPD, zzz_web_agent, zzz_matterhorn1)
+- **Database routing** w nc/db_routers.py
+- **CONN_MAX_AGE=0** dla connection management
+- **Environment variables** dla credentials
+- **Connection pooling** dla performance
+- **SSL** dla production connections
+
+## Modele i pola
+- **BigAutoField** dla primary keys
+- **CharField** z max_length
+- **TextField** dla długich tekstów
+- **DecimalField** dla pieniędzy z decimal_places
+- **DateTimeField** z auto_now_add/auto_now
+- **ForeignKey** z on_delete
+- **ManyToManyField** z through model gdy potrzebne
+- **Indexes** dla często używanych pól
+
+## Optymalizacja zapytań
+- **select_related()** dla ForeignKey
+- **prefetch_related()** dla ManyToManyField
+- **only()** i **defer()** dla specific fields
+- **values()** i **values_list()** dla specific data
+- **exists()** zamiast count() > 0
+- **bulk_create()** i **bulk_update()** dla masowych operacji
+- **iterator()** dla dużych QuerySet
+
+## Indeksy i constraints
+- **db_index=True** dla często używanych pól
+- **unique=True** dla unikalnych pól
+- **unique_together** dla composite uniqueness
+- **index_together** dla composite indexes
+- **CheckConstraint** dla business rules
+- **Partial indexes** dla conditional indexes
+
+## Migracje
+- **makemigrations** przed zmianami modeli
+- **migrate** po makemigrations
+- **--empty** dla custom migrations
+- **data migrations** dla zmian danych
+- **squash migrations** dla czystości
+- **rollback** dla problemów
+- **fake** dla manual migrations
+- **Zawsze określaj bazę danych i settings** w komendach:
+  - `python manage.py migrate matterhorn1 --database=matterhorn1 --settings=nc.settings.dev`
+  - `python manage.py migrate --database=default --settings=nc.settings.dev`
+  - `python manage.py migrate --database=matterhorn --settings=nc.settings.dev`
+  - `python manage.py migrate --database=MPD --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_web_agent --settings=nc.settings.dev`
+
+## Transakcje
+- **atomic()** dla critical operations
+- **transaction.atomic()** w views
+- **savepoint** dla nested transactions
+- **rollback** dla error handling
+- **commit** dla explicit commits
+- **autocommit** dla simple operations
+
+## Performance monitoring
+- **EXPLAIN ANALYZE** dla query analysis
+- **pg_stat_statements** dla query stats
+- **slow query log** dla performance
+- **connection monitoring** dla resources
+- **index usage** dla optimization
+- **vacuum** i **analyze** dla maintenance
+
+## Backup i recovery
+- **pg_dump** dla backups
+- **pg_restore** dla recovery
+- **WAL archiving** dla point-in-time recovery
+- **replication** dla high availability
+- **monitoring** dla health checks
+- **alerting** dla problems
+
+## Bezpieczeństwo
+- **User permissions** dla access control
+- **Row Level Security** dla data isolation
+- **encryption** dla sensitive data
+- **audit logging** dla compliance
+- **connection security** dla network
+- **password policies** dla users
+
+## Multi-database patterns
+- **Database routing** w routers.py
+- **using** parameter w operations
+- **cross-database** operations
+- **data synchronization** między bazami
+- **consistency** dla distributed data
+- **transaction coordination** dla ACID
+
+## Monitoring i maintenance
+- **pg_stat_activity** dla active connections
+- **pg_stat_database** dla database stats
+- **pg_stat_user_tables** dla table stats
+- **VACUUM** dla space reclamation
+- **ANALYZE** dla statistics
+- **REINDEX** dla index maintenance

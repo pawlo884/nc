@@ -321,10 +321,10 @@ class BaseAPICommand(BaseCommand):
                 name__isnull=False
             ).exclude(
                 name__in=['Placeholder Name', '0 Nowy artykul - 0']
-            ).order_by('-product_id').first()
+            ).order_by('-product_uid').first()
 
             if last_product:
-                return int(last_product.product_id)
+                return int(last_product.product_uid)
             else:
                 return 0
         except Exception as e:
