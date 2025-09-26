@@ -263,7 +263,8 @@ CELERY_TASK_ACKS_LATE = True
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': 'redis://:dev_password@redis:6379/1',  # Używamy bazy 1 dla cache
+        # Używamy bazy 1 dla cache
+        'LOCATION': f'redis://:{os.getenv("REDIS_PASSWORD", "Relisys17!!")}@redis:6379/1',
     }
 }
 CELERY_TASK_TRACK_STARTED = True
