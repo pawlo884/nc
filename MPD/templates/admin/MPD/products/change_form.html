@@ -3,6 +3,12 @@
   {{ block.super }}
   <h3>Aktualne drzewo ścieżek</h3>
   <div style="background:#f8f8f8; border:1px solid #ccc; padding:10px; margin-top:20px;">
+    <div style="margin-bottom: 10px; padding: 8px; background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px;">
+      <strong>Zarządzanie ścieżkami produktu:</strong><br>
+      <span style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 2px 5px; border-radius: 3px; margin-right: 10px;">☑️ Zaznaczone</span> - ścieżki przypisane do tego produktu<br>
+      <span style="color: #666;">☐ Niezaznaczone</span> - kliknij checkbox aby przypisać/odpiąć ścieżkę
+      <div id="paths-status" style="margin-top: 5px; font-size: 12px; color: #666;"></div>
+    </div>
     <style>
       .toggle-btn { margin-right: 4px; }
       ul { margin-bottom: 0; }
@@ -10,6 +16,7 @@
     {{ paths_tree|safe }}
     <script>
       document.addEventListener('DOMContentLoaded', function() {
+        // Obsługa przycisków składania/rozwijania
         document.querySelectorAll('.toggle-btn').forEach(function(btn) {
           btn.addEventListener('click', function() {
             var target = document.getElementById(btn.dataset.target);
@@ -20,6 +27,81 @@
               target.style.display = 'none';
               btn.textContent = '[+]';
             }
+          });
+        });
+
+        // Pobierz ID produktu z URL
+        var productId = window.location.pathname.match(/\/(\d+)\/change\//);
+        productId = productId ? productId[1] : null;
+
+        if (!productId) {
+          document.getElementById('paths-status').textContent = 'Zapisz produkt aby móc zarządzać ścieżkami';
+          document.querySelectorAll('.path-checkbox').forEach(function(cb) {
+            cb.disabled = true;
+          });
+          return;
+        }
+
+        // Obsługa checkboxów ścieżek
+        document.querySelectorAll('.path-checkbox').forEach(function(checkbox) {
+          checkbox.addEventListener('change', function() {
+            var pathId = this.dataset.pathId;
+            var isChecked = this.checked;
+            var action = isChecked ? 'assign' : 'unassign';
+            
+            // Pokaż status
+            document.getElementById('paths-status').textContent = 'Zapisywanie...';
+            
+            // Wyślij AJAX request
+            fetch('/mpd/manage-product-paths/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || document.querySelector('meta[name=csrf-token]')?.content || ''
+              },
+              body: JSON.stringify({
+                product_id: productId,
+                path_id: pathId,
+                action: action
+              })
+            })
+            .then(response => response.json())
+            .then(data => {
+              if (data.status === 'success') {
+                // Aktualizuj style
+                var listItem = checkbox.closest('li');
+                if (isChecked) {
+                  listItem.style.cssText = 'background-color: #d4edda; border: 1px solid #c3e6cb; padding: 2px 5px; border-radius: 3px; margin: 1px 0;';
+                  document.getElementById('paths-status').textContent = 'Ścieżka została przypisana';
+                } else {
+                  listItem.style.cssText = '';
+                  document.getElementById('paths-status').textContent = 'Ścieżka została odłączona';
+                }
+                // Wyczyść status po 3 sekundach
+                setTimeout(function() {
+                  document.getElementById('paths-status').textContent = '';
+                }, 3000);
+              } else {
+                // Cofnij zmianę w checkbox w przypadku błędu
+                checkbox.checked = !isChecked;
+                document.getElementById('paths-status').textContent = 'Błąd: ' + (data.message || 'Nie udało się zapisać');
+                document.getElementById('paths-status').style.color = '#dc3545';
+                setTimeout(function() {
+                  document.getElementById('paths-status').textContent = '';
+                  document.getElementById('paths-status').style.color = '#666';
+                }, 5000);
+              }
+            })
+            .catch(error => {
+              console.error('Error:', error);
+              checkbox.checked = !isChecked;
+              document.getElementById('paths-status').textContent = 'Błąd połączenia';
+              document.getElementById('paths-status').style.color = '#dc3545';
+              setTimeout(function() {
+                document.getElementById('paths-status').textContent = '';
+                document.getElementById('paths-status').style.color = '#666';
+              }, 5000);
+            });
           });
         });
       });

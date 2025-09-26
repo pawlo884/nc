@@ -18,15 +18,22 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 urlpatterns = [
     path('i18n/', include('django.conf.urls.i18n')),
+    # API Documentation
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'),
+         name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
 urlpatterns += i18n_patterns(
     path('admin/', admin.site.urls),
     path('matterhorn/', include('matterhorn.urls')),
     path('mpd/', include('MPD.urls')),
+    path('matterhorn1/', include('matterhorn1.urls')),
     prefix_default_language=False
 )
 

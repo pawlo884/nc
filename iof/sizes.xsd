@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="http://www.w3.org/2001/xml.xsd"/>
+	<xs:annotation>
+	    <xs:documentation>
+	        Internet Offer Format 3.0 (https://www.idosell.com/pl/shop/developers/formats/iof/internet-offer-format-iof). 
+	        Describes the light.xml file. 
+	        Holds information about sizes group tree.    
+	        Each size group holds one or more sizes. 
+            Each product is associated with a size by sizes.group.size@id attribute.
+            @id can be passed as a string, but must be unique in its scope and only a-z,A-Z,_,- range chars can be used (e.g. no blanks/spaces allowed)
+	    </xs:documentation>
+	</xs:annotation>	
+    <xs:element name="sizes">
+	    <xs:complexType>
+	        <xs:sequence>
+	            <xs:element maxOccurs="unbounded" minOccurs="0" ref="group"/>
+	        </xs:sequence>
+	        <xs:attribute name="file_format" type="xs:NMTOKEN" use="optional">
+	            <xs:annotation>
+	                <xs:documentation>Format: IOF</xs:documentation>
+	                </xs:annotation>
+	        </xs:attribute>            	
+	        <xs:attribute name="version" type="xs:decimal" use="optional">
+	        	<xs:annotation>
+	                <xs:documentation>IOF version: major.minor</xs:documentation>
+	             </xs:annotation>
+	        </xs:attribute>
+            <xs:attribute name="language" type="xs:NMTOKEN" use="optional">
+                <xs:annotation>
+                    <xs:documentation>Language: language code in the ISO 639 standard</xs:documentation>
+                 </xs:annotation>
+            </xs:attribute>
+	        <xs:attribute name="generated" use="optional">
+	        	<xs:annotation>
+	                <xs:documentation>Date generated: YYYY-MM-DD 00:00:00</xs:documentation>
+	             </xs:annotation>
+	            <xs:simpleType>
+	                <xs:restriction base="xs:string">
+	                    <xs:pattern value="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"/>
+	                </xs:restriction>
+	            </xs:simpleType>
+	        </xs:attribute>
+	    </xs:complexType>
+    </xs:element>
+    <xs:element name="group">
+        <xs:annotation>
+            <xs:documentation>All sizes must be hold in given "group" tag</xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:sequence>
+                <xs:choice minOccurs="0" maxOccurs="unbounded">
+                    <xs:element maxOccurs="unbounded" minOccurs="0" ref="size"/>
+                </xs:choice>
+            </xs:sequence>
+            <xs:attribute name="id" type="xs:string" use="optional"/>
+            <xs:attribute name="name" type="xs:string" use="optional"/>   
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="size">
+        <xs:annotation>
+            <xs:documentation>Holds information about a single size.</xs:documentation>
+        </xs:annotation>        
+        <xs:complexType>
+            <xs:sequence>
+                <xs:choice minOccurs="0" maxOccurs="unbounded">            	
+                	<xs:element maxOccurs="unbounded" minOccurs="0" ref="name"/>
+                </xs:choice>
+            </xs:sequence>
+            <xs:attribute name="id" type="xs:string" use="optional"/>
+            <xs:attribute name="name" type="xs:string" use="optional"/> 
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="name">
+        <xs:complexType mixed="true">
+            <xs:simpleContent>
+                <xs:extension base="xs:string">
+                    <xs:attribute ref="xml:lang" use="optional"/>
+                </xs:extension>
+            </xs:simpleContent>
+        </xs:complexType>
+    </xs:element> 
+</xs:schema>

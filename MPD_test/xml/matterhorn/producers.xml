@@ -1,24 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<producers file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="2025-07-10 11:39:51" expires="2025-07-11 11:39:51">
-  <producer id="5" name="Step in style"/>
-  <producer id="6" name="Kalimo"/>
-  <producer id="7" name="Italy Moda"/>
-  <producer id="8" name="Stylove"/>
-  <producer id="9" name="Jersa"/>
-  <producer id="10" name="Moe"/>
-  <producer id="11" name="LaBalancia"/>
-  <producer id="12" name="With You"/>
-  <producer id="13" name="Roco Fashion"/>
-  <producer id="14" name="Numoco"/>
-  <producer id="15" name="Henderson"/>
-  <producer id="16" name="Makadamia"/>
-  <producer id="17" name="PRIMO"/>
-  <producer id="18" name="Marko"/>
-  <producer id="19" name="Barontex"/>
-  <producer id="21" name="GABBIANO"/>
-  <producer id="22" name="Ava"/>
-  <producer id="23" name="Etna"/>
-  <producer id="24" name="Self Collection"/>
-  <producer id="57" name="Ewlon"/>
-  <producer id="20" name="Lupo Line"/>
+<producers file_format="IOF" version="3.0" generated_by="nc" language="pol" generated="2025-09-06 11:46:25" expires="2025-09-07 11:46:25">
+  <producer id="1" name="Lupo Line"/>
+  <producer id="5" name="Ava"/>
+  <producer id="3" name="Ewlon"/>
+  <producer id="2" name="Marko"/>
+  <producer id="4" name="Self Collection"/>
 </producers>

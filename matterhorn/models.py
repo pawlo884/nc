@@ -36,10 +36,24 @@ class Products(models.Model):
     last_updated = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'products'
         verbose_name = "Product"
         verbose_name_plural = "Products"
+        indexes = [
+            models.Index(fields=['active']),
+            models.Index(fields=['category_name']),
+            models.Index(fields=['brand']),
+            models.Index(fields=['is_mapped']),
+            models.Index(fields=['mapped_product_id']),
+            models.Index(fields=['last_updated']),
+            models.Index(fields=['timestamp']),
+            models.Index(fields=['category_id']),
+            models.Index(fields=['brand_id']),
+            # Złożone indeksy dla często używanych kombinacji
+            models.Index(fields=['active', 'category_name']),
+            models.Index(fields=['is_mapped', 'mapped_product_id']),
+        ]
 
     @admin.display(description="Product Color ID's")
     def get_product_color_id(self):
@@ -72,18 +86,22 @@ class Images(models.Model):
     image_id = models.BigAutoField(primary_key=True)
     image_path = models.TextField(blank=True, null=True)
     product = models.ForeignKey(
-        'Products', models.CASCADE, blank=True, null=True)
+        'Products', models.CASCADE, blank=True, null=True, related_name='images')
     timestamp = models.DateTimeField()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'images'
+        indexes = [
+            models.Index(fields=['product']),
+            models.Index(fields=['timestamp']),
+        ]
 
 
 class ProductsProxy(Products):
     class Meta:
         proxy = True
-        managed = False
+        managed = True
         verbose_name = "Mapper"
         verbose_name_plural = "Mapper"
 
@@ -114,17 +132,21 @@ class OtherColors(models.Model):
         on_delete=models.CASCADE,
         db_column='product_id',
         related_name='other_colors',
-        db_index=True)
+        db_index=True,
+        null=True,
+        blank=True)
     color_product = models.ForeignKey(
         Products,
         on_delete=models.CASCADE,
         related_name='othercolors_color_product_id',
         db_column='color_product_id',
-        db_index=True)
+        db_index=True,
+        null=True,
+        blank=True)
     timestamp = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
+        managed = True
         verbose_name_plural = "Other Colors"
         db_table = 'other_colors'
         unique_together = (('product', 'color_product'),)
@@ -141,16 +163,20 @@ class ProductInSet(models.Model):
         on_delete=models.CASCADE,
         db_column='product_id',
         related_name='product_in_set',
-        db_index=True)
+        db_index=True,
+        null=True,
+        blank=True)
     set_product = models.ForeignKey(
         Products,
         on_delete=models.CASCADE,
         related_name='productinset_set_product_id',
-        db_index=True)
+        db_index=True,
+        null=True,
+        blank=True)
     timestamp = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_in_set'
         verbose_name_plural = "Product in Series"
         unique_together = (('product', 'set_product'),)
@@ -167,7 +193,7 @@ class UpdateLog(models.Model):
     data_inventory = models.TextField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'update_log'
 
 
@@ -185,11 +211,19 @@ class Variants(models.Model):
     last_updated = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         verbose_name_plural = "Variants"
         db_table = 'variants'
         indexes = [
             models.Index(fields=['product']),
+            models.Index(fields=['is_mapped']),
+            models.Index(fields=['mapped_variant_id']),
+            models.Index(fields=['last_updated']),
+            models.Index(fields=['timestamp']),
+            models.Index(fields=['ean']),
+            # Złożone indeksy
+            models.Index(fields=['product', 'is_mapped']),
+            models.Index(fields=['last_updated', 'product']),
         ]
 
 
@@ -287,7 +321,7 @@ class StockHistory(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
+        managed = True
         verbose_name_plural = "Stock History"
         db_table = 'stock_history'
         indexes = [

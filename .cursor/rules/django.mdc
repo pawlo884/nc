@@ -1,0 +1,89 @@
+---
+description: Reguły dla Django - modele, widoki, URL-e, admin
+globs: ["**/models.py", "**/views.py", "**/urls.py", "**/admin.py", "**/serializers.py"]
+alwaysApply: true
+---
+
+# Reguły Django
+
+## Modele (models.py)
+- **Wszystkie modele** muszą mieć `__str__` method
+- **Meta class** z `verbose_name` i `verbose_name_plural` po polsku
+- **db_table** dla każdego modelu (nazwa tabeli)
+- **ordering** w Meta class dla list w admin
+- **unique_together** lub **constraints** dla unikalności
+- **related_name** dla ForeignKey i ManyToManyField
+- **on_delete** zawsze określony dla ForeignKey
+- **blank=True, null=True** dla opcjonalnych pól
+- **help_text** dla pól w admin
+
+## Widoki (views.py)
+- **Class-based views** zamiast function-based gdy możliwe
+- **Permission classes** dla API views
+- **Serializer classes** dla DRF views
+- **Pagination** dla list views
+- **Filtering** i **search** dla list views
+- **Exception handling** z odpowiednimi status codes
+- **Logging** dla ważnych operacji
+- **Database routing** dla multi-database
+
+## URL-e (urls.py)
+- **Namespace** dla każdej aplikacji
+- **app_name** w każdym urls.py
+- **path()** zamiast url()
+- **include()** dla aplikacji
+- **name** dla każdego URL pattern
+- **trailing_slash** consistency
+
+## Admin (admin.py)
+- **list_display** dla wszystkich modeli
+- **list_filter** dla ForeignKey i DateField
+- **search_fields** dla CharField i TextField
+- **readonly_fields** dla auto-generated fields
+- **list_per_page** dla dużych tabel
+- **ordering** w admin
+- **actions** dla bulk operations
+- **custom templates** gdy potrzebne
+
+## Serializers (serializers.py)
+- **ModelSerializer** zamiast Serializer gdy możliwe
+- **fields** lub **exclude** zawsze określone
+- **read_only_fields** dla auto-generated
+- **write_only_fields** dla haseł
+- **validators** dla custom validation
+- **to_representation** dla custom output
+- **to_internal_value** dla custom input
+
+## Bazy danych
+- **Database routing** w nc/db_routers.py
+- **using** parameter w QuerySet operations
+- **select_related** i **prefetch_related** dla optymalizacji
+- **only()** i **defer()** dla select_related
+- **bulk_create** i **bulk_update** dla masowych operacji
+
+## Migracje
+- **makemigrations** przed każdą zmianą modelu
+- **migrate** po makemigrations
+- **--empty** dla custom migrations
+- **data migrations** dla zmian danych
+- **squash migrations** dla czystości
+- **Zawsze określaj bazę danych i settings** w komendach:
+  - `python manage.py migrate --database=zzz_matterhorn1 --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_default --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_matterhorn --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_MPD --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_web_agent --settings=nc.settings.dev`
+
+## Testy
+- **TestCase** zamiast SimpleTestCase
+- **setUp** i **tearDown** methods
+- **fixtures** dla test data
+- **mock** dla external APIs
+- **coverage** dla test coverage
+
+## Bezpieczeństwo
+- **CSRF protection** dla forms
+- **XSS protection** w templates
+- **SQL injection** protection (ORM)
+- **Permission checks** w views
+- **Input validation** w serializers

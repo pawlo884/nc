@@ -1,7 +1,9 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths
+from django.db.models import Exists, OuterRef
+from django.contrib.admin import DateFieldListFilter, SimpleListFilter
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductImage, ProductSeries, Categories, Vat, Units, FabricComponent, ProductFabric
 import decimal
 # Register your models here.
 
@@ -10,33 +12,117 @@ import decimal
 # (pozostawiam tylko show_variants jako readonly_field)
 
 
+class HasRetailPricesFilter(SimpleListFilter):
+    title = 'ma ceny detaliczne'
+    parameter_name = 'has_retail_prices'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('yes', 'Tak'),
+            ('no', 'Nie'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'yes':
+            return queryset.filter(
+                Exists(ProductVariants.objects.filter(
+                    product=OuterRef('pk'),
+                    productvariantsretailprice__isnull=False
+                ))
+            )
+        elif self.value() == 'no':
+            return queryset.filter(
+                ~Exists(ProductVariants.objects.filter(
+                    product=OuterRef('pk'),
+                    productvariantsretailprice__isnull=False
+                ))
+            )
+
+
 @admin.register(Products)
 class ProductsAdmin(admin.ModelAdmin):
     show_full_result_count = False
     list_per_page = 30
-    fields = ['name', 'short_description', 'description', 'brand', 'show_variants',
-              'show_images', 'show_related_products', 'edit_retail_prices']  # karta produktu
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('name', 'short_description', 'description', 'brand', 'series', 'unit', 'visibility')
+        }),
+        ('Warianty produktu', {
+            'fields': ('show_variants',),
+            'description': 'Przegląd wszystkich wariantów produktu z kolorami, rozmiarami i cenami'
+        }),
+        ('Zdjęcia produktu', {
+            'fields': ('show_images',),
+            'description': 'Zdjęcia produktu pogrupowane według kolorów'
+        }),
+        ('Powiązane produkty', {
+            'fields': ('show_related_products',),
+            'description': 'Zestawy i produkty z tej samej serii'
+        }),
+        ('Ceny detaliczne', {
+            'fields': ('edit_retail_prices',),
+            'description': 'Edycja cen detalicznych dla wszystkich wariantów'
+        }),
+        ('Metadane', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+            'description': 'Informacje o dacie utworzenia i ostatniej aktualizacji'
+        }),
+    )
     list_display = ['id', 'name', 'description',
-                    'brand', 'updated_at']  # widok listy produktów
-    list_filter = ['brand']
-    search_fields = ['id', 'name', 'description', 'brand__name']
+                    'brand', 'updated_at', 'visibility']  # widok listy produktów
+    list_filter = [
+        'brand',
+        'series',
+        'visibility',
+        HasRetailPricesFilter,
+        ('created_at', DateFieldListFilter),
+        ('updated_at', DateFieldListFilter),
+    ]
+    search_fields = ['id', 'name', 'description',
+                     'brand__name', 'series__name']
     readonly_fields = ['show_variants', 'show_images',
-                       'show_related_products', 'edit_retail_prices']
+                       'show_related_products', 'edit_retail_prices', 'created_at', 'updated_at']
+    change_form_template = 'admin/MPD/products/change_form.html'
+    actions = ['make_visible', 'make_hidden']
 
     def get_queryset(self, request):
-        return super().get_queryset(request).using('MPD')
+        return super().get_queryset(request).using('MPD').select_related('brand', 'series', 'unit')
+
+    @admin.action(description='Oznacz wybrane produkty jako widoczne')
+    def make_visible(self, request, queryset):
+        """Masowa akcja - oznacz produkty jako widoczne"""
+        from django.utils import timezone
+        updated = queryset.update(visibility=True, updated_at=timezone.now())
+        self.message_user(
+            request,
+            f'{updated} produktów zostało oznaczonych jako widoczne.',
+            level='SUCCESS'
+        )
+
+    @admin.action(description='Oznacz wybrane produkty jako niewidoczne')
+    def make_hidden(self, request, queryset):
+        """Masowa akcja - oznacz produkty jako niewidoczne"""
+        from django.utils import timezone
+        updated = queryset.update(visibility=False, updated_at=timezone.now())
+        self.message_user(
+            request,
+            f'{updated} produktów zostało oznaczonych jako niewidoczne.',
+            level='SUCCESS'
+        )
 
     @admin.display(description="Edycja cen detalicznych")
     def edit_retail_prices(self, obj):
-        variants = list(ProductVariants.objects.filter(product=obj))
+        variants = list(ProductVariants.objects.filter(product=obj)
+                        .select_related('color', 'size'))
         if not variants:
             return "Brak wariantów produktu"
         variant_ids = [v.variant_id for v in variants]
         # Pobierz EANy i ceny detaliczne jednym zapytaniem
         sources_map = {s.variant.variant_id: s.ean for s in ProductvariantsSources.objects.filter(
-            variant__variant_id__in=variant_ids)}
+            variant__variant_id__in=variant_ids).select_related('variant')}
         retail_map = {r.variant.variant_id: r.retail_price for r in ProductVariantsRetailPrice.objects.using(
-            'MPD').filter(variant__variant_id__in=variant_ids)}
+            'MPD').filter(variant__variant_id__in=variant_ids).select_related('variant')}
         grouped = {}
         for variant in variants:
             color_name = variant.color.name if variant.color else "-"
@@ -55,7 +141,7 @@ class ProductsAdmin(admin.ModelAdmin):
         html += "<button type='button' onclick='setAllRetailPrices()' style='margin-left:8px;'>Ustaw dla wszystkich</button>"
         html += "</div>"
         html += "<table style='border-collapse:collapse; width:100%;'>"
-        html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>kolor</th><th style='border:1px solid #ccc;padding:4px 8px;'>rozmiar</th><th style='border:1px solid #ccc;padding:4px 8px;'>ean</th><th style='border:1px solid #ccc;padding:4px 8px;'>cena detaliczna</th><th style='border:1px solid #ccc;padding:4px 8px;'>VAT</th><th style='border:1px solid #ccc;padding:4px 8px;'>waluta</th></tr>"
+        html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>kolor</th><th style='border:1px solid #ccc;padding:4px 8px;'>rozmiar</th><th style='border:1px solid #ccc;padding:4px 8px;'>ean</th><th style='border:1px solid #ccc;padding:4px 8px;'>cena detaliczna</th><th style='border:1px solid #ccc;padding:4px 8px;'>VAT_id</th><th style='border:1px solid #ccc;padding:4px 8px;'>waluta</th></tr>"
         for (color_name, size_name, ean), variant_ids in grouped.items():
             retail_price = retail_map.get(variant_ids[0], "")
             html += "<tr>"
@@ -154,18 +240,26 @@ class ProductsAdmin(admin.ModelAdmin):
 
     @admin.display(description="Warianty produktu")
     def show_variants(self, obj):
-        variants = list(ProductVariants.objects.filter(product=obj))
+        # Zoptymalizowane zapytanie z select_related i prefetch_related
+        variants = list(ProductVariants.objects.filter(product=obj)
+                        .select_related('color', 'producer_color', 'size')
+                        .prefetch_related('productvariantssources_set__source'))
+
         if not variants:
             return "Brak wariantów"
+
         variant_ids = [v.variant_id for v in variants]
+
         # Pobierz źródła, EANy i ceny detaliczne dla wszystkich wariantów jednym zapytaniem
         sources_qs = ProductvariantsSources.objects.filter(
-            variant__variant_id__in=variant_ids)
+            variant__variant_id__in=variant_ids).select_related('source')
         sources_map = {}
         for s in sources_qs:
             sources_map.setdefault(s.variant.variant_id, []).append(s)
+
         retail_map = {r.variant.variant_id: r.retail_price for r in ProductVariantsRetailPrice.objects.using(
             'MPD').filter(variant__variant_id__in=variant_ids)}
+
         # Pobierz stock_and_prices dla wszystkich variant_id i source_id
         from django.db import connections
         with connections['MPD'].cursor() as cursor:
@@ -227,16 +321,20 @@ class ProductsAdmin(admin.ModelAdmin):
         print(f"\n=== DEBUG: show_images dla produktu {obj.id} ===")
 
         # Grupowanie zdjęć po nazwie koloru producenta lub zwykłego koloru (nie używamy variant_id)
+        # Zoptymalizowane zapytanie z prefetch_related
         images = obj.images.all() if hasattr(obj, 'images') else []
         # Pobierz wszystkie unikalne kolory producenta i zwykłe kolory z wariantów produktu
+        # Zoptymalizowane zapytania z select_related
         producer_colors = (
             ProductVariants.objects.filter(
                 product=obj, producer_color__isnull=False)
+            .select_related('producer_color')
             .values_list('producer_color__id', 'producer_color__name')
             .distinct()
         )
         normal_colors = (
             ProductVariants.objects.filter(product=obj, color__isnull=False)
+            .select_related('color')
             .values_list('color__id', 'color__name')
             .distinct()
         )
@@ -312,20 +410,23 @@ class ProductsAdmin(admin.ModelAdmin):
     def show_related_products(self, obj):
         html = ""
         # Zestawy, do których należy ten produkt
+        # Zoptymalizowane zapytanie
         set_items = list(ProductSetItem.objects.filter(product_id=obj.id))
         set_ids = [si.product_set_id for si in set_items]
         if set_items:
             html += "<b>Zestawy, do których należy ten produkt:</b>"
             for set_id in set_ids:
                 try:
-                    set_obj = ProductSet.objects.get(id=set_id)
+                    set_obj = ProductSet.objects.select_related(
+                        'mapped_product').get(id=set_id)
                     set_products = ProductSetItem.objects.filter(
                         product_set_id=set_id).exclude(product_id=obj.id)
                     html += f"<div style='margin-bottom:8px;'><span style='font-weight:600;'>Zestaw: {set_obj.name} (ID: {set_obj.id})</span></div>"
                     html += "<div style='display:flex; flex-direction:row; flex-wrap:wrap; gap:24px; align-items:flex-start; margin-bottom:16px; width:100%;'>"
                     for sp in set_products:
                         try:
-                            prod = Products.objects.get(id=sp.product_id)
+                            prod = Products.objects.select_related(
+                                'brand').prefetch_related('images').get(id=sp.product_id)
                             admin_url = f"/admin/MPD/products/{prod.id}/change/"
                             img_html = ""
                             images_rel = getattr(prod, 'images', None)
@@ -351,7 +452,10 @@ class ProductsAdmin(admin.ModelAdmin):
         if series and series_products:
             html += f"<b>Produkty z tej samej serii ({series_name}):</b>"
             html += "<div style='display:flex; flex-direction:row; gap:24px; align-items:flex-start; margin-bottom:8px;'>"
-            for p in series_products:
+            # Zoptymalizowane zapytanie dla produktów z serii
+            series_products_optimized = Products.objects.filter(
+                series=series).exclude(id=obj.id).select_related('brand').prefetch_related('images')
+            for p in series_products_optimized:
                 admin_url = f"/admin/MPD/products/{p.id}/change/"
                 img_html = ""
                 images_rel = getattr(p, 'images', None)
@@ -366,11 +470,66 @@ class ProductsAdmin(admin.ModelAdmin):
             html = "Brak powiązanych produktów"
         return mark_safe(html)
 
+    def get_tree(self, product_id=None):
+        """Generuje drzewo ścieżek w formacie HTML z wyróżnieniem przypisanych do produktu"""
+        paths = list(Paths.objects.using('MPD').all())
+
+        # Pobierz ścieżki przypisane do produktu
+        assigned_path_ids = set()
+        if product_id:
+            product_paths = ProductPaths.objects.using(
+                'MPD').filter(product_id=product_id)
+            assigned_path_ids = set(pp.path_id for pp in product_paths)
+        tree = {}
+        by_id = {p.id: p for p in paths}
+        for p in paths:
+            parent = p.parent_id
+            if parent and parent in by_id:
+                tree.setdefault(parent, []).append(p)
+            else:
+                tree.setdefault(None, []).append(p)
+
+        def build_html(parent=None):
+            html = ''
+            children = tree.get(parent, [])
+            if children:
+                html += '<ul style="list-style:none; margin:0; padding-left:18px">'
+                for p in children:
+                    has_children = p.id in tree
+                    node_id = f'path-node-{p.id}'
+                    is_assigned = p.id in assigned_path_ids
+
+                    # Style dla przypisanych ścieżek
+                    style = 'background-color: #d4edda; border: 1px solid #c3e6cb; padding: 2px 5px; border-radius: 3px; margin: 1px 0;' if is_assigned else ''
+                    checked_attr = 'checked' if is_assigned else ''
+
+                    # Checkbox do zarządzania przypisaniem
+                    checkbox_html = f'<input type="checkbox" class="path-checkbox" data-path-id="{p.id}" {checked_attr} style="margin-right: 8px;">'
+
+                    html += f'<li id="{node_id}" style="{style}">' \
+                        + (f'<span class="toggle-btn" data-target="{node_id}-children" style="cursor:pointer; font-weight:bold;">[-]</span> ' if has_children else '') \
+                        + checkbox_html \
+                        + f'{p.name or "(brak nazwy)"} [{p.path or "-"}] [id={p.id}]'
+                    if has_children:
+                        html += f'<div id="{node_id}-children">' + \
+                            build_html(p.id) + '</div>'
+                    html += '</li>'
+                html += '</ul>'
+            return html
+        return build_html()
+
+    def render_change_form(self, request, context, *args, **kwargs):
+        """Dodaje drzewo ścieżek do kontekstu formularza edycji produktu"""
+        obj = kwargs.get('obj')
+        product_id = obj.id if obj else None
+        context['paths_tree'] = self.get_tree(product_id)
+        return super().render_change_form(request, context, *args, **kwargs)
+
 
 @admin.register(Brands)
 class BrandsAdmin(admin.ModelAdmin):
-    fields = ['name', 'logo_url', 'opis', 'url']
-    list_display = ['id', 'name', 'url']
+    fields = ['name', 'logo_url', 'opis', 'url', 'iai_brand_id']
+    list_display = ['id', 'name', 'url', 'iai_brand_id']
     search_fields = ['name']
 
     def get_queryset(self, request):
@@ -483,8 +642,163 @@ class PathsAdmin(admin.ModelAdmin):
 
 admin.site.register(Paths, PathsAdmin)
 
+
+@admin.register(IaiProductCounter)
+class IaiProductCounterAdmin(admin.ModelAdmin):
+    list_display = ['id', 'counter_value']
+    readonly_fields = ['id', 'counter_value']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FullChangeFile)
+class FullChangeFileAdmin(admin.ModelAdmin):
+    list_display = ['id', 'filename', 'timestamp',
+                    'created_at', 'file_size']
+    list_filter = ['created_at']
+    search_fields = ['filename', 'timestamp']
+    readonly_fields = ['id', 'filename', 'timestamp', 'created_at',
+                       'bucket_url', 'local_path', 'file_size']
+    ordering = ['-created_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
 # @admin.register(Categories)
 # class CategoriesAdmin(admin.ModelAdmin):
 #     list_display = ['id', 'name', 'path', 'parent_id']
 #     search_fields = ['name', 'path']
 #     list_filter = ['name']
+
+
+@admin.register(Attributes)
+class AttributesAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name']
+    search_fields = ['name']
+    list_filter = ['name']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductVariants)
+class ProductVariantsAdmin(admin.ModelAdmin):
+    list_display = ['variant_id', 'product', 'color', 'producer_color',
+                    'size', 'producer_code', 'iai_product_id', 'updated_at']
+    list_filter = ['color', 'producer_color', 'size', 'updated_at']
+    search_fields = ['variant_id', 'product__name',
+                     'producer_code', 'iai_product_id']
+    raw_id_fields = ['product', 'color', 'producer_color', 'size']
+    readonly_fields = ['variant_id', 'updated_at']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductvariantsSources)
+class ProductVariantsSourcesAdmin(admin.ModelAdmin):
+    list_display = ['id', 'variant', 'source', 'ean', 'variant_uid',
+                    'gtin14', 'gtin13', 'gtin12', 'isbn10', 'gtin8', 'upce', 'mpn', 'other']
+    list_filter = ['source']
+    search_fields = ['ean', 'variant_uid', 'gtin14', 'gtin13',
+                     'gtin12', 'isbn10', 'gtin8', 'upce', 'mpn', 'other']
+    raw_id_fields = ['variant', 'source']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductVariantsRetailPrice)
+class ProductVariantsRetailPriceAdmin(admin.ModelAdmin):
+    list_display = ['variant', 'retail_price',
+                    'vat', 'currency', 'net_price', 'updated_at']
+    list_filter = ['currency', 'updated_at']
+    search_fields = ['variant__variant_id', 'variant__product__name']
+    raw_id_fields = ['variant']
+    readonly_fields = ['updated_at']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductImage)
+class ProductImageAdmin(admin.ModelAdmin):
+    list_display = ['id', 'product',
+                    'iai_product_id', 'file_path', 'updated_at']
+    list_filter = ['updated_at']
+    search_fields = ['product__name', 'file_path', 'iai_product_id']
+    raw_id_fields = ['product']
+    readonly_fields = ['id', 'updated_at']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductSeries)
+class ProductSeriesAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name']
+    search_fields = ['name']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(Categories)
+class CategoriesAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'path', 'parent_id']
+    search_fields = ['name', 'path']
+    list_filter = ['name']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(Vat)
+class VatAdmin(admin.ModelAdmin):
+    list_display = ['id', 'vat_rate']
+    search_fields = ['vat_rate']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(ProductPaths)
+class ProductPathsAdmin(admin.ModelAdmin):
+    list_display = ['id', 'product_id', 'path_id']
+    search_fields = ['product_id', 'path_id']
+    list_filter = ['path_id']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(Units)
+class UnitsAdmin(admin.ModelAdmin):
+    list_display = ['id', 'unit_id', 'name']
+    search_fields = ['name', 'unit_id']
+    list_filter = ['unit_id']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
+
+@admin.register(FabricComponent)
+class FabricComponentAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name']
+    search_fields = ['name']
+
+
+@admin.register(ProductFabric)
+class ProductFabricAdmin(admin.ModelAdmin):
+    list_display = ['id', 'product', 'component', 'percentage']
+    list_filter = ['component', 'percentage']
+    search_fields = ['product__name', 'component__name']
+    raw_id_fields = ['product', 'component']

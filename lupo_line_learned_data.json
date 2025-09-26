@@ -1,0 +1,274 @@
+{
+  "products_processed": [
+    {
+      "timestamp": "2025-08-18T11:18:15.217869",
+      "title": "Kostium dwuczęściowy Biustonosz Bralet Model Ember Multicolor - Lupo Line",
+      "model": "Ember",
+      "description": "\n    Biustonosz Wave to model stworzony z myślą o kobietach z pełniejszym biustem, \n    które pragną połączyć komfort z modnym, odważnym wzorem. Biustonosz posiada \n    miękkie miseczki z modelującymi cięciami oraz jest usztywniony fiszbinami, \n    dzięki czemu doskonale podtrzymuje średnie i duże biusty. Ramiączka regulowane, \n    nieodpinane.\n    ",
+      "detected_attributes": [
+        27,
+        9,
+        15,
+        23,
+        5
+      ],
+      "producer_color": "Multicolor",
+      "main_color": "wielokolorowy",
+      "series_name": "strój kąpielowy Ember - Lupo Line",
+      "material_composition": [
+        {
+          "component": "poliamid",
+          "percentage": 85
+        },
+        {
+          "component": "elastan",
+          "percentage": 15
+        }
+      ],
+      "success": true,
+      "errors": []
+    }
+  ],
+  "pattern_success_rate": {},
+  "attribute_correlations": {
+    "attr_27": {
+      "successful_phrases": {
+        "biustonosz wave": 1,
+        "biustonosz wave to": 1,
+        "to model stworzony": 1,
+        "model stworzony z": 1,
+        "z myślą o": 1,
+        "o kobietach z": 1,
+        "z pełniejszym biustem,": 1,
+        "pełniejszym biustem, które": 1,
+        "biustem, które pragną": 1,
+        "które pragną połączyć": 1,
+        "pragną połączyć komfort": 1,
+        "połączyć komfort z": 1,
+        "z modnym, odważnym": 1,
+        "modnym, odważnym wzorem.": 1,
+        "odważnym wzorem. biustonosz": 1,
+        "wzorem. biustonosz posiada": 1,
+        "biustonosz posiada miękkie": 1,
+        "posiada miękkie miseczki": 1,
+        "miękkie miseczki z": 1,
+        "z modelującymi cięciami": 1,
+        "modelującymi cięciami oraz": 1,
+        "cięciami oraz jest": 1,
+        "oraz jest usztywniony": 1,
+        "jest usztywniony fiszbinami,": 1,
+        "usztywniony fiszbinami, dzięki": 1,
+        "fiszbinami, dzięki czemu": 1,
+        "dzięki czemu doskonale": 1,
+        "czemu doskonale podtrzymuje": 1,
+        "doskonale podtrzymuje średnie": 1,
+        "podtrzymuje średnie i": 1,
+        "i duże biusty.": 1,
+        "duże biusty. ramiączka": 1,
+        "biusty. ramiączka regulowane,": 1,
+        "ramiączka regulowane, nieodpinane.": 1,
+        "regulowane, nieodpinane.": 1
+      },
+      "context_words": {}
+    },
+    "attr_9": {
+      "successful_phrases": {
+        "biustonosz wave": 1,
+        "biustonosz wave to": 1,
+        "to model stworzony": 1,
+        "model stworzony z": 1,
+        "z myślą o": 1,
+        "o kobietach z": 1,
+        "z pełniejszym biustem,": 1,
+        "pełniejszym biustem, które": 1,
+        "biustem, które pragną": 1,
+        "które pragną połączyć": 1,
+        "pragną połączyć komfort": 1,
+        "połączyć komfort z": 1,
+        "z modnym, odważnym": 1,
+        "modnym, odważnym wzorem.": 1,
+        "odważnym wzorem. biustonosz": 1,
+        "wzorem. biustonosz posiada": 1,
+        "biustonosz posiada miękkie": 1,
+        "posiada miękkie miseczki": 1,
+        "miękkie miseczki z": 1,
+        "z modelującymi cięciami": 1,
+        "modelującymi cięciami oraz": 1,
+        "cięciami oraz jest": 1,
+        "oraz jest usztywniony": 1,
+        "jest usztywniony fiszbinami,": 1,
+        "usztywniony fiszbinami, dzięki": 1,
+        "fiszbinami, dzięki czemu": 1,
+        "dzięki czemu doskonale": 1,
+        "czemu doskonale podtrzymuje": 1,
+        "doskonale podtrzymuje średnie": 1,
+        "podtrzymuje średnie i": 1,
+        "i duże biusty.": 1,
+        "duże biusty. ramiączka": 1,
+        "biusty. ramiączka regulowane,": 1,
+        "ramiączka regulowane, nieodpinane.": 1,
+        "regulowane, nieodpinane.": 1
+      },
+      "context_words": {}
+    },
+    "attr_15": {
+      "successful_phrases": {
+        "biustonosz wave": 1,
+        "biustonosz wave to": 1,
+        "to model stworzony": 1,
+        "model stworzony z": 1,
+        "z myślą o": 1,
+        "o kobietach z": 1,
+        "z pełniejszym biustem,": 1,
+        "pełniejszym biustem, które": 1,
+        "biustem, które pragną": 1,
+        "które pragną połączyć": 1,
+        "pragną połączyć komfort": 1,
+        "połączyć komfort z": 1,
+        "z modnym, odważnym": 1,
+        "modnym, odważnym wzorem.": 1,
+        "odważnym wzorem. biustonosz": 1,
+        "wzorem. biustonosz posiada": 1,
+        "biustonosz posiada miękkie": 1,
+        "posiada miękkie miseczki": 1,
+        "miękkie miseczki z": 1,
+        "z modelującymi cięciami": 1,
+        "modelującymi cięciami oraz": 1,
+        "cięciami oraz jest": 1,
+        "oraz jest usztywniony": 1,
+        "jest usztywniony fiszbinami,": 1,
+        "usztywniony fiszbinami, dzięki": 1,
+        "fiszbinami, dzięki czemu": 1,
+        "dzięki czemu doskonale": 1,
+        "czemu doskonale podtrzymuje": 1,
+        "doskonale podtrzymuje średnie": 1,
+        "podtrzymuje średnie i": 1,
+        "i duże biusty.": 1,
+        "duże biusty. ramiączka": 1,
+        "biusty. ramiączka regulowane,": 1,
+        "ramiączka regulowane, nieodpinane.": 1,
+        "regulowane, nieodpinane.": 1
+      },
+      "context_words": {}
+    },
+    "attr_23": {
+      "successful_phrases": {
+        "biustonosz wave": 1,
+        "biustonosz wave to": 1,
+        "to model stworzony": 1,
+        "model stworzony z": 1,
+        "z myślą o": 1,
+        "o kobietach z": 1,
+        "z pełniejszym biustem,": 1,
+        "pełniejszym biustem, które": 1,
+        "biustem, które pragną": 1,
+        "które pragną połączyć": 1,
+        "pragną połączyć komfort": 1,
+        "połączyć komfort z": 1,
+        "z modnym, odważnym": 1,
+        "modnym, odważnym wzorem.": 1,
+        "odważnym wzorem. biustonosz": 1,
+        "wzorem. biustonosz posiada": 1,
+        "biustonosz posiada miękkie": 1,
+        "posiada miękkie miseczki": 1,
+        "miękkie miseczki z": 1,
+        "z modelującymi cięciami": 1,
+        "modelującymi cięciami oraz": 1,
+        "cięciami oraz jest": 1,
+        "oraz jest usztywniony": 1,
+        "jest usztywniony fiszbinami,": 1,
+        "usztywniony fiszbinami, dzięki": 1,
+        "fiszbinami, dzięki czemu": 1,
+        "dzięki czemu doskonale": 1,
+        "czemu doskonale podtrzymuje": 1,
+        "doskonale podtrzymuje średnie": 1,
+        "podtrzymuje średnie i": 1,
+        "i duże biusty.": 1,
+        "duże biusty. ramiączka": 1,
+        "biusty. ramiączka regulowane,": 1,
+        "ramiączka regulowane, nieodpinane.": 1,
+        "regulowane, nieodpinane.": 1
+      },
+      "context_words": {}
+    },
+    "attr_5": {
+      "successful_phrases": {
+        "biustonosz wave": 1,
+        "biustonosz wave to": 1,
+        "to model stworzony": 1,
+        "model stworzony z": 1,
+        "z myślą o": 1,
+        "o kobietach z": 1,
+        "z pełniejszym biustem,": 1,
+        "pełniejszym biustem, które": 1,
+        "biustem, które pragną": 1,
+        "które pragną połączyć": 1,
+        "pragną połączyć komfort": 1,
+        "połączyć komfort z": 1,
+        "z modnym, odważnym": 1,
+        "modnym, odważnym wzorem.": 1,
+        "odważnym wzorem. biustonosz": 1,
+        "wzorem. biustonosz posiada": 1,
+        "biustonosz posiada miękkie": 1,
+        "posiada miękkie miseczki": 1,
+        "miękkie miseczki z": 1,
+        "z modelującymi cięciami": 1,
+        "modelującymi cięciami oraz": 1,
+        "cięciami oraz jest": 1,
+        "oraz jest usztywniony": 1,
+        "jest usztywniony fiszbinami,": 1,
+        "usztywniony fiszbinami, dzięki": 1,
+        "fiszbinami, dzięki czemu": 1,
+        "dzięki czemu doskonale": 1,
+        "czemu doskonale podtrzymuje": 1,
+        "doskonale podtrzymuje średnie": 1,
+        "podtrzymuje średnie i": 1,
+        "i duże biusty.": 1,
+        "duże biusty. ramiączka": 1,
+        "biusty. ramiączka regulowane,": 1,
+        "ramiączka regulowane, nieodpinane.": 1,
+        "regulowane, nieodpinane.": 1
+      },
+      "context_words": {}
+    }
+  },
+  "model_characteristics": {
+    "Ember": {
+      "count": 1,
+      "typical_attributes": {
+        "27": 1,
+        "9": 1,
+        "15": 1,
+        "23": 1,
+        "5": 1
+      },
+      "typical_colors": {
+        "Multicolor": 1
+      },
+      "typical_materials": {
+        "poliamid": 1,
+        "elastan": 1
+      },
+      "success_rate": {
+        "successful": 1,
+        "total": 1
+      }
+    }
+  },
+  "description_patterns": {},
+  "material_patterns": {
+    "material_by_model": {
+      "Ember": {
+        "poliamid_85_elastan_15": 1
+      }
+    }
+  },
+  "title_optimization_patterns": {},
+  "error_patterns": [],
+  "learning_statistics": {
+    "total_products": 1,
+    "successful_extractions": 1,
+    "failed_extractions": 0,
+    "last_updated": "2025-08-18T11:18:15.218683"
+  }
+}

@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../datascientist"
+		},
+		{
+			"path": "../career-guide"
+		},
+		{
+			"path": "../nozyk"
+		}
+	],
+	"settings": {
+		"postman.settings.dotenv-detection-notification-visibility": false,
+		"powershell.cwd": "nc_project"
+	}
+}

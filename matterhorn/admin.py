@@ -9,6 +9,7 @@ from rapidfuzz import fuzz
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.core.cache import cache
 from .defs_import import get_popular_products, get_stock_statistics, clean_old_stock_history, get_safe_variant_id
 from MPD.models import ProductvariantsSources
 
@@ -60,15 +61,26 @@ class ProductsAdmin(admin.ModelAdmin):
         queryset = super().get_queryset(request)
         category = request.GET.get('category_name__exact')
 
-        if category:
-            self.brand_choices = list(queryset.filter(
-                category_name=category).values_list('brand', flat=True).distinct())
-        else:
-            self.brand_choices = list(
-                queryset.values_list('brand', flat=True).distinct())
+        # Cache dla brand_choices
+        cache_key = f"brand_choices_{category or 'all'}"
+        self.brand_choices = cache.get(cache_key)
+        if self.brand_choices is None:
+            if category:
+                self.brand_choices = list(queryset.filter(
+                    category_name=category).values_list('brand', flat=True).distinct())
+            else:
+                self.brand_choices = list(
+                    queryset.values_list('brand', flat=True).distinct())
+            # Cache na 5 minut
+            cache.set(cache_key, self.brand_choices, 300)
 
         # Optymalizacja zapytań do relacji używanych w list_display i metodach
-        return queryset.select_related('brand').prefetch_related('images', 'variants', 'other_colors', 'product_in_set')
+        return queryset.select_related().prefetch_related(
+            'images',
+            'variants',
+            'other_colors__color_product',
+            'product_in_set__set_product'
+        )
 
     def lookup_allowed(self, lookup, value):
         # Zezwól na filtrowanie po kategorii i marce
@@ -211,6 +223,61 @@ class ProductsAdmin(admin.ModelAdmin):
                                        series_id, mapped_product_id])
                     return JsonResponse({'success': True, 'message': 'Zaktualizowano serię.'})
 
+                # Aktualizacja koloru producenta
+                if 'producer_color_name' in request.POST and len(request.POST) == 1:
+                    producer_color_name = request.POST.get(
+                        'producer_color_name')
+                    main_color_id = request.POST.get('main_color_id')
+
+                    if not main_color_id:
+                        return JsonResponse({'success': False, 'error': 'Brak głównego koloru'})
+
+                    with connections['MPD'].cursor() as cursor:
+                        # Pobierz kolor aktualnego produktu z Matterhorn
+                        with connections['matterhorn'].cursor() as matterhorn_cursor:
+                            matterhorn_cursor.execute(
+                                "SELECT color FROM products WHERE id = %s", [product_id])
+                            color_result = matterhorn_cursor.fetchone()
+                            if not color_result:
+                                return JsonResponse({'success': False, 'error': 'Nie można pobrać koloru produktu'})
+                            product_color = color_result[0]
+
+                        # Pobierz color_id dla koloru produktu
+                        cursor.execute(
+                            "SELECT id FROM colors WHERE name = %s AND parent_id IS NULL", [product_color])
+                        color_row = cursor.fetchone()
+                        if not color_row:
+                            return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
+                        color_id = color_row[0]
+
+                        # Sprawdź czy kolor producenta już istnieje
+                        cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s", [
+                                       producer_color_name, color_id])
+                        pc_row = cursor.fetchone()
+                        if pc_row:
+                            producer_color_id = pc_row[0]
+                        else:
+                            # Utwórz nowy kolor producenta
+                            cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id", [
+                                           producer_color_name, color_id])
+                            row = cursor.fetchone()
+                            if row:
+                                producer_color_id = row[0]
+                            else:
+                                return JsonResponse({'success': False, 'error': 'Nie udało się utworzyć koloru producenta'})
+
+                        # Aktualizuj tylko warianty z tym samym color_id (tym samym kolorem produktu)
+                        cursor.execute("""
+                            UPDATE product_variants 
+                            SET producer_color_id = %s, updated_at = NOW() 
+                            WHERE product_id = %s AND color_id = %s
+                        """, [producer_color_id, mapped_product_id, color_id])
+
+                        updated_count = cursor.rowcount
+                        connections['MPD'].commit()
+
+                    return JsonResponse({'success': True, 'message': f'Zaktualizowano kolor producenta dla {updated_count} wariantów.'})
+
                 # Analogicznie możesz dodać kolejne pola...
 
                 return JsonResponse({'success': False, 'error': 'Nieprawidłowe pole lub brak obsługi.'})
@@ -259,8 +326,14 @@ class ProductsAdmin(admin.ModelAdmin):
                     f"[add_new_variants_to_mpd] ID koloru w MPD: {color_id}")
 
                 # Generuj nowy iai_product_id dla tego koloru produktu
-                mpd_cursor.execute(
-                    "SELECT COALESCE(MAX(iai_product_id), 0) + 1 FROM product_variants")
+                # Użyj sekwencji lub tabeli counter, aby iai_product_id zawsze rósł
+                mpd_cursor.execute("""
+                    INSERT INTO iai_product_counter (counter_value) 
+                    VALUES (1) 
+                    ON CONFLICT (id) 
+                    DO UPDATE SET counter_value = iai_product_counter.counter_value + 1 
+                    RETURNING counter_value
+                """)
                 iai_product_id_result = mpd_cursor.fetchone()
                 iai_product_id = iai_product_id_result[0] if iai_product_id_result else 1
                 variant_logger.info(
@@ -613,8 +686,14 @@ class ProductsAdmin(admin.ModelAdmin):
                                 raise Exception('Brak wariantów dla produktu')
 
                             # Generuj unikalny iai_product_id dla wszystkich wariantów tego produktu
-                            cursor.execute(
-                                "SELECT COALESCE(MAX(iai_product_id), 0) + 1 FROM product_variants")
+                            # Użyj sekwencji lub tabeli counter, aby iai_product_id zawsze rósł
+                            cursor.execute("""
+                                INSERT INTO iai_product_counter (counter_value) 
+                                VALUES (1) 
+                                ON CONFLICT (id) 
+                                DO UPDATE SET counter_value = iai_product_counter.counter_value + 1 
+                                RETURNING counter_value
+                            """)
                             iai_product_id_result = cursor.fetchone()
                             iai_product_id = iai_product_id_result[0] if iai_product_id_result else 1
                             logger.info(
@@ -744,24 +823,45 @@ class ProductsAdmin(admin.ModelAdmin):
                             f"FABRICS: {fabric_components} {fabric_percentages}")
                         # --- DODAJ: zapis materiałów (fabric) ---
                         if fabric_components and fabric_percentages:
+                            # Sprawdź czy suma procentów nie przekracza 100%
+                            total_percentage = 0
+                            valid_percentages = []
+
                             for comp_id, perc in zip(fabric_components, fabric_percentages):
-                                try:
-                                    # Sprawdź czy wartości nie są puste
-                                    if comp_id and perc and comp_id.strip() and perc.strip():
+                                if comp_id and perc and comp_id.strip() and perc.strip():
+                                    try:
                                         comp_id_int = int(comp_id)
                                         perc_int = int(perc)
-                                        if perc_int > 0:
-                                            cursor.execute(
-                                                "INSERT INTO product_fabric (product_id, component_id, percentage) VALUES (%s, %s, %s)",
-                                                [new_product_id,
-                                                    comp_id_int, perc_int]
-                                            )
-                                except (ValueError, TypeError) as e:
-                                    logger.error(
-                                        f"Błąd zapisu materiału: {comp_id}, {perc}: {e}")
-                                except Exception as e:
-                                    logger.error(
-                                        f"Nieoczekiwany błąd zapisu materiału: {comp_id}, {perc}: {e}")
+                                        if perc_int > 0 and perc_int <= 100:
+                                            total_percentage += perc_int
+                                            valid_percentages.append(
+                                                (comp_id_int, perc_int))
+                                    except (ValueError, TypeError) as e:
+                                        logger.error(
+                                            f"Błąd parsowania materiału: {comp_id}, {perc}: {e}")
+
+                            # Sprawdź czy suma procentów jest poprawna
+                            if total_percentage > 100:
+                                logger.warning(
+                                    f"Suma procentów materiałów przekracza 100%: {total_percentage}%. Pomijam zapis materiałów.")
+                                variant_logger.warning(
+                                    f"Suma procentów materiałów przekracza 100%: {total_percentage}%. Pomijam zapis materiałów.")
+                            elif total_percentage == 0:
+                                logger.info(
+                                    "Brak poprawnych procentów materiałów do zapisu.")
+                            else:
+                                # Zapisz materiały tylko jeśli suma procentów jest poprawna
+                                for comp_id_int, perc_int in valid_percentages:
+                                    try:
+                                        cursor.execute(
+                                            "INSERT INTO product_fabric (product_id, component_id, percentage) VALUES (%s, %s, %s)",
+                                            [new_product_id, comp_id_int, perc_int]
+                                        )
+                                        logger.info(
+                                            f"Zapisano materiał: component_id={comp_id_int}, percentage={perc_int}%")
+                                    except Exception as e:
+                                        logger.error(
+                                            f"Błąd zapisu materiału: {comp_id_int}, {perc_int}: {e}")
                         # --- KONIEC ZAPISU MATERIAŁÓW ---
 
                 return JsonResponse({'success': True, 'message': 'Produkt został pomyślnie zmapowany'})
@@ -864,12 +964,6 @@ class ProductsAdmin(admin.ModelAdmin):
                 variant_logger.error(f"[assign_mapping] Błąd: {e}")
                 return JsonResponse({'success': False, 'error': str(e)})
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda żądania'})
-
-    def get_queryset(self, request):
-        queryset = super().get_queryset(request)
-        queryset = queryset.prefetch_related(
-            'variants', 'other_colors', 'product_in_set')
-        return queryset
 
     def get_product_images(self, obj):
         images = Images.objects.filter(product=obj)
@@ -1216,8 +1310,14 @@ class ProductsAdmin(admin.ModelAdmin):
                             suggested_in_query = 0
                         scored.append(
                             {'id': row[0], 'name': row[1], 'brand': row[2], 'similarity': score, 'suggested_in_query': suggested_in_query})
-                    suggested_products = sorted(
-                        scored, key=lambda x: x['similarity'], reverse=True)[:5]
+                    # Sprawdź parametr sortowania z request
+                    sort_by = request.GET.get('sort_by', 'similarity')
+                    if sort_by == 'suggested_in_query':
+                        suggested_products = sorted(
+                            scored, key=lambda x: x['suggested_in_query'], reverse=True)[:5]
+                    else:
+                        suggested_products = sorted(
+                            scored, key=lambda x: x['similarity'], reverse=True)[:5]
             except Exception as e:
                 logger.error(
                     f"Błąd fuzzy search sugerowanych produktów (RapidFuzz): {e}")
@@ -1602,8 +1702,34 @@ class ProductsAdmin(admin.ModelAdmin):
                                         f"Nie udało się utworzyć koloru: {value}")
                                     raise Exception(
                                         'Nie udało się utworzyć koloru')
-                        cursor.execute(f"UPDATE product_variants SET {field_name} = %s, updated_at = NOW() WHERE product_id = %s", [
-                                       color_id, product_id])
+
+                        # Dla producer_color_id, aktualizuj tylko warianty z odpowiednim color_id
+                        if field_name == 'producer_color_id':
+                            # Pobierz kolor aktualnego produktu z request
+                            request_data = json.loads(request.body)
+                            product_color = request_data.get('current_color')
+
+                            if not product_color:
+                                return JsonResponse({'success': False, 'error': 'Brak informacji o kolorze produktu'})
+
+                            # Pobierz color_id dla koloru produktu w MPD
+                            cursor.execute(
+                                "SELECT id FROM colors WHERE name = %s AND parent_id IS NULL", [product_color])
+                            color_row = cursor.fetchone()
+                            if not color_row:
+                                return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
+                            product_color_id = color_row[0]
+
+                            # Aktualizuj tylko warianty z tym samym color_id (tym samym kolorem produktu)
+                            cursor.execute(f"""
+                                UPDATE product_variants 
+                                SET {field_name} = %s, updated_at = NOW() 
+                                WHERE product_id = %s AND color_id = %s
+                            """, [color_id, product_id, product_color_id])
+                        else:
+                            # Dla color_id, aktualizuj wszystkie warianty produktu
+                            cursor.execute(f"UPDATE product_variants SET {field_name} = %s, updated_at = NOW() WHERE product_id = %s", [
+                                           color_id, product_id])
                     elif field_name in variants_fields:
                         cursor.execute(f"UPDATE product_variants SET {field_name} = %s, updated_at = NOW() WHERE product_id = %s", [
                                        value, product_id])

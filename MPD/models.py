@@ -5,6 +5,17 @@ from django.contrib import admin
 
 # Create your models here.
 
+class Attributes(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        managed = True
+        db_table = 'attributes'
+        app_label = 'MPD'
+        verbose_name = 'Attribute'
+        verbose_name_plural = 'Attributes'
+
 
 class Brands(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -12,9 +23,11 @@ class Brands(models.Model):
     logo_url = models.TextField(blank=True, null=True)
     opis = models.TextField(blank=True, null=True)
     url = models.URLField(max_length=255, blank=True, null=True)
+    iai_brand_id = models.IntegerField(blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'brands'
         app_label = 'MPD'
         verbose_name = 'Brand'
@@ -35,6 +48,8 @@ class Colors(models.Model):
     hex_code = models.CharField(max_length=7, blank=True, null=True)
     parent_id = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, db_column='parent_id')
+    iai_colors_id = models.IntegerField(blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = True
@@ -49,20 +64,23 @@ class Colors(models.Model):
 
 class Products(models.Model):
     id = models.BigAutoField(primary_key=True)
-    name = models.CharField(max_length=255, blank=True, null=True)
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     short_description = models.CharField(max_length=500, blank=True, null=True)
     brand = models.ForeignKey(
-        Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id')
-    updated_at = models.DateTimeField(blank=True, null=True)
+        Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     series = models.ForeignKey('ProductSeries', db_column='series_id',
                                on_delete=models.DO_NOTHING, blank=True, null=True)
     unit = models.ForeignKey(
         'Units', on_delete=models.CASCADE, db_column='unit', to_field='unit_id', null=True, blank=True)
+    visibility = models.BooleanField(
+        default=True, verbose_name='Widoczność w sklepie')
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'products'
         app_label = 'MPD'
         verbose_name = 'Product'
@@ -75,6 +93,23 @@ class Products(models.Model):
         return self.brand.name if self.brand else 'Brak marki'
 
 
+class ProductAttribute(models.Model):
+    product = models.ForeignKey(
+        Products, on_delete=models.CASCADE, related_name='product_attributes')
+    attribute = models.ForeignKey(Attributes, on_delete=models.CASCADE)
+
+    class Meta:
+        managed = True
+        db_table = 'product_attributes'
+        app_label = 'MPD'
+        verbose_name = 'Atrybut produktu'
+        verbose_name_plural = 'Atrybuty produktów'
+        unique_together = ('product', 'attribute')
+
+    def __str__(self):
+        return str(self.attribute.name)
+
+
 class Sizes(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255, blank=True, null=True)
@@ -82,9 +117,10 @@ class Sizes(models.Model):
     unit = models.CharField(max_length=255, blank=True, null=True)
     name_lower = models.CharField(max_length=255, blank=True, null=True)
     iai_size_id = models.CharField(max_length=255, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'sizes'
         app_label = 'MPD'
         verbose_name = 'Size'
@@ -111,6 +147,7 @@ class Sources(models.Model):
     city = models.CharField(max_length=100, blank=True, null=True)
     country = models.CharField(max_length=100, blank=True, null=True)
     province = models.CharField(max_length=100, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
         managed = True
@@ -121,7 +158,7 @@ class Sources(models.Model):
 
 
 class ProductVariants(models.Model):
-    variant_id = models.IntegerField(db_column='variant_id', primary_key=True)
+    variant_id = models.AutoField(db_column='variant_id', primary_key=True)
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id')
     color = models.ForeignKey(
@@ -132,11 +169,13 @@ class ProductVariants(models.Model):
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
     producer_code = models.CharField(max_length=255, blank=True, null=True)
     iai_product_id = models.IntegerField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    exported_to_iai = models.BooleanField(
+        default=False, verbose_name='Wyeksportowany do IAI')
+    updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_variants'
         app_label = 'MPD'
         verbose_name = 'Product Variant'
@@ -162,9 +201,10 @@ class ProductvariantsSources(models.Model):
     upce = models.CharField(max_length=50, blank=True, null=True)
     mpn = models.CharField(max_length=50, blank=True, null=True)
     other = models.CharField(max_length=50, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_variants_sources'
         app_label = 'MPD'
         verbose_name = 'Product Variant Source'
@@ -181,11 +221,11 @@ class ProductVariantsRetailPrice(models.Model):
     currency = models.CharField(max_length=10, null=True, blank=True)
     net_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_variants_retail_price'
 
 
@@ -195,10 +235,11 @@ class ProductImage(models.Model):
         Products, on_delete=models.CASCADE, db_column='product_id', related_name='images')
     iai_product_id = models.IntegerField(blank=True, null=True)
     file_path = models.CharField(max_length=500)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_images'
         app_label = 'MPD'
         verbose_name = 'Product Image'
@@ -219,7 +260,7 @@ class ProductSet(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_set'
         verbose_name = 'Product Set'
         verbose_name_plural = 'Product Sets'
@@ -239,7 +280,7 @@ class ProductSetItem(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_set_items'
         verbose_name = 'Product Set Item'
         verbose_name_plural = 'Product Set Items'
@@ -254,11 +295,12 @@ class ProductSeries(models.Model):
     objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_series'
         app_label = 'MPD'
         verbose_name = 'Seria'
         verbose_name_plural = 'Serie'
+        ordering = ['name']
 
     def __str__(self):
         return str(self.name) if self.name else f'Seria {self.id}'
@@ -274,9 +316,10 @@ class StockAndPrices(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=10)
     last_updated = models.DateTimeField()
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'stock_and_prices'
         verbose_name = 'Stan magazynowy'
         verbose_name_plural = 'Stany magazynowe'
@@ -295,7 +338,7 @@ class StockHistory(models.Model):
     change_date = models.DateTimeField()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'stock_history'
         verbose_name = 'Historia stanu magazynowego'
         verbose_name_plural = 'Historia stanów magazynowych'
@@ -306,9 +349,10 @@ class Categories(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     path = models.CharField(max_length=255, blank=True, null=True)
     parent_id = models.BigIntegerField(blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'categories'
         verbose_name = 'Kategoria'
         verbose_name_plural = 'Kategorie'
@@ -332,9 +376,10 @@ class Vat(models.Model):
     id = models.BigAutoField(primary_key=True)
     vat_rate = models.DecimalField(
         max_digits=5, decimal_places=2, null=True, blank=True)
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'vat'
 
 
@@ -343,9 +388,13 @@ class Paths(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     path = models.CharField(max_length=255, blank=True, null=True)
     parent_id = models.BigIntegerField(blank=True, null=True)
+    iai_category_id = models.IntegerField(blank=True, null=True)
+    iai_menu_id = models.IntegerField(blank=True, null=True)
+    iai_menu_parent_id = models.IntegerField(blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'path'
         verbose_name = 'Ścieżka'
         verbose_name_plural = 'Ścieżki'
@@ -355,11 +404,13 @@ class ProductPaths(models.Model):
     id = models.BigAutoField(primary_key=True)
     product_id = models.IntegerField()
     path_id = models.IntegerField()
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'product_path'
         verbose_name = 'Ścieżka produktu'
+        verbose_name_plural = 'Ścieżki produktów'
         unique_together = ('product_id', 'path_id')
 
 
@@ -367,12 +418,16 @@ class Units(models.Model):
     id = models.BigAutoField(primary_key=True)
     unit_id = models.IntegerField(unique=True)
     name = models.CharField(max_length=255, blank=True, null=True)
+    objects = models.Manager()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'units'
         verbose_name = 'Jednostka'
         verbose_name_plural = 'Jednostki'
+
+    def __str__(self):
+        return str(self.name) if self.name else f'Jednostka {self.unit_id}'
 
 
 class FabricComponent(models.Model):
@@ -382,7 +437,7 @@ class FabricComponent(models.Model):
         db_table = 'fabric_component'
 
     def __str__(self):
-        return self.name
+        return str(self.name) if self.name else "Brak nazwy"
 
 
 class ProductFabric(models.Model):
@@ -396,24 +451,42 @@ class ProductFabric(models.Model):
         unique_together = ('product', 'component')
 
     def __str__(self):
-        return f"{self.component.name} {self.percentage}%"
+        component_name = self.component.name if self.component and self.component.name else "Nieznany komponent"
+        return f"{component_name} {self.percentage}%"
 
 
-class ExportTracking(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    export_type = models.CharField(max_length=255)
-    last_exported_product_id = models.BigIntegerField()
-    last_exported_timestamp = models.DateTimeField()
-    total_products_exported = models.BigIntegerField()
-    export_status = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+class IaiProductCounter(models.Model):
+    id = models.IntegerField(primary_key=True)
+    counter_value = models.BigIntegerField()
+    objects = models.Manager()
 
     class Meta:
-        managed = False
-        db_table = 'xml_export_tracking'
-        verbose_name = 'Status eksportu'
-        verbose_name_plural = 'Statusy eksportu'
+        managed = True
+        db_table = 'iai_product_counter'
+        verbose_name = 'Licznik IAI Product ID'
+        verbose_name_plural = 'Liczniki IAI Product ID'
 
     def __str__(self):
-        return f"{self.export_type} - {self.export_status}"
+        return f"Licznik IAI: {str(self.counter_value)}"
+
+
+class FullChangeFile(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    filename = models.CharField(max_length=255)
+    timestamp = models.CharField(max_length=50)  # YYYY-MM-DDTHH-MM-SS
+    created_at = models.DateTimeField(auto_now_add=True)
+    bucket_url = models.URLField(blank=True, null=True)
+    local_path = models.CharField(max_length=500, blank=True, null=True)
+    file_size = models.BigIntegerField(default=0)
+
+    objects = models.Manager()
+
+    class Meta:
+        managed = True
+        db_table = 'full_change_files'
+        verbose_name = 'Plik XML'
+        verbose_name_plural = 'Pliki XML'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.filename} ({self.timestamp}) - {self.file_size} bytes"

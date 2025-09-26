@@ -1,0 +1,87 @@
+---
+description: Reguły dla Celery - taski, kolejki, scheduler, monitoring
+globs: ["**/tasks.py", "**/celery.py", "**/management/commands/*.py"]
+alwaysApply: true
+---
+
+# Reguły Celery
+
+## Taski (tasks.py)
+- **@shared_task** dla wszystkich tasków
+- **bind=True** dla tasków które potrzebują self
+- **autoretry_for** dla retry logic
+- **max_retries** i **countdown** dla retry
+- **time_limit** i **soft_time_limit** dla timeout
+- **acks_late=True** dla reliability
+- **task_ignore_result=False** dla monitoring
+- **task_track_started=True** dla progress tracking
+
+## Kolejki i routing
+- **queue='default'** dla wszystkich tasków
+- **CELERY_TASK_ROUTES** w settings
+- **priority** dla ważnych tasków
+- **routing_key** dla custom routing
+- **exchange** i **routing_key** dla advanced routing
+
+## Scheduler (django-celery-beat)
+- **PeriodicTask** model dla scheduled tasks
+- **CrontabSchedule** dla cron-like scheduling
+- **IntervalSchedule** dla interval scheduling
+- **SolarSchedule** dla solar events
+- **ClockedSchedule** dla specific times
+- **DatabaseScheduler** w settings
+
+## Monitoring i logging
+- **Flower** dla monitoring (port 5555)
+- **django-celery-results** dla result storage
+- **Logging** w taskach z poziomem INFO
+- **Progress tracking** dla długich tasków
+- **Error handling** z proper exceptions
+- **Task state** tracking
+
+## Konfiguracja Redis
+- **CELERY_BROKER_URL** dla broker
+- **CELERY_RESULT_BACKEND** dla results
+- **CELERY_CACHE_BACKEND** dla cache
+- **Redis password** w URL
+- **Database number** dla separation
+- **Connection pooling** dla performance
+
+## Task patterns
+- **Chain** dla sequential tasks
+- **Group** dla parallel tasks
+- **Chord** dla parallel + callback
+- **Map** dla batch processing
+- **Starmap** dla multiple arguments
+- **Chunks** dla large datasets
+
+## Error handling
+- **try/except** w taskach
+- **retry()** dla recoverable errors
+- **raise** dla unrecoverable errors
+- **logging** dla error tracking
+- **notification** dla critical errors
+- **dead letter queue** dla failed tasks
+
+## Performance
+- **Connection pooling** dla Redis
+- **Task batching** dla efficiency
+- **Memory management** dla large tasks
+- **Database optimization** w taskach
+- **Caching** dla repeated operations
+- **Async operations** gdzie możliwe
+
+## Development
+- **CELERY_TASK_ALWAYS_EAGER=True** dla testing
+- **CELERY_TASK_EAGER_PROPAGATES=True** dla debugging
+- **Local development** z Redis
+- **Docker** dla production-like environment
+- **Environment variables** dla configuration
+
+## Production
+- **Multiple workers** dla scalability
+- **Process monitoring** z supervisor/systemd
+- **Resource limits** dla workers
+- **Graceful shutdown** dla workers
+- **Health checks** dla monitoring
+- **Backup** dla Redis data

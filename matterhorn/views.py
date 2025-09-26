@@ -14,7 +14,8 @@ def about(request):
 
 
 def products(request):
-    product_list = Products.objects.all().order_by('-id')
+    product_list = Products.objects.select_related().prefetch_related(
+        'images', 'variants', 'other_colors').order_by('-id')
 
     # Filtrowanie na podstawie pól
     filters = {

@@ -186,6 +186,13 @@
             {% if not is_mapped and suggested_products %}
             <div class="form-row" style="margin-bottom:30px;">
                 <h3>Sugerowane podobne produkty w MPD:</h3>
+                <div style="margin-bottom: 10px;">
+                    <label for="sort-select" style="margin-right: 10px;">Sortuj według:</label>
+                    <select id="sort-select" onchange="changeSort()" style="padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+                        <option value="similarity" {% if request.GET.sort_by != 'suggested_in_query' %}selected{% endif %}>Podobieństwo</option>
+                        <option value="suggested_in_query" {% if request.GET.sort_by == 'suggested_in_query' %}selected{% endif %}>Pokrycie słów</option>
+                    </select>
+                </div>
                 <table style="width:100%; border-collapse:collapse;">
                     <thead>
                         <tr>
@@ -624,17 +631,24 @@ function addToSetInline(productId) {
 function updateField(field, inputId) {
     const value = document.getElementById(inputId).value;
     const productId = {{ original.mapped_product_id|default:'null' }};
+    const currentColor = '{{ original.color|default:"" }}';
     if (!productId) {
         showInlineStatus('Brak mapped_product_id!', false);
         return;
     }
+    
+    const requestData = { value: value };
+    if (field === 'producer_color_id' && currentColor) {
+        requestData.current_color = currentColor;
+    }
+    
     fetch(`/admin/matterhorn/products/mpd-update-field/${productId}/${field}/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ value: value })
+        body: JSON.stringify(requestData)
     })
     .then(response => response.json())
     .then(data => {
@@ -744,6 +758,13 @@ function updateAttributes() {
         statusMessage.className = 'status-message error';
         statusMessage.textContent = 'Błąd: ' + error;
     });
+}
+
+function changeSort() {
+    const sortBy = document.getElementById('sort-select').value;
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.set('sort_by', sortBy);
+    window.location.href = currentUrl.toString();
 }
 </script>
 {% endblock %} 

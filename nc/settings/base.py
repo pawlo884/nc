@@ -13,7 +13,21 @@ from logging.handlers import RotatingFileHandler
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Load environment variables
-load_dotenv()
+# Sprawdź czy używamy ustawień dev i załaduj odpowiedni plik .env
+if os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.dev'):
+    load_dotenv('.env.dev')
+else:
+    load_dotenv()
+
+# API URL configuration
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
+
+# Matterhorn API configuration
+MATTERHORN_API_URL = os.getenv(
+    'MATTERHORN_API_URL', 'https://matterhorn.pl')
+MATTERHORN_API_USERNAME = os.getenv('MATTERHORN_API_USERNAME', '')
+MATTERHORN_API_PASSWORD = os.getenv('MATTERHORN_API_PASSWORD', '')
+MATTERHORN_API_KEY = os.getenv('MATTERHORN_API_KEY', '')
 
 # Konfiguracja logowania
 LOGGING = {
@@ -35,8 +49,8 @@ LOGGING = {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs/matterhorn/import_all_by_one.log'),
-            'maxBytes': 5 * 1024 * 1024,  # 10MB
-            'backupCount': 5,
+            'maxBytes': 2 * 1024 * 1024,  # 2MB - zmniejszone z 5MB
+            'backupCount': 3,  # Zmniejszone z 5 do 3
             'formatter': 'verbose',
         },
         'console': {
@@ -68,10 +82,12 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'debug_toolbar',
-    'main',
+    'rest_framework',
+    'drf_spectacular',
     'matterhorn',
     'MPD',
     'web_agent',
+    'matterhorn1',
 ]
 
 MIDDLEWARE = [
@@ -116,6 +132,9 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+        }
     },
     'matterhorn': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -124,6 +143,9 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN_DB_HOST'),
         'PORT': os.getenv('MATTERHORN_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+        }
     },
     'MPD': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -132,13 +154,42 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+        }
+    },
+    'zzz_web_agent': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('WEB_AGENT_NAME'),
+        'USER': os.getenv('WEB_AGENT_USER'),
+        'PASSWORD': os.getenv('WEB_AGENT_PASSWORD'),
+        'HOST': os.getenv('WEB_AGENT_DB_HOST'),
+        'PORT': os.getenv('WEB_AGENT_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+        }
+    },
+    'matterhorn1': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('MATTERHORN1_DB_NAME'),
+        'USER': os.getenv('MATTERHORN1_DB_USER'),
+        'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
+        'HOST': os.getenv('MATTERHORN1_DB_HOST'),
+        'PORT': os.getenv('MATTERHORN1_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+        }
     }
 }
 
 # Database routers
 DATABASE_ROUTERS = [
     'nc.db_routers.MatterhornRouter',
-    'nc.db_routers.MPDRouter',]
+    'nc.db_routers.MPDRouter',
+    'nc.db_routers.WebAgentRouter',
+    'nc.db_routers.Matterhorn1Router',
+    'nc.db_routers.DefaultRouter',
+]
 
 WSGI_APPLICATION = 'nc.wsgi.application'
 
@@ -196,10 +247,34 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Warsaw'
 CELERY_TASK_ACKS_LATE = True
+
+# Cache Configuration - Redis dla blokad między workerami
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': 'redis://:dev_password@redis:6379/1',  # Używamy bazy 1 dla cache
+    }
+}
 CELERY_TASK_TRACK_STARTED = True
 
 # Celery Beat Configuration
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Celery Task Configuration
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Europe/Warsaw'
+CELERY_ENABLE_UTC = True
+
+# Celery Task Routes - uproszczone do jednej kolejki
+CELERY_TASK_ROUTES = {
+    # Wszystkie taski używają domyślnej kolejki
+    'matterhorn1.tasks.*': {'queue': 'default'},
+}
+
+# Celery Beat Schedule - używaj Django periodic tasks zamiast tego
+# CELERY_BEAT_SCHEDULE = {}
 
 # WhiteNoise Configuration
 WHITENOISE_USE_FINDERS = True
@@ -228,3 +303,40 @@ DEBUG_TOOLBAR_PANELS = [
     'debug_toolbar.panels.redirects.RedirectsPanel',
     'debug_toolbar.panels.profiling.ProfilingPanel',
 ]
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
+    ],
+}
+
+# drf-spectacular Configuration
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'NC Project API',
+    'DESCRIPTION': 'API dla zarządzania produktami, wariantami i eksportu XML',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'TAGS': [
+        {'name': 'Products', 'description': 'Operacje na produktach'},
+        {'name': 'Variants', 'description': 'Operacje na wariantach produktów'},
+        {'name': 'Brands', 'description': 'Operacje na markach'},
+        {'name': 'Categories', 'description': 'Operacje na kategoriach'},
+        {'name': 'Images', 'description': 'Operacje na obrazach produktów'},
+        {'name': 'Product Sets', 'description': 'Zarządzanie zestawami produktów'},
+        {'name': 'XML Export', 'description': 'Eksport i generowanie plików XML'},
+        {'name': 'Database', 'description': 'Operacje na bazie danych'},
+        {'name': 'Sync', 'description': 'Synchronizacja z zewnętrznymi API'},
+    ],
+}
