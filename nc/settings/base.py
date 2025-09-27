@@ -279,9 +279,11 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Warsaw'
 CELERY_ENABLE_UTC = True
 
-# Celery Task Routes - uproszczone do jednej kolejki
+# Celery Task Routes - routing do odpowiednich kolejek
 CELERY_TASK_ROUTES = {
-    # Wszystkie taski używają domyślnej kolejki
+    # Task importu trafia do kolejki 'import'
+    'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
+    # Pozostałe taski używają domyślnej kolejki
     'matterhorn1.tasks.*': {'queue': 'default'},
 }
 

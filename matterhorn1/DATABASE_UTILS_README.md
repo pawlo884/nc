@@ -288,3 +288,5 @@ if not color_id:
 - ✅ **Testowalność** - łatwiejsze testowanie jednostkowe
 - ✅ **Maintenance** - centralizacja logiki operacji między bazami
 
+
+

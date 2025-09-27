@@ -39,7 +39,7 @@ services:
 
   celery-default:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
-      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=200000"]
+      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=200000 --uid=1001 --gid=1001"]
       volumes:
         - .:/app
         - celery_data:/var/lib/celery
@@ -49,7 +49,7 @@ services:
         - DJANGO_SETTINGS_MODULE=nc.settings.prod
         - CELERY_STATE_DB=/var/lib/celery/worker_state_default
         - TZ=Europe/Warsaw
-        - C_FORCE_ROOT=true
+        # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
         - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
         - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
         - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
@@ -63,10 +63,39 @@ services:
       restart: always
       networks:
         - nc_network
+      user: "1001:1001"
+
+  celery-import:
+      image: ${DOCKERHUB_USERNAME}/django-app:latest
+      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=200000 --uid=1001 --gid=1001"]
+      volumes:
+        - .:/app
+        - celery_data:/var/lib/celery
+      env_file:
+        - .env.${ENVIRONMENT:-prod}
+      environment:
+        - DJANGO_SETTINGS_MODULE=nc.settings.prod
+        - CELERY_STATE_DB=/var/lib/celery/worker_state_import
+        - TZ=Europe/Warsaw
+        # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
+        - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+        - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+        - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+        - CELERY_WORKER_SEND_TASK_EVENTS=true
+        - CELERY_TASK_SEND_SENT_EVENT=true
+      depends_on:
+        redis:
+          condition: service_healthy
+        web:
+          condition: service_started
+      restart: always
+      networks:
+        - nc_network
+      user: "1001:1001"
 
   celery-beat:
       image: ${DOCKERHUB_USERNAME}/django-app:latest
-      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info"]
+      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info --uid=1001 --gid=1001"]
       volumes:
         - .:/app
       env_file:
@@ -74,7 +103,7 @@ services:
       environment:
         - DJANGO_SETTINGS_MODULE=nc.settings.prod
         - TZ=Europe/Warsaw
-        - C_FORCE_ROOT=true
+        # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
         - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
         - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
         - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
@@ -88,14 +117,17 @@ services:
       restart: always
       networks:
         - nc_network
+      user: "1001:1001"
 
   redis:
     image: redis:7.2-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD:-prod_password}
-    ports:
-      - "6379:6379"
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-prod_password}
+    # Usunięto publiczny port - Redis dostępny tylko wewnątrz sieci Docker
+    # ports:
+    #   - "6379:6379"
     volumes:
       - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - nc_network
     healthcheck:
@@ -104,10 +136,11 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+    restart: unless-stopped
 
   flower:
     image: ${DOCKERHUB_USERNAME}/django-app:latest
-    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0"]
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0 --uid=1001 --gid=1001"]
     ports:
       - "5555:5555"
     volumes:
@@ -118,7 +151,7 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw
-      - C_FORCE_ROOT=true
+      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
@@ -133,8 +166,10 @@ services:
     depends_on:
       - redis
       - celery-default
+      - celery-import
     networks:
       - nc_network
+    user: "1001:1001"
 
 volumes:
   redis_data:

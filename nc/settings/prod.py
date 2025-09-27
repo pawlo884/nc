@@ -60,9 +60,11 @@ CELERY_TASK_TRACK_STARTED = True
 # Celery Beat Configuration
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
-# Celery Task Routes - uproszczone do jednej kolejki
+# Celery Task Routes - routing do odpowiednich kolejek
 CELERY_TASK_ROUTES = {
-    # Wszystkie taski używają domyślnej kolejki
+    # Task importu trafia do kolejki 'import'
+    'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
+    # Pozostałe taski używają domyślnej kolejki
     'matterhorn1.tasks.*': {'queue': 'default'},
 }
 
