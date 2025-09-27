@@ -68,6 +68,10 @@ LOGGING = {
     },
 }
 
+# Upewnij się, że katalog logów istnieje
+log_dir = os.path.join(BASE_DIR, 'logs/matterhorn')
+os.makedirs(log_dir, exist_ok=True)
+
 # Application definition
 INSTALLED_APPS = [
     'admin_interface',
