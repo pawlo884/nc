@@ -23,7 +23,7 @@ services:
 
   celery-default:
     build: .
-    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=2" ]
+    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=2 --uid=1001 --gid=1001" ]
     volumes:
       - .:/app
       - celery_data:/var/lib/celery
@@ -33,7 +33,7 @@ services:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
       - CELERY_STATE_DB=/var/lib/celery/worker_state_default
       - TZ=Europe/Warsaw
-      - C_FORCE_ROOT=true
+      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
@@ -46,10 +46,11 @@ services:
     restart: always
     networks:
       - app_network
+    user: "1001:1001"
 
   celery-import:
     build: .
-    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1" ]
+    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --uid=1001 --gid=1001" ]
     volumes:
       - .:/app
       - celery_data:/var/lib/celery
@@ -59,7 +60,7 @@ services:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
       - CELERY_STATE_DB=/var/lib/celery/worker_state_import
       - TZ=Europe/Warsaw
-      - C_FORCE_ROOT=true
+      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
@@ -72,10 +73,11 @@ services:
     restart: always
     networks:
       - app_network
+    user: "1001:1001"
 
   celery-beat:
     build: .
-    command: [ "/bin/bash", "-c", "celery -A nc.celery beat --loglevel=info" ]
+    command: [ "/bin/bash", "-c", "celery -A nc.celery beat --loglevel=info --uid=1001 --gid=1001" ]
     volumes:
       - .:/app
     env_file:
@@ -92,10 +94,11 @@ services:
     restart: always
     networks:
       - app_network
+    user: "1001:1001"
 
   flower:
     build: .
-    command: [ "/bin/bash", "-c", "sleep 120 && FLOWER_UNAUTHENTICATED_API=true celery -A nc.celery --broker=redis://:dev_password@redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30" ]
+    command: [ "/bin/bash", "-c", "sleep 120 && FLOWER_UNAUTHENTICATED_API=true celery -A nc.celery --broker=redis://:dev_password@redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --uid=1001 --gid=1001" ]
     ports:
       - "5555:5555"
     volumes:
@@ -106,7 +109,7 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.dev
       - TZ=Europe/Warsaw
-      - C_FORCE_ROOT=true
+      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
@@ -125,18 +128,22 @@ services:
       - celery-default
     networks:
       - app_network
+    user: "1001:1001"
 
   redis:
     image: redis:latest
+    # Port dostępny tylko lokalnie dla development
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
     environment:
       - TZ=Europe/Warsaw
       - REDIS_PASSWORD=dev_password
     restart: always
     networks:
       - app_network
-    command: redis-server --requirepass dev_password --maxmemory 100mb --maxmemory-policy allkeys-lru --protected-mode no
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass dev_password --maxmemory 100mb --maxmemory-policy allkeys-lru
 
 volumes:
   static_volume:

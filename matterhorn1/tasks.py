@@ -1161,18 +1161,11 @@ def _bulk_update_inventory(inventory_data):
             logger.warning("Brak danych inventory do aktualizacji")
             return 0
 
-        # Debug: sprawdź typ i zawartość
-        logger.info(
-            f"INVENTORY DEBUG: typ danych: {type(inventory_data)}, długość: {len(inventory_data) if hasattr(inventory_data, '__len__') else 'N/A'}")
-
         updated_count = 0
         variants_to_update = []
 
         # Przygotuj dane do bulk update
         for i, item in enumerate(inventory_data):
-            logger.info(
-                f"INVENTORY DEBUG: item {i}: typ={type(item)}, wartość={item}")
-
             if item is None:
                 logger.warning(f"Pominięto None item na pozycji {i}")
                 continue
@@ -1190,17 +1183,12 @@ def _bulk_update_inventory(inventory_data):
 
                 # Aktualizuj warianty (w INVENTORY API dane są w 'inventory')
                 variants_data = item.get('inventory', [])
-                logger.info(
-                    f"INVENTORY DEBUG: variants_data dla produktu {product_uid}: typ={type(variants_data)}, wartość={variants_data}")
 
                 if not variants_data:
                     logger.info(f"Brak wariantów dla produktu {product_uid}")
                     continue
 
                 for j, variant_data in enumerate(variants_data):
-                    logger.info(
-                        f"INVENTORY DEBUG: variant {j} dla produktu {product_uid}: typ={type(variant_data)}, wartość={variant_data}")
-
                     if variant_data is None:
                         logger.warning(
                             f"Pominięto None variant {j} dla produktu {product_uid}")

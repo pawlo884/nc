@@ -21,9 +21,11 @@ app.conf.update(
     enable_utc=True,
 )
 
-# Konfiguracja routingu tasków - uproszczona do jednej kolejki
+# Konfiguracja routingu tasków - routing do odpowiednich kolejek
 app.conf.task_routes = {
-    # Wszystkie taski używają domyślnej kolejki
+    # Task importu trafia do kolejki 'import'
+    'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
+    # Pozostałe taski używają domyślnej kolejki
     'matterhorn1.tasks.*': {'queue': 'default'},
 }
 
