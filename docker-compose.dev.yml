@@ -24,7 +24,7 @@ services:
 
   celery-default:
     build: .
-    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=2 --uid=1001 --gid=1001" ]
+    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=2" ]
     volumes:
       - .:/app
       - celery_data:/var/lib/celery
@@ -51,7 +51,7 @@ services:
 
   celery-import:
     build: .
-    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --uid=1001 --gid=1001" ]
+    command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1" ]
     volumes:
       - .:/app
       - celery_data:/var/lib/celery
@@ -78,7 +78,7 @@ services:
 
   celery-beat:
     build: .
-    command: [ "/bin/bash", "-c", "celery -A nc.celery beat --loglevel=info --uid=1001 --gid=1001" ]
+    command: [ "/bin/bash", "-c", "celery -A nc.celery beat --loglevel=info" ]
     volumes:
       - .:/app
     env_file:
@@ -99,7 +99,7 @@ services:
 
   flower:
     build: .
-    command: [ "/bin/bash", "-c", "sleep 120 && FLOWER_UNAUTHENTICATED_API=true celery -A nc.celery --broker=redis://:dev_password@redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --uid=1001 --gid=1001" ]
+    command: [ "/bin/bash", "-c", "sleep 120 && FLOWER_UNAUTHENTICATED_API=true celery -A nc.celery --broker=redis://:dev_password@redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30" ]
     ports:
       - "5555:5555"
     volumes:
