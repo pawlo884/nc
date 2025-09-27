@@ -20,6 +20,7 @@ services:
       - app_network
     depends_on:
       - redis
+    user: "1001:1001"
 
   celery-default:
     build: .

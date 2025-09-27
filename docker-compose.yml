@@ -19,6 +19,7 @@ services:
       - nc_network
     depends_on:
       - redis
+    user: "1001:1001"
 
   nginx:
     image: nginx:alpine
