@@ -19,13 +19,11 @@ logger = logging.getLogger(__name__)
 # Logger do osobnego pliku dla mapowania wariantów
 variant_logger = logging.getLogger('matterhorn.variant_mapping')
 if not variant_logger.handlers:
-    log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
-    os.makedirs(log_dir, exist_ok=True)
-    fh = logging.FileHandler(os.path.join(
-        log_dir, 'matterhorn_variant_mapping.log'), encoding='utf-8')
+    # Używamy tylko console logging
+    ch = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    fh.setFormatter(formatter)
-    variant_logger.addHandler(fh)
+    ch.setFormatter(formatter)
+    variant_logger.addHandler(ch)
     variant_logger.setLevel(logging.INFO)
 
 # Register your models here.
