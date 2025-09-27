@@ -29,7 +29,7 @@ MATTERHORN_API_USERNAME = os.getenv('MATTERHORN_API_USERNAME', '')
 MATTERHORN_API_PASSWORD = os.getenv('MATTERHORN_API_PASSWORD', '')
 MATTERHORN_API_KEY = os.getenv('MATTERHORN_API_KEY', '')
 
-# Konfiguracja logowania
+# Konfiguracja logowania - tylko console logging
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -45,14 +45,6 @@ LOGGING = {
         },
     },
     'handlers': {
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs/matterhorn/import_all_by_one.log'),
-            'maxBytes': 2 * 1024 * 1024,  # 2MB - zmniejszone z 5MB
-            'backupCount': 3,  # Zmniejszone z 5 do 3
-            'formatter': 'verbose',
-        },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -61,16 +53,12 @@ LOGGING = {
     },
     'loggers': {
         'matterhorn': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,
         },
     },
 }
-
-# Upewnij się, że katalog logów istnieje
-log_dir = os.path.join(BASE_DIR, 'logs/matterhorn')
-os.makedirs(log_dir, exist_ok=True)
 
 # Application definition
 INSTALLED_APPS = [

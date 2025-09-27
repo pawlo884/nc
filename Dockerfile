@@ -21,6 +21,7 @@ ENV DJANGO_SETTINGS_MODULE=nc.settings.prod
 RUN mkdir -p /app/static /app/staticfiles /app/logs/matterhorn /var/lib/celery && \
     chown -R celery:celery /app /var/lib/celery && \
     chmod 755 /var/lib/celery && \
+    chmod 755 /app/logs/matterhorn && \
     chmod +x /app/docker-entrypoint.sh && \
     ln -s /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
