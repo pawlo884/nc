@@ -311,7 +311,6 @@ DEBUG_TOOLBAR_PANELS = [
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_RENDERER_CLASSES': [
@@ -325,23 +324,34 @@ REST_FRAMEWORK = {
     ],
 }
 
-# drf-spectacular Configuration
-SPECTACULAR_SETTINGS = {
-    'TITLE': 'NC Project API',
-    'DESCRIPTION': 'API dla zarządzania produktami, wariantami i eksportu XML',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'COMPONENT_SPLIT_REQUEST': True,
-    'SCHEMA_PATH_PREFIX': '/api/',
-    'TAGS': [
-        {'name': 'Products', 'description': 'Operacje na produktach'},
-        {'name': 'Variants', 'description': 'Operacje na wariantach produktów'},
-        {'name': 'Brands', 'description': 'Operacje na markach'},
-        {'name': 'Categories', 'description': 'Operacje na kategoriach'},
-        {'name': 'Images', 'description': 'Operacje na obrazach produktów'},
-        {'name': 'Product Sets', 'description': 'Zarządzanie zestawami produktów'},
-        {'name': 'XML Export', 'description': 'Eksport i generowanie plików XML'},
-        {'name': 'Database', 'description': 'Operacje na bazie danych'},
-        {'name': 'Sync', 'description': 'Synchronizacja z zewnętrznymi API'},
-    ],
-}
+# Dodaj drf_spectacular tylko jeśli jest dostępny
+try:
+    import drf_spectacular
+    REST_FRAMEWORK['DEFAULT_SCHEMA_CLASS'] = 'drf_spectacular.openapi.AutoSchema'
+except ImportError:
+    pass
+
+# drf-spectacular Configuration (tylko jeśli dostępny)
+try:
+    import drf_spectacular
+    SPECTACULAR_SETTINGS = {
+        'TITLE': 'NC Project API',
+        'DESCRIPTION': 'API dla zarządzania produktami, wariantami i eksportu XML',
+        'VERSION': '1.0.0',
+        'SERVE_INCLUDE_SCHEMA': False,
+        'COMPONENT_SPLIT_REQUEST': True,
+        'SCHEMA_PATH_PREFIX': '/api/',
+        'TAGS': [
+            {'name': 'Products', 'description': 'Operacje na produktach'},
+            {'name': 'Variants', 'description': 'Operacje na wariantach produktów'},
+            {'name': 'Brands', 'description': 'Operacje na markach'},
+            {'name': 'Categories', 'description': 'Operacje na kategoriach'},
+            {'name': 'Images', 'description': 'Operacje na obrazach produktów'},
+            {'name': 'Product Sets', 'description': 'Zarządzanie zestawami produktów'},
+            {'name': 'XML Export', 'description': 'Eksport i generowanie plików XML'},
+            {'name': 'Database', 'description': 'Operacje na bazie danych'},
+            {'name': 'Sync', 'description': 'Synchronizacja z zewnętrznymi API'},
+        ],
+    }
+except ImportError:
+    SPECTACULAR_SETTINGS = {}
