@@ -7,7 +7,20 @@ from django.utils import timezone
 import json
 import logging
 from datetime import datetime
-from drf_spectacular.utils import extend_schema, OpenApiExample
+
+# Import drf_spectacular tylko jeśli jest dostępny
+try:
+    from drf_spectacular.utils import extend_schema, OpenApiExample
+    DRF_SPECTACULAR_AVAILABLE = True
+except ImportError:
+    DRF_SPECTACULAR_AVAILABLE = False
+    # Dummy decorator jeśli drf_spectacular nie jest dostępny
+
+    def extend_schema(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+    OpenApiExample = None
 
 from .models import (
     Product, Brand, Category,

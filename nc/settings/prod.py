@@ -24,7 +24,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
-# Logowanie - tylko console (bez plików)
+# Logowanie - tylko console (bez plików) - nadpisuje base.py
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -53,6 +53,11 @@ LOGGING = {
             'propagate': False,
         },
         'django.request': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'matterhorn': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,

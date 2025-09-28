@@ -1,6 +1,19 @@
 from rest_framework import serializers
 from .models import ProductSet, ProductSetItem, Products
-from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
+
+# Import drf_spectacular tylko jeśli jest dostępny
+try:
+    from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
+    DRF_SPECTACULAR_AVAILABLE = True
+except ImportError:
+    DRF_SPECTACULAR_AVAILABLE = False
+    # Dummy decorator jeśli drf_spectacular nie jest dostępny
+
+    def extend_schema_serializer(*args, **kwargs):
+        def decorator(cls):
+            return cls
+        return decorator
+    OpenApiExample = None
 
 
 @extend_schema_serializer(
@@ -16,7 +29,7 @@ from drf_spectacular.utils import extend_schema_serializer, OpenApiExample
             }
         )
     ]
-)
+) if DRF_SPECTACULAR_AVAILABLE else None
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Products
@@ -41,7 +54,7 @@ class ProductSerializer(serializers.ModelSerializer):
             }
         )
     ]
-)
+) if DRF_SPECTACULAR_AVAILABLE else None
 class ProductSetItemSerializer(serializers.ModelSerializer):
     mapped_product = ProductSerializer()
 
