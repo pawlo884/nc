@@ -29,7 +29,7 @@ except ImportError:
             }
         )
     ]
-) if DRF_SPECTACULAR_AVAILABLE else None
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema_serializer()
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Products
@@ -54,7 +54,7 @@ class ProductSerializer(serializers.ModelSerializer):
             }
         )
     ]
-) if DRF_SPECTACULAR_AVAILABLE else None
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema_serializer()
 class ProductSetItemSerializer(serializers.ModelSerializer):
     mapped_product = ProductSerializer()
 

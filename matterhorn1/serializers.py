@@ -35,7 +35,7 @@ from .models import (
             }
         )
     ]
-) if DRF_SPECTACULAR_AVAILABLE else None
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema_serializer()
 class BrandSerializer(serializers.ModelSerializer):
     """Serializer dla marek"""
 
@@ -69,7 +69,7 @@ class BrandSerializer(serializers.ModelSerializer):
             }
         )
     ]
-) if DRF_SPECTACULAR_AVAILABLE else None
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema_serializer()
 class CategorySerializer(serializers.ModelSerializer):
     """Serializer dla kategorii"""
 
@@ -116,7 +116,7 @@ class ProductDetailsSerializer(serializers.ModelSerializer):
             }
         )
     ]
-) if DRF_SPECTACULAR_AVAILABLE else None
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema_serializer()
 class ProductImageSerializer(serializers.ModelSerializer):
     """Serializer dla obrazów produktu"""
 
@@ -155,7 +155,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
             }
         )
     ]
-) if DRF_SPECTACULAR_AVAILABLE else None
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema_serializer()
 class ProductVariantSerializer(serializers.ModelSerializer):
     """Serializer dla wariantów produktu"""
 
@@ -233,7 +233,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             }
         )
     ]
-) if DRF_SPECTACULAR_AVAILABLE else None
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema_serializer()
 class ProductSerializer(serializers.ModelSerializer):
     """Główny serializer dla produktów"""
 
