@@ -2,8 +2,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile
-      no_cache: true
+      dockerfile: Dockerfile.prod
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
     command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --max-requests 500 --max-requests-jitter 50 --preload"]
     ports:
@@ -45,8 +44,7 @@ services:
   celery-default:
       build:
         context: .
-        dockerfile: Dockerfile
-        no_cache: true
+        dockerfile: Dockerfile.prod
       # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
       command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=200000"]
       volumes:
@@ -77,8 +75,7 @@ services:
   celery-import:
       build:
         context: .
-        dockerfile: Dockerfile
-        no_cache: true
+        dockerfile: Dockerfile.prod
       # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
       command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=200000"]
       volumes:
@@ -109,8 +106,7 @@ services:
   celery-beat:
       build:
         context: .
-        dockerfile: Dockerfile
-        no_cache: true
+        dockerfile: Dockerfile.prod
       # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
       command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info"]
       volumes:
@@ -158,8 +154,7 @@ services:
   flower:
     build:
       context: .
-      dockerfile: Dockerfile
-      no_cache: true
+      dockerfile: Dockerfile.prod
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0"]
     ports:

@@ -47,8 +47,14 @@ Thumbs.db
 
 # Docker
 Dockerfile*
-docker-compose*.yml
+docker-compose.dev.yml
 .dockerignore
+
+# Development files
+.env.dev
+.env.local
+.env.development
+.env.test
 
 # Documentation
 *.md

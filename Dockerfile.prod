@@ -1,4 +1,4 @@
-# Prosty Dockerfile - bez problemów z cache
+# Dockerfile dla produkcji - maksymalnie prosty
 FROM python:3.13-slim
 
 # Zainstaluj pakiety systemowe
@@ -18,8 +18,19 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
-# Skopiuj cały projekt
-COPY . .
+# Skopiuj tylko potrzebne pliki (bez dev)
+COPY manage.py .
+COPY nc/ ./nc/
+COPY matterhorn/ ./matterhorn/
+COPY matterhorn1/ ./matterhorn1/
+COPY MPD/ ./MPD/
+COPY web_agent/ ./web_agent/
+COPY static/ ./static/
+COPY nginx.conf .
+COPY redis.conf .
+COPY docker-compose.yml .
+COPY package.json .
+COPY docker-entrypoint.sh .
 
 # Utwórz katalogi
 RUN mkdir -p /app/staticfiles /app/logs/matterhorn /var/lib/celery
