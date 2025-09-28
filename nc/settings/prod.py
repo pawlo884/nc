@@ -84,13 +84,7 @@ WHITENOISE_AUTOREFRESH = False  # Wyłączone w produkcji dla wydajności
 WHITENOISE_USE_FINDERS = True
 WHITENOISE_INDEX_FILE = True
 
-# Dodatkowe ustawienia dla admin_interface
-STATICFILES_FINDERS = [
-    'django.contrib.staticfiles.finders.FileSystemFinder',
-    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-    # Dodane dla admin_interface
-    'admin_interface.finders.AdminInterfaceStaticFilesFinder',
-]
+# STATICFILES_FINDERS - używamy domyślnych z base.py
 
 # Security settings for production
 SECURE_SSL_REDIRECT = False  # Tymczasowo wyłączone, ponieważ nie mamy jeszcze HTTPS
