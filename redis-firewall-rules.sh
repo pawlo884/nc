@@ -53,3 +53,4 @@ sudo ufw status verbose
 
 echo "Firewall skonfigurowany dla Redis!"
 echo "Redis jest teraz dostępny tylko wewnątrz sieci Docker."
+

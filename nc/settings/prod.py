@@ -8,7 +8,63 @@ SECRET_KEY = os.getenv(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '209.38.208.114']
+# Bezpieczniejsza konfiguracja ALLOWED_HOSTS
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '209.38.208.114',
+    # Dodaj konkretne domeny zamiast '*'
+    # 'twoja-domena.com',
+    # 'www.twoja-domena.com',
+]
+
+# Dodatkowe ustawienia bezpieczeństwa dla produkcji
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Logowanie prób ataków
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'security': {
+            'format': 'SECURITY {asctime} {levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'security_file': {
+            'level': 'WARNING',
+            'class': 'logging.FileHandler',
+            'filename': '/app/logs/security.log',
+            'formatter': 'security',
+        },
+        'django_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': '/app/logs/django.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django.security.DisallowedHost': {
+            'handlers': ['security_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['django_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
 
 # Static files (CSS, JavaScript, Images)
@@ -17,12 +73,25 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
+
+# Konfiguracja dla plików statycznych w produkcji
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# WhiteNoise Configuration
+# WhiteNoise Configuration - zoptymalizowane dla produkcji
 WHITENOISE_USE_FINDERS = True
 WHITENOISE_MANIFEST_STRICT = False
 WHITENOISE_ALLOW_ALL_ORIGINS = True
+WHITENOISE_AUTOREFRESH = False  # Wyłączone w produkcji dla wydajności
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_INDEX_FILE = True
+
+# Dodatkowe ustawienia dla admin_interface
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+    # Dodane dla admin_interface
+    'admin_interface.finders.AdminInterfaceStaticFilesFinder',
+]
 
 # Security settings for production
 SECURE_SSL_REDIRECT = False  # Tymczasowo wyłączone, ponieważ nie mamy jeszcze HTTPS

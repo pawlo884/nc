@@ -138,3 +138,4 @@ ps aux | grep redis-security-monitor
 - [ ] Pełny audit bezpieczeństwa
 - [ ] Test penetracyjny
 - [ ] Aktualizacja dokumentacji
+

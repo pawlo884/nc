@@ -1,6 +1,13 @@
 # Wybierz obraz bazowy
 FROM python:3.13-slim
 
+# Zaktualizuj system i zainstaluj niezbędne pakiety systemowe
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Utwórz użytkownika celery z dedykowanym UID/GID
 RUN groupadd -r celery && useradd -r -g celery -u 1001 celery
 
@@ -9,10 +16,23 @@ WORKDIR /app
 
 # Skopiuj plik z zależnościami i zainstaluj je
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 
-# Skopiuj pliki projektu do kontenera
-COPY . /app/
+# Skopiuj pliki projektu do kontenera (optymalizacja: kopiuj najpierw pliki, które rzadko się zmieniają)
+COPY manage.py /app/
+COPY nc/ /app/nc/
+COPY matterhorn/ /app/matterhorn/
+COPY matterhorn1/ /app/matterhorn1/
+COPY MPD/ /app/MPD/
+COPY web_agent/ /app/web_agent/
+COPY static/ /app/static/
+COPY *.py /app/ 2>/dev/null || true
+COPY *.md /app/ 2>/dev/null || true
+COPY *.conf /app/ 2>/dev/null || true
+COPY *.yml /app/ 2>/dev/null || true
+COPY *.yaml /app/ 2>/dev/null || true
+COPY *.json /app/ 2>/dev/null || true
+COPY *.sh /app/ 2>/dev/null || true
 
 # Ustaw zmienną środowiskową dla Django podczas budowania
 ENV DJANGO_SETTINGS_MODULE=nc.settings.prod
@@ -26,7 +46,10 @@ RUN mkdir -p /app/static /app/staticfiles /app/logs/matterhorn /var/lib/celery &
     ln -s /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Zbierz statyczne pliki jako root (potrzebne dla collectstatic)
-RUN python manage.py collectstatic --noinput
+RUN python manage.py collectstatic --noinput --clear
+
+# Sprawdź czy pliki admin_interface zostały skopiowane
+RUN find /app/staticfiles -name "*admin*" -type f | head -10
 
 # Zmień właściciela plików statycznych na celery
 RUN chown -R celery:celery /app/staticfiles

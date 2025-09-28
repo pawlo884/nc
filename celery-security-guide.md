@@ -227,3 +227,4 @@ docker-compose exec celery-default celery -A nc.celery inspect active
 # Sprawdź statystyki
 docker-compose exec celery-default celery -A nc.celery inspect stats
 ```
+
