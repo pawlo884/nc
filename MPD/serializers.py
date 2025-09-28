@@ -91,7 +91,7 @@ class ProductSetItemSerializer(serializers.ModelSerializer):
             }
         )
     ]
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema_serializer()
 class ProductSetSerializer(serializers.ModelSerializer):
     items = ProductSetItemSerializer(many=True, read_only=True)
 

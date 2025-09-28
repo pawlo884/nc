@@ -143,7 +143,7 @@ class ProductBulkView(BaseBulkView):
             ]
         )
     ]
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class ProductBulkCreateView(ProductBulkView):
     """Bulk create dla produktów"""
 
@@ -235,7 +235,7 @@ class ProductBulkCreateView(ProductBulkView):
         400: {'description': 'Błąd walidacji danych'},
         500: {'description': 'Błąd serwera'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class ProductBulkUpdateView(ProductBulkView):
     """Bulk update dla produktów"""
 
@@ -360,7 +360,7 @@ class VariantBulkView(BaseBulkView):
         400: {'description': 'Błąd walidacji danych'},
         500: {'description': 'Błąd serwera'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class VariantBulkCreateView(View):
     """Bulk create dla wariantów"""
 
@@ -585,7 +585,7 @@ class BrandBulkView(BaseBulkView):
         400: {'description': 'Błąd walidacji danych'},
         500: {'description': 'Błąd serwera'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class BrandBulkCreateView(View):
     """Bulk create dla marek"""
 
@@ -682,7 +682,7 @@ class CategoryBulkView(BaseBulkView):
         400: {'description': 'Błąd walidacji danych'},
         500: {'description': 'Błąd serwera'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class CategoryBulkCreateView(View):
     """Bulk create dla kategorii"""
 
@@ -779,7 +779,7 @@ class ImageBulkView(BaseBulkView):
         400: {'description': 'Błąd walidacji danych'},
         500: {'description': 'Błąd serwera'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class ImageBulkCreateView(View):
     """Bulk create dla obrazów"""
 
@@ -886,7 +886,7 @@ class ImageBulkCreateView(View):
     responses={
         200: {'description': 'Synchronizacja została uruchomiona'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class APISyncView(View):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
@@ -904,7 +904,7 @@ class APISyncView(View):
     responses={
         200: {'description': 'Synchronizacja produktów została uruchomiona'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class ProductSyncView(View):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
@@ -922,7 +922,7 @@ class ProductSyncView(View):
     responses={
         200: {'description': 'Synchronizacja wariantów została uruchomiona'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class VariantSyncView(View):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
@@ -940,7 +940,7 @@ class VariantSyncView(View):
     responses={
         200: {'description': 'Status API został pobrany pomyślnie'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class APIStatusView(View):
     def get(self, request):
         return JsonResponse({'message': 'APIStatusView - do implementacji'})
@@ -954,7 +954,7 @@ class APIStatusView(View):
     responses={
         200: {'description': 'Logi zostały pobrane pomyślnie'}
     }
-)
+) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
 class APILogsView(View):
     def get(self, request):
         return JsonResponse({'message': 'APILogsView - do implementacji'})
