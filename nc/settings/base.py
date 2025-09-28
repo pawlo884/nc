@@ -74,12 +74,18 @@ INSTALLED_APPS = [
     'django_celery_results',
     'debug_toolbar',
     'rest_framework',
-    'drf_spectacular',
     'matterhorn',
     'MPD',
     'web_agent',
     'matterhorn1',
 ]
+
+# Dodaj drf_spectacular tylko jeśli jest dostępny
+try:
+    import drf_spectacular
+    INSTALLED_APPS.append('drf_spectacular')
+except ImportError:
+    pass
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
