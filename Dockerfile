@@ -1,6 +1,9 @@
 # Wybierz obraz bazowy
 FROM python:3.13-slim
 
+# Wyłącz cache dla tego build
+ARG BUILDKIT_INLINE_CACHE=0
+
 # Zaktualizuj system i zainstaluj niezbędne pakiety systemowe
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -28,13 +31,14 @@ COPY matterhorn1/ /app/matterhorn1/
 COPY MPD/ /app/MPD/
 COPY web_agent/ /app/web_agent/
 COPY static/ /app/static/
-COPY *.py /app/ 2>/dev/null || true
-COPY *.md /app/ 2>/dev/null || true
-COPY *.conf /app/ 2>/dev/null || true
-COPY *.yml /app/ 2>/dev/null || true
-COPY *.yaml /app/ 2>/dev/null || true
-COPY *.json /app/ 2>/dev/null || true
-COPY *.sh /app/ 2>/dev/null || true
+
+# Skopiuj pliki konfiguracyjne
+COPY nginx.conf /app/
+COPY redis.conf /app/
+COPY docker-compose.yml /app/
+COPY docker-compose.dev.yml /app/
+COPY package.json /app/
+COPY docker-entrypoint.sh /app/
 
 # Ustaw zmienną środowiskową dla Django podczas budowania
 ENV DJANGO_SETTINGS_MODULE=nc.settings.prod
