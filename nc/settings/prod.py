@@ -24,7 +24,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
-# Logowanie prób ataków
+# Logowanie - tylko console (bez plików)
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -33,33 +33,27 @@ LOGGING = {
             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
             'style': '{',
         },
-        'security': {
-            'format': 'SECURITY {asctime} {levelname} {message}',
-            'style': '{',
-        },
     },
     'handlers': {
-        'security_file': {
-            'level': 'WARNING',
-            'class': 'logging.FileHandler',
-            'filename': '/app/logs/security.log',
-            'formatter': 'security',
-        },
-        'django_file': {
+        'console': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': '/app/logs/django.log',
+            'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
     },
     'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'django.security.DisallowedHost': {
-            'handlers': ['security_file'],
+            'handlers': ['console'],
             'level': 'WARNING',
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['django_file'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },

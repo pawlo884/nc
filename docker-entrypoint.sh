@@ -10,6 +10,12 @@ mkdir -p /app/logs
 chmod 755 /app/logs/matterhorn
 chmod 755 /app/logs
 
+# Utwórz pliki logów jeśli nie istnieją
+touch /app/logs/security.log
+touch /app/logs/django.log
+chmod 666 /app/logs/security.log
+chmod 666 /app/logs/django.log
+
 # Sprawdzenie i naprawa plików statycznych w produkcji
 if [ "$DJANGO_SETTINGS_MODULE" = "nc.settings.prod" ]; then
     echo "🔧 Sprawdzanie plików statycznych w produkcji..."

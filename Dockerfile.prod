@@ -35,6 +35,10 @@ COPY docker-entrypoint.sh .
 # Utwórz katalogi
 RUN mkdir -p /app/staticfiles /app/logs/matterhorn /var/lib/celery
 
+# Utwórz pliki logów
+RUN touch /app/logs/security.log /app/logs/django.log && \
+    chmod 666 /app/logs/security.log /app/logs/django.log
+
 # Ustaw uprawnienia
 RUN chown -R celery:celery /app /var/lib/celery && \
     chmod 755 /var/lib/celery && \
