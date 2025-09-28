@@ -6,7 +6,8 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Utwórz użytkownika celery z dedykowanym UID/GID
 RUN groupadd -r celery && useradd -r -g celery -u 1001 celery
@@ -16,7 +17,8 @@ WORKDIR /app
 
 # Skopiuj plik z zależnościami i zainstaluj je
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt \
+    && pip cache purge
 
 # Skopiuj pliki projektu do kontenera (optymalizacja: kopiuj najpierw pliki, które rzadko się zmieniają)
 COPY manage.py /app/
