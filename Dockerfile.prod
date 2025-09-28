@@ -45,6 +45,9 @@ RUN chown -R celery:celery /app /var/lib/celery && \
     chmod 755 /app/logs/matterhorn && \
     chmod +x /app/docker-entrypoint.sh
 
+# Ustaw zmienną środowiskową PRZED collectstatic
+ENV DJANGO_SETTINGS_MODULE=nc.settings.prod
+
 # Zbierz pliki statyczne
 RUN python manage.py collectstatic --noinput --clear
 
@@ -53,6 +56,3 @@ RUN chown -R celery:celery /app/staticfiles
 
 # Przełącz na użytkownika celery
 USER celery
-
-# Ustaw zmienną środowiskową
-ENV DJANGO_SETTINGS_MODULE=nc.settings.prod
