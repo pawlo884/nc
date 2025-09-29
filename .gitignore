@@ -22,3 +22,7 @@ celerybeat-schedule
 
 # pliki .xml
 MPD_test/*
+
+# statyczne pliki Django
+staticfiles/
+static/

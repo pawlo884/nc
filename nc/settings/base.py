@@ -61,7 +61,7 @@ LOGGING = {
 
 # Application definition
 INSTALLED_APPS = [
-    # 'admin_interface',  # Wyłączone - nie jest zainstalowane w produkcji
+    'admin_interface',  # Włączone - do customizacji kolorów admin
     'colorfield',
     'django.contrib.admin',
     'django.contrib.auth',

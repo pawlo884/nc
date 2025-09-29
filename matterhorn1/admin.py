@@ -87,8 +87,10 @@ class ProductAdmin(admin.ModelAdmin):
     ]
     list_display_links = ['product_uid', 'name']
     list_filter = [
-        'brand', 'category', 'active', 'is_mapped', 'created_at', 'updated_at'
+        ('brand', admin.RelatedOnlyFieldListFilter), 'category', 'active', 'is_mapped', 'created_at', 'updated_at'
     ]
+    # Wymuś dropdown dla filtra brand
+    list_max_show_all = 200
     search_fields = [
         'product_uid', 'name', 'description', 'brand__name', 'category__name'
     ]
@@ -1614,34 +1616,16 @@ admin.site.site_header = "Matterhorn1 Administration"
 admin.site.site_title = "Matterhorn1 Admin"
 admin.site.index_title = "Zarządzanie danymi Matterhorn1"
 
+# Wymuś dropdown dla wszystkich filtrów
+admin.site.enable_nav_sidebar = False
+
+# Dodaj custom CSS
+class Media:
+    css = {
+        'all': ('css/admin-custom.css',)
+    }
+
 # Dodatkowe filtry i akcje
-
-
-class ProductStatusFilter(admin.SimpleListFilter):
-    title = 'Status produktu'
-    parameter_name = 'status'
-
-    def lookups(self, request, model_admin):
-        return (
-            ('active', 'Aktywne'),
-            ('inactive', 'Nieaktywne'),
-            ('no_stock', 'Brak stanu'),
-            ('with_stock', 'Ze stanem'),
-        )
-
-    def queryset(self, request, queryset):
-        if self.value() == 'active':
-            return queryset.filter(active=True)
-        elif self.value() == 'inactive':
-            return queryset.filter(active=False)
-        elif self.value() == 'no_stock':
-            return queryset.filter(variants__stock=0).distinct()
-        elif self.value() == 'with_stock':
-            return queryset.filter(variants__stock__gt=0).distinct()
-
-
-# Dodaj filtr do ProductAdmin
-ProductAdmin.list_filter.append(ProductStatusFilter)
 
 # Akcje masowe
 

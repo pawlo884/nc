@@ -99,7 +99,7 @@ services:
 
   flower:
     build: .
-    command: [ "/bin/bash", "-c", "sleep 120 && FLOWER_UNAUTHENTICATED_API=true celery -A nc.celery --broker=redis://:dev_password@redis:6379/0 flower --port=5555 --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30" ]
+    command: [ "/bin/bash", "-c", "sleep 120 && mkdir -p /tmp/flower && FLOWER_UNAUTHENTICATED_API=true celery -A nc.celery --broker=redis://:dev_password@redis:6379/0 flower --port=5555 --persistent=True --db=/tmp/flower/flower.db --inspect_timeout=30" ]
     ports:
       - "5555:5555"
     volumes:
@@ -132,10 +132,10 @@ services:
     user: "1001:1001"
 
   redis:
-    image: redis:latest
-    # Port dostępny tylko lokalnie dla development
+    image: redis:7.2-alpine
+    # Port dostępny tylko lokalnie dla development - zmieniony z 6379 na 6380
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:6380:6379"
     volumes:
       - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
     environment:
