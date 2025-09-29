@@ -27,7 +27,7 @@ if [ "$DJANGO_SETTINGS_MODULE" = "nc.settings.prod" ]; then
     # Sprawdź czy pliki admin_interface istnieją
     if [ ! -d "/app/staticfiles/admin_interface" ]; then
         echo "⚠️  Brak plików admin_interface, naprawianie..."
-        python manage.py collectstatic --clear --noinput
+        python manage.py collectstatic --clear --noinput --skip-checks
         echo "✅ Pliki statyczne naprawione"
     else
         echo "✅ Pliki statyczne admin_interface są dostępne"

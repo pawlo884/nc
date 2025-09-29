@@ -1,10 +1,27 @@
 services:
+  static-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    command: ["/bin/bash", "-c", "python manage.py collectstatic --noinput --skip-checks"]
+    volumes:
+      - static_volume:/app/staticfiles
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.prod
+      - TZ=Europe/Warsaw
+      - DJANGO_ENV=prod
+    networks:
+      - nc_network
+    user: "1001:1001"
+
   web:
     build:
       context: .
       dockerfile: Dockerfile.prod
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
-    command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && python manage.py collectstatic --noinput && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --max-requests 500 --max-requests-jitter 50 --preload"]
+    command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --max-requests 500 --max-requests-jitter 50 --preload"]
     ports:
       - "8000:8000"
     volumes:
@@ -22,6 +39,7 @@ services:
       - nc_network
     depends_on:
       - redis
+      - static-init
     user: "1001:1001"
 
   nginx:
