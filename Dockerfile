@@ -30,11 +30,9 @@ RUN chown -R celery:celery /app /var/lib/celery && \
     chmod 755 /app/logs/matterhorn && \
     chmod +x /app/docker-entrypoint.sh
 
-# Uruchom migracje (potrzebne dla admin_interface)
-RUN python manage.py migrate --noinput
-
-# Zbierz pliki statyczne
-RUN python manage.py collectstatic --noinput --clear
+# Zbierz pliki statyczne (bez migracji - będą uruchomione w entrypoint)
+# Używamy --skip-checks aby ominąć sprawdzanie bazy danych
+RUN python manage.py collectstatic --noinput --clear --skip-checks
 
 # Zmień właściciela plików statycznych
 RUN chown -R celery:celery /app/staticfiles
