@@ -20,6 +20,10 @@ chmod 666 /app/logs/django.log
 if [ "$DJANGO_SETTINGS_MODULE" = "nc.settings.prod" ]; then
     echo "🔧 Sprawdzanie plików statycznych w produkcji..."
     
+    # Uruchom migracje (potrzebne dla admin_interface)
+    echo "🔄 Uruchamianie migracji..."
+    python manage.py migrate --noinput
+    
     # Sprawdź czy pliki admin_interface istnieją
     if [ ! -d "/app/staticfiles/admin_interface" ]; then
         echo "⚠️  Brak plików admin_interface, naprawianie..."

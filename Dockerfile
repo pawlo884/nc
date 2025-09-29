@@ -30,6 +30,9 @@ RUN chown -R celery:celery /app /var/lib/celery && \
     chmod 755 /app/logs/matterhorn && \
     chmod +x /app/docker-entrypoint.sh
 
+# Uruchom migracje (potrzebne dla admin_interface)
+RUN python manage.py migrate --noinput
+
 # Zbierz pliki statyczne
 RUN python manage.py collectstatic --noinput --clear
 
