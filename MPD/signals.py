@@ -18,11 +18,11 @@ def remove_product_mapping_in_matterhorn(sender, instance, using, **kwargs):
                 cursor.execute(
                     """
                    # UPDATE products
-                   # SET mapped_product_id = False
-                   # WHERE mapped_product_id = %s
+                   # SET mapped_product_uid = False
+                   # WHERE mapped_product_uid = %s
                     """, [instance.id])
         except Exception as e:
-            print(f"Błąd aktualizacji mapped_product_id: {e}")
+            print(f"Błąd aktualizacji mapped_product_uid: {e}")
 
 
 @receiver(post_delete, sender=MDP)
@@ -33,14 +33,14 @@ def remove_variants_mapping_in_matterhorn(sender, instance, using, **kwargs):
                 cursor.execute(
                     """
                     #UPDATE variants
-                    #SET mapped_variant_id = NULL
-                    #WHERE mapped_variant_id IN (
+                    #SET mapped_variant_uid = NULL
+                    #WHERE mapped_variant_uid IN (
                     #    SELECT variant_id FROM product_variants
                     #    WHERE product_id = %s
                     #)
                     """, [instance.id])
         except Exception as e:
-            print(f"Bład aktualizacji mapped_variant_id: {e}")"""'''
+            print(f"Bład aktualizacji mapped_variant_uid: {e}")"""'''
 
 
 @receiver(pre_delete, sender=Products)
@@ -76,27 +76,27 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                 cursor.execute(
                     """
                     UPDATE product 
-                    SET mapped_product_id = NULL,
+                    SET mapped_product_uid = NULL,
                         is_mapped = False,
                         updated_at = NOW()
-                    WHERE mapped_product_id = %s
+                    WHERE mapped_product_uid = %s
                     """, [instance.id]
                 )
                 products_updated = cursor.rowcount
                 logger.info(
                     f"Zaktualizowano {products_updated} rekordów w tabeli product")
 
-            # Usunięcie wartości variant_id z mapped_variant_id w tabeli product_variants w matterhorn1
+            # Usunięcie wartości variant_id z mapped_variant_uid w tabeli product_variants w matterhorn1
             if hasattr(instance, 'variant_ids') and instance.variant_ids:
                 with connections['matterhorn1'].cursor() as cursor:
                     placeholders = ', '.join(
                         ['%s'] * len(instance.variant_ids))
                     cursor.execute(f"""
                         UPDATE productvariant
-                        SET mapped_variant_id = NULL,
+                        SET mapped_variant_uid = NULL,
                             is_mapped = False,
                             updated_at = NOW()
-                        WHERE mapped_variant_id IN ({placeholders})
+                        WHERE mapped_variant_uid IN ({placeholders})
                         """, instance.variant_ids)
                     variants_updated = cursor.rowcount
                     logger.info(

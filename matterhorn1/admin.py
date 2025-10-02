@@ -14,8 +14,7 @@ from .models import (
     Brand, Category, Product, ProductDetails, ProductImage,
     ProductVariant, ApiSyncLog, Saga, SagaStep, StockHistory
 )
-from .transaction_logger import logged_transaction, DatabaseOperationTracker
-from .database_utils import DatabaseUtils, SafeCrossDatabaseOperations
+from .transaction_logger import logged_transaction
 
 logger = logging.getLogger(__name__)
 
@@ -218,9 +217,9 @@ class ProductAdmin(admin.ModelAdmin):
                     producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]}
                                        for row in cursor.fetchall()]
 
-                    # Pobierz producer_color_name z pierwszego wariantu
+                    # Pobierz producer_color_name i producer_code z pierwszego wariantu
                     cursor.execute("""
-                        SELECT c.name 
+                        SELECT c.name, pv.producer_code
                         FROM product_variants pv
                         LEFT JOIN colors c ON pv.producer_color_id = c.id
                         WHERE pv.product_id = %s
@@ -229,6 +228,18 @@ class ProductAdmin(admin.ModelAdmin):
                     result = cursor.fetchone()
                     if result:
                         producer_color_name = result[0] or ''
+                        producer_code = result[1] or ''
+
+                    # Pobierz nazwę serii
+                    cursor.execute("""
+                        SELECT ps.name
+                        FROM products p
+                        LEFT JOIN product_series ps ON p.series_id = ps.id
+                        WHERE p.id = %s
+                    """, [product.mapped_product_uid])
+                    series_result = cursor.fetchone()
+                    if series_result:
+                        series_name = series_result[0] or ''
             else:
                 # Jeśli produkt nie jest zmapowany, pobierz tylko kolory
                 with connections['MPD'].cursor() as cursor:
@@ -266,7 +277,7 @@ class ProductAdmin(admin.ModelAdmin):
                     selected_attributes = []
 
                 # Pobierz jednostki
-                cursor.execute("SELECT id, name FROM units ORDER BY name")
+                cursor.execute("SELECT unit_id, name FROM units ORDER BY name")
                 units = [{'id': row[0], 'name': row[1]}
                          for row in cursor.fetchall()]
 
@@ -284,6 +295,12 @@ class ProductAdmin(admin.ModelAdmin):
                 cursor.execute(
                     "SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
                 size_categories = [row[0] for row in cursor.fetchall()]
+
+                # Pobierz komponenty materiałów (fabric)
+                cursor.execute(
+                    "SELECT id, name FROM fabric_component ORDER BY name")
+                fabric_components = [{'id': row[0], 'name': row[1]}
+                                     for row in cursor.fetchall()]
 
             # Pobierz sugerowane produkty (tylko dla niezmapowanych produktów)
             if not is_mapped:
@@ -321,9 +338,10 @@ class ProductAdmin(admin.ModelAdmin):
                 'mpd_brands': mpd_brands,
                 'size_categories': size_categories,
                 'producer_color_name': producer_color_name,
-                'producer_code': '',
-                'series_name': '',
-                'selected_unit_id': None
+                'producer_code': producer_code,
+                'series_name': series_name,
+                'selected_unit_id': None,
+                'fabric_components': fabric_components
             })
 
         except Exception as e:
@@ -343,7 +361,7 @@ class ProductAdmin(admin.ModelAdmin):
                                    for row in cursor.fetchall()]
 
                 # Pobierz jednostki
-                cursor.execute("SELECT id, name FROM units ORDER BY name")
+                cursor.execute("SELECT unit_id, name FROM units ORDER BY name")
                 units = [{'id': row[0], 'name': row[1]}
                          for row in cursor.fetchall()]
 
@@ -367,6 +385,12 @@ class ProductAdmin(admin.ModelAdmin):
                 mpd_paths = [{'id': row[0], 'name': row[1], 'path': row[2]}
                              for row in cursor.fetchall()]
 
+                # Pobierz komponenty materiałów (fabric)
+                cursor.execute(
+                    "SELECT id, name FROM fabric_component ORDER BY name")
+                fabric_components = [{'id': row[0], 'name': row[1]}
+                                     for row in cursor.fetchall()]
+
             extra_context.update({
                 'is_mapped': False,
                 'mpd_data': {},
@@ -381,7 +405,8 @@ class ProductAdmin(admin.ModelAdmin):
                 'producer_color_name': producer_color_name,
                 'producer_code': '',
                 'series_name': '',
-                'selected_unit_id': None
+                'selected_unit_id': None,
+                'fabric_components': fabric_components
             })
 
         return super().change_view(request, object_id, form_url, extra_context)
@@ -394,9 +419,6 @@ class ProductAdmin(admin.ModelAdmin):
         """Tworzy nowy produkt w bazie MPD przez API"""
         if request.method == 'POST':
             try:
-                import requests
-                from django.conf import settings
-
                 name = request.POST.get('mpd_name')
                 description = request.POST.get('mpd_description')
                 short_description = request.POST.get('mpd_short_description')
@@ -405,16 +427,50 @@ class ProductAdmin(admin.ModelAdmin):
                 main_color_id = request.POST.get('main_color_id')
                 producer_code = request.POST.get('producer_code')
                 producer_color_name = request.POST.get('producer_color_name')
+                series_name = request.POST.get('series_name')
                 unit_id = request.POST.get('unit_id')
 
                 logger.info(
                     f"Form data: name='{name}', description='{description}', brand_name='{brand_name}', size_category='{size_category}', main_color_id='{main_color_id}', unit_id='{unit_id}'")
 
+                # Debug: sprawdź dostępne jednostki
+                with connections['MPD'].cursor() as debug_cursor:
+                    debug_cursor.execute(
+                        "SELECT unit_id, name FROM units ORDER BY unit_id")
+                    available_units = debug_cursor.fetchall()
+                    logger.info(f"Available units in MPD: {available_units}")
+                    logger.info(
+                        f"Selected unit_id: {unit_id} (type: {type(unit_id)})")
+
                 if not name:
                     return JsonResponse({'success': False, 'error': 'Nazwa jest wymagana'})
 
-                # KROK 6: Nazwa + Opis + Krótki opis + Atrybuty + Marka + Grupa rozmiarowa + Główny kolor + Kolor producenta
-                mpd_data = {
+                # KROK 6: Nazwa + Opis + Krótki opis + Atrybuty + Marka + Grupa rozmiarowa + Główny kolor + Kolor producenta + Series + Ścieżki + Jednostka + Skład
+                # Przygotuj dane dla MPD (do utworzenia przez Sagę)
+
+                # Przygotuj dane składu (fabric)
+                fabric_components_ids = request.POST.getlist(
+                    'fabric_component[]')
+                fabric_percentages = request.POST.getlist(
+                    'fabric_percentage[]')
+                fabric_data = []
+                for comp_id, perc in zip(fabric_components_ids, fabric_percentages):
+                    if comp_id and perc and comp_id.strip() and perc.strip():
+                        try:
+                            fabric_data.append({
+                                'component_id': int(comp_id),
+                                'percentage': int(perc)
+                            })
+                        except (ValueError, TypeError):
+                            pass  # Pomiń błędne dane
+
+                # Konwertuj unit_id
+                converted_unit_id = int(
+                    unit_id) if unit_id and unit_id.isdigit() else None
+                logger.info(
+                    f"Converted unit_id: {converted_unit_id} (from '{unit_id}')")
+
+                mpd_product_data = {
                     'name': name,
                     'description': description or '',
                     'short_description': short_description or '',
@@ -423,127 +479,66 @@ class ProductAdmin(admin.ModelAdmin):
                     'main_color_id': main_color_id or None,
                     'producer_color_name': producer_color_name or '',
                     'producer_code': producer_code or '',
-                    'unit_id': None,   # Wyłączone na razie
-                    'visibility': False
+                    'series_name': series_name or '',
+                    'unit_id': converted_unit_id,
+                    'visibility': False,
+                    'attributes': request.POST.getlist('mpd_attributes'),
+                    'paths': request.POST.getlist('mpd_paths'),
+                    'fabric': fabric_data
                 }
 
-                # Warianty wyłączone na razie
-                # variants = []
+                # Przygotuj dane dla Matterhorn (do mapowania przez Sagę)
+                matterhorn_data = {
+                    'product_id': product_id
+                }
 
-                # Wyślij żądanie do API MPD (bulk create)
-                mpd_api_url = f"{settings.MPD_API_URL}/bulk-create/"
-                logger.info(f"Sending data to MPD: {mpd_data}")
-                response = requests.post(
-                    mpd_api_url, json={'products': [mpd_data]}, timeout=30)
+                # Użyj Saga Pattern do bezpiecznej operacji między bazami
+                from matterhorn1.saga import SagaService
 
-                if response.status_code == 200:
-                    result = response.json()
-                    logger.info(f"Bulk create response: {result}")
-                    logger.info(f"Response status: {result.get('status')}")
-                    logger.info(
-                        f"Created products count: {len(result.get('created_products', []))}")
-                    logger.info(
-                        f"Errors count: {len(result.get('errors', []))}")
-                    logger.info(
-                        f"Total created: {result.get('total_created', 0)}")
+                logger.info(
+                    f"Sending data to Saga - MPD: {mpd_product_data}, Matterhorn: {matterhorn_data}")
 
-                    if result.get('status') == 'success':
-                        created_products = result.get('created_products', [])
-                        errors = result.get('errors', [])
-                        logger.info(f"Created products: {created_products}")
-                        logger.info(f"Errors: {errors}")
+                # Wykonaj operację używając Saga Pattern
+                saga_result = SagaService.create_product_with_mapping(
+                    matterhorn_data, mpd_product_data)
 
-                        if created_products:
-                            mpd_product_id = created_products[0].get('id')
-                            logger.info(f"MPD product ID: {mpd_product_id}")
-                        else:
-                            logger.error("No products created in response")
-                            error_msg = "Nie utworzono produktu"
-                            if errors:
-                                error_msg += f". Błędy: {', '.join(errors)}"
-                            return JsonResponse({'success': False, 'error': error_msg})
+                if saga_result.status.value != 'completed':
+                    error_msg = f"Saga failed: {saga_result.error}"
+                    logger.error(error_msg)
+                    return JsonResponse({'success': False, 'error': error_msg})
 
-                        # Użyj Saga Pattern do bezpiecznej operacji między bazami
-                        from matterhorn1.saga import SagaService
+                # Pobierz mpd_product_id z wyniku Sagi
+                mpd_product_id = None
+                for step in saga_result.steps:
+                    if step.name == 'create_mpd_product' and step.result:
+                        mpd_product_id = step.result.get('mpd_product_id')
+                        break
 
-                        # Przygotuj dane dla Saga
-                        matterhorn_data = {
-                            'product_id': product_id,
-                            'mpd_product_id': mpd_product_id
-                        }
+                if not mpd_product_id:
+                    return JsonResponse({'success': False, 'error': 'Nie udało się pobrać ID produktu MPD'})
 
-                        mpd_data = {
-                            'mpd_product_id': mpd_product_id,
-                            'attributes': request.POST.getlist('mpd_attributes')
-                        }
+                logger.info(f"MPD product created with ID: {mpd_product_id}")
 
-                        # Wykonaj operację używając Saga Pattern
-                        saga_result = SagaService.create_product_with_mapping(
-                            matterhorn_data, mpd_data)
-
-                        if saga_result.status.value != 'completed':
-                            error_msg = f"Saga failed: {saga_result.error}"
-                            logger.error(error_msg)
-                            return JsonResponse({'success': False, 'error': error_msg})
-
-                        # Dodaj warianty jeśli podano size_category
-                        variant_info = None
-                        if size_category:
-                            logger.info(
-                                f"Dodawanie wariantów dla produktu {product_id} z kategorią rozmiarów: {size_category}")
-
-                            # Utwórz producer_color_id z producer_color_name i main_color_id
-                            producer_color_id_to_use = None
-                            if producer_color_name and main_color_id:
-                                try:
-                                    with connections['MPD'].cursor() as cursor:
-                                        # Sprawdź czy kolor producenta już istnieje
-                                        cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s",
-                                                       [producer_color_name, main_color_id])
-                                        pc_row = cursor.fetchone()
-                                        if pc_row:
-                                            producer_color_id_to_use = pc_row[0]
-                                        else:
-                                            # Utwórz nowy kolor producenta
-                                            cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id",
-                                                           [producer_color_name, main_color_id])
-                                            row = cursor.fetchone()
-                                            if row:
-                                                producer_color_id_to_use = row[0]
-                                                logger.info(
-                                                    f"Utworzono nowy kolor producenta: {producer_color_name} (ID: {producer_color_id_to_use})")
-                                except Exception as e:
-                                    logger.error(
-                                        f"Błąd podczas tworzenia koloru producenta: {e}")
-
-                            variant_info = self.add_new_variants_to_mpd(
-                                product_id, mpd_product_id, size_category,
-                                producer_color_id=producer_color_id_to_use, producer_code=producer_code
-                            )
-                            logger.info(
-                                f"Wynik dodawania wariantów: {variant_info}")
+                # Warianty zostały utworzone przez Sagę (krok 4)
+                # Pobierz informacje o wariantach z wyniku Sagi
+                variant_info = None
+                for step in saga_result.steps:
+                    if step.name == 'create_mpd_variants' and step.result:
+                        variant_info = step.result
+                        break
 
                         message = f'Utworzono produkt w MPD (ID: {mpd_product_id})'
                         if variant_info:
-                            message += f'. Dodano {variant_info.get("added", 0)} wariantów'
-                            if variant_info.get('missing_sizes'):
-                                message += f'. Brakujące rozmiary: {", ".join(variant_info["missing_sizes"])}'
+                            created_count = variant_info.get(
+                                "created_variants", 0)
+                            if created_count > 0:
+                                message += f'. Dodano {created_count} wariantów'
 
                         return JsonResponse({
                             'success': True,
                             'message': message,
                             'variant_info': variant_info
                         })
-                    else:
-                        return JsonResponse({
-                            'success': False,
-                            'error': result.get('message', 'Błąd API MPD')
-                        })
-                else:
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Błąd API MPD: {response.status_code}'
-                    })
 
             except Exception as e:
                 logger.error("Błąd podczas tworzenia produktu MPD: %s", e)
@@ -667,16 +662,90 @@ class ProductAdmin(admin.ModelAdmin):
         """Przypisuje istniejący produkt MPD do produktu matterhorn1"""
         if request.method == 'POST':
             try:
-                # Zaktualizuj mapped_product_id
-                with connections['default'].cursor() as cursor:
-                    cursor.execute(
-                        "UPDATE product SET mapped_product_uid = %s WHERE id = %s",
-                        [mpd_product_id, product_id]
-                    )
+                producer_code = request.POST.get('producer_code')
+                producer_color_name = request.POST.get('producer_color_name')
+                main_color_id = request.POST.get('main_color_id')
+                producer_color_id = None
+
+                # Obsługa koloru producenta
+                if producer_color_name and main_color_id:
+                    with connections['MPD'].cursor() as cursor:
+                        # Sprawdź czy kolor o takiej nazwie już istnieje
+                        cursor.execute("SELECT id FROM colors WHERE name = %s", [
+                                       producer_color_name])
+                        pc_result = cursor.fetchone()
+                        if pc_result:
+                            producer_color_id = pc_result[0]
+                            logger.info(
+                                f"Użyto istniejącego koloru producenta: {producer_color_name} (id={producer_color_id})")
+                        else:
+                            # Jeśli nie istnieje, dodaj nowy kolor
+                            cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id",
+                                           [producer_color_name, main_color_id])
+                            producer_color_id = cursor.fetchone()[0]
+                            logger.info(
+                                f"Dodano nowy kolor producenta: {producer_color_name} (id={producer_color_id})")
+
+                # Zaktualizuj mapped_product_uid i is_mapped
+                with connections['matterhorn1'].cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE product 
+                        SET mapped_product_uid = %s, is_mapped = true, updated_at = NOW()
+                        WHERE id = %s
+                    """, [mpd_product_id, product_id])
+
+                # Pobierz kategorię rozmiarową z MPD
+                with connections['MPD'].cursor() as mpd_cursor:
+                    mpd_cursor.execute("""
+                        SELECT s.category
+                        FROM product_variants pv
+                        JOIN sizes s ON pv.size_id = s.id
+                        WHERE pv.product_id = %s
+                        LIMIT 1
+                    """, [mpd_product_id])
+                    size_cat_result = mpd_cursor.fetchone()
+                    if not size_cat_result or not size_cat_result[0]:
+                        logger.warning(
+                            f"Nie można ustalić kategorii rozmiarowej dla produktu MPD {mpd_product_id}")
+                        size_category = None
+                    else:
+                        size_category = size_cat_result[0]
+
+                mapping_info = {}
+                if size_category:
+                    # Dodaj warianty do MPD
+                    from .saga_variants import create_mpd_variants
+                    try:
+                        mapping_info = create_mpd_variants(
+                            mpd_product_id, product_id, size_category,
+                            producer_code, main_color_id, producer_color_name
+                        )
+                        logger.info(
+                            f"Wynik dodawania wariantów: {mapping_info}")
+                    except Exception as e:
+                        logger.error(f"Błąd podczas dodawania wariantów: {e}")
+                        mapping_info = {'error': f'Błąd wariantów: {str(e)}'}
+
+                    # Upload zdjęć do bucketa
+                    try:
+                        from .saga import SagaService
+                        upload_result = SagaService._upload_product_images(
+                            mpd_product_id, product_id, producer_color_name
+                        )
+                        logger.info(f"Wynik uploadu zdjęć: {upload_result}")
+                        mapping_info['uploaded_images'] = upload_result.get(
+                            'uploaded_images', 0)
+                    except Exception as e:
+                        logger.error(f"Błąd podczas uploadu zdjęć: {e}")
+                        mapping_info['upload_error'] = str(e)
+                else:
+                    mapping_info = {
+                        'error': 'Brak kategorii rozmiarowej w MPD'}
 
                 return JsonResponse({
                     'success': True,
-                    'message': f'Przypisano produkt MPD (ID: {mpd_product_id})'
+                    'message': f'Produkt został przypisany do MPD ID {mpd_product_id}.',
+                    'mapping_info': mapping_info
                 })
 
             except Exception as e:
@@ -1124,9 +1193,9 @@ class ProductAdmin(admin.ModelAdmin):
         """Upload obrazu do bucketa"""
         from .defs_db import upload_image_to_bucket_and_get_url
         return upload_image_to_bucket_and_get_url(
-            image_url=image_url,
+            image_path=image_url,
             product_id=product_id,
-            color_name=color_name,
+            producer_color_name=color_name,
             image_number=image_number
         )
 
@@ -1136,6 +1205,7 @@ class ProductAdmin(admin.ModelAdmin):
             cursor.execute("""
                 INSERT INTO product_images (product_id, file_path)
                 VALUES (%s, %s)
+                ON CONFLICT (product_id, file_path) DO NOTHING
             """, [mpd_product_id, image_url])
 
     def _get_mpd_product_data(self, mpd_product_id):
@@ -1170,7 +1240,7 @@ class ProductAdmin(admin.ModelAdmin):
             logger.error(f"Błąd synchronizacji produktu {product.id}: {e}")
         return False
 
-    def add_new_variants_to_mpd(self, product_id, mapped_product_id, size_category, producer_color_id=None, producer_code=None):
+    def add_new_variants_to_mpd(self, product_id, mapped_product_uid, size_category, producer_color_id=None, producer_code=None):
         """Dodaje nowe warianty do MPD z filtrowaniem według kategorii rozmiarów"""
         variant_logger = logging.getLogger('matterhorn1.variants')
 
@@ -1181,7 +1251,7 @@ class ProductAdmin(admin.ModelAdmin):
                 "add_variants",
                 {
                     'product_id': product_id,
-                    'mapped_product_id': mapped_product_id,
+                    'mapped_product_uid': mapped_product_uid,
                     'size_category': size_category,
                     'producer_color_id': producer_color_id,
                     'producer_code': producer_code
@@ -1189,8 +1259,8 @@ class ProductAdmin(admin.ModelAdmin):
             )
 
             variant_logger.info(
-                "[add_new_variants_to_mpd] START: product_id=%s, mapped_product_id=%s, size_category=%s, producer_color_id=%s, producer_code=%s",
-                product_id, mapped_product_id, size_category, producer_color_id, producer_code)
+                "[add_new_variants_to_mpd] START: product_id=%s, mapped_product_uid=%s, size_category=%s, producer_color_id=%s, producer_code=%s",
+                product_id, mapped_product_uid, size_category, producer_color_id, producer_code)
 
             missing_sizes = []
             missing_colors = False
@@ -1323,19 +1393,19 @@ class ProductAdmin(admin.ModelAdmin):
                     variant_id = row[0] if row else 1
 
                     variant_logger.info(
-                        f"[add_new_variants_to_mpd] Dodaję nowy wariant {variant_uid} jako variant_id {variant_id} (product_id={mapped_product_id}, color_id={color_id}, size_id={size_id}, ean={ean}, producer_color_id={producer_color_id}, producer_code={producer_code})")
+                        f"[add_new_variants_to_mpd] Dodaję nowy wariant {variant_uid} jako variant_id {variant_id} (product_id={mapped_product_uid}, color_id={color_id}, size_id={size_id}, ean={ean}, producer_color_id={producer_color_id}, producer_code={producer_code})")
 
                     try:
                         if producer_color_id:
                             mpd_cursor.execute("""
                                 INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id, updated_at)
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-                            """, [variant_id, mapped_product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id])
+                            """, [variant_id, mapped_product_uid, color_id, producer_color_id, size_id, producer_code, iai_product_id])
                         else:
                             mpd_cursor.execute("""
                                 INSERT INTO product_variants (variant_id, product_id, color_id, size_id, producer_code, iai_product_id, updated_at)
                                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                            """, [variant_id, mapped_product_id, color_id, size_id, producer_code, iai_product_id])
+                            """, [variant_id, mapped_product_uid, color_id, size_id, producer_code, iai_product_id])
 
                         # Dodaj wpis do product_variants_sources
                         mpd_cursor.execute("""
@@ -1349,16 +1419,16 @@ class ProductAdmin(admin.ModelAdmin):
                             f"[add_new_variants_to_mpd] Błąd podczas dodawania wariantu {variant_uid} do product_variants: {e}")
                         continue
 
-                    # Aktualizuj mapped_variant_id w matterhorn1 (przed stock_and_prices)
+                    # Aktualizuj mapped_variant_uid w matterhorn1 (przed stock_and_prices)
                     try:
                         matterhorn_cursor.execute("""
-                            UPDATE productvariant SET mapped_variant_id = %s, is_mapped = true, updated_at = NOW() WHERE variant_uid = %s
+                            UPDATE productvariant SET mapped_variant_uid = %s, is_mapped = true, updated_at = NOW() WHERE variant_uid = %s
                         """, [variant_id, variant_uid])
                         variant_logger.info(
-                            f"[add_new_variants_to_mpd] Zaktualizowano mapped_variant_id w matterhorn1 dla wariantu {variant_uid}")
+                            f"[add_new_variants_to_mpd] Zaktualizowano mapped_variant_uid w matterhorn1 dla wariantu {variant_uid}")
                     except Exception as e:
                         variant_logger.error(
-                            f"[add_new_variants_to_mpd] Błąd podczas aktualizacji mapped_variant_id w matterhorn1 dla wariantu {variant_uid}: {e}")
+                            f"[add_new_variants_to_mpd] Błąd podczas aktualizacji mapped_variant_uid w matterhorn1 dla wariantu {variant_uid}: {e}")
                         continue
 
                     try:
@@ -1382,7 +1452,7 @@ class ProductAdmin(admin.ModelAdmin):
                                 WHERE variant_id = %s AND source_id = %s
                             """, [stock, product_price, variant_id, 2])
                             variant_logger.info(
-                                f"[add_new_variants_to_mpd] Zaktualizowano istniejący rekord w stock_and_prices")
+                                "[add_new_variants_to_mpd] Zaktualizowano istniejący rekord w stock_and_prices")
                         else:
                             # Dodaj nowy rekord
                             mpd_cursor.execute("""
@@ -1391,11 +1461,11 @@ class ProductAdmin(admin.ModelAdmin):
                                 VALUES (%s, %s, %s, %s, 'PLN')
                             """, [variant_id, 2, stock, product_price])
                             variant_logger.info(
-                                f"[add_new_variants_to_mpd] Dodano nowy rekord do stock_and_prices")
+                                "[add_new_variants_to_mpd] Dodano nowy rekord do stock_and_prices")
                     except Exception as e:
                         variant_logger.error(
                             f"[add_new_variants_to_mpd] Błąd podczas dodawania/uzupełniania stock_and_prices dla wariantu {variant_uid}: {e}")
-                        # Nie continue tutaj - mapped_variant_id już zostało zaktualizowane
+                        # Nie continue tutaj - mapped_variant_uid już zostało zaktualizowane
 
                     added_variants += 1
                     variant_logger.info(
@@ -1620,6 +1690,8 @@ admin.site.index_title = "Zarządzanie danymi Matterhorn1"
 admin.site.enable_nav_sidebar = False
 
 # Dodaj custom CSS
+
+
 class Media:
     css = {
         'all': ('css/admin-custom.css',)

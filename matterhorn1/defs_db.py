@@ -25,14 +25,14 @@ s3_client = boto3.client('s3',
                          )
 
 
-def upload_image_to_bucket_and_get_url(image_url, product_id, color_name=None, image_number=1):
+def upload_image_to_bucket_and_get_url(image_path, product_id, producer_color_name=None, image_number=1):
     """
     Upload obrazu do DigitalOcean Spaces bucket
 
     Args:
-        image_url (str): URL lub ścieżka do obrazu
+        image_path (str): URL lub ścieżka do obrazu
         product_id (int): ID produktu
-        color_name (str): Nazwa koloru (opcjonalne)
+        producer_color_name (str): Nazwa koloru producenta (opcjonalne)
         image_number (int): Numer obrazu (opcjonalne)
 
     Returns:
@@ -40,7 +40,7 @@ def upload_image_to_bucket_and_get_url(image_url, product_id, color_name=None, i
     """
     try:
         logger.info(
-            f"Rozpoczynam przesyłanie zdjęcia: {image_url} dla produktu {product_id}")
+            f"Rozpoczynam przesyłanie zdjęcia: {image_path} dla produktu {product_id}")
 
         is_production = os.getenv(
             "DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
@@ -49,12 +49,12 @@ def upload_image_to_bucket_and_get_url(image_url, product_id, color_name=None, i
             f"Środowisko: {'produkcyjne' if is_production else 'testowe'}, folder: {bucket_folder}")
 
         # Określ rozszerzenie pliku
-        if image_url.startswith(('http://', 'https://')):
+        if image_path.startswith(('http://', 'https://')):
             # Pobierz rozszerzenie z URL
             file_extension = os.path.splitext(
-                image_url.split('?')[0])[1].lower()
+                image_path.split('?')[0])[1].lower()
         else:
-            file_extension = os.path.splitext(image_url)[1].lower()
+            file_extension = os.path.splitext(image_path)[1].lower()
 
         logger.info(f"Rozszerzenie pliku: {file_extension}")
 
@@ -63,35 +63,35 @@ def upload_image_to_bucket_and_get_url(image_url, product_id, color_name=None, i
             return None
 
         # Zamień znaki niedozwolone na podkreślnik
-        safe_color = color_name.replace(
-            '/', '_').replace(' ', '_') if color_name else ""
+        safe_color = producer_color_name.replace(
+            '/', '_').replace(' ', '_') if producer_color_name else ""
         suffix = f"_{safe_color}" if safe_color else ""
         new_filename = f"{product_id}_{image_number}{suffix}{file_extension}"
         new_path = f"{bucket_folder}/{product_id}/{new_filename}"
         logger.info(f"Nowa nazwa pliku: {new_filename}, ścieżka: {new_path}")
 
         # Pobierz dane obrazu
-        if image_url.startswith(('http://', 'https://')):
-            logger.info(f"Pobieranie pliku z URL: {image_url}")
+        if image_path.startswith(('http://', 'https://')):
+            logger.info(f"Pobieranie pliku z URL: {image_path}")
             try:
-                response = requests.get(image_url, stream=True, timeout=30)
+                response = requests.get(image_path, stream=True, timeout=30)
                 if response.status_code != 200:
                     logger.error(
-                        f"Nie można pobrać pliku z URL: {image_url}. Status code: {response.status_code}")
+                        f"Nie można pobrać pliku z URL: {image_path}. Status code: {response.status_code}")
                     return None
                 file_data = response.content
                 logger.info(
                     f"Pobrano plik z URL, rozmiar: {len(file_data)} bajtów")
             except requests.exceptions.RequestException as e:
                 logger.error(
-                    f"Błąd podczas pobierania pliku z URL: {image_url}. Błąd: {str(e)}")
+                    f"Błąd podczas pobierania pliku z URL: {image_path}. Błąd: {str(e)}")
                 return None
         else:
-            logger.info(f"Otwieranie pliku lokalnego: {image_url}")
-            if not os.path.exists(image_url):
-                logger.error(f"Plik do uploadu nie istnieje: {image_url}")
+            logger.info(f"Otwieranie pliku lokalnego: {image_path}")
+            if not os.path.exists(image_path):
+                logger.error(f"Plik do uploadu nie istnieje: {image_path}")
                 return None
-            with open(image_url, 'rb') as f:
+            with open(image_path, 'rb') as f:
                 file_data = f.read()
                 logger.info(
                     f"Odczytano plik lokalny, rozmiar: {len(file_data)} bajtów")

@@ -81,7 +81,7 @@ variant_data = {
 variant_id = DatabaseUtils.create_mpd_variant(variant_data)
 ```
 
-##### `update_product_mapping(product_id: int, mapped_product_id: int) -> bool`
+##### `update_product_mapping(product_id: int, mapped_product_uid: int) -> bool`
 Aktualizuje mapowanie produktu w bazie matterhorn1.
 
 ```python
@@ -287,6 +287,9 @@ if not color_id:
 - ✅ **Konsystencja** - jednolite API dla wszystkich operacji
 - ✅ **Testowalność** - łatwiejsze testowanie jednostkowe
 - ✅ **Maintenance** - centralizacja logiki operacji między bazami
+
+
+
 
 
 

@@ -33,6 +33,17 @@ app.conf.task_routes = {
 app.conf.task_acks_late = True
 app.conf.task_reject_on_worker_lost = True
 
+# Konfiguracja heartbeat
+app.conf.worker_send_task_events = True
+app.conf.task_send_sent_event = True
+app.conf.worker_hijack_root_logger = False
+app.conf.worker_log_color = False
+
+# Konfiguracja heartbeat i monitoringu
+app.conf.worker_heartbeat = 30  # heartbeat co 30 sekund
+app.conf.worker_pool_restarts = True
+app.conf.worker_prefetch_multiplier = 1
+
 # Konfiguracja beat - używaj Django periodic tasks zamiast tego
 # app.conf.beat_schedule = {}
 

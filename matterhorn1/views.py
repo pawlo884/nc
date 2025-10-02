@@ -1024,7 +1024,7 @@ def get_product_details(request, product_id):
                 'variants': variants,
                 'images': images,
                 'details': details,
-                'mapped_product_id': product.mapped_product_id
+                'mapped_product_uid': product.mapped_product_uid
             }
         })
 

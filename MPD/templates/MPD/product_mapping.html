@@ -490,7 +490,7 @@
             }
 
             productList.innerHTML = products.map(product => `
-                <div class="product-item ${product.mapped_product_id ? 'mapped' : ''}" 
+                <div class="product-item ${product.mapped_product_uid ? 'mapped' : ''}" 
                      onclick="selectProduct(${product.product_id})" 
                      data-product-id="${product.product_id}">
                     <div class="product-name">${product.name}</div>
@@ -498,7 +498,7 @@
                         ${product.brand ? `<span class="product-brand">${product.brand.name}</span> • ` : ''}
                         ${product.category ? product.category.name : 'Brak kategorii'} • 
                         ${product.variants.length} wariantów
-                        ${product.mapped_product_id ? ` • ID MPD: ${product.mapped_product_id}` : ''}
+                        ${product.mapped_product_uid ? ` • ID MPD: ${product.mapped_product_uid}` : ''}
                     </div>
                 </div>
             `).join('');

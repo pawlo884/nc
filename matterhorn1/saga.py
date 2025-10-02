@@ -11,10 +11,9 @@ from datetime import datetime
 from typing import Dict, List, Callable, Any, Optional
 from enum import Enum
 from dataclasses import dataclass
-from django.db import connections, transaction
-from django.core.cache import cache
+from django.db import connections
 from django.utils import timezone
-from .transaction_logger import logged_transaction, DatabaseOperationTracker
+from . import saga_variants
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +39,7 @@ class SagaStep:
     error: Optional[str] = None
     executed_at: Optional[datetime] = None
     compensated_at: Optional[datetime] = None
+    result: Optional[Dict[str, Any]] = None  # Wynik wykonania kroku
 
 
 @dataclass
@@ -183,8 +183,19 @@ class SagaOrchestrator:
 
         try:
             # Wykonaj wszystkie kroki
-            for step in self.steps:
-                self._execute_step(step)
+            for i, step in enumerate(self.steps):
+                result = self._execute_step(step)
+                step.result = result
+
+                # Aktualizuj dane następnych kroków z wynikiem bieżącego
+                if result and i < len(self.steps) - 1:
+                    for next_step in self.steps[i + 1:]:
+                        # Aktualizuj wartości None w danych następnych kroków
+                        for key, value in result.items():
+                            if key in next_step.data and next_step.data[key] is None:
+                                next_step.data[key] = value
+                                logger.info(
+                                    f"🔄 Saga {self.saga_id}: Przekazuję {key}={value} do kroku '{next_step.name}'")
 
             # Wszystkie kroki wykonane pomyślnie
             self.status = SagaStatus.COMPLETED
@@ -322,6 +333,58 @@ class SagaService:
             }
         )
 
+        # Krok 4: Dodaj ścieżki w MPD (jeśli podano)
+        if mpd_product_data.get("paths"):
+            saga.add_step(
+                name="add_mpd_paths",
+                execute_func=SagaService._add_mpd_paths,
+                compensate_func=SagaService._remove_mpd_paths,
+                data={
+                    "mpd_product_id": None,  # Będzie wypełnione przez poprzedni krok
+                    "paths": mpd_product_data.get("paths", [])
+                }
+            )
+
+        # Krok 5: Dodaj skład materiałowy (jeśli podano)
+        if mpd_product_data.get("fabric"):
+            saga.add_step(
+                name="add_mpd_fabric",
+                execute_func=SagaService._add_mpd_fabric,
+                compensate_func=SagaService._remove_mpd_fabric,
+                data={
+                    "mpd_product_id": None,  # Będzie wypełnione przez poprzedni krok
+                    "fabric": mpd_product_data.get("fabric", [])
+                }
+            )
+
+        # Krok 6: Utwórz warianty w MPD (jeśli podano size_category)
+        if mpd_product_data.get("size_category"):
+            saga.add_step(
+                name="create_mpd_variants",
+                execute_func=SagaService._create_mpd_product_variants,
+                compensate_func=SagaService._delete_mpd_product_variants,
+                data={
+                    "mpd_product_id": None,  # Będzie wypełnione przez poprzedni krok
+                    "matterhorn_product_id": matterhorn_product_data.get("product_id"),
+                    "size_category": mpd_product_data.get("size_category"),
+                    "producer_code": mpd_product_data.get("producer_code"),
+                    "main_color_id": mpd_product_data.get("main_color_id"),
+                    "producer_color_name": mpd_product_data.get("producer_color_name")
+                }
+            )
+
+        # Krok 7: Upload zdjęć do bucketa (jeśli produkt ma zdjęcia)
+        saga.add_step(
+            name="upload_product_images",
+            execute_func=SagaService._upload_product_images,
+            compensate_func=SagaService._remove_product_images,
+            data={
+                "mpd_product_id": None,  # Będzie wypełnione przez poprzedni krok
+                "matterhorn_product_id": matterhorn_product_data.get("product_id"),
+                "producer_color_name": mpd_product_data.get("producer_color_name")
+            }
+        )
+
         return saga.execute()
 
     @staticmethod
@@ -437,7 +500,7 @@ class SagaService:
 
         try:
             product = Product.objects.get(id=matterhorn_data['product_id'])
-            product.mapped_product_id = mpd_product_id
+            product.mapped_product_uid = mpd_product_id
             product.is_mapped = True
             product.save()
 
@@ -460,7 +523,7 @@ class SagaService:
 
         try:
             product = Product.objects.get(id=matterhorn_data['product_id'])
-            product.mapped_product_id = None
+            product.mapped_product_uid = None
             product.is_mapped = False
             product.save()
 
@@ -592,7 +655,7 @@ class SagaService:
                 for variant_data in variants_data:
                     cursor.execute("""
                         UPDATE productvariant 
-                        SET mapped_variant_id = %s, is_mapped = true, updated_at = NOW() 
+                        SET mapped_variant_uid = %s, is_mapped = true, updated_at = NOW() 
                         WHERE variant_uid = %s
                     """, [variant_data['variant_id'], variant_data['variant_uid']])
 
@@ -616,7 +679,7 @@ class SagaService:
                 for variant_data in variants_data:
                     cursor.execute("""
                         UPDATE productvariant 
-                        SET mapped_variant_id = NULL, is_mapped = false, updated_at = NOW() 
+                        SET mapped_variant_uid = NULL, is_mapped = false, updated_at = NOW() 
                         WHERE variant_uid = %s
                     """, [variant_data['variant_uid']])
 
@@ -627,3 +690,229 @@ class SagaService:
             logger.error(f"❌ Błąd podczas cofania mapping wariantów: {e}")
 
         return {}
+
+    @staticmethod
+    def _add_mpd_paths(mpd_product_id: int, paths: List[int]) -> Dict:
+        """Dodaj ścieżki do produktu w MPD"""
+        logger.info(
+            f"🔄 Dodaję ścieżki do produktu MPD {mpd_product_id}: {paths}")
+
+        if not paths:
+            logger.info("ℹ️ Brak ścieżek do dodania")
+            return {}
+
+        try:
+            with connections['MPD'].cursor() as cursor:
+                for path_id in paths:
+                    cursor.execute(
+                        "INSERT INTO product_path (product_id, path_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                        [mpd_product_id, path_id]
+                    )
+
+            logger.info(
+                f"✅ Dodano {len(paths)} ścieżek do produktu MPD {mpd_product_id}")
+
+        except Exception as e:
+            raise Exception(f"Failed to add paths to MPD product: {e}")
+
+        return {"added_paths": len(paths)}
+
+    @staticmethod
+    def _remove_mpd_paths(mpd_product_id: int, paths: List[int]) -> Dict:
+        """Usuń ścieżki z produktu w MPD (kompensacja)"""
+        logger.info(
+            f"🔄 Usuwam ścieżki z produktu MPD {mpd_product_id}: {paths}")
+
+        if not paths:
+            return {}
+
+        try:
+            with connections['MPD'].cursor() as cursor:
+                for path_id in paths:
+                    cursor.execute(
+                        "DELETE FROM product_path WHERE product_id = %s AND path_id = %s",
+                        [mpd_product_id, path_id]
+                    )
+
+            logger.info(
+                f"✅ Usunięto {len(paths)} ścieżek z produktu MPD {mpd_product_id}")
+
+        except Exception as e:
+            logger.error(f"❌ Błąd podczas usuwania ścieżek: {e}")
+
+        return {}
+
+    @staticmethod
+    def _add_mpd_fabric(mpd_product_id: int, fabric: List[Dict]) -> Dict:
+        """Dodaj skład materiałowy do produktu w MPD"""
+        logger.info(
+            f"🔄 Dodaję skład materiałowy do produktu MPD {mpd_product_id}: {len(fabric)} komponentów")
+
+        if not fabric:
+            logger.info("ℹ️ Brak składu do dodania")
+            return {}
+
+        try:
+            # Sprawdź czy suma procentów jest poprawna
+            total_percentage = sum(item['percentage'] for item in fabric)
+
+            if total_percentage > 100:
+                logger.warning(
+                    f"Suma procentów materiałów przekracza 100%: {total_percentage}%. Pomijam zapis.")
+                return {"error": "Suma procentów przekracza 100%"}
+
+            if total_percentage == 0:
+                logger.info("Brak poprawnych procentów materiałów do zapisu.")
+                return {}
+
+            with connections['MPD'].cursor() as cursor:
+                for item in fabric:
+                    component_id = item['component_id']
+                    percentage = item['percentage']
+
+                    if percentage > 0 and percentage <= 100:
+                        cursor.execute(
+                            "INSERT INTO product_fabric (product_id, component_id, percentage) VALUES (%s, %s, %s)",
+                            [mpd_product_id, component_id, percentage]
+                        )
+
+            logger.info(
+                f"✅ Dodano {len(fabric)} komponentów składu do produktu MPD {mpd_product_id}")
+
+        except Exception as e:
+            raise Exception(f"Failed to add fabric to MPD product: {e}")
+
+        return {"added_fabric": len(fabric)}
+
+    @staticmethod
+    def _remove_mpd_fabric(mpd_product_id: int, fabric: List[Dict]) -> Dict:
+        """Usuń skład materiałowy z produktu w MPD (kompensacja)"""
+        logger.info(
+            f"🔄 Usuwam skład materiałowy z produktu MPD {mpd_product_id}")
+
+        if not fabric:
+            return {}
+
+        try:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute(
+                    "DELETE FROM product_fabric WHERE product_id = %s",
+                    [mpd_product_id]
+                )
+
+            logger.info(
+                f"✅ Usunięto skład materiałowy z produktu MPD {mpd_product_id}")
+
+        except Exception as e:
+            logger.error(f"❌ Błąd podczas usuwania składu: {e}")
+
+        return {}
+
+    @staticmethod
+    def _upload_product_images(mpd_product_id: int, matterhorn_product_id: int, producer_color_name: str = None) -> Dict:
+        """Upload zdjęć produktu do bucketa i zapisz do MPD"""
+        logger.info(f"🔄 Uploaduję zdjęcia dla produktu MPD {mpd_product_id}")
+
+        try:
+            from .defs_db import upload_image_to_bucket_and_get_url
+
+            # Pobierz zdjęcia z matterhorn1
+            with connections['matterhorn1'].cursor() as cursor:
+                cursor.execute("""
+                    SELECT image_url, "order"
+                    FROM productimage 
+                    WHERE product_id = %s 
+                    AND image_url IS NOT NULL 
+                    ORDER BY "order", id
+                """, [matterhorn_product_id])
+                images = cursor.fetchall()
+
+            if not images:
+                logger.info("ℹ️ Brak zdjęć do uploadu")
+                return {"uploaded_images": 0}
+
+            uploaded_count = 0
+            uploaded_images = []
+
+            with connections['MPD'].cursor() as mpd_cursor:
+                for idx, (image_url, image_order) in enumerate(images, 1):
+                    if image_url:
+                        # Upload do bucketa
+                        bucket_url = upload_image_to_bucket_and_get_url(
+                            image_path=image_url,
+                            product_id=mpd_product_id,
+                            producer_color_name=producer_color_name,
+                            image_number=idx
+                        )
+
+                        if bucket_url:
+                            # Zapisz do MPD
+                            mpd_cursor.execute("""
+                                INSERT INTO product_images (product_id, file_path)
+                                VALUES (%s, %s)
+                                ON CONFLICT (product_id, file_path) DO NOTHING
+                            """, [mpd_product_id, bucket_url])
+
+                            uploaded_count += 1
+                            uploaded_images.append({
+                                'original_url': image_url,
+                                'uploaded_url': bucket_url,
+                                'order': image_order or idx
+                            })
+                            logger.info(
+                                f"✅ Uploadowano zdjęcie {idx}: {bucket_url}")
+
+            logger.info(
+                f"✅ Uploadowano {uploaded_count} zdjęć do produktu MPD {mpd_product_id}")
+            return {
+                "uploaded_images": uploaded_count,
+                "images": uploaded_images
+            }
+
+        except Exception as e:
+            raise Exception(f"Failed to upload product images: {e}")
+
+    @staticmethod
+    def _remove_product_images(mpd_product_id: int, matterhorn_product_id: int = None, producer_color_name: str = None) -> Dict:
+        """Usuń zdjęcia produktu z MPD (kompensacja)"""
+        logger.info(f"🔄 Usuwam zdjęcia produktu MPD {mpd_product_id}")
+
+        try:
+            with connections['MPD'].cursor() as cursor:
+                cursor.execute("""
+                    DELETE FROM product_images WHERE product_id = %s
+                """, [mpd_product_id])
+
+            logger.info(f"✅ Usunięto zdjęcia produktu MPD {mpd_product_id}")
+
+        except Exception as e:
+            logger.error(f"❌ Błąd podczas usuwania zdjęć: {e}")
+
+        return {}
+
+    @staticmethod
+    def _create_mpd_product_variants(
+            mpd_product_id: int,
+            matterhorn_product_id: int,
+            size_category: str,
+            producer_code: str = None,
+            main_color_id: int = None,
+            producer_color_name: str = None
+    ) -> Dict:
+        """Utwórz warianty w MPD razem z produktem"""
+        return saga_variants.create_mpd_variants(
+            mpd_product_id, matterhorn_product_id, size_category,
+            producer_code, main_color_id, producer_color_name
+        )
+
+    @staticmethod
+    def _delete_mpd_product_variants(
+            mpd_product_id: int,
+            matterhorn_product_id: int = None,
+            variant_ids: List[int] = None,
+            **kwargs
+    ) -> Dict:
+        """Usuń warianty z MPD (kompensacja)"""
+        return saga_variants.delete_mpd_variants(
+            mpd_product_id, matterhorn_product_id, variant_ids, **kwargs
+        )

@@ -50,3 +50,11 @@ CORS_ALLOWED_ORIGINS = [
 # Celery Configuration for development
 CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://:dev_password@redis:6379/0'
+
+# Celery heartbeat configuration
+CELERY_WORKER_HEARTBEAT = 30
+CELERY_WORKER_SEND_TASK_EVENTS = True
+CELERY_TASK_SEND_SENT_EVENT = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True

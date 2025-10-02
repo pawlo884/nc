@@ -1465,8 +1465,8 @@ def track_stock_changes(self, variant_uid, product_uid, old_stock, new_stock, pr
         variant_name: Nazwa wariantu (opcjonalne)
     """
     try:
-        logger.info(
-            f"📊 Śledzenie zmiany stanu: {product_name} - {variant_name}: {old_stock} → {new_stock}")
+        # logger.info(
+        #     f"📊 Śledzenie zmiany stanu: {product_name} - {variant_name}: {old_stock} → {new_stock}")
 
         stock_history = track_stock_change(
             variant_uid=variant_uid,
@@ -1478,8 +1478,8 @@ def track_stock_changes(self, variant_uid, product_uid, old_stock, new_stock, pr
         )
 
         if stock_history:
-            logger.info(
-                f"✅ Zapisano zmianę stanu w StockHistory (ID: {stock_history.id})")
+            # logger.info(
+            #     f"✅ Zapisano zmianę stanu w StockHistory (ID: {stock_history.id})")
             return {
                 'status': 'success',
                 'stock_history_id': stock_history.id,

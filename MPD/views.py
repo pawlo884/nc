@@ -171,7 +171,7 @@ class ProductSetViewSet(viewsets.ModelViewSet):
         try:
             item = ProductSetItem.objects.get(
                 set=set,
-                mapped_product_id=product_id
+                mapped_product_uid=product_id
             )
             item.delete()
             return Response({'status': 'product removed from set'})
@@ -966,14 +966,18 @@ def bulk_create_products(request):
                     errors.append(f"Brak nazwy produktu")
                     continue
 
-                # KROK 6: Nazwa + Opis + Krótki opis + Atrybuty + Marka + Grupa rozmiarowa (inne pola wyłączone)
+                # KROK 6: Nazwa + Opis + Krótki opis + Atrybuty + Marka + Grupa rozmiarowa + Series + Jednostka
                 description = product_data.get('description', '')
                 short_description = product_data.get('short_description', '')
                 brand_name = product_data.get('brand_name', '')
                 size_category = product_data.get('size_category', '')
+                series_name = product_data.get('series_name', '')
                 unit_id = product_data.get('unit_id')
-                series_id = product_data.get('series_id')
                 visibility = product_data.get('visibility', True)
+
+                # Debug: sprawdź unit_id
+                logger.info(
+                    f"MPD bulk_create: unit_id={unit_id} (type: {type(unit_id)})")
 
                 # Pobierz lub utwórz markę
                 brand_id = None
@@ -982,17 +986,29 @@ def bulk_create_products(request):
                         'MPD').get_or_create(name=brand_name)
                     brand_id = brand.id
 
-                # Utwórz produkt z nazwą, opisem, krótkim opisem i marką
+                # Pobierz lub utwórz series
+                series_id = None
+                if series_name:
+                    from MPD.models import ProductSeries
+                    series, _ = ProductSeries.objects.using(
+                        'MPD').get_or_create(name=series_name)
+                    series_id = series.id
+
+                # Utwórz produkt z nazwą, opisem, krótkim opisem, marką, series i jednostką
                 # size_category jest używane tylko do filtrowania rozmiarów, nie zapisujemy go w produkcie
                 product = Products.objects.using('MPD').create(
                     name=name,
                     description=description or '',
                     short_description=short_description or '',
                     brand_id=brand_id,
-                    unit_id=None,   # Wyłączone na razie
-                    series_id=None,  # Wyłączone na razie
+                    unit_id=unit_id,
+                    series_id=series_id,
                     visibility=visibility
                 )
+
+                # Debug: sprawdź zapisany produkt
+                logger.info(
+                    f"Created product {product.id} with unit_id={product.unit_id}")
 
                 # Warianty wyłączone na razie
                 created_variants = []
@@ -1090,8 +1106,8 @@ def bulk_map_from_matterhorn1(request):
                         visibility=product_data.get('visibility', True)
                     )
 
-                    # Zaktualizuj mapped_product_id w matterhorn1
-                    matterhorn_product.mapped_product_id = mpd_product.id
+                    # Zaktualizuj mapped_product_uid w matterhorn1
+                    matterhorn_product.mapped_product_uid = mpd_product.id
                     matterhorn_product.save()
 
                     # Utwórz warianty jeśli istnieją
@@ -1259,7 +1275,7 @@ def get_matterhorn1_products(request):
                 } if product.category else None,
                 'variants': variants,
                 'images': images,
-                'mapped_product_id': product.mapped_product_id
+                'mapped_product_uid': product.mapped_product_uid
             })
 
         return JsonResponse({

@@ -71,20 +71,23 @@
     
     .mpd-form label {
         display: block;
-        margin-bottom: 5px;
+        margin-bottom: 3px;
         font-weight: bold;
+        font-size: 11px;
+        color: #555;
     }
     
     .mpd-form input[type="text"],
     .mpd-form textarea,
     .mpd-form select {
         width: 100%;
-        padding: 8px 12px;
+        padding: 4px;
         border: 1px solid #ccc;
-        border-radius: 4px;
+        border-radius: 2px;
         color: #333;
         background-color: #fff;
         line-height: 1.2;
+        font-size: 11px;
         height: auto;
         min-height: 36px;
         vertical-align: top;
@@ -103,45 +106,45 @@
     #main_color_id, #unit_id {
         color: #333 !important;
         background-color: #fff !important;
-        font-size: 14px !important;
+        font-size: 11px !important;
         line-height: 1.2 !important;
-        padding: 8px 12px !important;
+        padding: 4px !important;
         height: auto !important;
-        min-height: 36px !important;
+        min-height: 28px !important;
         vertical-align: top !important;
     }
     
     #main_color_id option, #unit_id option {
         color: #333 !important;
         background-color: #fff !important;
-        font-size: 14px !important;
-        padding: 5px !important;
+        font-size: 11px !important;
+        padding: 3px !important;
     }
     
     select#main_color_id, select#unit_id {
         color: #333 !important;
         background-color: #fff !important;
-        font-size: 14px !important;
+        font-size: 11px !important;
     }
     
     select#main_color_id option, select#unit_id option {
         color: #333 !important;
         background-color: #fff !important;
-        font-size: 14px !important;
-        padding: 5px !important;
+        font-size: 11px !important;
+        padding: 3px !important;
     }
     
     /* Override Django admin styles */
     .form-row select {
         color: #333 !important;
         background-color: #fff !important;
-        font-size: 14px !important;
+        font-size: 11px !important;
     }
     
     .form-row select option {
         color: #333 !important;
         background-color: #fff !important;
-        font-size: 14px !important;
+        font-size: 11px !important;
     }
     
     /* Force visibility */
@@ -203,18 +206,18 @@
     }
 
     .mpd-form button {
-        background-color: #417690;
+        background-color: #28a745;
         color: white;
         border: none;
-        padding: 10px 20px;
-        border-radius: 4px;
+        padding: 3px 6px;
+        border-radius: 2px;
         cursor: pointer;
-        font-size: 14px;
+        font-size: 10px;
         margin-right: 10px;
     }
 
     .mpd-form button:hover {
-        background-color: #295270;
+        background-color: #218838;
     }
 
     .mpd-form button:disabled {
@@ -285,39 +288,68 @@
     </div>
     <div class="column right-column">
         <div class="mpd-form">
-            <h2>Dane MPD</h2>
+            <h2 style="margin:0 0 12px 0; font-size:14px; color:#333; font-weight:bold;">Dane MPD</h2>
             <div id="inline-status-message" class="status-message" style="display:none;"></div>
             <div id="status-message"></div>
             
             {% if not is_mapped and suggested_products %}
-            <div class="form-row" style="margin-bottom:30px;">
-                <h3>Sugerowane podobne produkty w MPD:</h3>
-                <div style="margin-bottom: 10px;">
-                    <label for="sort-select" style="margin-right: 10px;">Sortuj według:</label>
-                    <select id="sort-select" onchange="changeSort()" style="padding: 5px; border: 1px solid #ccc; border-radius: 3px;">
+            <div class="form-row" style="margin-bottom:30px; padding:12px; border:1px solid #ddd; border-radius:4px; background:#f8f9fa;">
+                <h3 style="margin:0 0 12px 0; color:#333; font-size:14px; font-weight:bold;">Sugerowane podobne produkty w MPD:</h3>
+                <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+                    <label for="sort-select" style="font-size:12px; font-weight:bold; color:#666;">Sortuj według:</label>
+                    <select id="sort-select" onchange="changeSort()" style="padding: 4px 6px; border: 1px solid #ccc; border-radius: 3px; font-size:12px;">
                         <option value="similarity" {% if request.GET.sort_by != 'suggested_in_query' %}selected{% endif %}>Podobieństwo</option>
                         <option value="suggested_in_query" {% if request.GET.sort_by == 'suggested_in_query' %}selected{% endif %}>Pokrycie słów</option>
                     </select>
                 </div>
-                <table style="width:100%; border-collapse:collapse;">
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
                     <thead>
-                        <tr>
-                            <th style="text-align:left; border-bottom:1px solid #ccc;">Nazwa</th>
-                            <th style="text-align:left; border-bottom:1px solid #ccc;">Marka</th>
-                            <th style="text-align:left; border-bottom:1px solid #ccc;">Podobieństwo</th>
-                            <th style="text-align:left; border-bottom:1px solid #ccc;">Pokrycie słów (%)</th>
-                            <th style="text-align:left; border-bottom:1px solid #ccc;">Akcja</th>
+                        <tr style="background:#f8f9fa;">
+                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px;">Nazwa</th>
+                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px; width:80px;">Marka</th>
+                            <th style="text-align:center; border:1px solid #ddd; padding:6px; font-size:11px; width:60px;">Podob.</th>
+                            <th style="text-align:center; border:1px solid #ddd; padding:6px; font-size:11px; width:60px;">Pokrycie</th>
+                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px; width:120px;">Główny kolor</th>
+                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px; width:120px;">Kolor prod.</th>
+                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px; width:100px;">Kod prod.</th>
+                            <th style="text-align:center; border:1px solid #ddd; padding:6px; font-size:11px; width:80px;">Akcja</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for product in suggested_products %}
-                        <tr>
-                            <td>{{ product.name }}</td>
-                            <td>{{ product.brand }}</td>
-                            <td>{{ product.similarity|floatformat:1 }}%</td>
-                            <td>{{ product.suggested_in_query|floatformat:1 }}%</td>
-                            <td>
-                                <button type="button" class="assign-mapping-btn" data-mpd-id="{{ product.id }}">Przypisz</button>
+                        <tr style="border-bottom:1px solid #eee; transition:background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f8ff'" onmouseout="this.style.backgroundColor=''">
+                            <td style="border:1px solid #ddd; padding:6px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ product.name }}">{{ product.name|truncatechars:30 }}</td>
+                            <td style="border:1px solid #ddd; padding:6px; text-align:center;">{{ product.brand|truncatechars:10 }}</td>
+                            <td style="border:1px solid #ddd; padding:6px; text-align:center; font-weight:bold; color:#28a745;">{{ product.similarity|floatformat:1 }}%</td>
+                            <td style="border:1px solid #ddd; padding:6px; text-align:center; color:#17a2b8;">{{ product.suggested_in_query|floatformat:1 }}%</td>
+                            <td style="border:1px solid #ddd; padding:4px;">
+                                <select class="main-color-select" style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;">
+                                    <option value="">-- kolor --</option>
+                                    {% for color in main_colors %}
+                                    <option value="{{ color.id }}">{{ color.name|truncatechars:15 }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td style="border:1px solid #ddd; padding:4px;">
+                                <input type="text" class="producer-color-input" list="producer_colors_list" autocomplete="off" 
+                                       style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;" 
+                                       placeholder="Kolor prod.">
+                                <datalist id="producer_colors_list">
+                                    {% for color in producer_colors %}
+                                    <option value="{{ color.name }}">{{ color.name }}</option>
+                                    {% endfor %}
+                                </datalist>
+                            </td>
+                            <td style="border:1px solid #ddd; padding:4px;">
+                                <input type="text" class="producer-code-input" placeholder="Kod" 
+                                       style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;">
+                            </td>
+                            <td style="border:1px solid #ddd; padding:4px; text-align:center;">
+                                <button type="button" class="assign-mapping-btn" data-mpd-id="{{ product.id }}" 
+                                        style="background:#007cba; color:white; border:none; padding:4px 8px; border-radius:3px; font-size:11px; cursor:pointer; transition:background-color 0.2s;"
+                                        onmouseover="this.style.backgroundColor='#005a87'" onmouseout="this.style.backgroundColor='#007cba'">
+                                    Przypisz
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -330,145 +362,229 @@
                 {% csrf_token %}
                 <input type="hidden" name="product_id" value="{{ original.id }}">
                 
-                <!-- KROK 1: NAZWA -->
-                <div class="form-row">
-                    <label for="mpd_name">Nazwa:</label>
-                    <input type="text" id="mpd_name" name="mpd_name" value="{{ original.name }}">
-                    <button type="button" onclick="updateField('name', 'mpd_name')">Zapisz</button>
+                <!-- Kompaktowy formularz w dwóch kolumnach -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div class="form-row" style="margin:0;">
+                        <label for="mpd_name" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Nazwa:</label>
+                        <input type="text" id="mpd_name" name="mpd_name" value="{{ original.name }}" 
+                               style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
+                        <button type="button" onclick="updateField('name', 'mpd_name')" 
+                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Zapisz
+                        </button>
+                    </div>
+                    
+                    <div class="form-row" style="margin:0;">
+                        <label for="mpd_short_description" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Krótki opis:</label>
+                        <textarea id="mpd_short_description" name="mpd_short_description" style="height: 35px; width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px; resize:vertical;">{{ mpd_data.short_description }}</textarea>
+                        <button type="button" onclick="updateField('short_description', 'mpd_short_description')" 
+                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Zapisz
+                        </button>
+                    </div>
                 </div>
                 
-                <!-- KROK 2: OPIS -->
-                <div class="form-row">
-                    <label for="mpd_description">Opis:</label>
-                    <textarea id="mpd_description" name="mpd_description">{{ original.description }}</textarea>
-                    <button type="button" onclick="updateField('description', 'mpd_description')">Zapisz</button>
+                <div class="form-row" style="margin-bottom:10px;">
+                    <label for="mpd_description" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Opis:</label>
+                    <textarea id="mpd_description" name="mpd_description" style="height: 60px; width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px; resize:vertical;">{{ original.description }}</textarea>
+                    <button type="button" onclick="updateField('description', 'mpd_description')" 
+                            style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                        Zapisz
+                    </button>
                 </div>
                 
-                <!-- KROK 3: KRÓTKI OPIS -->
-                <div class="form-row">
-                    <label for="mpd_short_description">Krótki opis:</label>
-                    <textarea id="mpd_short_description" name="mpd_short_description" style="height: 60px;">{{ mpd_data.short_description }}</textarea>
-                    <button type="button" onclick="updateField('short_description', 'mpd_short_description')">Zapisz</button>
-                </div>
-                
-                <!-- KROK 4: ATRYBUTY -->
-                <div class="form-row">
-                    <label for="mpd_attributes">Atrybuty:</label>
-                    <select multiple name="mpd_attributes" id="mpd_attributes" size="10" style="width: 100%;" onchange="saveAttributeSelection()" onblur="saveAttributeSelection()" onfocus="restoreAttributeSelection()" onclick="saveAttributeSelection()">
-                        {% for attribute in mpd_attributes %}
-                        <option value="{{ attribute.id }}" {% if attribute.id in selected_attributes %}selected{% endif %}>
-                            {{ attribute.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <button type="button" onclick="updateAttributes()" style="margin-left:10px;">Zapisz atrybuty</button>
-                </div>
-                <div class="form-row">
-                    <label>Przypisane atrybuty:</label>
-                    <ul style="list-style: none; padding: 0;">
-                        {% for attribute in mpd_attributes %}
-                            {% if attribute.id in selected_attributes %}
-                                <li style="display: flex; align-items: center; margin-bottom: 5px;">
-                                    <span style="flex-grow: 1;">{{ attribute.name }}</span>
-                                    <button type="button" class="remove-attribute-btn" data-attribute-id="{{ attribute.id }}" style="background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 8px; cursor: pointer; margin-left: 10px;">×</button>
-                                </li>
-                            {% endif %}
-                        {% endfor %}
-                    </ul>
+                <!-- KROK 4: ATRYBUTY - Kompaktowa wersja -->
+                <div class="form-row" style="margin-bottom:10px;">
+                    <label for="mpd_attributes" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Atrybuty:</label>
+                    <div style="display:grid; grid-template-columns:2fr 1fr; gap:6px; align-items:start;">
+                        <select multiple name="mpd_attributes" id="mpd_attributes" size="15" 
+                                style="width:100%; padding:3px; border:1px solid #ccc; border-radius:2px; font-size:10px;" 
+                                onchange="saveAttributeSelection()" onblur="saveAttributeSelection()" onfocus="restoreAttributeSelection()" onclick="saveAttributeSelection()">
+                            {% for attribute in mpd_attributes %}
+                            <option value="{{ attribute.id }}" {% if attribute.id in selected_attributes %}selected{% endif %}>
+                                {{ attribute.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div>
+                            <button type="button" onclick="updateAttributes()" 
+                                    style="background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px; width:100%; margin-bottom:4px;">
+                                Zapisz atrybuty
+                            </button>
+                            <button type="button" onclick="removeSelectedAttributes()" 
+                                    style="background:#dc3545; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px; width:100%; margin-bottom:6px;">
+                                Usuń wybrane
+                            </button>
+                            <div id="selected-attributes-list" style="font-size:9px; color:#666; background:#f8f9fa; padding:4px; border-radius:2px; border:1px solid #ddd; max-height:120px; overflow-y:auto;">
+                                <strong>Wybrane:</strong><br>
+                                <div id="selected-attributes-content">
+                                    {% for attribute in mpd_attributes %}
+                                        {% if attribute.id in selected_attributes %}
+                                        <div class="selected-attribute" data-attribute-id="{{ attribute.id }}" style="display:flex; justify-content:space-between; align-items:center; margin:2px 0; padding:2px; background:#e8f5e8; border-radius:2px;">
+                                            <span>{{ attribute.name }}</span>
+                                            <button type="button" onclick="removeSingleAttribute({{ attribute.id }})" 
+                                                    style="background:#dc3545; color:white; border:none; padding:1px 4px; border-radius:1px; cursor:pointer; font-size:8px; margin-left:4px;">
+                                                ×
+                                            </button>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- KROK 5: MARKA -->
-                <div class="form-row">
-                    <label for="mpd_brand">Marka:</label>
-                    <select id="mpd_brand" name="mpd_brand">
-                        <option value="">-- wybierz markę --</option>
-                        {% for brand in mpd_brands %}
-                        <option value="{{ brand.name }}" {% if brand.name == original.brand.name %}selected{% endif %}>{{ brand.name }}</option>
-                        {% endfor %}
-                    </select>
-                    <button type="button" onclick="updateField('brand_id', 'mpd_brand')">Zapisz</button>
+                <!-- KROK 5-6: MARKA I GRUPA ROZMIAROWA - W dwóch kolumnach -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div class="form-row" style="margin:0;">
+                        <label for="mpd_brand" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Marka:</label>
+                        <select id="mpd_brand" name="mpd_brand" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
+                            <option value="">-- wybierz markę --</option>
+                            {% for brand in mpd_brands %}
+                            <option value="{{ brand.name }}" {% if brand.name == original.brand.name %}selected{% endif %}>{{ brand.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" onclick="updateField('brand_id', 'mpd_brand')" 
+                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Zapisz
+                        </button>
+                    </div>
+                    
+                    <div class="form-row" style="margin:0;">
+                        <label for="mpd_size_category" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Grupa rozmiarowa:</label>
+                        <select id="mpd_size_category" name="mpd_size_category" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
+                            <option value="">-- wybierz grupę --</option>
+                            {% for cat in size_categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" onclick="updateField('size_category', 'mpd_size_category')" 
+                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Zapisz
+                        </button>
+                    </div>
                 </div>
                 
-                <!-- KROK 6: GRUPA ROZMIAROWA -->
-                <div class="form-row">
-                    <label for="mpd_size_category">Grupa rozmiarowa:</label>
-                    <select id="mpd_size_category" name="mpd_size_category">
-                        <option value="">-- wybierz grupę --</option>
-                        {% for cat in size_categories %}
-                        <option value="{{ cat }}">{{ cat }}</option>
-                        {% endfor %}
-                    </select>
-                    <button type="button" onclick="updateField('size_category', 'mpd_size_category')">Zapisz</button>
+                <!-- KROK 7-9: KOLORY I KOD - W trzech kolumnach -->
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div class="form-row" style="margin:0;">
+                        <label for="main_color_id" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Główny kolor:</label>
+                        <select id="main_color_id" name="main_color_id" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
+                            <option value="">-- wybierz kolor --</option>
+                            {% for color in main_colors %}
+                            <option value="{{ color.id }}" {% if mpd_data.main_color_id == color.id or original.color == color.name %}selected{% endif %}>{{ color.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" onclick="updateField('color_id', 'main_color_id')" 
+                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Zapisz
+                        </button>
+                    </div>
+                    
+                    <div class="form-row" style="margin:0;">
+                        <label for="producer_color_name" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Kolor producenta:</label>
+                        <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off" 
+                               placeholder="Kolor producenta" 
+                               style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
+                        <button type="button" onclick="updateField('producer_color_id', 'producer_color_name')" 
+                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Zapisz
+                        </button>
+                        <datalist id="producer_colors_list">
+                            {% for color in producer_colors %}
+                                <option value="{{ color.name }}">{{ color.name }}</option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    
+                    <div class="form-row" style="margin:0;">
+                        <label for="producer_code" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Kod producenta:</label>
+                        <input type="text" id="producer_code" name="producer_code" value="{{ producer_code|default:'' }}" 
+                               placeholder="Kod producenta" 
+                               style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
+                        <button type="button" onclick="updateField('producer_code', 'producer_code')" 
+                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Zapisz
+                        </button>
+                    </div>
                 </div>
                 
-                <!-- KROK 7: GŁÓWNY KOLOR -->
-                <div class="form-row">
-                    <label for="main_color_id">Główny kolor:</label>
-                    <select id="main_color_id" name="main_color_id">
-                        <option value="">-- wybierz kolor --</option>
-                        {% for color in main_colors %}
-                        <option value="{{ color.id }}" {% if mpd_data.main_color_id == color.id or original.color == color.name %}selected{% endif %}>{{ color.name }}</option>
-                        {% endfor %}
-                    </select>
-                    <button type="button" onclick="updateField('color_id', 'main_color_id')">Zapisz</button>
+                <!-- KROK 10-12: NAZWA SERII, ŚCIEŻKI, JEDNOSTKA - W trzech kolumnach -->
+                <div style="display:grid; grid-template-columns:1fr 2fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div class="form-row" style="margin:0;">
+                        <label for="series_name" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Nazwa serii:</label>
+                        <input type="text" id="series_name" name="series_name" value="{{ series_name|default:'' }}" 
+                               placeholder="Nazwa serii" 
+                               style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
+                        <button type="button" onclick="updateField('series_id', 'series_name')" 
+                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Zapisz
+                        </button>
+                    </div>
+                    
+                    <div class="form-row" style="margin:0;">
+                        <label for="mpd_paths" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Ścieżki produktu:</label>
+                        <select id="mpd_paths" name="mpd_paths" multiple size="10" 
+                                style="width:100%; padding:3px; border:1px solid #ccc; border-radius:2px; font-size:10px;">
+                            {% for path in mpd_paths %}
+                            <option value="{{ path.id }}" {% if path.id in selected_paths %}selected{% endif %}>
+                                {{ path.name }} ({{ path.path }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" onclick="addPaths()" 
+                                style="margin-top:3px; background:#17a2b8; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Dodaj
+                        </button>
+                    </div>
+                    
+                    <div class="form-row" style="margin:0;">
+                        <label for="unit_id" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Jednostka:</label>
+                        <select id="unit_id" name="unit_id" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
+                            <option value="">-- wybierz jednostkę --</option>
+                            {% for unit in units %}
+                            <option value="{{ unit.id }}" {% if unit.id == selected_unit_id %}selected{% endif %}>{{ unit.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" onclick="updateField('unit', 'unit_id')" 
+                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
+                            Zapisz
+                        </button>
+                    </div>
                 </div>
                 
-                <!-- KROK 8: KOLOR PRODUCENTA -->
-                <div class="form-row">
-                    <label for="producer_color_name">Kolor producenta:</label>
-                    <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off" placeholder="Kolor producenta">
-                    <button type="button" onclick="updateField('producer_color_id', 'producer_color_name')">Zapisz</button>
-                    <datalist id="producer_colors_list">
-                        {% for color in producer_colors %}
-                            <option value="{{ color.name }}">{{ color.name }}</option>
-                        {% endfor %}
-                    </datalist>
-                </div>
-                
-                <!-- KROK 9: KOD PRODUCENTA (wyłączony) -->
-                <div class="form-row" style="display: none;">
-                    <label for="producer_code">Kod producenta:</label>
-                    <input type="text" id="producer_code" name="producer_code" value="{{ original.product_id|default:producer_code }}" placeholder="Kod producenta">
-                    <button type="button" onclick="updateField('producer_code', 'producer_code')">Zapisz</button>
-                </div>
-                
-                <!-- KROK 10: NAZWA SERII (wyłączony) -->
-                <div class="form-row" style="display: none;">
-                    <label for="series_name">Nazwa serii (opcjonalnie):</label>
-                    <input type="text" id="series_name" name="series_name" value="{{ series_name }}" placeholder="Nazwa serii">
-                    <button type="button" onclick="updateField('series_id', 'series_name')">Zapisz</button>
-                </div>
-                
-                <!-- KROK 11: ŚCIEŻKI (wyłączony) -->
-                <div class="form-row" style="display: none;">
-                    <label for="mpd_paths">Ścieżki produktu (możesz wybrać wiele):</label>
-                    <select id="mpd_paths" name="mpd_paths" multiple size="5">
-                        {% for path in mpd_paths %}
-                        <option value="{{ path.id }}" {% if path.id in selected_paths %}selected{% endif %}>
-                            {{ path.name }} ({{ path.path }})
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <button type="button" onclick="addPaths()" style="margin-left:10px;">Dodaj</button>
-                </div>
-                
-                <!-- KROK 12: JEDNOSTKA (wyłączony) -->
-                <div class="form-row" style="display: none;">
-                    <label for="unit_id">Jednostka:</label>
-                    <select id="unit_id" name="unit_id">
-                        <option value="">-- wybierz jednostkę --</option>
-                        {% for unit in units %}
-                        <option value="{{ unit.id }}" {% if unit.id == selected_unit_id %}selected{% endif %}>{{ unit.name }}</option>
-                        {% endfor %}
-                    </select>
+                <!-- KROK 13: SKŁAD (MATERIAŁY) -->
+                <div class="form-row" id="fabric-section">
+                    <label>Skład (materiały):</label>
+                    <div id="fabric-list">
+                        <div class="fabric-row" style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
+                            <select name="fabric_component[]">
+                                <option value="">-- wybierz materiał --</option>
+                                {% for fabric in fabric_components %}
+                                    <option value="{{ fabric.id }}">{{ fabric.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="number" name="fabric_percentage[]" min="0" max="100" placeholder="%" style="width:60px;" />
+                            <button type="button" onclick="removeFabricRow(this)">Usuń</button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="addFabricRow()" style="margin-top:5px;">Dodaj materiał</button>
                 </div>
                 
                 <div class="form-row" style="margin-bottom: 10px;">
-                    <b>ID w MPD:</b> {{ original.mapped_product_id|default:'-' }}
+                    <b>ID w MPD:</b> {{ original.mapped_product_uid|default:'-' }}
                 </div>
             </form>
             {% if not is_mapped %}
             <button type="button" id="create-mpd-product-btn" class="mpd-form-btn" style="margin-top:20px; background:#417690; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Utwórz nowy produkt w MPD</button>
+            {% else %}
+            <!-- KROK 14: UPLOAD ZDJĘĆ -->
+            <div class="form-row" style="margin-top:20px;">
+                <button type="button" onclick="uploadImages()" style="background:#28a745; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Upload zdjęć do bucketa</button>
+                <div id="status-message" style="margin-top:10px; padding:10px; border-radius:4px; display:none;"></div>
+            </div>
+            {% endif %}
             <div id="bulk-create-single-container" style="display:none; margin-top:20px;">
                 <div id="single-product-create-container" 
                      data-product-id="{{ original.product_id }}"
@@ -478,13 +594,6 @@
                      data-variants="[{% for variant in original.variants.all %}{'name': '{{ variant.name|escapejs }}', 'stock': {{ variant.stock }}, 'ean': '{{ variant.ean|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}]">
                 </div>
             </div>
-            {% else %}
-            <div id="product-mapping-container" 
-                 data-product-id="{{ original.id }}"
-                 data-is-mapped="{{ is_mapped|yesno:'true,false' }}"
-                 data-mapped-product-id="{{ original.mapped_product_id|default:'' }}">
-            </div>
-            {% endif %}
         </div>
     </div>
     <button class="toggle-button">{% if is_mapped %}◀{% else %}▶{% endif %}</button>
@@ -503,8 +612,18 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.assign-mapping-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const mpdId = this.getAttribute('data-mpd-id');
+            const row = this.closest('tr');
+            const mainColorId = row.querySelector('.main-color-select').value;
+            const producerColorName = row.querySelector('.producer-color-input').value;
+            const producerCode = row.querySelector('.producer-code-input').value;
+            
             if (confirm('Czy na pewno chcesz przypisać ten produkt do MPD ID ' + mpdId + '?')) {
                 const formData = new FormData();
+                
+                formData.append('main_color_id', mainColorId);
+                formData.append('producer_color_name', producerColorName);
+                formData.append('producer_code', producerCode);
+                
                 fetch(`/admin/matterhorn1/product/assign-mapping/${document.querySelector('[name=product_id]').value}/${mpdId}/`, {
                     method: 'POST',
                     headers: {
@@ -616,7 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function updateField(field, inputId) {
     const value = document.getElementById(inputId).value;
-    const productId = {{ original.mapped_product_id|default:'null' }};
+    const productId = {{ original.mapped_product_uid|default:'null' }};
     
     // Force text visibility for select elements
     const selectElement = document.getElementById(inputId);
@@ -748,6 +867,64 @@ function removeAttribute(attributeId) {
     });
 }
 
+function removeSingleAttribute(attributeId) {
+    removeAttribute(attributeId);
+}
+
+function removeSelectedAttributes() {
+    const attributesSelect = document.getElementById('mpd_attributes');
+    const selectedOptions = Array.from(attributesSelect.selectedOptions);
+    
+    if (selectedOptions.length === 0) {
+        alert('Nie wybrano żadnych atrybutów do usunięcia.');
+        return;
+    }
+    
+    const productId = {{ original.id }};
+    const attributeIds = selectedOptions.map(option => option.value);
+    
+    // Usuń każdy atrybut
+    let completed = 0;
+    let errors = 0;
+    
+    attributeIds.forEach(attributeId => {
+        const formData = new FormData();
+        formData.append('remove_attribute_id', attributeId);
+        
+        fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                completed++;
+            } else {
+                errors++;
+            }
+            
+            // Po usunięciu wszystkich atrybutów, odśwież stronę
+            if (completed + errors === attributeIds.length) {
+                if (completed > 0) {
+                    showInlineStatus(`Usunięto ${completed} atrybutów${errors > 0 ? `, ${errors} błędów` : ''}.`, completed > 0);
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showInlineStatus('Błąd usuwania atrybutów.', false);
+                }
+            }
+        })
+        .catch(error => {
+            errors++;
+            if (completed + errors === attributeIds.length) {
+                showInlineStatus('Błąd usuwania atrybutów.', false);
+            }
+        });
+    });
+}
+
 
 function saveAttributeSelection() {
     const attributesSelect = document.getElementById('mpd_attributes');
@@ -790,7 +967,7 @@ function restoreAttributeSelection() {
 function updateAttributes() {
     const attributesSelect = document.getElementById('mpd_attributes');
     const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
-    const productId = {{ original.mapped_product_id|default:'null' }};
+    const productId = {{ original.mapped_product_uid|default:'null' }};
     
     if (!productId) {
         // Dla niezmapowanych produktów - użyj mpd-create z całym formularzem
@@ -837,6 +1014,27 @@ function updateAttributes() {
     }
 }
 
+
+function addFabricRow() {
+    var row = document.createElement('div');
+    row.className = 'fabric-row';
+    row.style = 'display:flex; gap:10px; align-items:center; margin-bottom:5px;';
+    row.innerHTML = `
+        <select name="fabric_component[]">
+            <option value="">-- wybierz materiał --</option>
+            {% for fabric in fabric_components %}
+                <option value="{{ fabric.id }}">{{ fabric.name }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" name="fabric_percentage[]" min="0" max="100" placeholder="%" style="width:60px;" />
+        <button type="button" onclick="removeFabricRow(this)">Usuń</button>
+    `;
+    document.getElementById('fabric-list').appendChild(row);
+}
+
+function removeFabricRow(btn) {
+    btn.parentElement.remove();
+}
 
 function changeSort() {
     const sortBy = document.getElementById('sort-select').value;

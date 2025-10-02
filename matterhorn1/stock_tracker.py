@@ -320,14 +320,14 @@ def sync_stock_changes_from_api():
 
         changes_data = []
         for variant in variants:
-            # Sprawdź czy wariant ma mapped_variant_id (jest zmapowany do MPD)
-            if variant.mapped_variant_id:
+            # Sprawdź czy wariant ma mapped_variant_uid (jest zmapowany do MPD)
+            if variant.mapped_variant_uid:
                 # Pobierz aktualny stan z MPD
                 with connections['MPD'].cursor() as cursor:
                     cursor.execute("""
                         SELECT stock FROM stock_and_prices 
                         WHERE variant_id = %s AND source_id = %s
-                    """, [variant.mapped_variant_id, 2])
+                    """, [variant.mapped_variant_uid, 2])
                     result = cursor.fetchone()
 
                     if result:

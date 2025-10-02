@@ -309,13 +309,13 @@ class DatabaseUtils:
         return None
 
     @staticmethod
-    def update_product_mapping(product_id: int, mapped_product_id: int) -> bool:
+    def update_product_mapping(product_id: int, mapped_product_uid: int) -> bool:
         """
         Zaktualizuj mapowanie produktu w matterhorn1
 
         Args:
             product_id: ID produktu w matterhorn1
-            mapped_product_id: ID produktu w MPD
+            mapped_product_uid: UID produktu w MPD
 
         Returns:
             True jeśli operacja się powiodła
@@ -324,21 +324,21 @@ class DatabaseUtils:
             try:
                 with connections['matterhorn1'].cursor() as cursor:
                     tx_logger.log_operation("UPDATE", "matterhorn1", "product", "update_mapping",
-                                            {"product_id": product_id, "mapped_product_id": mapped_product_id})
+                                            {"product_id": product_id, "mapped_product_uid": mapped_product_uid})
                     cursor.execute(
-                        "UPDATE product SET mapped_product_id = %s WHERE id = %s",
-                        [mapped_product_id, product_id]
+                        "UPDATE product SET mapped_product_uid = %s WHERE id = %s",
+                        [mapped_product_uid, product_id]
                     )
 
                     tx_logger.log_operation("UPDATE", "matterhorn1", "product", "mapping_updated",
-                                            {"product_id": product_id, "mapped_product_id": mapped_product_id,
+                                            {"product_id": product_id, "mapped_product_uid": mapped_product_uid,
                                              "rows_affected": cursor.rowcount})
                     return cursor.rowcount > 0
 
             except Exception as e:
                 tx_logger.log_operation("UPDATE", "matterhorn1", "product", "update_mapping_failed",
                                         {"product_id": product_id,
-                                            "mapped_product_id": mapped_product_id},
+                                            "mapped_product_uid": mapped_product_uid},
                                         success=False, error=str(e))
                 logger.error(
                     f"Błąd podczas aktualizacji mapowania produktu {product_id}: {e}")
