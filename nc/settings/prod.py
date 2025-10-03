@@ -13,6 +13,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '209.38.208.114',
+    'app-web-1',  # Nazwa kontenera Docker
     # Dodaj konkretne domeny zamiast '*'
     # 'twoja-domena.com',
     # 'www.twoja-domena.com',
