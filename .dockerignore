@@ -27,7 +27,6 @@ media/
 
 # Static files (will be collected during build)
 staticfiles/
-static/
 
 # IDE
 .vscode/
