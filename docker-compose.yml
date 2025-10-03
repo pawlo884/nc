@@ -16,7 +16,7 @@ services:
       - nc_network
     user: "1001:1001"
 
-  web:
+  app-web-1:
     build:
       context: .
       dockerfile: Dockerfile.prod
@@ -38,11 +38,11 @@ services:
     networks:
       - nc_network
     depends_on:
-      - redis
+      - app-redis-1
       - static-init
     user: "1001:1001"
 
-  nginx:
+  app-nginx-1:
     image: nginx:alpine
     ports:
       - "80:80"
@@ -54,103 +54,103 @@ services:
     environment:
       - TZ=Europe/Warsaw
     depends_on:
-      - web
+      - app-web-1
     restart: always
     networks:
       - nc_network
 
   celery-default:
-      build:
-        context: .
-        dockerfile: Dockerfile.prod
-      # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
-      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=200000"]
-      volumes:
-        - .:/app
-        - celery_data:/var/lib/celery
-      env_file:
-        - .env.${ENVIRONMENT:-prod}
-      environment:
-        - DJANGO_SETTINGS_MODULE=nc.settings.prod
-        - CELERY_STATE_DB=/var/lib/celery/worker_state_default
-        - TZ=Europe/Warsaw
-        # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
-        - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-        - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-        - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
-        - CELERY_WORKER_SEND_TASK_EVENTS=true
-        - CELERY_TASK_SEND_SENT_EVENT=true
-      depends_on:
-        redis:
-          condition: service_healthy
-        web:
-          condition: service_started
-      restart: always
-      networks:
-        - nc_network
-      user: "1001:1001"
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=200000"]
+    volumes:
+      - .:/app
+      - celery_data:/var/lib/celery
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.prod
+      - CELERY_STATE_DB=/var/lib/celery/worker_state_default
+      - TZ=Europe/Warsaw
+      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+      - CELERY_WORKER_SEND_TASK_EVENTS=true
+      - CELERY_TASK_SEND_SENT_EVENT=true
+    depends_on:
+      app-redis-1:
+        condition: service_healthy
+      app-web-1:
+        condition: service_started
+    restart: always
+    networks:
+      - nc_network
+    user: "1001:1001"
 
   celery-import:
-      build:
-        context: .
-        dockerfile: Dockerfile.prod
-      # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
-      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=200000"]
-      volumes:
-        - .:/app
-        - celery_data:/var/lib/celery
-      env_file:
-        - .env.${ENVIRONMENT:-prod}
-      environment:
-        - DJANGO_SETTINGS_MODULE=nc.settings.prod
-        - CELERY_STATE_DB=/var/lib/celery/worker_state_import
-        - TZ=Europe/Warsaw
-        # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
-        - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-        - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-        - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
-        - CELERY_WORKER_SEND_TASK_EVENTS=true
-        - CELERY_TASK_SEND_SENT_EVENT=true
-      depends_on:
-        redis:
-          condition: service_healthy
-        web:
-          condition: service_started
-      restart: always
-      networks:
-        - nc_network
-      user: "1001:1001"
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=200000"]
+    volumes:
+      - .:/app
+      - celery_data:/var/lib/celery
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.prod
+      - CELERY_STATE_DB=/var/lib/celery/worker_state_import
+      - TZ=Europe/Warsaw
+      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+      - CELERY_WORKER_SEND_TASK_EVENTS=true
+      - CELERY_TASK_SEND_SENT_EVENT=true
+    depends_on:
+      app-redis-1:
+        condition: service_healthy
+      app-web-1:
+        condition: service_started
+    restart: always
+    networks:
+      - nc_network
+    user: "1001:1001"
 
   celery-beat:
-      build:
-        context: .
-        dockerfile: Dockerfile.prod
-      # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
-      command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info"]
-      volumes:
-        - .:/app
-      env_file:
-        - .env.${ENVIRONMENT:-prod}
-      environment:
-        - DJANGO_SETTINGS_MODULE=nc.settings.prod
-        - TZ=Europe/Warsaw
-        # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
-        - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-        - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-        - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
-        - CELERY_WORKER_SEND_TASK_EVENTS=true
-        - CELERY_TASK_SEND_SENT_EVENT=true
-      depends_on:
-        redis:
-          condition: service_healthy
-        web:
-          condition: service_started
-      restart: always
-      networks:
-        - nc_network
-      user: "1001:1001"
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info"]
+    volumes:
+      - .:/app
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.prod
+      - TZ=Europe/Warsaw
+      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+      - CELERY_WORKER_SEND_TASK_EVENTS=true
+      - CELERY_TASK_SEND_SENT_EVENT=true
+    depends_on:
+      app-redis-1:
+        condition: service_healthy
+      app-web-1:
+        condition: service_started
+    restart: always
+    networks:
+      - nc_network
+    user: "1001:1001"
 
-  redis:
+  app-redis-1:
     image: redis:7.2-alpine
     command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-prod_password}
     # Usunięto publiczny port - Redis dostępny tylko wewnątrz sieci Docker
@@ -174,7 +174,7 @@ services:
       context: .
       dockerfile: Dockerfile.prod
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
-    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0"]
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0"]
     ports:
       - "5555:5555"
     volumes:
@@ -186,8 +186,8 @@ services:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw
       # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
@@ -198,7 +198,7 @@ services:
       - CELERY_TASK_IGNORE_RESULT=false
       - CELERY_TASK_STORE_EAGER_RESULT=true
     depends_on:
-      - redis
+      - app-redis-1
       - celery-default
       - celery-import
     networks:
