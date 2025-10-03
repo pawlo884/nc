@@ -16,7 +16,7 @@ services:
       - nc_network
     user: "1001:1001"
 
-  app-web-1:
+  web:
     build:
       context: .
       dockerfile: Dockerfile.prod
@@ -38,11 +38,11 @@ services:
     networks:
       - nc_network
     depends_on:
-      - app-redis-1
+      - redis
       - static-init
     user: "1001:1001"
 
-  app-nginx-1:
+  nginx:
     image: nginx:alpine
     ports:
       - "80:80"
@@ -54,7 +54,7 @@ services:
     environment:
       - TZ=Europe/Warsaw
     depends_on:
-      - app-web-1
+      - web
     restart: always
     networks:
       - nc_network
@@ -75,15 +75,15 @@ services:
       - CELERY_STATE_DB=/var/lib/celery/worker_state_default
       - TZ=Europe/Warsaw
       # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
     depends_on:
-      app-redis-1:
+      redis:
         condition: service_healthy
-      app-web-1:
+      web:
         condition: service_started
     restart: always
     networks:
@@ -106,15 +106,15 @@ services:
       - CELERY_STATE_DB=/var/lib/celery/worker_state_import
       - TZ=Europe/Warsaw
       # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
     depends_on:
-      app-redis-1:
+      redis:
         condition: service_healthy
-      app-web-1:
+      web:
         condition: service_started
     restart: always
     networks:
@@ -135,22 +135,22 @@ services:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw
       # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
     depends_on:
-      app-redis-1:
+      redis:
         condition: service_healthy
-      app-web-1:
+      web:
         condition: service_started
     restart: always
     networks:
       - nc_network
     user: "1001:1001"
 
-  app-redis-1:
+  redis:
     image: redis:7.2-alpine
     command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-prod_password}
     # Usunięto publiczny port - Redis dostępny tylko wewnątrz sieci Docker
@@ -174,7 +174,7 @@ services:
       context: .
       dockerfile: Dockerfile.prod
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
-    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0"]
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0"]
     ports:
       - "5555:5555"
     volumes:
@@ -186,8 +186,8 @@ services:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw
       # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
@@ -198,7 +198,7 @@ services:
       - CELERY_TASK_IGNORE_RESULT=false
       - CELERY_TASK_STORE_EAGER_RESULT=true
     depends_on:
-      - app-redis-1
+      - redis
       - celery-default
       - celery-import
     networks:
