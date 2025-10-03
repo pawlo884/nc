@@ -1,9 +1,23 @@
 services:
+  static-init:
+    build: .
+    command: ["/bin/bash", "-c", "python manage.py collectstatic --noinput --skip-checks"]
+    volumes:
+      - static_volume:/app/staticfiles
+    env_file:
+      - .env.dev
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.dev
+      - TZ=Europe/Warsaw
+      - DJANGO_DEBUG=1
+    networks:
+      - app_network
+    user: "1001:1001"
+
   web:
     build: .
-    command: [ "/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && python manage.py runserver 0.0.0.0:8000" ]
-    ports:
-      - "8000:8000"
+    command: [ "/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 1 --timeout 300 --keep-alive 5 --reload" ]
+    # Usunięto port 8000 - teraz Nginx będzie serwował aplikację
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -20,7 +34,24 @@ services:
       - app_network
     depends_on:
       - redis
+      - static-init
     user: "1001:1001"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8000:80"  # Nginx będzie dostępny na porcie 8000
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - static_volume:/app/staticfiles
+      - nginx_logs:/var/log/nginx
+    environment:
+      - TZ=Europe/Warsaw
+    depends_on:
+      - web
+    restart: always
+    networks:
+      - app_network
 
   celery-default:
     build: .
@@ -150,6 +181,7 @@ volumes:
   static_volume:
   celery_data:
   flower_data:
+  nginx_logs:
     driver: local
 
 networks:

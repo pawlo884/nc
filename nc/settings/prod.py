@@ -74,17 +74,23 @@ STATICFILES_DIRS = [
 ]
 
 # Konfiguracja dla plików statycznych w produkcji
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-# WhiteNoise Configuration - zoptymalizowane dla produkcji
-WHITENOISE_USE_FINDERS = True
-WHITENOISE_MANIFEST_STRICT = False
-WHITENOISE_ALLOW_ALL_ORIGINS = True
-WHITENOISE_AUTOREFRESH = False  # Wyłączone w produkcji dla wydajności
-WHITENOISE_USE_FINDERS = True
-WHITENOISE_INDEX_FILE = True
+# W produkcji używamy Nginx do serwowania plików statycznych, nie WhiteNoise
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # STATICFILES_FINDERS - używamy domyślnych z base.py
+
+# Usuń WhiteNoise z middleware w produkcji - Nginx obsługuje pliki statyczne
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
 
 # Security settings for production
 SECURE_SSL_REDIRECT = False  # Tymczasowo wyłączone, ponieważ nie mamy jeszcze HTTPS

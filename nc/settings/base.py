@@ -69,7 +69,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'whitenoise.runserver_nostatic',
     'django_celery_beat',
     'django_celery_results',
     'debug_toolbar',
@@ -89,7 +88,6 @@ except ImportError:
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -241,7 +239,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# STATICFILES_STORAGE - konfigurowany w settings.dev.py i settings.prod.py
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -287,10 +285,7 @@ CELERY_TASK_ROUTES = {
 # Celery Beat Schedule - używaj Django periodic tasks zamiast tego
 # CELERY_BEAT_SCHEDULE = {}
 
-# WhiteNoise Configuration
-WHITENOISE_USE_FINDERS = True
-WHITENOISE_MANIFEST_STRICT = False
-WHITENOISE_ALLOW_ALL_ORIGINS = True
+# WhiteNoise usunięty - Nginx obsługuje pliki statyczne w obu środowiskach
 
 
 # Debug Toolbar Configuration
