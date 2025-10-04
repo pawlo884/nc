@@ -35,6 +35,9 @@ SECURE_HSTS_SECONDS = None
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_FRAME_DENY = False
 
+# Cross-Origin-Opener-Policy settings for development
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+
 # CSRF Configuration for development
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost',

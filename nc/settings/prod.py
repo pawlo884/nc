@@ -101,6 +101,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
 SECURE_FRAME_DENY = False
 
+# Cross-Origin-Opener-Policy settings for production
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+
 # Dodatkowe ustawienia dla proxy
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = None
