@@ -78,12 +78,15 @@ CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://:dev_password@redis:6379/0'
 
 # Celery heartbeat configuration
-CELERY_WORKER_HEARTBEAT = 30
+CELERY_WORKER_HEARTBEAT = 60  # Zwiększony z 30 do 60 sekund
 CELERY_WORKER_SEND_TASK_EVENTS = True
 CELERY_TASK_SEND_SENT_EVENT = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_ACKS_LATE = True
-CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = False  # Zmieniony na False dla development
+CELERY_WORKER_DISABLE_RATE_LIMITS = True  # Wyłącz limity dla development
+CELERY_TASK_TIME_LIMIT = 600  # 10 minut limit dla tasków
+CELERY_TASK_SOFT_TIME_LIMIT = 540  # 9 minut soft limit
 
 # Static files configuration for development with Nginx
 # Nginx obsługuje pliki statyczne, nie WhiteNoise
