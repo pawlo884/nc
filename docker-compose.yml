@@ -43,9 +43,7 @@ services:
     user: "1001:1001"
 
   nginx:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
+    image: nginx:alpine
     ports:
       - "80:80"
       - "443:443"
@@ -53,17 +51,13 @@ services:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
       - static_volume:/app/staticfiles
       - nginx_logs:/var/log/nginx
-      - ./nginx_security_setup.sh:/usr/local/bin/nginx_security_setup.sh:ro
-      - ./nginx_monitor.py:/usr/local/bin/nginx_monitor.py:ro
     environment:
       - TZ=Europe/Warsaw
-    command: ["/bin/bash", "-c", "/usr/local/bin/nginx_security_setup.sh"]
     depends_on:
       - web
     restart: always
     networks:
       - nc_network
-    user: "1001:1001"
 
   celery-default:
     build:
