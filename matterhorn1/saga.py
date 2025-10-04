@@ -430,37 +430,52 @@ class SagaService:
 
     @staticmethod
     def _create_mpd_product(mpd_data: Dict) -> Dict:
-        """Utwórz produkt w MPD"""
-        from django.conf import settings
-        import requests
+        """Utwórz produkt w MPD bezpośrednio przez model Django"""
+        from django.db import connections
+        from MPD.models import Products, Brands, ProductSeries
 
         logger.info(
             f"🔄 Tworzę produkt w MPD: {mpd_data.get('name', 'Unknown')}")
 
-        # Wyślij żądanie do API MPD
-        mpd_api_url = f"{settings.MPD_API_URL}/bulk-create/"
-        response = requests.post(
-            mpd_api_url,
-            json={'products': [mpd_data]},
-            timeout=30
-        )
+        try:
+            # Pobierz lub utwórz markę
+            brand_id = None
+            brand_name = mpd_data.get('brand_name')
+            if brand_name:
+                brand, _ = Brands.objects.using(
+                    'MPD').get_or_create(name=brand_name)
+                brand_id = brand.id
 
-        if response.status_code != 200:
-            raise Exception(
-                f"MPD API error: {response.status_code} - {response.text}")
+            # Pobierz lub utwórz series
+            series_id = None
+            series_name = mpd_data.get('series_name')
+            if series_name:
+                series, _ = ProductSeries.objects.using(
+                    'MPD').get_or_create(name=series_name)
+                series_id = series.id
 
-        result = response.json()
-        if result.get('status') != 'success':
-            raise Exception(f"MPD creation failed: {result.get('errors', [])}")
+            # Utwórz produkt w MPD
+            product = Products.objects.using('MPD').create(
+                name=mpd_data.get('name'),
+                description=mpd_data.get('description', ''),
+                short_description=mpd_data.get('short_description', ''),
+                brand_id=brand_id,
+                unit_id=mpd_data.get('unit_id'),
+                series_id=series_id,
+                visibility=mpd_data.get('visibility', False)
+            )
 
-        created_products = result.get('created_products', [])
-        if not created_products:
-            raise Exception("No products created in MPD")
+            mpd_product_id = product.id
+            logger.info(f"✅ Utworzono produkt w MPD z ID: {mpd_product_id}")
 
-        mpd_product_id = created_products[0].get('id')
-        logger.info(f"✅ Utworzono produkt w MPD z ID: {mpd_product_id}")
+            return {
+                'mpd_product_id': mpd_product_id,
+                'created_products': [{'id': mpd_product_id, 'name': product.name}]
+            }
 
-        return {"mpd_product_id": mpd_product_id}
+        except Exception as e:
+            logger.error(f"❌ Błąd podczas tworzenia produktu w MPD: {e}")
+            raise Exception(f"Failed to create MPD product: {e}")
 
     @staticmethod
     def _delete_mpd_product(mpd_data: Dict, mpd_product_id: int = None) -> Dict:
@@ -477,7 +492,7 @@ class SagaService:
 
             # Wyślij żądanie usunięcia do API MPD
             mpd_api_url = f"{settings.MPD_API_URL}/products/{mpd_product_id}/"
-            response = requests.delete(mpd_api_url, timeout=30)
+            response = requests.delete(mpd_api_url, timeout=120)
 
             if response.status_code == 200:
                 logger.info(f"✅ Usunięto produkt z MPD: {mpd_product_id}")

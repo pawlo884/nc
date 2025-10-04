@@ -591,7 +591,7 @@
                      data-product-name="{{ original.name }}"
                      data-product-description="{{ original.description }}"
                      data-brand-name="{{ original.brand.name|default:'' }}"
-                     data-variants="[{% for variant in original.variants.all %}{'name': '{{ variant.name|escapejs }}', 'stock': {{ variant.stock }}, 'ean': '{{ variant.ean|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}]">
+                     data-variants="{{ variants_json }}">
                 </div>
             </div>
         </div>
@@ -660,15 +660,43 @@ document.addEventListener('DOMContentLoaded', function() {
             statusMessage.className = 'status-message';
             statusMessage.textContent = 'Tworzenie produktu w MPD...';
             
+            // Debug: sprawdź CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+            console.log('CSRF Token:', csrfToken ? csrfToken.value : 'NOT FOUND');
+            console.log('Product ID:', productId);
+            console.log('Form Data:', Array.from(formData.entries()));
+            
             fetch(`/admin/matterhorn1/product/mpd-create/${productId}/`, {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    'X-CSRFToken': csrfToken ? csrfToken.value : ''
                 },
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // Sprawdź content-type przed parsowaniem
+                const contentType = response.headers.get('content-type');
+                console.log('Content-Type:', contentType);
+                
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    // Jeśli nie jest JSON, przeczytaj jako text
+                    return response.text().then(text => {
+                        console.log('Response text (not JSON):', text);
+                        throw new Error('Server returned non-JSON response: ' + text.substring(0, 100));
+                    });
+                }
+            })
             .then(data => {
+                console.log('Parsed JSON data:', data);
                 statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
                 statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
                 if (data.success) {
@@ -1128,6 +1156,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // SingleProductCreate - dla tworzenia pojedynczego produktu
   const singleProductCreateContainer = document.getElementById('single-product-create-container');
   if (singleProductCreateContainer) {
+    // Debug: sprawdź co jest w dataset.variants
+    console.log('dataset.variants:', singleProductCreateContainer.dataset.variants);
+    console.log('typeof dataset.variants:', typeof singleProductCreateContainer.dataset.variants);
+    
     const productData = {
       product_id: parseInt(singleProductCreateContainer.dataset.productId),
       name: singleProductCreateContainer.dataset.productName,

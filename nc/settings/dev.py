@@ -13,6 +13,17 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.109', '*']
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://212.127.93.27:8000')
 MPD_API_URL = os.getenv('MPD_API_URL', 'http://localhost:8000/mpd')
 
+# Timeout settings for long-running requests
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Django timeout settings
+USE_TZ = True
+TIME_ZONE = 'Europe/Warsaw'
+
+# Database connection timeout
+DATABASE_CONNECTION_TIMEOUT = 300  # 5 minutes
+
 # Security settings for development
 CORS_REPLACE_HTTPS_REFERER = False
 HOST_SCHEME = "http://"
@@ -23,6 +34,18 @@ CSRF_COOKIE_SECURE = False
 SECURE_HSTS_SECONDS = None
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_FRAME_DENY = False
+
+# CSRF Configuration for development
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost',
+    'http://127.0.0.1',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://192.168.1.109',
+    'http://192.168.1.109:8000',
+]
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
 
 # Debug Toolbar Configuration
 hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())

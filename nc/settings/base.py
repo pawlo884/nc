@@ -129,6 +129,8 @@ DATABASES = {
         'PORT': os.getenv('DEFAULT_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
+            'connect_timeout': 60,
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
     'matterhorn': {
@@ -140,6 +142,8 @@ DATABASES = {
         'PORT': os.getenv('MATTERHORN_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
+            'connect_timeout': 60,
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
     'MPD': {
@@ -151,6 +155,8 @@ DATABASES = {
         'PORT': os.getenv('MPD_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
+            'connect_timeout': 60,
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
     'zzz_web_agent': {
@@ -162,6 +168,8 @@ DATABASES = {
         'PORT': os.getenv('WEB_AGENT_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
+            'connect_timeout': 60,
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
     'web_agent': {
@@ -173,6 +181,8 @@ DATABASES = {
         'PORT': os.getenv('WEB_AGENT_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
+            'connect_timeout': 60,
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
     'matterhorn1': {
@@ -184,6 +194,8 @@ DATABASES = {
         'PORT': os.getenv('MATTERHORN1_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
+            'connect_timeout': 60,
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     }
 }

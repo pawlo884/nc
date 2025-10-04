@@ -391,6 +391,17 @@ class ProductAdmin(admin.ModelAdmin):
                 fabric_components = [{'id': row[0], 'name': row[1]}
                                      for row in cursor.fetchall()]
 
+            # Przygotuj JSON dla wariantów
+            import json
+            variants_data = []
+            for variant in product.variants.all():
+                variants_data.append({
+                    'name': variant.name,
+                    'stock': variant.stock,
+                    'ean': variant.ean
+                })
+            variants_json = json.dumps(variants_data)
+
             extra_context.update({
                 'is_mapped': False,
                 'mpd_data': {},
@@ -406,7 +417,8 @@ class ProductAdmin(admin.ModelAdmin):
                 'producer_code': '',
                 'series_name': '',
                 'selected_unit_id': None,
-                'fabric_components': fabric_components
+                'fabric_components': fabric_components,
+                'variants_json': variants_json
             })
 
         return super().change_view(request, object_id, form_url, extra_context)
@@ -417,6 +429,11 @@ class ProductAdmin(admin.ModelAdmin):
 
     def mpd_create(self, request, product_id):
         """Tworzy nowy produkt w bazie MPD przez API"""
+        logger.info(f"🔄 mpd_create: Rozpoczynam dla produktu {product_id}")
+        logger.info(f"📋 mpd_create: Method: {request.method}")
+        logger.info(f"📋 mpd_create: POST data: {dict(request.POST)}")
+        logger.info(f"📋 mpd_create: Headers: {dict(request.headers)}")
+
         if request.method == 'POST':
             try:
                 name = request.POST.get('mpd_name')
@@ -527,18 +544,17 @@ class ProductAdmin(admin.ModelAdmin):
                         variant_info = step.result
                         break
 
-                        message = f'Utworzono produkt w MPD (ID: {mpd_product_id})'
-                        if variant_info:
-                            created_count = variant_info.get(
-                                "created_variants", 0)
-                            if created_count > 0:
-                                message += f'. Dodano {created_count} wariantów'
+                message = f'Utworzono produkt w MPD (ID: {mpd_product_id})'
+                if variant_info:
+                    created_count = variant_info.get("created_variants", 0)
+                    if created_count > 0:
+                        message += f'. Dodano {created_count} wariantów'
 
-                        return JsonResponse({
-                            'success': True,
-                            'message': message,
-                            'variant_info': variant_info
-                        })
+                return JsonResponse({
+                    'success': True,
+                    'message': message,
+                    'variant_info': variant_info
+                })
 
             except Exception as e:
                 logger.error("Błąd podczas tworzenia produktu MPD: %s", e)

@@ -945,30 +945,44 @@ def bulk_create_products(request):
     """
     Endpoint do bulk tworzenia produktów w MPD
     """
+    logger.info("🚀 MPD bulk_create_products: Rozpoczynam przetwarzanie")
+
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'}, status=405)
 
     try:
+        logger.info("📥 MPD bulk_create_products: Parsuję dane JSON")
         data = json.loads(request.body)
         products_data = data.get('products', [])
 
         if not products_data:
+            logger.warning(
+                "⚠️ MPD bulk_create_products: Brak danych produktów")
             return JsonResponse({'status': 'error', 'message': 'Brak danych produktów'}, status=400)
+
+        logger.info(
+            f"📊 MPD bulk_create_products: Przetwarzam {len(products_data)} produktów")
 
         created_products = []
         errors = []
 
-        for product_data in products_data:
+        for i, product_data in enumerate(products_data, 1):
             try:
+                logger.info(
+                    f"🔄 MPD bulk_create_products: Przetwarzam produkt {i}/{len(products_data)}: {product_data.get('name', 'Unknown')}")
+
                 # Wymagane pola
                 name = product_data.get('name')
                 if not name:
+                    logger.warning(
+                        f"⚠️ MPD bulk_create_products: Brak nazwy produktu {i}")
                     errors.append(f"Brak nazwy produktu")
                     continue
 
                 # KROK 6: Nazwa + Opis + Krótki opis + Atrybuty + Marka + Grupa rozmiarowa + Series + Jednostka
                 description = product_data.get('description', '')
-                short_description = product_data.get('short_description', '')
+                short_description = product_data.get(
+                    'short_description', '')
                 brand_name = product_data.get('brand_name', '')
                 size_category = product_data.get('size_category', '')
                 series_name = product_data.get('series_name', '')
@@ -996,6 +1010,8 @@ def bulk_create_products(request):
 
                 # Utwórz produkt z nazwą, opisem, krótkim opisem, marką, series i jednostką
                 # size_category jest używane tylko do filtrowania rozmiarów, nie zapisujemy go w produkcie
+                logger.info(
+                    f"💾 MPD bulk_create_products: Tworzę produkt w bazie danych")
                 product = Products.objects.using('MPD').create(
                     name=name,
                     description=description or '',
@@ -1005,6 +1021,8 @@ def bulk_create_products(request):
                     series_id=series_id,
                     visibility=visibility
                 )
+                logger.info(
+                    f"✅ MPD bulk_create_products: Utworzono produkt {product.id}")
 
                 # Debug: sprawdź zapisany produkt
                 logger.info(
@@ -1024,10 +1042,13 @@ def bulk_create_products(request):
                     f"Błąd tworzenia produktu {product_data.get('name', 'Unknown')}: {str(e)}")
                 continue
 
+        logger.info(f"🏁 MPD bulk_create_products: Zakończono przetwarzanie")
         logger.info(
-            f"Bulk create result: created={len(created_products)}, errors={len(errors)}")
-        logger.info(f"Created products: {created_products}")
-        logger.info(f"Errors: {errors}")
+            f"📊 MPD bulk_create_products: Wynik - utworzono={len(created_products)}, błędy={len(errors)}")
+        logger.info(
+            f"✅ MPD bulk_create_products: Utworzone produkty: {created_products}")
+        if errors:
+            logger.warning(f"❌ MPD bulk_create_products: Błędy: {errors}")
 
         return JsonResponse({
             'status': 'success',
@@ -1037,6 +1058,7 @@ def bulk_create_products(request):
         })
 
     except Exception as e:
+        logger.error(f"❌ MPD bulk_create_products: Błąd: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 

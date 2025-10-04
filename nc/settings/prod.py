@@ -96,7 +96,6 @@ MIDDLEWARE = [
 # Security settings for production
 SECURE_SSL_REDIRECT = False  # Tymczasowo wyłączone, ponieważ nie mamy jeszcze HTTPS
 SESSION_COOKIE_SECURE = False  # Tymczasowo wyłączone
-CSRF_COOKIE_SECURE = False  # Tymczasowo wyłączone
 SECURE_HSTS_SECONDS = None  # Tymczasowo wyłączone
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
@@ -105,6 +104,17 @@ SECURE_FRAME_DENY = False
 # Dodatkowe ustawienia dla proxy
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = None
+
+# CSRF Configuration
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost',
+    'http://127.0.0.1',
+    'http://209.38.208.114',
+    'https://209.38.208.114',
+]
+CSRF_COOKIE_SECURE = False  # Tymczasowo wyłączone dla HTTP
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True
