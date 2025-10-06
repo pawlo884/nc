@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
     command: ["/bin/bash", "-c", "python manage.py collectstatic --noinput --skip-checks"]
     volumes:
       - static_volume:/app/staticfiles
@@ -20,6 +22,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
     command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --max-requests 500 --max-requests-jitter 50 --preload"]
     ports:
@@ -63,6 +67,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=150000"]
     deploy:
@@ -100,6 +106,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=150000"]
     deploy:
@@ -137,6 +145,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info"]
     deploy:
@@ -191,6 +201,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
     # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0"]
     deploy:

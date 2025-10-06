@@ -1,6 +1,10 @@
 # Dockerfile dla produkcji - maksymalnie prosty
 FROM python:3.13-slim
 
+# Argument dla daty budowania (wymusza rebuild)
+ARG BUILD_DATE
+ENV BUILD_DATE=${BUILD_DATE}
+
 # Zainstaluj pakiety systemowe
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -21,7 +25,7 @@ RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 # Skopiuj tylko potrzebne pliki (bez dev)
 COPY manage.py .
 COPY nc/ ./nc/
-COPY matterhorn/ ./matterhorn/
+# COPY matterhorn/ ./matterhorn/  # Katalog nie istnieje - usunięty
 COPY matterhorn1/ ./matterhorn1/
 COPY MPD/ ./MPD/
 COPY web_agent/ ./web_agent/

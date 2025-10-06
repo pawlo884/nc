@@ -57,22 +57,22 @@ class WebAgentRouter:
 
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'web_agent':
-            # Na produkcji baza nazywa się 'web_agent', lokalnie 'zzz_web_agent'
+            # Na produkcji używaj 'web_agent', lokalnie 'zzz_web_agent'
             from django.conf import settings
-            if 'zzz_web_agent' in settings.DATABASES:
-                return 'zzz_web_agent'
-            elif 'web_agent' in settings.DATABASES:
+            if 'web_agent' in settings.DATABASES:
                 return 'web_agent'
+            elif 'zzz_web_agent' in settings.DATABASES:
+                return 'zzz_web_agent'
         return None
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label == 'web_agent':
-            # Na produkcji baza nazywa się 'web_agent', lokalnie 'zzz_web_agent'
+            # Na produkcji używaj 'web_agent', lokalnie 'zzz_web_agent'
             from django.conf import settings
-            if 'zzz_web_agent' in settings.DATABASES:
-                return 'zzz_web_agent'
-            elif 'web_agent' in settings.DATABASES:
+            if 'web_agent' in settings.DATABASES:
                 return 'web_agent'
+            elif 'zzz_web_agent' in settings.DATABASES:
+                return 'zzz_web_agent'
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -83,12 +83,12 @@ class WebAgentRouter:
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'web_agent':
-            # Na produkcji baza nazywa się 'web_agent', lokalnie 'zzz_web_agent'
+            # Na produkcji używaj 'web_agent', lokalnie 'zzz_web_agent'
             from django.conf import settings
-            if 'zzz_web_agent' in settings.DATABASES:
-                return db == 'zzz_web_agent'
-            elif 'web_agent' in settings.DATABASES:
+            if 'web_agent' in settings.DATABASES:
                 return db == 'web_agent'
+            elif 'zzz_web_agent' in settings.DATABASES:
+                return db == 'zzz_web_agent'
         return None
 
 
