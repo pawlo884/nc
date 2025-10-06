@@ -46,6 +46,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://192.168.1.109',
     'http://192.168.1.109:8000',
+    'http://212.127.93.27',
+    'http://212.127.93.27:8000',
 ]
 CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
@@ -71,6 +73,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "http://212.127.93.27:8000",
 ]
 
 # Celery Configuration for development
