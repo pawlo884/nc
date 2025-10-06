@@ -1,6 +1,6 @@
 import os
 import hashlib
-from matterhorn.defs_db import s3_client, DO_SPACES_BUCKET, DO_SPACES_REGION
+from matterhorn1.defs_db import s3_client, DO_SPACES_BUCKET, DO_SPACES_REGION
 import logging
 import xml.etree.ElementTree as ET
 from xml.dom import minidom

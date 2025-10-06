@@ -4,7 +4,7 @@ from django.db import connections
 from .models import Products, ProductVariants, ProductVariantsRetailPrice
 import logging
 import traceback
-from matterhorn.defs_db import delete_product_folder_from_bucket
+from matterhorn1.defs_db import delete_product_folder_from_bucket
 
 logger = logging.getLogger('MPD')
 

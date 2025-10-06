@@ -172,6 +172,8 @@ class ProductAdmin(admin.ModelAdmin):
 
         try:
             product = Product.objects.get(id=object_id)
+            logger.info(
+                f"[matterhorn1_fuzzy] Found product: {product.name}, Brand: {product.brand}")
             is_mapped = bool(product.mapped_product_uid)
 
             # Pobierz dane MPD jeśli produkt jest zmapowany
@@ -302,27 +304,76 @@ class ProductAdmin(admin.ModelAdmin):
                 fabric_components = [{'id': row[0], 'name': row[1]}
                                      for row in cursor.fetchall()]
 
-            # Pobierz sugerowane produkty (tylko dla niezmapowanych produktów)
-            if not is_mapped:
-                with connections['MPD'].cursor() as cursor:
-                    cursor.execute("""
-                        SELECT p.id, p.name, b.name as brand_name
-                        FROM products p 
-                        LEFT JOIN brands b ON p.brand_id = b.id 
-                        WHERE LOWER(p.name) LIKE LOWER(%s)
-                        ORDER BY p.name
-                        LIMIT 10
-                    """, [f'%{product.name[:20]}%'])
-                    suggested_products = [
-                        {
-                            'id': row[0],
-                            'name': row[1],
-                            'brand': row[2] or '',
-                            'similarity': 85.0,  # Placeholder
-                            'suggested_in_query': 75.0  # Placeholder
-                        }
-                        for row in cursor.fetchall()
-                    ]
+            # Pobierz sugerowane produkty z fuzzy search
+            try:
+                logger.info(
+                    f"[matterhorn1_fuzzy] Product: {product.name}, Brand: {product.brand}")
+                if not product.brand:
+                    logger.warning(
+                        f"[matterhorn1_fuzzy] Product {product.name} has no brand, skipping fuzzy search")
+                    suggested_products = []
+                else:
+                    # Użyj product.brand.name zamiast product.brand
+                    brand_name = product.brand.name if hasattr(
+                        product.brand, 'name') else str(product.brand)
+                    logger.info(
+                        f"[matterhorn1_fuzzy] Using brand name: {brand_name}")
+                    with connections['MPD'].cursor() as cursor:
+                        # Pobierz wszystkie produkty z MPD dla tej marki
+                        cursor.execute("""
+                            SELECT p.id, p.name, b.name as brand_name
+                            FROM products p 
+                            LEFT JOIN brands b ON p.brand_id = b.id 
+                            WHERE b.name = %s
+                            ORDER BY p.name
+                        """, [brand_name])
+                        all_products = cursor.fetchall()
+                        logger.info(
+                            f"[matterhorn1_fuzzy] Found {len(all_products)} products in MPD for brand: {brand_name}")
+
+                        # Oblicz podobieństwo dla każdego produktu
+                        scored = []
+                        for row in all_products:
+                            similarity = fuzz.token_sort_ratio(
+                                product.name, row[1])
+                            # Oblicz pokrycie słów
+                            suggested_words = set(row[1].lower().replace(
+                                '(', '').replace(')', '').replace('-', ' ').split())
+                            query_words = set(product.name.lower().replace(
+                                '(', '').replace(')', '').replace('-', ' ').split())
+                            if suggested_words:
+                                suggested_in_query = int(
+                                    100 * len(suggested_words & query_words) / len(suggested_words))
+                            else:
+                                suggested_in_query = 0
+
+                            scored.append({
+                                'id': row[0],
+                                'name': row[1],
+                                'brand': row[2] or '',
+                                'similarity': similarity,
+                                'suggested_in_query': suggested_in_query
+                            })
+
+                        # Sortuj według podobieństwa i weź top 5
+                        suggested_products = sorted(
+                            scored, key=lambda x: x['similarity'], reverse=True)[:5]
+                        logger.info(
+                            f"[matterhorn1_fuzzy] Final suggested_products count: {len(suggested_products)}")
+                        if suggested_products:
+                            logger.info(
+                                f"[matterhorn1_fuzzy] First suggested: {suggested_products[0]}")
+            except Exception as e:
+                logger.error(f"Błąd fuzzy search w matterhorn1: {e}")
+                suggested_products = []
+
+            # DEBUG: Sprawdź czy fuzzy search znalazł produkty
+            if not suggested_products:
+                logger.warning(
+                    f"[matterhorn1_fuzzy] DEBUG: No suggested_products found from fuzzy search")
+            else:
+                logger.info(
+                    f"[matterhorn1_fuzzy] DEBUG: Found {len(suggested_products)} real suggested_products")
 
             extra_context.update({
                 'is_mapped': is_mapped,

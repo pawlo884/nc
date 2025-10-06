@@ -3,7 +3,7 @@ from django.utils.safestring import mark_safe
 from django.utils.html import format_html
 from django.db.models import Exists, OuterRef
 from django.contrib.admin import DateFieldListFilter, SimpleListFilter
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductImage, ProductSeries, Categories, Vat, Units, FabricComponent, ProductFabric
+from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Categories, Vat, Units, FabricComponent, ProductFabric
 import decimal
 # Register your models here.
 
@@ -51,6 +51,14 @@ class ProductsAdmin(admin.ModelAdmin):
             'fields': ('show_variants',),
             'description': 'Przegląd wszystkich wariantów produktu z kolorami, rozmiarami i cenami'
         }),
+        ('Atrybuty produktu', {
+            'fields': ('show_attributes', 'edit_attributes'),
+            'description': 'Zarządzanie atrybutami produktu - wyświetlanie i edycja'
+        }),
+        ('Skład materiałowy', {
+            'fields': ('show_fabric_composition', 'edit_fabric_composition'),
+            'description': 'Zarządzanie składem materiałowym produktu - komponenty i ich procenty'
+        }),
         ('Zdjęcia produktu', {
             'fields': ('show_images',),
             'description': 'Zdjęcia produktu pogrupowane według kolorów'
@@ -81,7 +89,7 @@ class ProductsAdmin(admin.ModelAdmin):
     ]
     search_fields = ['id', 'name', 'description',
                      'brand__name', 'series__name']
-    readonly_fields = ['show_variants', 'show_images',
+    readonly_fields = ['show_variants', 'show_attributes', 'edit_attributes', 'show_fabric_composition', 'edit_fabric_composition', 'show_images',
                        'show_related_products', 'edit_retail_prices', 'created_at', 'updated_at']
     change_form_template = 'admin/MPD/products/change_form.html'
     actions = ['make_visible', 'make_hidden']
@@ -237,6 +245,342 @@ class ProductsAdmin(admin.ModelAdmin):
             from django.urls import reverse
             return HttpResponseRedirect(reverse('admin:MPD_products_change', args=[obj.pk]))
         return super().response_change(request, obj)
+
+    @admin.display(description="Atrybuty produktu")
+    def show_attributes(self, obj):
+        """Wyświetla obecnie przypisane atrybuty produktu"""
+        if not obj.id:
+            return "Zapisz produkt aby móc zarządzać atrybutami"
+
+        # Pobierz atrybuty przypisane do produktu
+        product_attributes = ProductAttribute.objects.using('MPD').filter(
+            product=obj
+        ).select_related('attribute')
+
+        if not product_attributes:
+            return "Brak przypisanych atrybutów"
+
+        html = "<table style='border-collapse:collapse; width:100%;'>"
+        html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>ID</th><th style='border:1px solid #ccc;padding:4px 8px;'>Nazwa atrybutu</th></tr>"
+
+        for pa in product_attributes:
+            html += "<tr>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{pa.attribute.id}</td>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{pa.attribute.name}</td>"
+            html += "</tr>"
+
+        html += "</table>"
+        return mark_safe(html)
+
+    @admin.display(description="Edycja atrybutów")
+    def edit_attributes(self, obj):
+        """Formularz do zarządzania atrybutami produktu"""
+        if not obj.id:
+            return "Zapisz produkt aby móc zarządzać atrybutami"
+
+        # Pobierz wszystkie dostępne atrybuty
+        all_attributes = Attributes.objects.using('MPD').all().order_by('name')
+
+        # Pobierz atrybuty przypisane do produktu
+        assigned_attributes = set(ProductAttribute.objects.using('MPD').filter(
+            product=obj
+        ).values_list('attribute_id', flat=True))
+
+        print(
+            f"DEBUG: Przypisane atrybuty dla produktu {obj.id}: {assigned_attributes}")
+
+        html = "<div style='margin-bottom:12px;'>"
+        html += "<label>Dodaj nowe atrybuty:</label><br>"
+        html += "<select id='new_attribute_select' style='width:300px; margin-right:8px;'>"
+        html += "<option value=''>Wybierz atrybut...</option>"
+
+        for attr in all_attributes:
+            if attr.id not in assigned_attributes:
+                html += f"<option value='{attr.id}'>{attr.name}</option>"
+
+        html += "</select>"
+        html += "<button type='button' onclick='addAttribute()' style='background-color:#79aec8; color:white; padding:4px 8px; border:none; border-radius:4px; cursor:pointer;'>Dodaj</button>"
+        html += "</div>"
+
+        html += "<div id='attributes_list'>"
+        html += "<h4>Przypisane atrybuty:</h4>"
+
+        if assigned_attributes:
+            html += "<table style='border-collapse:collapse; width:100%;'>"
+            html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>Nazwa</th><th style='border:1px solid #ccc;padding:4px 8px;'>Akcje</th></tr>"
+
+            # Pobierz atrybuty bezpośrednio z relacji
+            product_attributes = ProductAttribute.objects.using('MPD').filter(
+                product=obj
+            ).select_related('attribute')
+
+            for pa in product_attributes:
+                html += "<tr>"
+                html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{pa.attribute.name}</td>"
+                html += "<td style='border:1px solid #ccc;padding:4px 8px;'>"
+                html += f"<button type='button' onclick='removeAttributeShow({pa.attribute.id}, {obj.id})' style='background-color:#dc3545; color:white; padding:2px 6px; border:none; border-radius:3px; cursor:pointer;'>Usuń</button>"
+                html += "</td>"
+                html += "</tr>"
+
+            html += "</table>"
+        else:
+            html += "<p>Brak przypisanych atrybutów</p>"
+
+        html += "</div>"
+
+        html += f"""
+        <script>
+        function addAttribute() {{
+            var select = document.getElementById('new_attribute_select');
+            var attributeId = select.value;
+            var attributeName = select.options[select.selectedIndex].text;
+            
+            if (!attributeId) {{
+                alert('Wybierz atrybut do dodania');
+                return;
+            }}
+            
+            console.log('Dodawanie atrybutu:', attributeId);
+            
+            // Wyślij AJAX request
+            fetch('/mpd/manage-product-attributes/', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || document.querySelector('meta[name=csrf-token]')?.content || ''
+                }},
+                body: JSON.stringify({{
+                    product_id: {obj.id},
+                    action: 'add',
+                    attribute_ids: [parseInt(attributeId)]
+                }})
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.status === 'success') {{
+                    location.reload();
+                }} else {{
+                    alert('Błąd: ' + (data.message || 'Nie udało się dodać atrybutu'));
+                }}
+            }})
+            .catch(error => {{
+                console.error('Error:', error);
+                alert('Błąd połączenia');
+            }});
+        }}
+        
+        function removeAttributeShow(attributeId, productId) {{
+            fetch('/mpd/manage-product-attributes/', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+                }},
+                body: JSON.stringify({{
+                    product_id: productId,
+                    action: 'remove',
+                    attribute_id: attributeId
+                }})
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.status === 'success') {{
+                    location.reload();
+                }} else {{
+                    alert('Błąd: ' + (data.message || 'Nie udało się usunąć atrybutu'));
+                }}
+            }})
+            .catch(error => {{
+                alert('Błąd połączenia: ' + error.message);
+            }});
+        }}
+        </script>
+        """
+
+        return mark_safe(html)
+
+    @admin.display(description="Skład materiałowy")
+    def show_fabric_composition(self, obj):
+        """Wyświetla obecny skład materiałowy produktu"""
+        if not obj.id:
+            return "Zapisz produkt aby móc zarządzać składem materiałowym"
+
+        # Pobierz skład materiałowy produktu
+        fabric_composition = ProductFabric.objects.using('MPD').filter(
+            product=obj
+        ).select_related('component')
+
+        if not fabric_composition:
+            return "Brak informacji o składzie materiałowym"
+
+        html = "<table style='border-collapse:collapse; width:100%;'>"
+        html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>Komponent</th><th style='border:1px solid #ccc;padding:4px 8px;'>Procent</th></tr>"
+
+        total_percentage = 0
+        for fabric in fabric_composition:
+            html += "<tr>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{fabric.component.name}</td>"
+            html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{fabric.percentage}%</td>"
+            html += "</tr>"
+            total_percentage += fabric.percentage
+
+        html += "</table>"
+
+        # Dodaj informację o sumie procentów
+        if total_percentage != 100:
+            color = "#dc3545" if total_percentage > 100 else "#ffc107"
+            html += f"<p style='color:{color}; font-weight:bold; margin-top:8px;'>Suma: {total_percentage}% {'(przekroczono 100%)' if total_percentage > 100 else '(niepełny skład)' if total_percentage < 100 else ''}</p>"
+        else:
+            html += "<p style='color:#28a745; font-weight:bold; margin-top:8px;'>Suma: 100% (pełny skład)</p>"
+
+        return mark_safe(html)
+
+    @admin.display(description="Edycja składu materiałowego")
+    def edit_fabric_composition(self, obj):
+        """Formularz do zarządzania składem materiałowym produktu"""
+        if not obj.id:
+            return "Zapisz produkt aby móc zarządzać składem materiałowym"
+
+        # Pobierz wszystkie dostępne komponenty
+        all_components = FabricComponent.objects.using(
+            'MPD').all().order_by('name')
+
+        # Pobierz obecny skład produktu
+        current_fabric = ProductFabric.objects.using('MPD').filter(
+            product=obj
+        ).select_related('component')
+
+        current_components = {
+            pf.component.id: pf.percentage for pf in current_fabric}
+
+        html = "<div style='margin-bottom:12px;'>"
+        html += "<label>Dodaj nowy komponent:</label><br>"
+        html += "<select id='new_component_select' style='width:200px; margin-right:8px;'>"
+        html += "<option value=''>Wybierz komponent...</option>"
+
+        for component in all_components:
+            if component.id not in current_components:
+                html += f"<option value='{component.id}'>{component.name}</option>"
+
+        html += "</select>"
+        html += "<input type='number' id='new_component_percentage' placeholder='Procent' min='1' max='100' style='width:80px; margin-right:8px;'>"
+        html += "<button type='button' onclick='addFabricComponent()' style='background-color:#79aec8; color:white; padding:4px 8px; border:none; border-radius:4px; cursor:pointer;'>Dodaj</button>"
+        html += "</div>"
+
+        html += "<div id='fabric_composition_list'>"
+        html += "<h4>Obecny skład materiałowy:</h4>"
+
+        if current_fabric:
+            html += "<table style='border-collapse:collapse; width:100%;'>"
+            html += "<tr><th style='border:1px solid #ccc;padding:4px 8px;'>Komponent</th><th style='border:1px solid #ccc;padding:4px 8px;'>Procent</th><th style='border:1px solid #ccc;padding:4px 8px;'>Akcje</th></tr>"
+
+            total_percentage = 0
+            for fabric in current_fabric:
+                html += "<tr>"
+                html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{fabric.component.name}</td>"
+                html += f"<td style='border:1px solid #ccc;padding:4px 8px;'>{fabric.percentage}%</td>"
+                html += "<td style='border:1px solid #ccc;padding:4px 8px;'>"
+                html += f"<button type='button' onclick='removeFabricComponent({fabric.component.id})' style='background-color:#dc3545; color:white; padding:2px 6px; border:none; border-radius:3px; cursor:pointer;'>Usuń</button>"
+                html += "</td>"
+                html += "</tr>"
+                total_percentage += fabric.percentage
+
+            html += "</table>"
+
+            # Dodaj informację o sumie procentów
+            if total_percentage != 100:
+                color = "#dc3545" if total_percentage > 100 else "#ffc107"
+                html += f"<p style='color:{color}; font-weight:bold; margin-top:8px;'>Suma: {total_percentage}% {'(przekroczono 100%)' if total_percentage > 100 else '(niepełny skład)' if total_percentage < 100 else ''}</p>"
+            else:
+                html += "<p style='color:#28a745; font-weight:bold; margin-top:8px;'>Suma: 100% (pełny skład)</p>"
+        else:
+            html += "<p>Brak informacji o składzie materiałowym</p>"
+
+        html += "</div>"
+
+        html += """
+        <script>
+        function addFabricComponent() {
+            var select = document.getElementById('new_component_select');
+            var percentageInput = document.getElementById('new_component_percentage');
+            var componentId = select.value;
+            var percentage = percentageInput.value;
+            
+            if (!componentId) {
+                alert('Wybierz komponent');
+                return;
+            }
+            
+            if (!percentage || percentage < 1 || percentage > 100) {
+                alert('Wprowadź prawidłowy procent (1-100)');
+                return;
+            }
+            
+            // Wyślij AJAX request
+            fetch('/mpd/manage-product-fabric/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || document.querySelector('meta[name=csrf-token]')?.content || ''
+                },
+                body: JSON.stringify({
+                    product_id: """ + str(obj.id) + """,
+                    action: 'add',
+                    component_id: parseInt(componentId),
+                    percentage: parseInt(percentage)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Odśwież stronę aby pokazać nowy komponent
+                    location.reload();
+                } else {
+                    alert('Błąd: ' + (data.message || 'Nie udało się dodać komponentu'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Błąd połączenia');
+            });
+        }
+        
+        function removeFabricComponent(componentId) {
+            if (!confirm('Czy na pewno chcesz usunąć ten komponent ze składu?')) {
+                return;
+            }
+            
+            // Wyślij AJAX request
+            fetch('/mpd/manage-product-fabric/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || document.querySelector('meta[name=csrf-token]')?.content || ''
+                },
+                body: JSON.stringify({
+                    product_id: """ + str(obj.id) + """,
+                    action: 'remove',
+                    component_id: componentId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Odśwież stronę aby usunąć komponent
+                    location.reload();
+                } else {
+                    alert('Błąd: ' + (data.message || 'Nie udało się usunąć komponentu'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Błąd połączenia');
+            });
+        }
+        </script>
+        """
+
+        return mark_safe(html)
 
     @admin.display(description="Warianty produktu")
     def show_variants(self, obj):

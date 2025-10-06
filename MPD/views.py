@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from .models import Products, ProductSet, ProductSetItem, ProductPaths, ProductAttribute
 from .models import Brands, Colors, Sizes, ProductVariants, ProductVariantsRetailPrice
+from .models import FabricComponent, ProductFabric, Attributes
 from django.http import JsonResponse
 from django.db import connections, transaction
 from django.utils import timezone
@@ -14,7 +15,7 @@ from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter
 import logging
 from django.http import HttpResponse
 import requests
-from matterhorn.defs_db import DO_SPACES_BUCKET, DO_SPACES_REGION
+from matterhorn1.defs_db import DO_SPACES_BUCKET, DO_SPACES_REGION
 from django.urls import reverse
 
 from django.views.decorators.csrf import csrf_exempt
@@ -589,6 +590,120 @@ def manage_product_paths(request):
 
 
 @csrf_exempt
+def manage_product_fabric(request):
+    """
+    Endpoint do zarządzania składem materiałowym produktów
+    Obsługuje dodawanie i usuwanie komponentów materiałowych
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        action = data.get('action')  # 'add' lub 'remove'
+
+        if not all([product_id, action]):
+            return JsonResponse({'status': 'error', 'message': 'Brak wymaganych parametrów'}, status=400)
+
+        if action not in ['add', 'remove']:
+            return JsonResponse({'status': 'error', 'message': 'Nieprawidłowa akcja'}, status=400)
+
+        # Konwertuj product_id na int
+        try:
+            product_id = int(product_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format ID produktu'}, status=400)
+
+        # Sprawdź czy produkt istnieje
+        try:
+            product = Products.objects.using('MPD').get(id=product_id)
+        except Products.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Produkt nie istnieje'}, status=404)
+
+        if action == 'add':
+            # Dodaj komponent do składu produktu
+            component_id = data.get('component_id')
+            percentage = data.get('percentage')
+
+            if not component_id or not percentage:
+                return JsonResponse({'status': 'error', 'message': 'Brak ID komponentu lub procentu'}, status=400)
+
+            # Konwertuj na int
+            try:
+                component_id = int(component_id)
+                percentage = int(percentage)
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format ID komponentu lub procentu'}, status=400)
+
+            # Sprawdź czy komponent istnieje
+            try:
+                component = FabricComponent.objects.using(
+                    'MPD').get(id=component_id)
+            except FabricComponent.DoesNotExist:
+                return JsonResponse({'status': 'error', 'message': 'Komponent nie istnieje'}, status=404)
+
+            # Sprawdź czy komponent nie jest już przypisany do produktu
+            if ProductFabric.objects.using('MPD').filter(product_id=product_id, component_id=component_id).exists():
+                return JsonResponse({'status': 'error', 'message': 'Komponent jest już przypisany do tego produktu'}, status=400)
+
+            # Utwórz nowy wpis składu
+            ProductFabric.objects.using('MPD').create(
+                product_id=product_id,
+                component_id=component_id,
+                percentage=percentage
+            )
+
+            message = f'Dodano komponent {component.name} ({percentage}%) do składu produktu {product.name}'
+
+        elif action == 'remove':
+            # Usuń komponent ze składu produktu
+            component_id = data.get('component_id')
+            if not component_id:
+                return JsonResponse({'status': 'error', 'message': 'Brak ID komponentu do usunięcia'}, status=400)
+
+            # Konwertuj na int
+            try:
+                component_id = int(component_id)
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format ID komponentu'}, status=400)
+
+            # Pobierz nazwę komponentu przed usunięciem
+            try:
+                component = FabricComponent.objects.using(
+                    'MPD').get(id=component_id)
+                component_name = component.name
+            except FabricComponent.DoesNotExist:
+                component_name = f"ID {component_id}"
+
+            # Usuń komponent ze składu
+            deleted_count, _ = ProductFabric.objects.using('MPD').filter(
+                product_id=product_id,
+                component_id=component_id
+            ).delete()
+
+            if deleted_count > 0:
+                message = f'Usunięto komponent {component_name} ze składu produktu {product.name}'
+            else:
+                message = f'Komponent {component_name} nie był przypisany do produktu {product.name}'
+
+        logger.info(f"Zarządzanie składem materiałowym: {message}")
+
+        return JsonResponse({
+            'status': 'success',
+            'message': message,
+            'product_id': product_id,
+            'action': action
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
+    except Exception as e:
+        logger.error(
+            f"Błąd podczas zarządzania składem materiałowym: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
+
+
+@csrf_exempt
 def manage_product_attributes(request):
     """
     Endpoint do zarządzania atrybutami produktów
@@ -651,16 +766,38 @@ def manage_product_attributes(request):
 
             logger.info(
                 f"Usuwanie atrybutu: product_id={product_id}, attribute_id={attribute_id}")
+            logger.info(f"Dane żądania: {data}")
+
+            # Sprawdź czy atrybut istnieje przed usunięciem
+            try:
+                attribute = Attributes.objects.using(
+                    'MPD').get(id=attribute_id)
+                attribute_name = attribute.name
+            except Attributes.DoesNotExist:
+                attribute_name = f"ID {attribute_id}"
+
+            # Sprawdź czy atrybut jest przypisany do produktu
+            existing_relation = ProductAttribute.objects.using('MPD').filter(
+                product_id=product_id,
+                attribute_id=attribute_id
+            ).first()
+
+            if not existing_relation:
+                logger.warning(
+                    f"Atrybut {attribute_id} nie jest przypisany do produktu {product_id}")
+                return JsonResponse({'status': 'error', 'message': f'Atrybut {attribute_name} nie jest przypisany do tego produktu'}, status=404)
 
             deleted_count, _ = ProductAttribute.objects.using('MPD').filter(
                 product_id=product_id,
                 attribute_id=attribute_id
             ).delete()
 
+            logger.info(f"Usunięto {deleted_count} rekordów atrybutu")
+
             if deleted_count > 0:
-                message = f'Usunięto atrybut z produktu {product.name}'
+                message = f'Usunięto atrybut {attribute_name} z produktu {product.name}'
             else:
-                message = f'Atrybut nie był przypisany do produktu {product.name}'
+                message = f'Atrybut {attribute_name} nie był przypisany do produktu {product.name}'
 
         logger.info(f"Zarządzanie atrybutami produktu: {message}")
 

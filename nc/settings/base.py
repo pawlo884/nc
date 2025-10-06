@@ -73,7 +73,7 @@ INSTALLED_APPS = [
     'django_celery_results',
     'debug_toolbar',
     'rest_framework',
-    'matterhorn',
+    # 'matterhorn',  # usunięta stara aplikacja
     'MPD',
     'web_agent',
     'matterhorn1',

@@ -77,8 +77,8 @@ CORS_ALLOWED_ORIGINS = [
 CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://:dev_password@redis:6379/0'
 
-# Celery heartbeat configuration
-CELERY_WORKER_HEARTBEAT = 60  # Zwiększony z 30 do 60 sekund
+# Celery heartbeat configuration - wyłączony dla development
+CELERY_WORKER_HEARTBEAT = 0  # Wyłączony heartbeat dla development
 CELERY_WORKER_SEND_TASK_EVENTS = True
 CELERY_TASK_SEND_SENT_EVENT = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1

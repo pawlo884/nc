@@ -42,7 +42,7 @@ if DRF_SPECTACULAR_AVAILABLE:
 
 urlpatterns += i18n_patterns(
     path('admin/', admin.site.urls),
-    path('matterhorn/', include('matterhorn.urls')),
+    # path('matterhorn/', include('matterhorn.urls')),  # stara aplikacja usunięta
     path('mpd/', include('MPD.urls')),
     path('matterhorn1/', include('matterhorn1.urls')),
     prefix_default_language=False
