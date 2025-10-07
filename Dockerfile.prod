@@ -32,7 +32,7 @@ COPY nc/ ./nc/
 COPY matterhorn1/ ./matterhorn1/
 COPY MPD/ ./MPD/
 COPY web_agent/ ./web_agent/
-COPY static/ ./static/
+# COPY static/ ./static/  # Nie kopiujemy - zostanie utworzony przez collectstatic
 COPY nginx.conf .
 COPY redis.conf .
 # COPY docker-compose.yml .  # Nie potrzebne w obrazie - używane tylko na hoście
