@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # Zoptymalizowany Dockerfile dla produkcji z cache'owaniem
-FROM python:3.13-slim
+FROM python:3.12-slim
 
 # Argument dla daty budowania (wymusza rebuild)
 ARG BUILD_DATE

@@ -24,12 +24,18 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
         
+    # Build obrazu produkcyjnego z cache (Dockerfile.prod)
     - name: Build and push
       uses: docker/build-push-action@v4
       with:
         context: .
+        file: ./Dockerfile.prod  # ← PRODUCTION Dockerfile
         push: true
         tags: ${{ env.DOCKERHUB_USERNAME }}/django-app:latest
+        cache-from: type=registry,ref=${{ env.DOCKERHUB_USERNAME }}/django-app:buildcache
+        cache-to: type=registry,ref=${{ env.DOCKERHUB_USERNAME }}/django-app:buildcache,mode=max
+        build-args: |
+          BUILD_DATE=${{ github.event.head_commit.timestamp }}
         
     - name: Deploy to DigitalOcean
       uses: appleboy/ssh-action@master
@@ -95,14 +101,14 @@ jobs:
           # Daj uprawnienia wykonania
           chmod +x deploy-from-registry.sh
           
-          # Uruchom zero-downtime deployment
+          # Uruchom zero-downtime deployment (używa docker-compose.prod.yml)
           export DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }}
           bash deploy-from-registry.sh
           
           echo ""
           echo "📊 Final status:"
-          docker-compose ps
+          docker-compose -f docker-compose.prod.yml ps
           
           echo ""
           echo "📋 Ostatnie logi:"
-          docker-compose logs --tail=50 web 
+          docker-compose -f docker-compose.prod.yml logs --tail=50 web 

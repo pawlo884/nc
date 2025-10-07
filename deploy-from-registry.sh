@@ -9,11 +9,13 @@ echo "========================================="
 echo ""
 
 # Konfiguracja
+COMPOSE_FILE="docker-compose.prod.yml"
 NEW_TAG="django-app:new-$(date +%Y%m%d-%H%M%S)"
 OLD_TAG="django-app:current"
 REGISTRY_IMAGE="${DOCKERHUB_USERNAME}/django-app:latest"
 
 echo "📋 Konfiguracja:"
+echo "   Compose file: $COMPOSE_FILE"
 echo "   Registry: $REGISTRY_IMAGE"
 echo "   Nowy tag: $NEW_TAG"
 echo "   Stary tag: $OLD_TAG"
@@ -57,13 +59,13 @@ echo "   Downtime: ~2-5 sekund"
 SWITCH_START=$(date +%s)
 
 # Stop kontenerów
-docker-compose stop
+docker-compose -f $COMPOSE_FILE stop
 
 # Remove kontenerów (volumes zostają!)
-docker-compose rm -f
+docker-compose -f $COMPOSE_FILE rm -f
 
 # Start z nowym obrazem
-docker-compose up -d
+docker-compose -f $COMPOSE_FILE up -d
 
 SWITCH_END=$(date +%s)
 SWITCH_TIME=$((SWITCH_END - SWITCH_START))
@@ -83,7 +85,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     RETRY_COUNT=$((RETRY_COUNT + 1))
     echo "   Próba $RETRY_COUNT/$MAX_RETRIES..."
     
-    UNHEALTHY=$(docker-compose ps | grep -E "Exit|unhealthy" || true)
+    UNHEALTHY=$(docker-compose -f $COMPOSE_FILE ps | grep -E "Exit|unhealthy" || true)
     
     if [ -z "$UNHEALTHY" ]; then
         HEALTH_OK=true
@@ -102,7 +104,7 @@ if [ "$HEALTH_OK" != "true" ]; then
     
     if [ -n "$BACKUP_TAG" ]; then
         docker tag $BACKUP_TAG $OLD_TAG
-        docker-compose up -d --force-recreate
+        docker-compose -f $COMPOSE_FILE up -d --force-recreate
         echo "✅ Rollback zakończony"
     fi
     
@@ -114,7 +116,7 @@ echo ""
 
 # Krok 6: Status
 echo "📊 Status kontenerów:"
-docker-compose ps
+docker-compose -f $COMPOSE_FILE ps
 echo ""
 
 # Krok 7: Cleanup starych obrazów (zostaw 3)
@@ -133,6 +135,6 @@ echo "   Backup: $BACKUP_TAG"
 echo ""
 echo "💡 W razie problemów rollback:"
 echo "   docker tag $BACKUP_TAG $OLD_TAG"
-echo "   docker-compose up -d --force-recreate"
+echo "   docker-compose -f $COMPOSE_FILE up -d --force-recreate"
 echo ""
 

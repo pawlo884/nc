@@ -1,10 +1,7 @@
+# docker-compose.prod.yml - dla produkcji (używa gotowych obrazów z Docker Hub)
 services:
   static-init:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      args:
-        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
     command: ["/bin/bash", "-c", "python manage.py collectstatic --noinput --skip-checks"]
     volumes:
       - static_volume:/app/staticfiles
@@ -19,12 +16,7 @@ services:
     user: "1001:1001"
 
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      args:
-        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
-    # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
+    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
     command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --max-requests 500 --max-requests-jitter 50 --preload"]
     ports:
       - "8000:8000"
@@ -64,12 +56,7 @@ services:
       - nc_network
 
   celery-default:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      args:
-        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
-    # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
+    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=150000"]
     deploy:
       resources:
@@ -86,7 +73,6 @@ services:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - CELERY_STATE_DB=/var/lib/celery/worker_state_default
       - TZ=Europe/Warsaw
-      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
@@ -103,12 +89,7 @@ services:
     user: "1001:1001"
 
   celery-import:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      args:
-        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
-    # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
+    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=150000"]
     deploy:
       resources:
@@ -125,7 +106,6 @@ services:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - CELERY_STATE_DB=/var/lib/celery/worker_state_import
       - TZ=Europe/Warsaw
-      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
@@ -142,12 +122,7 @@ services:
     user: "1001:1001"
 
   celery-beat:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      args:
-        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
-    # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
+    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info"]
     deploy:
       resources:
@@ -162,7 +137,6 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw
-      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
@@ -181,9 +155,6 @@ services:
   redis:
     image: redis:7.2-alpine
     command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-prod_password}
-    # Usunięto publiczny port - Redis dostępny tylko wewnątrz sieci Docker
-    # ports:
-    #   - "6379:6379"
     volumes:
       - redis_data:/data
       - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -198,12 +169,7 @@ services:
     restart: unless-stopped
 
   flower:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      args:
-        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
-    # image: ${DOCKERHUB_USERNAME}/django-app:latest  # Zakomentowane dla build bez cache
+    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0"]
     deploy:
       resources:
@@ -221,7 +187,6 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=nc.settings.prod
       - TZ=Europe/Warsaw
-      # Usunięto C_FORCE_ROOT=true - nie uruchamiamy jako root
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
@@ -256,3 +221,4 @@ volumes:
 networks:
   nc_network:
     driver: bridge
+

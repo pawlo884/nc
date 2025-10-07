@@ -1,6 +1,8 @@
 services:
   static-init:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     command: ["/bin/bash", "-c", "python manage.py collectstatic --noinput --skip-checks"]
     volumes:
       - static_volume:/app/staticfiles
@@ -15,7 +17,9 @@ services:
     user: "1001:1001"
 
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     command: [ "/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=zzz_default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 1 --timeout 300 --keep-alive 5 --reload" ]
     # Usunięto port 8000 - teraz Nginx będzie serwował aplikację
     volumes:
@@ -54,7 +58,9 @@ services:
       - app_network
 
   celery-default:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=2" ]
     volumes:
       - .:/app
@@ -81,7 +87,9 @@ services:
     user: "1001:1001"
 
   celery-import:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     command: [ "/bin/bash", "-c", "sleep 10 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1" ]
     volumes:
       - .:/app
@@ -108,7 +116,9 @@ services:
     user: "1001:1001"
 
   celery-beat:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     command: [ "/bin/bash", "-c", "celery -A nc.celery beat --loglevel=info" ]
     volumes:
       - .:/app
@@ -129,7 +139,9 @@ services:
     user: "1001:1001"
 
   flower:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     command: [ "/bin/bash", "-c", "sleep 120 && mkdir -p /tmp/flower && FLOWER_UNAUTHENTICATED_API=true celery -A nc.celery --broker=redis://:dev_password@redis:6379/0 flower --port=5555 --persistent=True --db=/tmp/flower/flower.db --inspect_timeout=30" ]
     ports:
       - "5555:5555"
