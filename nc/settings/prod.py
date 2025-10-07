@@ -58,11 +58,6 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'matterhorn': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
     },
 }
 

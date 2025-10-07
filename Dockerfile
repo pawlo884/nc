@@ -1,15 +1,17 @@
-# Prosty Dockerfile - bez problemów z cache
+# syntax=docker/dockerfile:1.4
+# Zoptymalizowany Dockerfile z cache'owaniem
 FROM python:3.13-slim
 
-# Zainstaluj pakiety systemowe
-RUN apt-get update && apt-get install -y \
+# Zainstaluj pakiety systemowe z cache'owaniem apt
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y \
     gcc \
     g++ \
     libpq-dev \
     nginx \
     cron \
-    iptables \
-    && rm -rf /var/lib/apt/lists/*
+    iptables
 
 # Utwórz użytkownika
 RUN groupadd -r celery && useradd -r -g celery -u 1001 celery
@@ -17,9 +19,10 @@ RUN groupadd -r celery && useradd -r -g celery -u 1001 celery
 # Ustaw katalog roboczy
 WORKDIR /app
 
-# Skopiuj requirements i zainstaluj zależności
+# Skopiuj requirements i zainstaluj zależności z cache'owaniem pip
 COPY requirements.txt .
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --break-system-packages -r requirements.txt
 
 # Skopiuj cały projekt
 COPY . .

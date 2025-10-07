@@ -1,16 +1,18 @@
-# Dockerfile dla produkcji - maksymalnie prosty
+# syntax=docker/dockerfile:1.4
+# Zoptymalizowany Dockerfile dla produkcji z cache'owaniem
 FROM python:3.13-slim
 
 # Argument dla daty budowania (wymusza rebuild)
 ARG BUILD_DATE
 ENV BUILD_DATE=${BUILD_DATE}
 
-# Zainstaluj pakiety systemowe
-RUN apt-get update && apt-get install -y \
+# Zainstaluj pakiety systemowe z cache'owaniem apt
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y \
     gcc \
     g++ \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libpq-dev
 
 # Utwórz użytkownika
 RUN groupadd -r celery && useradd -r -g celery -u 1001 celery
@@ -18,9 +20,10 @@ RUN groupadd -r celery && useradd -r -g celery -u 1001 celery
 # Ustaw katalog roboczy
 WORKDIR /app
 
-# Skopiuj requirements i zainstaluj zależności
+# Skopiuj requirements i zainstaluj zależności z cache'owaniem pip
 COPY requirements.txt .
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --break-system-packages -r requirements.txt
 
 # Skopiuj tylko potrzebne pliki (bez dev)
 COPY manage.py .

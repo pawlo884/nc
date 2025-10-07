@@ -133,13 +133,13 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
-    'matterhorn': {
+    'zzz_default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('MATTERHORN_DB_NAME'),
-        'USER': os.getenv('MATTERHORN_DB_USER'),
-        'PASSWORD': os.getenv('MATTERHORN_DB_PASSWORD'),
-        'HOST': os.getenv('MATTERHORN_DB_HOST'),
-        'PORT': os.getenv('MATTERHORN_DB_PORT'),
+        'NAME': os.getenv('DEFAULT_DB_NAME'),
+        'USER': os.getenv('DEFAULT_DB_USER'),
+        'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
+        'HOST': os.getenv('DEFAULT_DB_HOST'),
+        'PORT': os.getenv('DEFAULT_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
             'connect_timeout': 60,
@@ -147,6 +147,19 @@ DATABASES = {
         }
     },
     'MPD': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('MPD_DB_NAME'),
+        'USER': os.getenv('MPD_DB_USER'),
+        'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
+        'HOST': os.getenv('MPD_DB_HOST'),
+        'PORT': os.getenv('MPD_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+            'connect_timeout': 60,
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
+        }
+    },
+    'zzz_MPD': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('MPD_DB_NAME'),
         'USER': os.getenv('MPD_DB_USER'),
@@ -197,12 +210,24 @@ DATABASES = {
             'connect_timeout': 60,
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
+    },
+    'zzz_matterhorn1': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('MATTERHORN1_DB_NAME'),
+        'USER': os.getenv('MATTERHORN1_DB_USER'),
+        'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
+        'HOST': os.getenv('MATTERHORN1_DB_HOST'),
+        'PORT': os.getenv('MATTERHORN1_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+            'connect_timeout': 60,
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
+        }
     }
 }
 
 # Database routers
 DATABASE_ROUTERS = [
-    'nc.db_routers.MatterhornRouter',
     'nc.db_routers.MPDRouter',
     'nc.db_routers.WebAgentRouter',
     'nc.db_routers.Matterhorn1Router',
