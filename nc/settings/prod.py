@@ -134,6 +134,19 @@ CELERY_TIMEZONE = 'Europe/Warsaw'
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_TRACK_STARTED = True
 
+# Celery Redis connection settings - fix dla KeyError: 8
+CELERY_BROKER_CONNECTION_RETRY = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
+CELERY_BROKER_POOL_LIMIT = 10
+CELERY_REDIS_MAX_CONNECTIONS = 50
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'visibility_timeout': 3600,
+    'max_connections': 50,
+    'socket_keepalive': True,
+    'health_check_interval': 30,
+}
+
 # Celery Beat Configuration
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 

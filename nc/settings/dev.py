@@ -80,6 +80,19 @@ CORS_ALLOWED_ORIGINS = [
 CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://:dev_password@redis:6379/0'
 
+# Celery Redis connection settings - fix dla KeyError: 8
+CELERY_BROKER_CONNECTION_RETRY = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
+CELERY_BROKER_POOL_LIMIT = 10
+CELERY_REDIS_MAX_CONNECTIONS = 50
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'visibility_timeout': 3600,
+    'max_connections': 50,
+    'socket_keepalive': True,
+    'health_check_interval': 30,
+}
+
 # Celery heartbeat configuration - wyłączony dla development
 CELERY_WORKER_HEARTBEAT = 0  # Wyłączony heartbeat dla development
 CELERY_WORKER_SEND_TASK_EVENTS = True
