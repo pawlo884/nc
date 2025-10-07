@@ -291,17 +291,32 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Warsaw'
 CELERY_TASK_ACKS_LATE = True
 
-# Celery Redis connection settings - fix dla KeyError: 8
+# Celery Redis connection settings - fix dla connection timeouts
 CELERY_BROKER_CONNECTION_RETRY = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
 CELERY_BROKER_POOL_LIMIT = 10
 CELERY_REDIS_MAX_CONNECTIONS = 50
+
+# Celery Redis transport options - uproszczona konfiguracja keepalive
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     'visibility_timeout': 3600,
     'max_connections': 50,
     'socket_keepalive': True,
-    'health_check_interval': 30,
+    'socket_timeout': 120,  # Socket timeout (2 minuty)
+    'socket_connect_timeout': 30,  # Connection timeout (30 sekund)
+    'retry_on_timeout': True,
+    # Health check co 25 sekund
+    'health_check_interval': 25,
+}
+
+# Result backend transport options - takie same jak broker
+CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+    'socket_keepalive': True,
+    'socket_timeout': 120,
+    'socket_connect_timeout': 30,
+    'retry_on_timeout': True,
+    'health_check_interval': 25,
 }
 
 # Cache Configuration - Redis dla blokad między workerami
