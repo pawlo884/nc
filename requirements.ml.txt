@@ -1,0 +1,23 @@
+# Requirements dla ML Container
+# Instalowane TYLKO w kontenerze celery-ml (osobny Dockerfile.ml)
+
+# Core ML dependencies
+# PyTorch - najnowsze wersje kompatybilne z Python 3.13
+torch==2.8.0  # ~2-3GB
+torchvision==0.23.0
+torchaudio==2.8.0
+
+# Sentence Transformers - instaluje się z PyTorch
+sentence-transformers==3.3.1
+
+# Vector Database
+qdrant-client==1.12.0
+
+# ML utilities
+scikit-learn==1.5.2
+numpy==2.2.0
+
+# Optional: dla lepszej wydajności
+# transformers==4.36.0  # Jeśli potrzebne dodatkowe modele
+# faiss-cpu==1.7.4  # Alternatywa dla Qdrant (lokalny search)
+

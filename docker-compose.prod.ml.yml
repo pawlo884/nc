@@ -1,0 +1,49 @@
+# docker-compose.prod.ml.yml - ML Container dla PRODUKCJI
+# Uruchamianie: docker-compose -f docker-compose.prod.yml -f docker-compose.prod.ml.yml up -d
+services:
+  celery-ml:
+    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app-ml:latest
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q ml --loglevel=info --concurrency=2 --max-memory-per-child=300000"]
+    deploy:
+      resources:
+        limits:
+          memory: 2G  # ML modele potrzebują więcej pamięci
+        reservations:
+          memory: 1G
+    volumes:
+      - .:/app
+      - celery_data:/var/lib/celery
+      - ml_models:/app/ml_models  # Cache dla pobranych modeli
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=nc.settings.prod
+      - CELERY_STATE_DB=/var/lib/celery/worker_state_ml
+      - TZ=Europe/Warsaw
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+      - CELERY_WORKER_SEND_TASK_EVENTS=true
+      - CELERY_TASK_SEND_SENT_EVENT=true
+      # Dla Sentence Transformers
+      - TRANSFORMERS_CACHE=/app/ml_models/transformers
+      - TORCH_HOME=/app/ml_models/torch
+    depends_on:
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    restart: always
+    networks:
+      - nc_network
+    user: "1001:1001"
+
+volumes:
+  ml_models:
+    driver: local
+
+networks:
+  nc_network:
+    external: true
+
+

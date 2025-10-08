@@ -25,7 +25,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
         
     # Build obrazu produkcyjnego z cache (Dockerfile.prod)
-    - name: Build and push
+    - name: Build and push main app
       uses: docker/build-push-action@v4
       with:
         context: .
@@ -34,6 +34,31 @@ jobs:
         tags: ${{ env.DOCKERHUB_USERNAME }}/django-app:latest
         cache-from: type=registry,ref=${{ env.DOCKERHUB_USERNAME }}/django-app:buildcache
         cache-to: type=registry,ref=${{ env.DOCKERHUB_USERNAME }}/django-app:buildcache,mode=max
+        build-args: |
+          BUILD_DATE=${{ github.event.head_commit.timestamp }}
+    
+    # Check if ML files changed
+    - name: Check ML files changed
+      id: ml_changed
+      run: |
+        git fetch origin main
+        if git diff --name-only HEAD origin/main | grep -qE '(requirements\.ml\.txt|Dockerfile\.ml)'; then
+          echo "ml_changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "ml_changed=false" >> $GITHUB_OUTPUT
+        fi
+    
+    # Build obrazu ML z cache (Dockerfile.ml) - tylko gdy ML pliki się zmieniły
+    - name: Build and push ML app
+      if: steps.ml_changed.outputs.ml_changed == 'true'
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ./Dockerfile.ml  # ← ML Dockerfile z PyTorch
+        push: true
+        tags: ${{ env.DOCKERHUB_USERNAME }}/django-app-ml:latest
+        cache-from: type=registry,ref=${{ env.DOCKERHUB_USERNAME }}/django-app-ml:buildcache
+        cache-to: type=registry,ref=${{ env.DOCKERHUB_USERNAME }}/django-app-ml:buildcache,mode=max
         build-args: |
           BUILD_DATE=${{ github.event.head_commit.timestamp }}
         
