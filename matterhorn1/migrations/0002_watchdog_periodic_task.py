@@ -8,7 +8,7 @@ def create_watchdog_periodic_task(apps, schema_editor):
     # Utwórz/albo pobierz interwał 5 minut
     interval, _ = IntervalSchedule.objects.get_or_create(
         every=5,
-        period=IntervalSchedule.MINUTES,
+        period='minutes',
     )
 
     # Utwórz/albo pobierz zadanie watchdog
@@ -37,7 +37,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(create_watchdog_periodic_task, remove_watchdog_periodic_task),
+        migrations.RunPython(create_watchdog_periodic_task,
+                             remove_watchdog_periodic_task),
     ]
-
-

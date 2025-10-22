@@ -12,6 +12,9 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Automatyczne wyszukiwanie tasków w aplikacjach Django
 app.autodiscover_tasks()
 
+# Explicit import tasków MPD (force registration)
+app.autodiscover_tasks(['MPD', 'matterhorn1', 'web_agent'])
+
 # Konfiguracja tasków
 app.conf.update(
     task_serializer='json',
@@ -34,6 +37,7 @@ app.conf.task_routes = {
 
     # Pozostałe taski używają domyślnej kolejki
     'matterhorn1.tasks.*': {'queue': 'default'},
+    'MPD.tasks.*': {'queue': 'default'},
     'web_agent.tasks.*': {'queue': 'default'},
 }
 

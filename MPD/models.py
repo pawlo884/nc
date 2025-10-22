@@ -326,7 +326,7 @@ class StockAndPrices(models.Model):
 
 
 class StockHistory(models.Model):
-    id = models.BigIntegerField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)
     stock_id = models.BigIntegerField()
     source_id = models.BigIntegerField(null=True, blank=True)
     previous_stock = models.IntegerField()
@@ -335,7 +335,7 @@ class StockHistory(models.Model):
         max_digits=10, decimal_places=2, default=Decimal('0.00'))
     new_price = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal('0.00'))
-    change_date = models.DateTimeField()
+    change_date = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         managed = True

@@ -13,7 +13,7 @@ load_dotenv('.env.dev')
 # Konfiguracja S3 (DigitalOcean Spaces)
 DO_SPACES_BUCKET = os.getenv('DO_SPACES_BUCKET')
 DO_SPACES_REGION = os.getenv('DO_SPACES_REGION')
-DO_SPACES_ACCESS_KEY_ID = os.getenv('DO_SPACES_ACCESS_KEY_ID')
+DO_SPACES_ACCESS_KEY_ID = os.getenv('DO_SPACES_KEY')
 DO_SPACES_SECRET = os.getenv('DO_SPACES_SECRET')
 
 # Inicjalizacja klienta S3

@@ -168,4 +168,7 @@ class DefaultRouter:
                 return db == 'zzz_default'
             elif 'default' in settings.DATABASES:
                 return db == 'default'
+            # Jeśli nie ma bazy default, nie pozwalaj na migracje
+            return False
+
         return None
