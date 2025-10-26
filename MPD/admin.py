@@ -3,9 +3,67 @@ from django.utils.safestring import mark_safe
 from django.utils.html import format_html
 from django.db.models import Exists, OuterRef
 from django.contrib.admin import DateFieldListFilter, SimpleListFilter
+from django.urls import path
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+import json
+import logging
 from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Categories, Vat, Units, FabricComponent, ProductFabric
 import decimal
 # Register your models here.
+
+logger = logging.getLogger(__name__)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def admin_update_producer_code(request):
+    """
+    Endpoint do aktualizacji kodu producenta wariantu - dostępny w adminie
+    """
+    try:
+        data = json.loads(request.body)
+        variant_id = data.get('variant_id')
+        producer_code = data.get('producer_code', '')
+
+        if not variant_id:
+            return JsonResponse({'status': 'error', 'message': 'Brak variant_id'}, status=400)
+
+        # Znajdź wariant
+        try:
+            variant = ProductVariants.objects.using(
+                'MPD').get(variant_id=variant_id)
+        except ProductVariants.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Wariant nie istnieje'}, status=404)
+
+        # Aktualizuj kod producenta
+        variant.producer_code = producer_code
+        variant.save(using='MPD')
+
+        logger.info(
+            f"Zaktualizowano kod producenta dla wariantu {variant_id}: {producer_code}")
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Kod producenta został zaktualizowany',
+            'variant_id': variant_id,
+            'producer_code': producer_code
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Błąd podczas aktualizacji kodu producenta: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+
+
+# Dodaj URL do admina
+original_get_urls = admin.site.get_urls
+admin.site.get_urls = lambda: original_get_urls() + [
+    path('mpd/update-producer-code/', admin_update_producer_code,
+         name='admin_update_producer_code'),
+]
 
 
 # Usuwam ProductVariantsInline i wpis inlines = [ProductVariantsInline] z ProductsAdmin
@@ -619,6 +677,7 @@ class ProductsAdmin(admin.ModelAdmin):
             color = v.color.name if v.color else "-"
             producer_color = v.producer_color.name if v.producer_color else "-"
             size = v.size.name if v.size else "-"
+            producer_code = v.producer_code or "-"
             sources = sources_map.get(v.variant_id, [])
             sources_names = []
             eans = []
@@ -634,13 +693,14 @@ class ProductsAdmin(admin.ModelAdmin):
             sources_display = "<br>".join(
                 sources_names) if sources_names else "-"
             eans_display = "<br>".join(eans) if eans else "-"
-            key = (color, producer_color, size, sources_display, eans_display)
+            key = (color, producer_color, size, producer_code,
+                   sources_display, eans_display)
             if key not in grouped:
                 grouped[key] = []
             grouped[key].append(v.variant_id)
         html = "<table style='border-collapse:collapse;'>"
-        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Ceny</th><th style='border:1px solid #ccc;padding:2px 6px;'>Cena detaliczna</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
-        for (color, producer_color, size, sources_display, eans_display), variant_ids in grouped.items():
+        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kod producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Ceny</th><th style='border:1px solid #ccc;padding:2px 6px;'>Cena detaliczna</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
+        for (color, producer_color, size, producer_code, sources_display, eans_display), variant_ids in grouped.items():
             # Zsumuj stock i pobierz ceny dla wszystkich variant_id
             total_stock = 0
             prices = []
@@ -656,8 +716,55 @@ class ProductsAdmin(admin.ModelAdmin):
             prices_str = "<br>".join(prices) if prices else "-"
             retail_price_str = f"{retail_map.get(variant_ids[0], '-')} PLN" if retail_map.get(
                 variant_ids[0]) is not None else "-"
-            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{prices_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{retail_price_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_display}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{eans_display}</td></tr>"
+            # Dla każdego wariantu w grupie, utwórz edytowalne pole
+            producer_code_inputs = []
+            for variant_id in variant_ids:
+                # Znajdź wariant w liście variants
+                variant = next(
+                    (v for v in variants if v.variant_id == variant_id), None)
+                if variant:
+                    current_code = variant.producer_code or ""
+                    producer_code_inputs.append(
+                        f'<input type="text" value="{current_code}" data-variant-id="{variant_id}" class="producer-code-input" style="width:100%;border:1px solid #ccc;padding:2px;" onchange="updateProducerCode({variant_id}, this.value)">')
+
+            producer_code_cell = "<br>".join(
+                producer_code_inputs) if producer_code_inputs else producer_code
+
+            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_code_cell}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{prices_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{retail_price_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_display}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{eans_display}</td></tr>"
         html += "</table>"
+
+        # Dodaj JavaScript do obsługi aktualizacji kodów producenta
+        html += """
+        <script>
+        function updateProducerCode(variantId, newValue) {
+            fetch('/mpd/update-producer-code/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    variant_id: variantId,
+                    producer_code: newValue
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    console.log('Kod producenta zaktualizowany:', variantId, newValue);
+                } else {
+                    console.error('Błąd aktualizacji:', data.message);
+                    alert('Błąd aktualizacji kodu producenta: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia z serwerem');
+            });
+        }
+        </script>
+        """
+
         return mark_safe(html)
 
     @admin.display(description="Zdjęcia produktu")
@@ -1042,6 +1149,8 @@ class ProductVariantsAdmin(admin.ModelAdmin):
                      'producer_code', 'iai_product_id']
     raw_id_fields = ['product', 'color', 'producer_color', 'size']
     readonly_fields = ['variant_id', 'updated_at']
+    fields = ['product', 'color', 'producer_color', 'size',
+              'producer_code', 'iai_product_id', 'exported_to_iai']
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')

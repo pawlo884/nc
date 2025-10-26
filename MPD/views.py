@@ -986,6 +986,47 @@ def update_product(request, product_id):
                     attribute_id=attribute_id
                 )
 
+        # Aktualizuj warianty jeśli podano
+        if 'variants' in data:
+            # Usuń istniejące warianty
+            ProductVariants.objects.using('MPD').filter(
+                product_id=product_id).delete()
+
+            # Dodaj nowe warianty
+            for variant_data in data['variants']:
+                # Pobierz lub utwórz kolor
+                color_id = variant_data.get('color_id')
+                producer_color_id = variant_data.get('producer_color_id')
+
+                if variant_data.get('producer_color_name'):
+                    producer_color, _ = Colors.objects.using('MPD').get_or_create(
+                        name=variant_data['producer_color_name']
+                    )
+                    producer_color_id = producer_color.id
+
+                # Pobierz rozmiar
+                size_id = variant_data.get('size_id')
+
+                # Utwórz wariant
+                variant = ProductVariants.objects.using('MPD').create(
+                    product=product,
+                    color_id=color_id,
+                    producer_color_id=producer_color_id,
+                    size_id=size_id,
+                    producer_code=variant_data.get('producer_code', ''),
+                    iai_product_id=variant_data.get('iai_product_id')
+                )
+
+                # Dodaj cenę jeśli podano
+                if variant_data.get('price'):
+                    ProductVariantsRetailPrice.objects.using('MPD').create(
+                        variant=variant,
+                        retail_price=variant_data['price'],
+                        vat=variant_data.get('vat', 23.0),
+                        currency=variant_data.get('currency', 'PLN'),
+                        net_price=variant_data.get('net_price')
+                    )
+
         logger.info("Zaktualizowano produkt MPD: %s (ID: %s)",
                     product.name, product.id)
 
@@ -1452,4 +1493,48 @@ def get_matterhorn1_products(request):
     except Exception as e:
         logger.error(
             f"Błąd podczas pobierania produktów matterhorn1: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+def update_producer_code(request):
+    """
+    Endpoint do aktualizacji kodu producenta wariantu
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        variant_id = data.get('variant_id')
+        producer_code = data.get('producer_code', '')
+
+        if not variant_id:
+            return JsonResponse({'status': 'error', 'message': 'Brak variant_id'}, status=400)
+
+        # Znajdź wariant
+        try:
+            variant = ProductVariants.objects.using(
+                'MPD').get(variant_id=variant_id)
+        except ProductVariants.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Wariant nie istnieje'}, status=404)
+
+        # Aktualizuj kod producenta
+        variant.producer_code = producer_code
+        variant.save(using='MPD')
+
+        logger.info(
+            f"Zaktualizowano kod producenta dla wariantu {variant_id}: {producer_code}")
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Kod producenta został zaktualizowany',
+            'variant_id': variant_id,
+            'producer_code': producer_code
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Błąd podczas aktualizacji kodu producenta: {str(e)}")
         return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)

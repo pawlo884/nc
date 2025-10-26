@@ -138,12 +138,12 @@ class BaseXMLExporter:
         local_path = self.save_local(xml_content)
         bucket_url = self.save_to_bucket(local_path)
         if bucket_url:
-            print('✅ Eksport XML zakończony pomyślnie!')
-            print(f'📁 URL: {bucket_url}')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Eksport XML zakonczony pomyslnie!')
+            print(f'URL: {bucket_url}')
+            print(f'Lokalnie zapisano: {local_path}')
         else:
-            print('❌ Błąd podczas eksportu XML')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Blad podczas eksportu XML')
+            print(f'Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
 
@@ -605,12 +605,12 @@ class LightXMLExporter(BaseXMLExporter):
         if bucket_url:
             light_file.bucket_url = bucket_url
             light_file.save(using='MPD')
-            print('✅ Eksport XML zakończony pomyślnie!')
-            print(f'📁 URL: {bucket_url}')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Eksport XML zakonczony pomyslnie!')
+            print(f'URL: {bucket_url}')
+            print(f'Lokalnie zapisano: {local_path}')
         else:
-            print('❌ Błąd podczas eksportu XML')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Blad podczas eksportu XML')
+            print(f'Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
     def generate_xml(self):
@@ -1746,12 +1746,12 @@ class ProducersXMLExporter(BaseXMLExporter):
 
         bucket_url = self.save_to_bucket(local_path)
         if bucket_url:
-            print('✅ Eksport XML zakończony pomyślnie!')
-            print(f'📁 URL: {bucket_url}')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Eksport XML zakonczony pomyslnie!')
+            print(f'URL: {bucket_url}')
+            print(f'Lokalnie zapisano: {local_path}')
         else:
-            print('❌ Błąd podczas eksportu XML')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Blad podczas eksportu XML')
+            print(f'Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
 
@@ -1815,12 +1815,12 @@ class CategoriesXMLExporter(BaseXMLExporter):
         if bucket_url:
             categories_file.bucket_url = bucket_url
             categories_file.save(using='MPD')
-            print('✅ Eksport XML zakończony pomyślnie!')
-            print(f'📁 URL: {bucket_url}')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Eksport XML zakonczony pomyslnie!')
+            print(f'URL: {bucket_url}')
+            print(f'Lokalnie zapisano: {local_path}')
         else:
-            print('❌ Błąd podczas eksportu XML')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Blad podczas eksportu XML')
+            print(f'Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
     def generate_xml(self):
@@ -2024,7 +2024,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
         # Sprawdź czy są produkty do wyeksportowania
         if not self.has_products_to_export():
             print(
-                'ℹ️ Brak produktów do wyeksportowania w full_change.xml - pomijam generowanie')
+                'Brak produktow do wyeksportowania w full_change.xml - pomijam generowanie')
             return {'bucket_url': None, 'local_path': None, 'skipped': True}
 
         xml_content = self.generate_xml(incremental=incremental)
@@ -2032,7 +2032,7 @@ class FullChangeXMLExporter(BaseXMLExporter):
         # Sprawdź czy XML zawiera produkty (nie jest pusty)
         if '<product id=' not in xml_content:
             print(
-                'ℹ️ Wygenerowany full_change.xml jest pusty (brak produktów) - pomijam zapisywanie')
+                'Wygenerowany full_change.xml jest pusty (brak produktow) - pomijam zapisywanie')
             return {'bucket_url': None, 'local_path': None, 'skipped': True}
 
         local_path = self.save_local(xml_content)
@@ -2042,12 +2042,12 @@ class FullChangeXMLExporter(BaseXMLExporter):
         self.save_full_change_record(bucket_url, local_path)
 
         if bucket_url:
-            print('✅ Eksport XML zakończony pomyślnie!')
-            print(f'📁 URL: {bucket_url}')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Eksport XML zakonczony pomyslnie!')
+            print(f'URL: {bucket_url}')
+            print(f'Lokalnie zapisano: {local_path}')
         else:
-            print('❌ Błąd podczas eksportu XML')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Blad podczas eksportu XML')
+            print(f'Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
     def generate_navigation_xml(self, product_id):
@@ -2641,12 +2641,12 @@ class SizesXMLExporter(BaseXMLExporter):
         if bucket_url:
             sizes_file.bucket_url = bucket_url
             sizes_file.save(using='MPD')
-            print('✅ Eksport XML zakończony pomyślnie!')
-            print(f'📁 URL: {bucket_url}')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Eksport XML zakonczony pomyslnie!')
+            print(f'URL: {bucket_url}')
+            print(f'Lokalnie zapisano: {local_path}')
         else:
-            print('❌ Błąd podczas eksportu XML')
-            print(f'📄 Lokalnie zapisano: {local_path}')
+            print('Blad podczas eksportu XML')
+            print(f'Lokalnie zapisano: {local_path}')
         return {'bucket_url': bucket_url, 'local_path': local_path}
 
     def generate_xml(self):

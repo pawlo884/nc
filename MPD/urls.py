@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ProductSetViewSet, products, test_connection, test_table_structure, export_xml, export_full_xml, get_xml_file, xml_links, get_gateway_xml, generate_full_xml, generate_full_change_xml, generate_gateway_xml, generate_gateway_xml_api, empty_xml, generate_light_xml, generate_producers_xml, generate_stocks_xml, generate_units_xml, generate_categories_xml, generate_sizes_xml, generate_parameters_xml, generate_series_xml, generate_warranties_xml, generate_preset_xml, manage_product_paths, manage_product_attributes, manage_product_fabric, create_product, update_product, get_product, bulk_create_products, bulk_map_from_matterhorn1, get_matterhorn1_products, product_mapping
+from .views import ProductSetViewSet, products, test_connection, test_table_structure, export_xml, export_full_xml, get_xml_file, xml_links, get_gateway_xml, generate_full_xml, generate_full_change_xml, generate_gateway_xml, generate_gateway_xml_api, empty_xml, generate_light_xml, generate_producers_xml, generate_stocks_xml, generate_units_xml, generate_categories_xml, generate_sizes_xml, generate_parameters_xml, generate_series_xml, generate_warranties_xml, generate_preset_xml, manage_product_paths, manage_product_attributes, manage_product_fabric, create_product, update_product, get_product, bulk_create_products, bulk_map_from_matterhorn1, get_matterhorn1_products, product_mapping, update_producer_code
 
 router = DefaultRouter()
 router.register(r'product-sets', ProductSetViewSet)
@@ -55,4 +55,7 @@ urlpatterns = [
          name='get_matterhorn1_products'),
     path('matterhorn1/bulk-map/', bulk_map_from_matterhorn1,
          name='bulk_map_from_matterhorn1'),
+    # Aktualizacja kodu producenta
+    path('update-producer-code/', update_producer_code,
+         name='update_producer_code'),
 ]

@@ -7,10 +7,11 @@ SECRET_KEY = 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.109', '*', '_']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1',
+                 '192.168.50.63', '83.168.79.109', '*', '_']
 
 # API URL configuration for development
-API_BASE_URL = os.getenv('API_BASE_URL', 'http://212.127.93.27:8000')
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://83.168.79.109:8000')
 MPD_API_URL = os.getenv('MPD_API_URL', 'http://localhost:8000/mpd')
 
 # Timeout settings for long-running requests
@@ -44,17 +45,17 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
-    'http://192.168.1.109',
-    'http://192.168.1.109:8000',
-    'http://212.127.93.27',
-    'http://212.127.93.27:8000',
+    'http://192.168.50.63',
+    'http://192.168.50.63:8000',
+    'http://83.168.79.109',
+    'http://83.168.79.109:8000',
 ]
 CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
 
 # Debug Toolbar Configuration
 hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
-INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.1.109'] + \
+INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.50.63'] + \
     [ip[:-1] + '1' for ip in ips]
 
 # Wyłącz debug toolbar tymczasowo aby sprawdzić czy wpływa na admin interface
@@ -73,7 +74,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://212.127.93.27:8000",
+    "http://192.168.50.63:8000",
+    "http://83.168.79.109:8000",
 ]
 
 # Celery Configuration for development
