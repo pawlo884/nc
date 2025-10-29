@@ -1050,14 +1050,19 @@ class ColorsAdmin(admin.ModelAdmin):
     list_filter = ['name']
 
 
+@admin.register(Paths)
 class PathsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'path', 'parent_id')
+    list_display = ('id', 'name', 'path', 'parent_id',
+                    'iai_category_id', 'iai_menu_parent_id', 'iai_menu_id')
     search_fields = ('name', 'path')
     list_filter = ('parent_id',)
     change_form_template = 'admin/MPD/products/change_form.html'
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD')
+
     def get_tree(self):
-        paths = list(Paths.objects.all())
+        paths = list(Paths.objects.using('MPD').all())
         tree = {}
         by_id = {p.id: p for p in paths}
         for p in paths:
@@ -1089,9 +1094,6 @@ class PathsAdmin(admin.ModelAdmin):
     def render_change_form(self, request, context, *args, **kwargs):
         context['paths_tree'] = self.get_tree()
         return super().render_change_form(request, context, *args, **kwargs)
-
-
-admin.site.register(Paths, PathsAdmin)
 
 
 @admin.register(IaiProductCounter)

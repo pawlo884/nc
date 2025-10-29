@@ -7,7 +7,7 @@ alwaysApply: true
 # Reguły PostgreSQL
 
 ## Konfiguracja baz danych
-- **5 baz danych**: default, matterhorn, MPD, zzz_web_agent, matterhorn1
+- **5 baz danych**: default, matterhorn, MPD, web_agent, matterhorn1
 - **Wszystkie bazy dev mają prefiks zzz** (np. zzz_default, zzz_matterhorn, zzz_MPD, zzz_web_agent, zzz_matterhorn1)
 - **Database routing** w nc/db_routers.py
 - **CONN_MAX_AGE=0** dla connection management
