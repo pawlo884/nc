@@ -8,7 +8,7 @@ SECRET_KEY = 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!
 DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1',
-                 '192.168.50.63', '83.168.79.109', '*', '_']
+                 '192.168.50.63', '83.168.79.109', '212.127.93.27', '*', '_']
 
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://83.168.79.109:8000')
@@ -49,13 +49,15 @@ CSRF_TRUSTED_ORIGINS = [
     'http://192.168.50.63:8000',
     'http://83.168.79.109',
     'http://83.168.79.109:8000',
+    'http://212.127.93.27',
+    'http://212.127.93.27:8000',
 ]
 CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
 
 # Debug Toolbar Configuration
 hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
-INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.50.63'] + \
+INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.50.63', '212.127.93.27'] + \
     [ip[:-1] + '1' for ip in ips]
 
 # Wyłącz debug toolbar tymczasowo aby sprawdzić czy wpływa na admin interface

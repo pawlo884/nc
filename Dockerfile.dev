@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # Dockerfile dla środowiska DEVELOPMENT
-FROM python:3.13-slim
+FROM python:3.12-slim
 
 # Zainstaluj pakiety systemowe z cache'owaniem apt
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -20,6 +20,46 @@ WORKDIR /app
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --break-system-packages -r requirements.txt
+
+# Zależności systemowe dla Playwright/Chromium na Debian (bez "ttf-*" – używamy pakietów fonts-*)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    fonts-unifont \
+    fonts-noto-core \
+    fonts-noto-color-emoji \
+    fonts-liberation \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libcairo2 \
+    libpango-1.0-0 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcb-dri3-0 \
+    libxcursor1 \
+    libxext6 \
+    libxi6 \
+    libxrender1 \
+    libxtst6 \
+    libdbus-1-3 \
+    libexpat1 \
+    libgtk-3-0 \
+    libxshmfence1 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Zainstaluj Chromium dla Playwright (bez automatycznych deps, mamy je wyżej)
+RUN python -m playwright install chromium
 
 # Skopiuj cały projekt (dla dev możemy wszystko)
 COPY . .
