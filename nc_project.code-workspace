@@ -2,15 +2,6 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "../datascientist"
-		},
-		{
-			"path": "../career-guide"
-		},
-		{
-			"path": "../nozyk"
 		}
 	],
 	"settings": {
