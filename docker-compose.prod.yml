@@ -2,7 +2,7 @@
 services:
   static-init:
     image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
-    command: ["/bin/bash", "-c", "python manage.py collectstatic --noinput --skip-checks"]
+    command: ["/bin/bash", "-c", "echo '🔧 Zbieranie plików statycznych...' && python manage.py collectstatic --noinput --clear --verbosity 1 && echo '✅ Pliki statyczne zebrane' && ls -la /app/staticfiles/admin/css/ | head -5"]
     volumes:
       - static_volume:/app/staticfiles
     env_file:
@@ -17,7 +17,7 @@ services:
 
   web:
     image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
-    command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --max-requests 500 --max-requests-jitter 50 --preload"]
+    command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default --noinput && python manage.py migrate admin_interface --database=default --noinput && python manage.py migrate colorfield --database=default --noinput && python manage.py migrate matterhorn1 --database=matterhorn1 --noinput && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --max-requests 500 --max-requests-jitter 50 --preload --access-logfile - --error-logfile - --log-level info --capture-output"]
     ports:
       - "8000:8000"
     volumes:
@@ -51,13 +51,14 @@ services:
       - TZ=Europe/Warsaw
     depends_on:
       - web
+      - static-init
     restart: always
     networks:
       - nc_network
 
   celery-default:
     image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
-    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=150000"]
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat"]
     deploy:
       resources:
         limits:
@@ -90,7 +91,7 @@ services:
 
   celery-import:
     image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
-    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=150000"]
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat"]
     deploy:
       resources:
         limits:

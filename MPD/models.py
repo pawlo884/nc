@@ -340,6 +340,7 @@ class StockHistory(models.Model):
     class Meta:
         managed = True
         db_table = 'stock_history'
+        app_label = 'MPD'  # Wyraźnie określ app_label dla uniknięcia konfliktów
         verbose_name = 'Historia stanu magazynowego'
         verbose_name_plural = 'Historia stanów magazynowych'
 

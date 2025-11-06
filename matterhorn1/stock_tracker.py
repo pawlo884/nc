@@ -131,7 +131,7 @@ def get_stock_trends(product_uid=None, variant_uid=None, days=30):
                         sh.stock_change,
                         sh.change_type,
                         sh.timestamp
-                    FROM stock_history sh
+                    FROM matterhorn1_stock_history sh
                     WHERE sh.product_uid = %s
                         AND sh.timestamp >= %s
                     ORDER BY sh.timestamp DESC
@@ -147,7 +147,7 @@ def get_stock_trends(product_uid=None, variant_uid=None, days=30):
                         sh.stock_change,
                         sh.change_type,
                         sh.timestamp
-                    FROM stock_history sh
+                    FROM matterhorn1_stock_history sh
                     WHERE sh.variant_uid = %s
                         AND sh.timestamp >= %s
                     ORDER BY sh.timestamp DESC
@@ -198,7 +198,7 @@ def get_popular_products(days=30, limit=20):
                     SUM(ABS(sh.stock_change)) as total_stock_sold,
                     AVG(ABS(sh.stock_change)) as avg_stock_sold_per_change,
                     MAX(sh.timestamp) as last_activity
-                FROM stock_history sh
+                FROM matterhorn1_stock_history sh
                 WHERE sh.change_type = 'decrease'
                     AND sh.timestamp >= %s
                 GROUP BY sh.product_uid, sh.product_name
@@ -249,7 +249,7 @@ def get_stock_statistics(days=30):
                     AVG(CASE WHEN change_type = 'decrease' THEN ABS(stock_change) ELSE NULL END) as avg_sold_per_decrease,
                     COUNT(DISTINCT product_uid) as unique_products,
                     COUNT(DISTINCT variant_uid) as unique_variants
-                FROM stock_history
+                FROM matterhorn1_stock_history
                 WHERE timestamp >= %s
             """
 
@@ -291,7 +291,7 @@ def clean_old_stock_history(days_to_keep=90):
             cutoff_date = timezone.now() - timezone.timedelta(days=days_to_keep)
 
             delete_query = """
-                DELETE FROM stock_history
+                DELETE FROM matterhorn1_stock_history
                 WHERE timestamp < %s
             """
 

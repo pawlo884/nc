@@ -49,6 +49,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://192.168.50.63:8000',
     'http://83.168.79.109',
     'http://83.168.79.109:8000',
+    'http://212.127.93.27',
+    'http://212.127.93.27:8001',
 ]
 CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False

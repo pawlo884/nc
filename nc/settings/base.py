@@ -15,6 +15,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Sprawdź czy używamy ustawień dev i załaduj odpowiedni plik .env
 if os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.dev'):
     load_dotenv('.env.dev')
+elif os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.prod'):
+    # W produkcji Docker ładuje .env.prod przez env_file, ale na wszelki wypadek
+    load_dotenv('.env.prod')
+    load_dotenv()  # Fallback do .env jeśli .env.prod nie istnieje
 else:
     load_dotenv()
 

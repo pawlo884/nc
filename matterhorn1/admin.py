@@ -2038,7 +2038,7 @@ class StockHistoryAdmin(admin.ModelAdmin):
                         SUM(ABS(sh.stock_change)) as total_stock_sold,
                         AVG(ABS(sh.stock_change)) as avg_stock_sold_per_change,
                         MAX(sh.timestamp) as last_activity
-                    FROM stock_history sh
+                    FROM matterhorn1_stock_history sh
                     WHERE sh.change_type = 'decrease'
                         AND sh.timestamp >= %s
                     GROUP BY sh.product_uid, sh.product_name
@@ -2087,7 +2087,7 @@ class StockHistoryAdmin(admin.ModelAdmin):
                         AVG(CASE WHEN change_type = 'decrease' THEN ABS(stock_change) ELSE NULL END) as avg_sold_per_decrease,
                         COUNT(DISTINCT product_uid) as unique_products,
                         COUNT(DISTINCT variant_uid) as unique_variants
-                    FROM stock_history
+                    FROM matterhorn1_stock_history
                     WHERE timestamp >= %s
                 """
 
@@ -2127,7 +2127,7 @@ class StockHistoryAdmin(admin.ModelAdmin):
                 cutoff_date = timezone.now() - timedelta(days=days_to_keep)
 
                 delete_query = """
-                    DELETE FROM stock_history
+                    DELETE FROM matterhorn1_stock_history
                     WHERE timestamp < %s
                 """
 

@@ -8,9 +8,16 @@ https://docs.djangoproject.com/en/5.1/howto/deployment/wsgi/
 """
 
 import os
+import logging
 
 from django.core.wsgi import get_wsgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nc.settings')
 
-application = get_wsgi_application()
+logger = logging.getLogger(__name__)
+
+try:
+    application = get_wsgi_application()
+except Exception as e:
+    logger.error(f"Błąd podczas inicjalizacji WSGI: {e}", exc_info=True)
+    raise

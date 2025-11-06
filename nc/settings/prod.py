@@ -1,6 +1,15 @@
 import os
 from .base import *
 
+# Usuń debug_toolbar z INSTALLED_APPS w produkcji
+if 'debug_toolbar' in INSTALLED_APPS:
+    INSTALLED_APPS.remove('debug_toolbar')
+
+# Limity uploadów dla produkcji
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Maksymalna liczba pól w formularzu
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv(
     'DJANGO_SECRET_KEY', 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!')
@@ -57,6 +66,21 @@ LOGGING = {
         },
         'django.request': {
             'handlers': ['console'],
+            'level': 'ERROR',  # Zmienione na ERROR aby widzieć błędy 500
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'gunicorn.error': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'gunicorn.access': {
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
@@ -66,20 +90,36 @@ LOGGING = {
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+# Używamy Path object zamiast os.path.join dla spójności z base.py
+STATIC_ROOT = str(BASE_DIR / 'staticfiles')
+# Sprawdź czy katalog static istnieje przed dodaniem do STATICFILES_DIRS
+static_dir = str(BASE_DIR / 'static')
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
-]
+    static_dir,
+] if os.path.exists(static_dir) else []
 
 # Konfiguracja dla plików statycznych w produkcji
-# W produkcji używamy Nginx do serwowania plików statycznych, nie WhiteNoise
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+# Używamy WhiteNoise jako fallback gdy nginx nie działa lub aplikacja działa bezpośrednio
+# Używamy zwykłego WhiteNoiseStorage (bez manifestu) dla prostoty
+STATICFILES_STORAGE = 'whitenoise.storage.WhiteNoiseStaticFilesStorage'
+
+# WhiteNoise configuration
+WHITENOISE_USE_FINDERS = True  # Pozwól WhiteNoise używać finders do znajdowania plików
+WHITENOISE_AUTOREFRESH = True  # Automatycznie odświeżaj pliki (dla development)
+WHITENOISE_MANIFEST_STRICT = False  # Nie wymagaj manifestu
 
 # STATICFILES_FINDERS - używamy domyślnych z base.py
+# Dodajemy obsługę duplikatów - pierwszy znaleziony plik jest używany
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+]
 
-# Usuń WhiteNoise z middleware w produkcji - Nginx obsługuje pliki statyczne
+# Dodaj WhiteNoise do middleware dla serwowania plików statycznych
+# WhiteNoise działa jako fallback gdy nginx nie jest dostępny
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Dodane dla serwowania plików statycznych
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -130,9 +170,20 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
 ]
 
+# Redis Configuration - wspólne dla Celery i Cache
+# W Dockerze nazwa serwisu Redis to 'redis' (z docker-compose.prod.yml)
+REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
+
+# Debug: sprawdź czy zmienne są załadowane (tylko jeśli DEBUG=True)
+if DEBUG:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Redis Configuration: HOST={REDIS_HOST}, PASSWORD={'***' if REDIS_PASSWORD else 'NOT SET'}")
+
 # Celery Configuration
-CELERY_BROKER_URL = f'redis://:{os.getenv("REDIS_PASSWORD", "CHANGE_ME_IN_ENV")}@redis:6379/0'
-CELERY_RESULT_BACKEND = f'redis://:{os.getenv("REDIS_PASSWORD", "CHANGE_ME_IN_ENV")}@redis:6379/0'
+CELERY_BROKER_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0'
+CELERY_RESULT_BACKEND = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -180,13 +231,34 @@ CELERY_TASK_ROUTES = {
 }
 
 # Cache Configuration - Redis dla blokad między workerami
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        # Używamy bazy 1 dla cache
-        'LOCATION': f'redis://:{os.getenv("REDIS_PASSWORD", "CHANGE_ME_IN_ENV")}@redis:6379/1',
+# Użyj django-redis z obsługą błędów
+try:
+    import django_redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            # Używamy bazy 1 dla cache
+            'LOCATION': f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/1',
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                'CONNECTION_POOL_KWARGS': {
+                    'retry_on_timeout': True,
+                    'socket_connect_timeout': 5,
+                },
+                # Ignoruj błędy połączenia - aplikacja będzie działać bez cache
+                'IGNORE_EXCEPTIONS': True,
+            }
+        }
     }
-}
+except ImportError:
+    # Fallback do dummy cache jeśli django-redis nie jest dostępne
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        }
+    }
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {

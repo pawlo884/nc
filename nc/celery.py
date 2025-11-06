@@ -2,7 +2,8 @@ import os
 from celery import Celery
 
 # Ustaw domyślne ustawienia Django dla Celery
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nc.settings.dev')
+# Użyj zmiennej środowiskowej lub domyślnie dev
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', os.getenv('DJANGO_SETTINGS_MODULE', 'nc.settings.dev'))
 
 app = Celery('nc')
 
@@ -43,7 +44,7 @@ app.conf.task_routes = {
 
 # Konfiguracja retry
 app.conf.task_acks_late = True
-app.conf.task_reject_on_worker_lost = True
+app.conf.task_reject_on_worker_lost = False  # Zmienione na False dla stabilności
 
 # Konfiguracja heartbeat
 app.conf.worker_send_task_events = True
@@ -52,9 +53,10 @@ app.conf.worker_hijack_root_logger = False
 app.conf.worker_log_color = False
 
 # Konfiguracja heartbeat i monitoringu
-app.conf.worker_heartbeat = 30  # heartbeat co 30 sekund
+app.conf.worker_heartbeat = 0  # Wyłączony heartbeat dla stabilności
 app.conf.worker_pool_restarts = True
 app.conf.worker_prefetch_multiplier = 1
+app.conf.worker_disable_rate_limits = True  # Wyłącz limity dla stabilności
 
 # Konfiguracja beat - używaj Django periodic tasks zamiast tego
 # app.conf.beat_schedule = {}
@@ -63,3 +65,10 @@ app.conf.worker_prefetch_multiplier = 1
 @app.task(bind=True)
 def debug_task(self):
     print(f'Request: {self.request!r}')
+
+
+# Konfiguracja logowania dla Celery
+import logging
+logging.getLogger('celery').setLevel(logging.INFO)
+logging.getLogger('celery.worker').setLevel(logging.INFO)
+logging.getLogger('celery.task').setLevel(logging.INFO)

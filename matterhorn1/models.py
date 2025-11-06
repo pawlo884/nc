@@ -290,7 +290,8 @@ class StockHistory(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'stock_history'
+        db_table = 'matterhorn1_stock_history'  # Unikalna nazwa tabeli dla matterhorn1
+        app_label = 'matterhorn1'
         verbose_name = 'Historia stanów magazynowych'
         verbose_name_plural = 'Historia stanów magazynowych'
         ordering = ['-timestamp']

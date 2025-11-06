@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.http import HttpResponse
+from django.conf.urls.static import static
 
 # Import drf_spectacular tylko jeśli jest dostępny
 try:
@@ -69,3 +70,8 @@ if settings.DEBUG:
     urlpatterns += [
         path('__debug__/', include('debug_toolbar.urls')),
     ]
+
+# Serwuj pliki statyczne w produkcji jeśli nie ma nginx (fallback)
+# To jest potrzebne gdy aplikacja działa bezpośrednio na porcie 8001
+# Używamy zawsze (nie tylko gdy DEBUG=False), bo na VPS może nie być nginx
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
