@@ -66,11 +66,19 @@ jobs:
           
           # Czekaj aż kontener się uruchomi
           echo "⏳ Waiting for container to be ready..."
-          sleep 10
+          sleep 15
           
           # Sprawdź status
           echo "📊 Container status:"
           docker compose ps || echo "⚠️ Could not get status!"
+          
+          # Sprawdź migracje i bazę danych
+          echo "🗄️ Checking database migrations..."
+          docker compose exec -T nc python manage.py showmigrations --settings=nc.settings.prod || docker exec nc python manage.py showmigrations --settings=nc.settings.prod || echo "⚠️ Could not check migrations"
+          
+          # Sprawdź czy baza jest pusta (czy są tabele)
+          echo "📋 Checking if database is initialized..."
+          docker compose exec -T nc python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || docker exec nc python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
           
           echo "📋 Recent logs (nc):"
           docker compose logs nc --tail 50 || docker logs nc --tail 50 || echo "⚠️ Could not get logs"

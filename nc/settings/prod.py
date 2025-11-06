@@ -13,6 +13,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '209.38.208.114',
+    '212.127.93.27',  # VPS IP
     'app-web-1',  # Nazwa kontenera Docker
     'web',  # Alias kontenera w sieci Docker
     # Dodaj konkretne domeny zamiast '*'
@@ -110,6 +111,10 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1',
     'http://209.38.208.114',
     'https://209.38.208.114',
+    'http://212.127.93.27',
+    'http://212.127.93.27:8000',
+    'http://212.127.93.27:8001',
+    'https://212.127.93.27',
 ]
 CSRF_COOKIE_SECURE = False  # Tymczasowo wyłączone dla HTTP
 CSRF_COOKIE_HTTPONLY = False
