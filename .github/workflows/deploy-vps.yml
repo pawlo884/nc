@@ -10,6 +10,33 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Test SSH connection
+      uses: appleboy/ssh-action@master
+      id: ssh-test
+      continue-on-error: true
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: 22
+        timeout: 30s
+        script: |
+          echo "Testing SSH connection..."
+          whoami
+          echo "✅ SSH connection successful!"
+    
+    - name: Check SSH connection result
+      if: steps.ssh-test.outcome != 'success'
+      run: |
+        echo "❌ SSH connection failed!"
+        echo "Please check:"
+        echo "1. Port 22 is forwarded in router (external port 22 → internal IP:22)"
+        echo "2. Firewall allows port 22 on server"
+        echo "3. SSH service is running on server"
+        echo "4. VPS_HOST secret is correct (public IP or domain)"
+        echo "5. Server is accessible from internet"
+        exit 1
+    
     - name: Deploy to VPS via SSH
       uses: appleboy/ssh-action@master
       with:
@@ -18,6 +45,7 @@ jobs:
         key: ${{ secrets.VPS_SSH_KEY }}
         port: 22
         debug: true
+        timeout: 60s
         command_timeout: 20m
         script: |
           echo "🚀 Starting deployment..."
