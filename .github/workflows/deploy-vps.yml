@@ -72,10 +72,7 @@ jobs:
           echo "📊 Container status:"
           docker compose ps || echo "⚠️ Could not get status!"
           
-          echo "📋 Recent logs (web):"
-          docker compose logs web --tail 30 || echo "⚠️ Could not get logs"
-          
-          echo "📋 Recent logs (nginx):"
-          docker compose logs nginx --tail 30 || echo "⚠️ Could not get logs"
+          echo "📋 Recent logs (nc):"
+          docker compose logs nc --tail 50 || docker logs nc --tail 50 || echo "⚠️ Could not get logs"
           
           echo "✅ Deployment completed!"
