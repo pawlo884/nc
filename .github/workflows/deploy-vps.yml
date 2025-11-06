@@ -42,9 +42,12 @@ jobs:
           
           # Sprawdź status
           echo "📊 Container status:"
-          docker ps | grep nc || echo "⚠️ Container not found!"
+          docker compose ps || echo "⚠️ Could not get status!"
           
-          echo "📋 Recent logs:"
-          docker logs nc --tail 30 || echo "⚠️ Could not get logs"
+          echo "📋 Recent logs (web):"
+          docker compose logs web --tail 30 || echo "⚠️ Could not get logs"
+          
+          echo "📋 Recent logs (nginx):"
+          docker compose logs nginx --tail 30 || echo "⚠️ Could not get logs"
           
           echo "✅ Deployment completed!"
