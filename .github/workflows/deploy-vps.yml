@@ -1,0 +1,50 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Pozwala na ręczne uruchomienie z GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Deploy to VPS via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: 22
+        debug: true
+        command_timeout: 20m
+        script: |
+          echo "🚀 Starting deployment..."
+          
+          # Aktualizuj kod aplikacji
+          cd /home/pawel/apps/nc
+          echo "📥 Pulling latest code..."
+          git fetch origin
+          git reset --hard origin/main
+          
+          # Przejdź do katalogu docker-compose
+          cd /home/pawel/stacks/nc
+          
+          # Przebuduj i zrestartuj kontenery
+          echo "🐳 Rebuilding and restarting containers..."
+          docker compose build --no-cache
+          docker compose up -d --force-recreate
+          
+          # Czekaj aż kontener się uruchomi
+          echo "⏳ Waiting for container to be ready..."
+          sleep 10
+          
+          # Sprawdź status
+          echo "📊 Container status:"
+          docker ps | grep nc || echo "⚠️ Container not found!"
+          
+          echo "📋 Recent logs:"
+          docker logs nc --tail 30 || echo "⚠️ Could not get logs"
+          
+          echo "✅ Deployment completed!"
