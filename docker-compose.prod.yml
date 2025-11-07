@@ -19,6 +19,30 @@ services:
       - nc_network
     user: "1001:1001"
 
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      POSTGRES_USER: ${DEFAULT_DB_USER:-nc}
+      POSTGRES_PASSWORD: ${DEFAULT_DB_PASSWORD:-prod_password}
+      POSTGRES_DB: ${DEFAULT_DB_NAME:-zzz_default}
+      TZ: Europe/Warsaw
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DEFAULT_DB_USER:-nc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/initdb.d:/docker-entrypoint-initdb.d:ro
+    networks:
+      - nc_network
+
   web:
     build:
       context: .
@@ -41,6 +65,7 @@ services:
     networks:
       - nc_network
     depends_on:
+      - postgres
       - redis
       - static-init
     user: "1001:1001"
@@ -90,6 +115,8 @@ services:
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       web:
@@ -126,6 +153,8 @@ services:
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       web:
@@ -160,6 +189,8 @@ services:
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       web:
@@ -217,6 +248,7 @@ services:
       - CELERY_TASK_IGNORE_RESULT=false
       - CELERY_TASK_STORE_EAGER_RESULT=true
     depends_on:
+      - postgres
       - redis
       - celery-default
       - celery-import
