@@ -30,21 +30,17 @@ except ImportError:
 
 urlpatterns = [
     path('i18n/', include('django.conf.urls.i18n')),
-    path('', lambda request: HttpResponse('''
-    <html>
-    <head><title>NC Project</title></head>
-    <body>
-        <h1>NC Project - Django Application</h1>
-        <p>Application is running successfully!</p>
-        <ul>
-            <li><a href="/admin/">Admin Panel</a></li>
-            <li><a href="/mpd/">MPD Application</a></li>
-            <li><a href="/matterhorn1/">Matterhorn1 Application</a></li>
-            <li><a href="/web_agent/">Web Agent Application</a></li>
-        </ul>
-    </body>
-    </html>
-    ''')),
+    path('', lambda request: HttpResponse(
+        '<html><head><title>NC Project</title></head><body>'
+        '<h1>NC Project - Django Application</h1>'
+        '<p>Application is running successfully!</p>'
+        '<ul>'
+        '<li><a href="/admin/">Admin Panel</a></li>'
+        '<li><a href="/mpd/">MPD Application</a></li>'
+        '<li><a href="/matterhorn1/">Matterhorn1 Application</a></li>'
+        '<li><a href="/web_agent/">Web Agent Application</a></li>'
+        '</ul></body></html>'
+    )),
 ]
 
 # Dodaj URL-e drf_spectacular tylko jeśli jest dostępny

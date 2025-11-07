@@ -1,7 +1,11 @@
-# docker-compose.prod.yml - dla produkcji (używa gotowych obrazów z Docker Hub)
+# docker-compose.prod.yml - dla produkcji (VPS)
+# Buduje obraz lokalnie - szybsze wdrożenia, nie wymaga Docker Hub
 services:
   static-init:
-    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: nc-django-app:latest
     command: ["/bin/bash", "-c", "echo '🔧 Zbieranie plików statycznych...' && python manage.py collectstatic --noinput --clear --verbosity 1 && echo '✅ Pliki statyczne zebrane' && ls -la /app/staticfiles/admin/css/ | head -5"]
     volumes:
       - static_volume:/app/staticfiles
@@ -16,8 +20,11 @@ services:
     user: "1001:1001"
 
   web:
-    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
-    command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default --noinput && python manage.py migrate admin_interface --database=default --noinput && python manage.py migrate colorfield --database=default --noinput && python manage.py migrate matterhorn1 --database=matterhorn1 --noinput && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --max-requests 500 --max-requests-jitter 50 --preload --access-logfile - --error-logfile - --log-level info --capture-output"]
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: nc-django-app:latest
+    command: ["/bin/bash", "-c", "python manage.py makemigrations && python manage.py migrate --database=default --noinput && python manage.py migrate admin_interface --database=default --noinput && python manage.py migrate matterhorn1 --database=matterhorn1 --noinput && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class sync --timeout 300 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --preload --access-logfile - --error-logfile - --log-level warning --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30 --limit-request-line 8190 --limit-request-fields 100 --limit-request-field_size 8190"]
     ports:
       - "8000:8000"
     volumes:
@@ -57,7 +64,10 @@ services:
       - nc_network
 
   celery-default:
-    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: nc-django-app:latest
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1 --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat"]
     deploy:
       resources:
@@ -90,7 +100,10 @@ services:
     user: "1001:1001"
 
   celery-import:
-    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: nc-django-app:latest
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat"]
     deploy:
       resources:
@@ -123,7 +136,10 @@ services:
     user: "1001:1001"
 
   celery-beat:
-    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: nc-django-app:latest
     command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery beat --loglevel=info"]
     deploy:
       resources:
@@ -170,8 +186,11 @@ services:
     restart: unless-stopped
 
   flower:
-    image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app:latest
-    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@app-redis-1:6379/0"]
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: nc-django-app:latest
+    command: ["/bin/bash", "-c", "sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30 --broker_api=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0"]
     deploy:
       resources:
         limits:
@@ -194,8 +213,6 @@ services:
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
       - CELERY_TASK_EVENTS=true
-      - CELERY_WORKER_SEND_TASK_EVENTS=true
-      - CELERY_TASK_SEND_SENT_EVENT=true
       - CELERY_TASK_TRACK_STARTED=true
       - CELERY_TASK_IGNORE_RESULT=false
       - CELERY_TASK_STORE_EAGER_RESULT=true

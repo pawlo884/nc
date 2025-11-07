@@ -10,12 +10,17 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Maksymalna liczba pól w formularzu
 
+# Limity dla gunicorn - zwiększone dla stabilności
+GUNICORN_TIMEOUT = 300  # 5 minut
+GUNICORN_KEEPALIVE = 5  # 5 sekund
+GUNICORN_MAX_REQUESTS = 500  # Restart workera po 500 requestach
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv(
     'DJANGO_SECRET_KEY', 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 # Bezpieczniejsza konfiguracja ALLOWED_HOSTS
 ALLOWED_HOSTS = [
@@ -42,7 +47,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '{levelname} {asctime} {module} {process} {thread} {message}',
             'style': '{',
         },
     },
@@ -67,6 +72,16 @@ LOGGING = {
         'django.request': {
             'handlers': ['console'],
             'level': 'ERROR',  # Zmienione na ERROR aby widzieć błędy 500
+            'propagate': False,
+        },
+        'gunicorn.error': {
+            'handlers': ['console'],
+            'level': 'WARNING',  # Loguj błędy gunicorn
+            'propagate': False,
+        },
+        'gunicorn.access': {
+            'handlers': ['console'],
+            'level': 'INFO',
             'propagate': False,
         },
         'django.server': {
@@ -172,18 +187,48 @@ CORS_ALLOWED_ORIGINS = [
 
 # Redis Configuration - wspólne dla Celery i Cache
 # W Dockerze nazwa serwisu Redis to 'redis' (z docker-compose.prod.yml)
-REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
-REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
+# Użyj zmiennych środowiskowych CELERY_BROKER_URL jeśli są ustawione (z docker-compose)
+# W przeciwnym razie użyj REDIS_HOST i REDIS_PASSWORD
+if os.getenv('CELERY_BROKER_URL'):
+    # Workerzy mają ustawione CELERY_BROKER_URL w docker-compose
+    CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')
+    CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', os.getenv('CELERY_BROKER_URL'))
+    # Wyciągnij REDIS_HOST i REDIS_PASSWORD z URL dla cache
+    # Użyj prostego parsowania stringa zamiast regex
+    try:
+        # Format: redis://:password@host:port/db
+        broker_url = CELERY_BROKER_URL
+        if '://:' in broker_url:
+            # Ma hasło
+            parts = broker_url.replace('redis://:', '').split('@', 1)
+            if len(parts) == 2:
+                REDIS_PASSWORD = parts[0]
+                host_part = parts[1].split('/')[0]  # Usuń /db
+                REDIS_HOST = host_part.split(':')[0]  # Usuń :port
+            else:
+                REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+                REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
+        else:
+            # Bez hasła
+            REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+            REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
+    except Exception:
+        # Fallback jeśli parsowanie się nie powiedzie
+        REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+        REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
+else:
+    # Aplikacja web używa REDIS_HOST i REDIS_PASSWORD
+    REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+    REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
+    CELERY_BROKER_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0'
+    CELERY_RESULT_BACKEND = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0'
 
 # Debug: sprawdź czy zmienne są załadowane (tylko jeśli DEBUG=True)
 if DEBUG:
     import logging
     logger = logging.getLogger(__name__)
+    logger.info(f"Celery Configuration: BROKER_URL={CELERY_BROKER_URL[:30]}..., RESULT_BACKEND={CELERY_RESULT_BACKEND[:30]}...")
     logger.info(f"Redis Configuration: HOST={REDIS_HOST}, PASSWORD={'***' if REDIS_PASSWORD else 'NOT SET'}")
-
-# Celery Configuration
-CELERY_BROKER_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0'
-CELERY_RESULT_BACKEND = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'

@@ -56,31 +56,34 @@ jobs:
           git fetch origin
           git reset --hard origin/main
           
-          # Przejdź do katalogu docker-compose
-          cd /home/pawel/stacks/nc
-          
-          # Przebuduj i zrestartuj kontenery
+          # Przebuduj i zrestartuj kontenery (używa docker-compose.prod.yml)
+          # Używamy BuildKit dla lepszej wydajności i cache'owania
           echo "🐳 Rebuilding and restarting containers..."
-          docker compose build --no-cache
-          docker compose up -d --force-recreate
+          export DOCKER_BUILDKIT=1
+          export COMPOSE_DOCKER_CLI_BUILD=1
+          docker-compose -f docker-compose.prod.yml build --no-cache
+          docker-compose -f docker-compose.prod.yml up -d --force-recreate
           
           # Czekaj aż kontener się uruchomi
-          echo "⏳ Waiting for container to be ready..."
-          sleep 15
+          echo "⏳ Waiting for containers to be ready..."
+          sleep 20
+          
+          # Migracje są już w komendzie startowej web, ale sprawdzamy czy się wykonały
+          echo "🔄 Checking if migrations completed..."
           
           # Sprawdź status
           echo "📊 Container status:"
-          docker compose ps || echo "⚠️ Could not get status!"
+          docker-compose -f docker-compose.prod.yml ps || echo "⚠️ Could not get status!"
           
           # Sprawdź migracje i bazę danych
           echo "🗄️ Checking database migrations..."
-          docker compose exec -T nc python manage.py showmigrations --settings=nc.settings.prod || docker exec nc python manage.py showmigrations --settings=nc.settings.prod || echo "⚠️ Could not check migrations"
+          docker-compose -f docker-compose.prod.yml exec -T web python manage.py showmigrations --settings=nc.settings.prod || echo "⚠️ Could not check migrations"
           
           # Sprawdź czy baza jest pusta (czy są tabele)
           echo "📋 Checking if database is initialized..."
-          docker compose exec -T nc python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || docker exec nc python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
+          docker-compose -f docker-compose.prod.yml exec -T web python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
           
-          echo "📋 Recent logs (nc):"
-          docker compose logs nc --tail 50 || docker logs nc --tail 50 || echo "⚠️ Could not get logs"
+          echo "📋 Recent logs (web):"
+          docker-compose -f docker-compose.prod.yml logs web --tail 50 || echo "⚠️ Could not get logs"
           
           echo "✅ Deployment completed!"
