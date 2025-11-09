@@ -425,3 +425,31 @@ try:
     }
 except ImportError:
     SPECTACULAR_SETTINGS = {}
+
+# Storage configuration (MinIO / S3-compatible)
+if os.getenv('AWS_STORAGE_BUCKET_NAME'):
+    try:
+        import storages  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        if 'storages' not in INSTALLED_APPS:
+            INSTALLED_APPS.append('storages')
+
+        DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+        AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+        AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+        AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-1')
+        AWS_S3_ENDPOINT_URL = os.getenv('AWS_S3_ENDPOINT_URL')
+        AWS_S3_ADDRESSING_STYLE = os.getenv('AWS_S3_ADDRESSING_STYLE', 'path')
+        AWS_S3_SIGNATURE_VERSION = os.getenv('AWS_S3_SIGNATURE_VERSION', 's3v4')
+        AWS_S3_VERIFY = os.getenv('AWS_S3_VERIFY', 'true').lower() == 'true'
+        AWS_DEFAULT_ACL = os.getenv('AWS_DEFAULT_ACL') or None
+        AWS_QUERYSTRING_AUTH = os.getenv('AWS_QUERYSTRING_AUTH', 'false').lower() == 'true'
+
+        if AWS_S3_ENDPOINT_URL and AWS_STORAGE_BUCKET_NAME:
+            MEDIA_URL = os.getenv(
+                'MEDIA_URL',
+                f"{AWS_S3_ENDPOINT_URL.rstrip('/')}/{AWS_STORAGE_BUCKET_NAME}/"
+            )
