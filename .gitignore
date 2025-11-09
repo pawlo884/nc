@@ -26,3 +26,4 @@ MPD_test/*
 # statyczne pliki Django
 staticfiles/
 static/
+.env.dev1
