@@ -33,12 +33,23 @@ services:
       - PYTHONUNBUFFERED=1
       - DJANGO_DEBUG=1
       - REDIS_PASSWORD=dev_password
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-ncadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-ncadminpass}
+      - AWS_STORAGE_BUCKET_NAME=${S3_BUCKET_NAME:-nc-media}
+      - AWS_S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://minio:9000}
+      - AWS_S3_REGION_NAME=${S3_REGION_NAME:-us-east-1}
+      - AWS_S3_ADDRESSING_STYLE=${S3_ADDRESSING_STYLE:-path}
+      - AWS_S3_VERIFY=${S3_VERIFY_SSL:-false}
     restart: always
     networks:
       - app_network
     depends_on:
-      - redis
-      - static-init
+      redis:
+        condition: service_started
+      static-init:
+        condition: service_completed_successfully
+      minio-setup:
+        condition: service_completed_successfully
     user: "1001:1001"
 
   nginx:
@@ -78,9 +89,20 @@ services:
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-ncadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-ncadminpass}
+      - AWS_STORAGE_BUCKET_NAME=${S3_BUCKET_NAME:-nc-media}
+      - AWS_S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://minio:9000}
+      - AWS_S3_REGION_NAME=${S3_REGION_NAME:-us-east-1}
+      - AWS_S3_ADDRESSING_STYLE=${S3_ADDRESSING_STYLE:-path}
+      - AWS_S3_VERIFY=${S3_VERIFY_SSL:-false}
     depends_on:
-      - web
-      - redis
+      web:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
     restart: always
     networks:
       - app_network
@@ -107,9 +129,20 @@ services:
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-ncadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-ncadminpass}
+      - AWS_STORAGE_BUCKET_NAME=${S3_BUCKET_NAME:-nc-media}
+      - AWS_S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://minio:9000}
+      - AWS_S3_REGION_NAME=${S3_REGION_NAME:-us-east-1}
+      - AWS_S3_ADDRESSING_STYLE=${S3_ADDRESSING_STYLE:-path}
+      - AWS_S3_VERIFY=${S3_VERIFY_SSL:-false}
     depends_on:
-      - web
-      - redis
+      web:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
     restart: always
     networks:
       - app_network
@@ -130,9 +163,20 @@ services:
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-ncadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-ncadminpass}
+      - AWS_STORAGE_BUCKET_NAME=${S3_BUCKET_NAME:-nc-media}
+      - AWS_S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://minio:9000}
+      - AWS_S3_REGION_NAME=${S3_REGION_NAME:-us-east-1}
+      - AWS_S3_ADDRESSING_STYLE=${S3_ADDRESSING_STYLE:-path}
+      - AWS_S3_VERIFY=${S3_VERIFY_SSL:-false}
     depends_on:
-      - web
-      - redis
+      web:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
     restart: always
     networks:
       - app_network
@@ -167,12 +211,56 @@ services:
       - CELERY_TASK_IGNORE_RESULT=false
       - CELERY_TASK_STORE_EAGER_RESULT=true
       - FLOWER_UNAUTHENTICATED_API=true
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-ncadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-ncadminpass}
+      - AWS_STORAGE_BUCKET_NAME=${S3_BUCKET_NAME:-nc-media}
+      - AWS_S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://minio:9000}
+      - AWS_S3_REGION_NAME=${S3_REGION_NAME:-us-east-1}
+      - AWS_S3_ADDRESSING_STYLE=${S3_ADDRESSING_STYLE:-path}
+      - AWS_S3_VERIFY=${S3_VERIFY_SSL:-false}
     depends_on:
-      - redis
-      - celery-default
+      redis:
+        condition: service_started
+      celery-default:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
     networks:
       - app_network
     user: "1001:1001"
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T10-31-44Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ncadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ncadminpass}
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL:-http://localhost:9001}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - app_network
+
+  minio-setup:
+    image: minio/mc:RELEASE.2024-12-18T10-31-44Z
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ncadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ncadminpass}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-nc-media}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set minio http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
+        sleep 5;
+      done;
+      mc mb -p minio/$$S3_BUCKET_NAME || true;
+      "
+    networks:
+      - app_network
 
   redis:
     image: redis:7.2-alpine
@@ -195,6 +283,7 @@ volumes:
   flower_data:
   nginx_logs:
     driver: local
+  minio_data:
 
 networks:
   app_network:
