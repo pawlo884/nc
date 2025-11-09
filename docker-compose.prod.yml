@@ -305,7 +305,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ncadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ncadminpass}
-      MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL:-http://212.127.93.27:9001}
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL:-http://minio:9001}
     volumes:
       - minio_data:/data
     ports:

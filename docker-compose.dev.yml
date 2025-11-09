@@ -44,9 +44,12 @@ services:
     networks:
       - app_network
     depends_on:
-      - redis
-      - static-init
-      - minio-setup
+      redis:
+        condition: service_started
+      static-init:
+        condition: service_completed_successfully
+      minio-setup:
+        condition: service_completed_successfully
     user: "1001:1001"
 
   nginx:
@@ -94,9 +97,12 @@ services:
       - AWS_S3_ADDRESSING_STYLE=${S3_ADDRESSING_STYLE:-path}
       - AWS_S3_VERIFY=${S3_VERIFY_SSL:-false}
     depends_on:
-      - web
-      - redis
-      - minio-setup
+      web:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
     restart: always
     networks:
       - app_network
@@ -131,9 +137,12 @@ services:
       - AWS_S3_ADDRESSING_STYLE=${S3_ADDRESSING_STYLE:-path}
       - AWS_S3_VERIFY=${S3_VERIFY_SSL:-false}
     depends_on:
-      - web
-      - redis
-      - minio-setup
+      web:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
     restart: always
     networks:
       - app_network
@@ -162,9 +171,12 @@ services:
       - AWS_S3_ADDRESSING_STYLE=${S3_ADDRESSING_STYLE:-path}
       - AWS_S3_VERIFY=${S3_VERIFY_SSL:-false}
     depends_on:
-      - web
-      - redis
-      - minio-setup
+      web:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
     restart: always
     networks:
       - app_network
@@ -207,9 +219,12 @@ services:
       - AWS_S3_ADDRESSING_STYLE=${S3_ADDRESSING_STYLE:-path}
       - AWS_S3_VERIFY=${S3_VERIFY_SSL:-false}
     depends_on:
-      - redis
-      - celery-default
-      - minio-setup
+      redis:
+        condition: service_started
+      celery-default:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
     networks:
       - app_network
     user: "1001:1001"
