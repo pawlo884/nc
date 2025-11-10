@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'django_celery_results',
     'debug_toolbar',
     'rest_framework',
+    'rest_framework.authtoken',
     # 'matterhorn',  # usunięta stara aplikacja
     'MPD',
     'web_agent',
@@ -392,6 +393,22 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',
         'rest_framework.parsers.FormParser',
     ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '1000/day',
+        'anon': '100/day',
+        'bulk': '60/min',
+    },
 }
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny

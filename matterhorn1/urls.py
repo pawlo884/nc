@@ -1,5 +1,5 @@
 from django.urls import path, include
-from . import views
+from . import views, views_secure
 
 app_name = 'matterhorn1'
 
@@ -12,6 +12,10 @@ urlpatterns = [
              name='product_bulk_create'),
         path('products/bulk/update/', views.ProductBulkUpdateView.as_view(),
              name='product_bulk_update'),
+        path('products/bulk/create-secure/', views_secure.ProductBulkCreateAPI.as_view(),
+             name='product_bulk_create_secure'),
+        path('products/bulk/update-secure/', views_secure.ProductBulkUpdateAPI.as_view(),
+             name='product_bulk_update_secure'),
 
         # Bulk operations dla wariantów
         path('variants/bulk/', views.VariantBulkView.as_view(), name='variant_bulk'),
@@ -19,25 +23,36 @@ urlpatterns = [
              name='variant_bulk_create'),
         path('variants/bulk/update/', views.VariantBulkUpdateView.as_view(),
              name='variant_bulk_update'),
+        path('variants/bulk/create-secure/', views_secure.VariantBulkCreateAPI.as_view(),
+             name='variant_bulk_create_secure'),
+        path('variants/bulk/update-secure/', views_secure.VariantBulkUpdateAPI.as_view(),
+             name='variant_bulk_update_secure'),
 
         # Bulk operations dla marek
         path('brands/bulk/', views.BrandBulkView.as_view(), name='brand_bulk'),
         path('brands/bulk/create/', views.BrandBulkCreateView.as_view(),
              name='brand_bulk_create'),
+        path('brands/bulk/create-secure/', views_secure.BrandBulkCreateAPI.as_view(),
+             name='brand_bulk_create_secure'),
 
         # Bulk operations dla kategorii
         path('categories/bulk/', views.CategoryBulkView.as_view(),
              name='category_bulk'),
         path('categories/bulk/create/',
              views.CategoryBulkCreateView.as_view(), name='category_bulk_create'),
+        path('categories/bulk/create-secure/',
+             views_secure.CategoryBulkCreateAPI.as_view(), name='category_bulk_create_secure'),
 
         # Bulk operations dla obrazów
         path('images/bulk/', views.ImageBulkView.as_view(), name='image_bulk'),
         path('images/bulk/create/', views.ImageBulkCreateView.as_view(),
              name='image_bulk_create'),
+        path('images/bulk/create-secure/', views_secure.ImageBulkCreateAPI.as_view(),
+             name='image_bulk_create_secure'),
 
         # Synchronizacja z API
         path('sync/', views.APISyncView.as_view(), name='api_sync'),
+        path('sync/secure/', views_secure.APISyncAPI.as_view(), name='api_sync_secure'),
         path('sync/products/', views.ProductSyncView.as_view(), name='product_sync'),
         path('sync/variants/', views.VariantSyncView.as_view(), name='variant_sync'),
 
