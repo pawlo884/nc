@@ -20,13 +20,12 @@ SECRET_KEY = os.getenv(
     'DJANGO_SECRET_KEY', 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 # Bezpieczniejsza konfiguracja ALLOWED_HOSTS
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
-    '209.38.208.114',
     '212.127.93.27',  # VPS IP
     'app-web-1',  # Nazwa kontenera Docker
     'web',  # Alias kontenera w sieci Docker
@@ -147,7 +146,7 @@ MIDDLEWARE = [
 
 # Security settings for production
 SECURE_SSL_REDIRECT = False  # Tymczasowo wyłączone, ponieważ nie mamy jeszcze HTTPS
-SESSION_COOKIE_SECURE = False  # Tymczasowo wyłączone
+SESSION_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = None  # Tymczasowo wyłączone
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
@@ -162,16 +161,12 @@ SECURE_PROXY_SSL_HEADER = None
 
 # CSRF Configuration
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost',
-    'http://127.0.0.1',
-    'http://209.38.208.114',
-    'https://209.38.208.114',
     'http://212.127.93.27',
     'http://212.127.93.27:8000',
     'http://212.127.93.27:8001',
     'https://212.127.93.27',
 ]
-CSRF_COOKIE_SECURE = False  # Tymczasowo wyłączone dla HTTP
+CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
 
@@ -318,6 +313,22 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',
         'rest_framework.parsers.FormParser',
     ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '1000/day',
+        'anon': '100/day',
+        'bulk': '60/min',
+    },
 }
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
