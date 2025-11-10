@@ -27,3 +27,4 @@ MPD_test/*
 staticfiles/
 static/
 .env.dev1
+backups/*

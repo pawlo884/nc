@@ -1,3 +1,6 @@
+import os
+
+
 class MPDRouter:
     """
     Router dla aplikacji MPD
@@ -5,22 +8,20 @@ class MPDRouter:
 
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'MPD':
-            # Na produkcji używaj 'MPD', lokalnie 'zzz_MPD'
             from django.conf import settings
+            if os.getenv('DJANGO_ENV') == 'prod' and 'MPD' in settings.DATABASES:
+                return 'MPD'
             if 'zzz_MPD' in settings.DATABASES:
                 return 'zzz_MPD'
-            elif 'MPD' in settings.DATABASES:
-                return 'MPD'
         return None
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label == 'MPD':
-            # Na produkcji używaj 'MPD', lokalnie 'zzz_MPD'
             from django.conf import settings
+            if os.getenv('DJANGO_ENV') == 'prod' and 'MPD' in settings.DATABASES:
+                return 'MPD'
             if 'zzz_MPD' in settings.DATABASES:
                 return 'zzz_MPD'
-            elif 'MPD' in settings.DATABASES:
-                return 'MPD'
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -31,12 +32,11 @@ class MPDRouter:
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'MPD':
-            # Na produkcji używaj 'MPD', lokalnie 'zzz_MPD'
             from django.conf import settings
+            if os.getenv('DJANGO_ENV') == 'prod' and 'MPD' in settings.DATABASES:
+                return db == 'MPD'
             if 'zzz_MPD' in settings.DATABASES:
                 return db == 'zzz_MPD'
-            elif 'MPD' in settings.DATABASES:
-                return db == 'MPD'
         return None
 
 
