@@ -19,6 +19,7 @@ __pycache__/
 .env.prod
 .vscode/
 celerybeat-schedule
+node_modules/
 
 # pliki .xml
 MPD_test/*
@@ -28,3 +29,4 @@ staticfiles/
 static/
 .env.dev1
 backups/*
+..env.prod
