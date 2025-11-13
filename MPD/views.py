@@ -15,7 +15,7 @@ from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter
 import logging
 from django.http import HttpResponse
 import requests
-from matterhorn1.defs_db import DO_SPACES_BUCKET, DO_SPACES_REGION
+from matterhorn1.defs_db import BUCKET_PUBLIC_BASE_URL, resolve_image_url
 from django.urls import reverse
 
 from django.views.decorators.csrf import csrf_exempt
@@ -213,7 +213,11 @@ XML_FILES = [
     "full", "full_change", "light", "categories", "sizes", "producers", "units", "parameters", "stocks", "series", "warranties", "preset"
 ]
 
-BUCKET_URL = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/matterhorn/"
+XML_BUCKET_PREFIX = "MPD_test/xml/matterhorn/"
+if BUCKET_PUBLIC_BASE_URL:
+    BUCKET_URL = f"{BUCKET_PUBLIC_BASE_URL.rstrip('/')}/{XML_BUCKET_PREFIX}"
+else:
+    BUCKET_URL = None
 XML_FILE_MAP = {
     "full": "full.xml",
     "full_change": "full_change.xml",
@@ -233,6 +237,8 @@ XML_FILE_MAP = {
 def get_xml_file(request, xml_type):
     if xml_type not in XML_FILE_MAP:
         return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy typ XML'}, status=404)
+    if not BUCKET_URL:
+        return JsonResponse({'status': 'error', 'message': 'Brak konfiguracji MinIO/S3 dla plików XML'}, status=500)
     file_url = BUCKET_URL + XML_FILE_MAP[xml_type]
     try:
         resp = requests.get(file_url)
@@ -251,6 +257,8 @@ def get_gateway_xml(request):
     source_name = request.GET.get('source')
     if not source_name:
         return JsonResponse({'status': 'error', 'message': 'Brak parametru source'}, status=400)
+    if not BUCKET_URL:
+        return JsonResponse({'status': 'error', 'message': 'Brak konfiguracji MinIO/S3 dla plików XML'}, status=500)
     file_url = BUCKET_URL + "gateway.xml"
     try:
         resp = requests.get(file_url)
@@ -1450,10 +1458,9 @@ def get_matterhorn1_products(request):
 
             # Pobierz obrazy
             images = []
-            for image in product.images.all().order_by('order'):
+            for image in product.images.all():
                 images.append({
-                    'image_url': image.image_url,
-                    'order': image.order
+                    'image_url': resolve_image_url(image.file_path) or image.file_path
                 })
 
             products_data.append({

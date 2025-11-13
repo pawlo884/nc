@@ -1,6 +1,6 @@
 import os
 import hashlib
-from matterhorn1.defs_db import s3_client, DO_SPACES_BUCKET, DO_SPACES_REGION
+from matterhorn1.defs_db import s3_client, S3_BUCKET, BUCKET_PUBLIC_BASE_URL, resolve_image_url
 import logging
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
@@ -118,13 +118,16 @@ class BaseXMLExporter:
             with open(local_file_path, 'rb') as f:
                 file_data = f.read()
             s3_client.put_object(
-                Bucket=DO_SPACES_BUCKET,
+                Bucket=S3_BUCKET,
                 Key=bucket_path,
                 Body=file_data,
                 ContentType='application/xml',
                 ACL='public-read'
             )
-            file_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/{bucket_path}"
+            if BUCKET_PUBLIC_BASE_URL:
+                file_url = f"{BUCKET_PUBLIC_BASE_URL.rstrip('/')}/{bucket_path}"
+            else:
+                file_url = None
             logger.info(
                 f"Plik XML został pomyślnie przesłany do bucketa: {file_url}")
             return file_url
@@ -470,8 +473,9 @@ class FullXMLExporter(BaseXMLExporter):
                 xml.append('      <images>')
                 xml.append('        <large>')
                 for img in images:
+                    image_url = resolve_image_url(img.file_path) or img.file_path
                     xml.append(
-                        f'          <image url="{escape(img.file_path)}"/>')
+                        f'          <image url="{escape(image_url)}"/>')
                 xml.append('        </large>')
                 xml.append('      </images>')
 
@@ -2396,8 +2400,9 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 xml.append('      <images>')
                 xml.append('        <large>')
                 for img in images:
+                    image_url = resolve_image_url(img.file_path) or img.file_path
                     xml.append(
-                        f'          <image url="{escape(img.file_path)}"/>')
+                        f'          <image url="{escape(image_url)}"/>')
                 xml.append('        </large>')
                 xml.append('      </images>')
 

@@ -115,7 +115,7 @@ class ProductImage(models.Model):
     """Model dla obrazów produktów"""
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name='images')
-    image_url = models.URLField(max_length=1000)
+    image_url = models.CharField(max_length=1000)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -4,6 +4,7 @@ from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.cache import cache
 from .stock_tracker import track_stock_change, track_bulk_stock_changes, sync_stock_changes_from_api
+from .defs_db import normalize_storage_key
 
 logger = get_task_logger(__name__)
 
@@ -939,7 +940,7 @@ def _prepare_product_create(item):
         product._images_to_create = []
         for i, image_url in enumerate(item['images']):
             product._images_to_create.append({
-                'image_url': image_url,
+                'image_url': normalize_storage_key(image_url),
                 'order': i
             })
 
@@ -1027,7 +1028,7 @@ def _prepare_product_update(product, item):
         product._images_to_create = []
         for i, image_url in enumerate(item['images']):
             product._images_to_create.append({
-                'image_url': image_url,
+                'image_url': normalize_storage_key(image_url),
                 'order': i
             })
 
@@ -1596,48 +1597,51 @@ def watchdog_import_healthcheck(self):
     Uruchamiany co 5 minut przez Celery Beat.
     """
     logger.info("🔍 Watchdog: Sprawdzam i czyszczę stare blokady importu")
-    
+
     try:
         from matterhorn1.models import ApiSyncLog
         import datetime
-        
+
         # Wyczyść stare running rekordy (starsze niż 2 godziny)
         cleaned_running = _cleanup_old_running_imports()
-        
+
         # Sprawdź ghost taski - taski w statusie 'running' bez postępu
         ghost_tasks_cleaned = 0
         from django.utils import timezone
-        
+
         # Znajdź taski w statusie 'running' starsze niż 15 minut
         cutoff_time = timezone.now() - datetime.timedelta(minutes=15)
         running_tasks = ApiSyncLog.objects.filter(
             status='running',
             started_at__lt=cutoff_time
         )
-        
+
         for task in running_tasks:
-            task_age_minutes = (timezone.now() - task.started_at).total_seconds() / 60
-            
+            task_age_minutes = (
+                timezone.now() - task.started_at).total_seconds() / 60
+
             if task_age_minutes > 15:
                 # Task starszy niż 15 minut - sprawdź czy wartości się zmieniają
-                
+
                 # Sprawdź czy task ma jakiekolwiek wartości
                 has_any_values = (
-                    task.records_created > 0 or 
-                    task.records_updated > 0 or 
+                    task.records_created > 0 or
+                    task.records_updated > 0 or
                     task.records_errors > 0 or
                     task.current_page > 1
                 )
-                
+
                 if not has_any_values:
                     # Ghost task - brak jakichkolwiek wartości przez 15+ minut
                     task.status = 'error'
                     task.completed_at = timezone.now()
                     task.error_details = 'Ghost task - brak postępu przez 15 minut'
-                    task.duration_seconds = (task.completed_at - task.started_at).total_seconds()
+                    task.duration_seconds = (
+                        task.completed_at - task.started_at).total_seconds()
                     task.save()
-                    
-                    logger.warning(f"🧹 Watchdog: Oznaczono ghost task ID {task.id} jako failed (brak wartości)")
+
+                    logger.warning(
+                        f"🧹 Watchdog: Oznaczono ghost task ID {task.id} jako failed (brak wartości)")
                     ghost_tasks_cleaned += 1
                 else:
                     # Task ma wartości - sprawdź czy się nie zawiesił
@@ -1646,7 +1650,7 @@ def watchdog_import_healthcheck(self):
                         # Sprawdź czy wartości się zmieniają - porównaj z cache
                         cache_key = f'watchdog_task_{task.id}_last_values'
                         last_values = cache.get(cache_key)
-                        
+
                         if last_values:
                             # Porównaj z poprzednimi wartościami
                             current_values = {
@@ -1655,7 +1659,7 @@ def watchdog_import_healthcheck(self):
                                 'records_errors': task.records_errors,
                                 'current_page': task.current_page
                             }
-                            
+
                             # Sprawdź czy wartości się zmieniły
                             values_changed = (
                                 current_values['records_created'] != last_values['records_created'] or
@@ -1663,20 +1667,23 @@ def watchdog_import_healthcheck(self):
                                 current_values['records_errors'] != last_values['records_errors'] or
                                 current_values['current_page'] != last_values['current_page']
                             )
-                            
+
                             if not values_changed:
                                 # Wartości się nie zmieniły - ghost task
                                 task.status = 'error'
                                 task.completed_at = timezone.now()
                                 task.error_details = f'Ghost task - brak postępu przez {int(task_age_minutes)} minut (created: {task.records_created}, page: {task.current_page})'
-                                task.duration_seconds = (task.completed_at - task.started_at).total_seconds()
+                                task.duration_seconds = (
+                                    task.completed_at - task.started_at).total_seconds()
                                 task.save()
-                                
-                                logger.warning(f"🧹 Watchdog: Oznaczono ghost task ID {task.id} jako failed (brak postępu przez {int(task_age_minutes)} min)")
+
+                                logger.warning(
+                                    f"🧹 Watchdog: Oznaczono ghost task ID {task.id} jako failed (brak postępu przez {int(task_age_minutes)} min)")
                                 ghost_tasks_cleaned += 1
                             else:
                                 # Wartości się zmieniły - task pracuje
-                                logger.info(f"✅ Watchdog: Task ID {task.id} pracuje - wartości się zmieniają (created: {task.records_created}, page: {task.current_page})")
+                                logger.info(
+                                    f"✅ Watchdog: Task ID {task.id} pracuje - wartości się zmieniają (created: {task.records_created}, page: {task.current_page})")
                         else:
                             # Pierwszy raz sprawdzamy - zapisz wartości do cache
                             current_values = {
@@ -1685,15 +1692,19 @@ def watchdog_import_healthcheck(self):
                                 'records_errors': task.records_errors,
                                 'current_page': task.current_page
                             }
-                            cache.set(cache_key, current_values, 3600)  # 1 godzina
-                            logger.info(f"📝 Watchdog: Zapisałem wartości dla task ID {task.id} do porównania")
+                            cache.set(cache_key, current_values,
+                                      3600)  # 1 godzina
+                            logger.info(
+                                f"📝 Watchdog: Zapisałem wartości dla task ID {task.id} do porównania")
                     else:
                         # Task ma wartości i jest młodszy niż 20 minut - prawdopodobnie pracuje
-                        logger.info(f"✅ Watchdog: Task ID {task.id} pracuje (created: {task.records_created}, page: {task.current_page}, age: {int(task_age_minutes)} min)")
+                        logger.info(
+                            f"✅ Watchdog: Task ID {task.id} pracuje (created: {task.records_created}, page: {task.current_page}, age: {int(task_age_minutes)} min)")
             else:
                 # Task młodszy niż 15 minut - prawdopodobnie pracuje
-                logger.info(f"✅ Watchdog: Task ID {task.id} młody ({int(task_age_minutes)} min) - prawdopodobnie pracuje")
-        
+                logger.info(
+                    f"✅ Watchdog: Task ID {task.id} młody ({int(task_age_minutes)} min) - prawdopodobnie pracuje")
+
         # Wyczyść cache blokady jeśli są stare
         lock_id = 'matterhorn1_full_import_lock'
         current_lock = cache.get(lock_id)
@@ -1704,25 +1715,29 @@ def watchdog_import_healthcheck(self):
                 result = AsyncResult(current_lock)
                 if result.state in ['PENDING', 'RETRY']:
                     # Task nadal istnieje - nie ruszaj blokady
-                    logger.info(f"🔒 Watchdog: Blokada aktywna (task: {current_lock})")
+                    logger.info(
+                        f"🔒 Watchdog: Blokada aktywna (task: {current_lock})")
                 else:
                     # Task nie istnieje - wyczyść blokadę
                     cache.delete(lock_id)
-                    logger.info(f"🧹 Watchdog: Usunięto starą blokadę (task: {current_lock})")
+                    logger.info(
+                        f"🧹 Watchdog: Usunięto starą blokadę (task: {current_lock})")
             except Exception:
                 # Nie można sprawdzić task - wyczyść blokadę
                 cache.delete(lock_id)
-                logger.info(f"🧹 Watchdog: Usunięto nieznaną blokadę (task: {current_lock})")
-        
-        logger.info(f"✅ Watchdog: Zakończono czyszczenie (running: {cleaned_running}, ghost: {ghost_tasks_cleaned})")
-        
+                logger.info(
+                    f"🧹 Watchdog: Usunięto nieznaną blokadę (task: {current_lock})")
+
+        logger.info(
+            f"✅ Watchdog: Zakończono czyszczenie (running: {cleaned_running}, ghost: {ghost_tasks_cleaned})")
+
         return {
             'status': 'success',
             'cleaned_running': cleaned_running,
             'ghost_tasks_cleaned': ghost_tasks_cleaned,
             'lock_cleaned': current_lock is not None
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Watchdog: Błąd podczas czyszczenia: {e}")
         return {

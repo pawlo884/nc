@@ -1,5 +1,6 @@
 # pylint: disable=wrong-import-order
 import os
+from urllib.parse import urlsplit
 from dotenv import load_dotenv
 import boto3
 import logging
@@ -10,24 +11,98 @@ logger = logging.getLogger(__name__)
 # Załaduj zmienne środowiskowe
 load_dotenv('.env.dev')
 
-# Konfiguracja S3 (DigitalOcean Spaces)
+# Konfiguracja S3 (MinIO / S3-compatible)
+MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT')
+MINIO_BUCKET_NAME = os.getenv('MINIO_BUCKET_NAME')
+MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY')
+MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY')
+MINIO_REGION = os.getenv('MINIO_REGION', 'us-east-1')
+MINIO_PUBLIC_URL = os.getenv('MINIO_PUBLIC_URL')
+
 DO_SPACES_BUCKET = os.getenv('DO_SPACES_BUCKET')
 DO_SPACES_REGION = os.getenv('DO_SPACES_REGION')
-DO_SPACES_ACCESS_KEY_ID = os.getenv('DO_SPACES_KEY')
+DO_SPACES_ACCESS_KEY_ID = os.getenv('DO_SPACES_KEY') or os.getenv(
+    'DO_SPACES_ACCESS_KEY_ID')
 DO_SPACES_SECRET = os.getenv('DO_SPACES_SECRET')
 
-# Inicjalizacja klienta S3
-s3_client = boto3.client('s3',
-                         region_name=DO_SPACES_REGION,
-                         endpoint_url=f'https://{DO_SPACES_REGION}.digitaloceanspaces.com',
-                         aws_access_key_id=DO_SPACES_ACCESS_KEY_ID,
-                         aws_secret_access_key=DO_SPACES_SECRET
-                         )
+if MINIO_ENDPOINT and MINIO_ACCESS_KEY and MINIO_SECRET_KEY:
+    S3_BUCKET = MINIO_BUCKET_NAME or 'nc-media'
+    S3_REGION = MINIO_REGION
+    S3_ENDPOINT = MINIO_ENDPOINT.rstrip('/')
+    S3_ACCESS_KEY = MINIO_ACCESS_KEY
+    S3_SECRET = MINIO_SECRET_KEY
+    PUBLIC_BASE_URL = (
+        MINIO_PUBLIC_URL.rstrip('/')
+        if MINIO_PUBLIC_URL
+        else f"{S3_ENDPOINT}/{S3_BUCKET}"
+    )
+else:
+    S3_BUCKET = DO_SPACES_BUCKET
+    S3_REGION = DO_SPACES_REGION or 'us-east-1'
+    S3_ENDPOINT = (
+        f'https://{DO_SPACES_REGION}.digitaloceanspaces.com'
+        if DO_SPACES_REGION else None
+    )
+    S3_ACCESS_KEY = DO_SPACES_ACCESS_KEY_ID
+    S3_SECRET = DO_SPACES_SECRET
+    PUBLIC_BASE_URL = (
+        f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com"
+        if DO_SPACES_BUCKET and DO_SPACES_REGION else None
+    )
+
+if not all([S3_BUCKET, S3_ACCESS_KEY, S3_SECRET]):
+    raise RuntimeError(
+        "Brak wymaganej konfiguracji MinIO/S3. Ustaw MINIO_* lub DO_SPACES_* w pliku .env."
+    )
+
+BUCKET_PUBLIC_BASE_URL = PUBLIC_BASE_URL
+
+
+def normalize_storage_key(url: str) -> str:
+    """Zastąp pełny URL relatywną ścieżką wewnątrz bucketa (bez prefiksu bucket name)."""
+    if not url:
+        return url
+    if url.startswith(('http://', 'https://')):
+        parts = urlsplit(url)
+        path = parts.path.lstrip('/')
+    else:
+        path = url.lstrip('/')
+    
+    # Usuń prefiks nazwy bucketa jeśli jest w ścieżce
+    bucket_name = S3_BUCKET
+    if path.startswith(f'{bucket_name}/'):
+        path = path[len(f'{bucket_name}/'):]
+    
+    return path
+
+
+def build_public_url(key: str) -> str | None:
+    """Zwróć publiczny URL dla klucza w buckecie."""
+    if not key:
+        return None
+    if key.startswith(('http://', 'https://')):
+        return key
+    if BUCKET_PUBLIC_BASE_URL:
+        return f"{BUCKET_PUBLIC_BASE_URL.rstrip('/')}/{key.lstrip('/')}"
+    return None
+
+
+def resolve_image_url(value: str) -> str | None:
+    """Zwróć publiczny URL niezależnie od tego, czy w bazie jest pełny adres czy klucz."""
+    return build_public_url(normalize_storage_key(value))
+
+s3_client = boto3.client(
+    's3',
+    region_name=S3_REGION,
+    endpoint_url=S3_ENDPOINT,
+    aws_access_key_id=S3_ACCESS_KEY,
+    aws_secret_access_key=S3_SECRET
+)
 
 
 def upload_image_to_bucket_and_get_url(image_path, product_id, producer_color_name=None, image_number=1):
     """
-    Upload obrazu do DigitalOcean Spaces bucket
+    Upload obrazu do bucketa S3 kompatybilnego z MinIO
 
     Args:
         image_path (str): URL lub ścieżka do obrazu
@@ -100,7 +175,7 @@ def upload_image_to_bucket_and_get_url(image_path, product_id, producer_color_na
         logger.info(f"Przesyłanie pliku do S3: {new_path}")
         try:
             s3_client.put_object(
-                Bucket=DO_SPACES_BUCKET,
+                Bucket=S3_BUCKET,
                 Key=new_path,
                 Body=file_data,
                 ContentType=f'image/{file_extension[1:]}',
@@ -112,9 +187,10 @@ def upload_image_to_bucket_and_get_url(image_path, product_id, producer_color_na
             return None
 
         # Zwróć URL
-        file_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/{new_path}"
+        file_key = normalize_storage_key(new_path)
+        file_url = build_public_url(file_key)
         logger.info(f"Wygenerowany URL pliku: {file_url}")
-        return file_url
+        return file_key
 
     except Exception as e:
         logger.error(f"Błąd podczas przesyłania pliku do S3: {str(e)}")
@@ -136,12 +212,12 @@ def delete_product_folder_from_bucket(product_id):
 
         # Pobierz listę obiektów do usunięcia
         response = s3_client.list_objects_v2(
-            Bucket=DO_SPACES_BUCKET, Prefix=prefix)
+            Bucket=S3_BUCKET, Prefix=prefix)
 
         if 'Contents' in response:
             for obj in response['Contents']:
                 s3_client.delete_object(
-                    Bucket=DO_SPACES_BUCKET, Key=obj['Key'])
+                    Bucket=S3_BUCKET, Key=obj['Key'])
         logger.info(f"Usunięto folder {prefix} z bucketa.")
 
     except Exception as e:
@@ -171,17 +247,18 @@ def upload_product_images_to_bucket(product_id, images_data):
         color_name = image_data.get('color_name', '')
 
         # Upload obrazu
-        uploaded_url = upload_image_to_bucket_and_get_url(
+        uploaded_key = upload_image_to_bucket_and_get_url(
             image_url=image_url,
             product_id=product_id,
             color_name=color_name,
             image_number=i
         )
 
-        if uploaded_url:
+        if uploaded_key:
             uploaded_urls.append({
                 'original_url': image_url,
-                'uploaded_url': uploaded_url,
+                'uploaded_url': build_public_url(uploaded_key),
+                'storage_key': uploaded_key,
                 'order': image_data.get('order', i)
             })
 

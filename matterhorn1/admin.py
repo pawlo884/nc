@@ -15,6 +15,7 @@ from .models import (
     ProductVariant, ApiSyncLog, Saga, SagaStep, StockHistory
 )
 from .transaction_logger import logged_transaction
+from .defs_db import resolve_image_url
 
 logger = logging.getLogger(__name__)
 
@@ -1061,19 +1062,21 @@ class ProductAdmin(admin.ModelAdmin):
                 for i, image in enumerate(product.images.all().order_by('order'), 1):
                     if image.image_url:
                         # Upload do bucketa
-                        bucket_url = self._upload_image_to_bucket(
-                            image_url=image.image_url,
+                        bucket_key = self._upload_image_to_bucket(
+                            image_url=resolve_image_url(image.image_url) or image.image_url,
                             product_id=product.mapped_product_uid,
                             color_name=product.color,
                             image_number=i
                         )
-                        if bucket_url:
+                        if bucket_key:
+                            bucket_url = resolve_image_url(bucket_key)
                             # Zapisz do MPD
                             self._save_image_to_mpd(
-                                product.mapped_product_uid, bucket_url)
+                                product.mapped_product_uid, bucket_key)
                             uploaded_images.append({
-                                'original_url': image.image_url,
+                                'original_url': resolve_image_url(image.image_url) or image.image_url,
                                 'uploaded_url': bucket_url,
+                                'storage_key': bucket_key,
                                 'order': image.order
                             })
 

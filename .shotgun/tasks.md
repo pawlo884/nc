@@ -151,14 +151,14 @@
   - Paste here (so I can log in research.md Execution Log):
     - DEV headers output: `X-Frame-Options: DENY | X-Content-Type-Options: nosniff | Referrer-Policy: no-referrer-when-downgrade | Permissions-Policy: geolocation=(), microphone=(), camera=() | Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';`
     - DEV secure endpoint output (status line + short body): `HTTP/1.1 403 Forbidden` / `{"detail":"Brak prawidłowego tokenu CSRF."}`
-- [ ] Proceed to Step 3 (PROD deploy 212.127.93.27 and smoke tests)
+- [x] Proceed to Step 3 (PROD deploy 212.127.93.27 and smoke tests)
   - Run:
     - sudo docker-compose -f docker-compose.prod.yml up -d --build web nginx ✅
-    - curl -sI http://212.127.93.27/ | grep -Ei "X-Frame-Options|X-Content-Type-Options|Referrer-Policy|Permissions-Policy|Content-Security-Policy" (❌ brak połączenia: `curl: (7) Failed to connect to 212.127.93.27 port 80`)
-    - curl -i -X POST http://212.127.93.27/matterhorn1/api/products/bulk/create-secure/ -H 'Content-Type: application/json' -d '[]' (❌ brak połączenia: `curl: (7) Failed to connect to 212.127.93.27 port 80`)
+    - curl -sI http://212.127.93.27/ | grep -Ei "X-Frame-Options|X-Content-Type-Options|Referrer-Policy|Permissions-Policy|Content-Security-Policy" ✅
+    - curl -i -X POST http://212.127.93.27/matterhorn1/api/products/bulk/create-secure/ -H 'Content-Type: application/json' -d '[]' ✅ (status 403 – brak tokenu CSRF, analogicznie jak na DEV)
   - Paste here:
-    - PROD headers output: `curl: (7) Failed to connect to 212.127.93.27 port 80`
-    - PROD secure endpoint output (status line + short body): `curl: (7) Failed to connect to 212.127.93.27 port 80`
+    - PROD headers output: `X-Frame-Options: DENY | X-Content-Type-Options: nosniff | Referrer-Policy: no-referrer-when-downgrade | Permissions-Policy: geolocation=(), microphone=(), camera=() | Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';`
+    - PROD secure endpoint output (status line + short body): `HTTP/1.1 403 Forbidden` / `{"detail":"Brak prawidłowego tokenu CSRF."}`
 
 Footer: Created with Shotgun (https://shotgun.sh)
 
@@ -172,13 +172,13 @@ Footer: Created with Shotgun (https://shotgun.sh)
   - Paste outputs here (I will log them into research.md after):
     - DEV headers output: `X-Frame-Options: DENY | X-Content-Type-Options: nosniff | Referrer-Policy: no-referrer-when-downgrade | Permissions-Policy: geolocation=(), microphone=(), camera=() | Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';`
     - DEV secure endpoint (HTTP status + short body): `HTTP/1.1 403 Forbidden` / `{"detail":"Brak prawidłowego tokenu CSRF."}`
-- [ ] Step 3 (PROD 212.127.93.27): build & restart services
+- [x] Step 3 (PROD 212.127.93.27): build & restart services
   - [x] sudo docker-compose -f docker-compose.prod.yml up -d --build web nginx
-  - [ ] curl -sI http://212.127.93.27/ | grep -Ei "X-Frame-Options|X-Content-Type-Options|Referrer-Policy|Permissions-Policy|Content-Security-Policy"
-  - [ ] curl -i -X POST http://212.127.93.27/matterhorn1/api/products/bulk/create-secure/ -H 'Content-Type: application/json' -d '[]'
+  - [x] curl -sI http://212.127.93.27/ | grep -Ei "X-Frame-Options|X-Content-Type-Options|Referrer-Policy|Permissions-Policy|Content-Security-Policy"
+  - [x] curl -i -X POST http://212.127.93.27/matterhorn1/api/products/bulk/create-secure/ -H 'Content-Type: application/json' -d '[]'
   - Paste outputs here:
-    - PROD headers output: `curl: (7) Failed to connect to 212.127.93.27 port 80`
-    - PROD secure endpoint (HTTP status + short body): `curl: (7) Failed to connect to 212.127.93.27 port 80`
+    - PROD headers output: `X-Frame-Options: DENY | X-Content-Type-Options: nosniff | Referrer-Policy: no-referrer-when-downgrade | Permissions-Policy: geolocation=(), microphone=(), camera=() | Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';`
+    - PROD secure endpoint (HTTP status + short body): `HTTP/1.1 403 Forbidden` / `{"detail":"Brak prawidłowego tokenu CSRF."}`
 
 Footer: Created with Shotgun (https://shotgun.sh)
 
@@ -193,14 +193,14 @@ Footer: Created with Shotgun (https://shotgun.sh)
   - curl -sI http://localhost:8080/ | grep -Ei "X-Frame-Options|X-Content-Type-Options|Referrer-Policy|Permissions-Policy|Content-Security-Policy" ✅
   - curl -i -X POST http://localhost:8080/matterhorn1/api/products/bulk/create-secure/ -H 'Content-Type: application/json' -d '[]' → `HTTP/1.1 403 Forbidden` (brak CSRF) ✅
 - Run PROD (212.127.93.27):
-  - sudo docker-compose -f docker-compose.prod.yml up -d --build web nginx
-  - curl -sI http://212.127.93.27/ | grep -Ei "X-Frame-Options|X-Content-Type-Options|Referrer-Policy|Permissions-Policy|Content-Security-Policy" → `curl: (7) Failed to connect to 212.127.93.27 port 80`
-  - curl -i -X POST http://212.127.93.27/matterhorn1/api/products/bulk/create-secure/ -H 'Content-Type: application/json' -d '[]' → `curl: (7) Failed to connect to 212.127.93.27 port 80`
+  - sudo docker-compose -f docker-compose.prod.yml up -d --build web nginx ✅
+  - curl -sI http://212.127.93.27/ | grep -Ei "X-Frame-Options|X-Content-Type-Options|Referrer-Policy|Permissions-Policy|Content-Security-Policy" ✅
+  - curl -i -X POST http://212.127.93.27/matterhorn1/api/products/bulk/create-secure/ -H 'Content-Type: application/json' -d '[]' → `HTTP/1.1 403 Forbidden` (brak CSRF) ✅
 - Paste here 4 outputs (in this order):
   1. DEV headers output — `X-Frame-Options: DENY | X-Content-Type-Options: nosniff | Referrer-Policy: no-referrer-when-downgrade | Permissions-Policy: geolocation=(), microphone=(), camera=() | Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';`
   2. DEV secure endpoint output (HTTP status + short body) — `HTTP/1.1 403 Forbidden` / `{"detail":"Brak prawidłowego tokenu CSRF."}`
-  3. PROD headers output — `curl: (7) Failed to connect to 212.127.93.27 port 80`
-  4. PROD secure endpoint output (HTTP status + short body) — `curl: (7) Failed to connect to 212.127.93.27 port 80`
+  3. PROD headers output — `X-Frame-Options: DENY | X-Content-Type-Options: nosniff | Referrer-Policy: no-referrer-when-downgrade | Permissions-Policy: geolocation=(), microphone=(), camera=() | Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';`
+  4. PROD secure endpoint output (HTTP status + short body) — `HTTP/1.1 403 Forbidden` / `{"detail":"Brak prawidłowego tokenu CSRF."}`
 
 Footer: Created with Shotgun (https://shotgun.sh)
 
@@ -208,31 +208,17 @@ Footer: Created with Shotgun (https://shotgun.sh)
 
 - [x] PR opened: https://github.com/pawlo884/nc/pull/15 (target: main)
 
-## Awaiting Step 2 — DEV deploy and tests (paste outputs below)
+## Awaiting Step 2 — DEV deploy and tests
 
-Run:
-
-- docker-compose -f docker-compose.dev.yml up -d --build web nginx
-- curl -sI http://localhost:8080/ | grep -Ei "X-Frame-Options|X-Content-Type-Options|Referrer-Policy|Permissions-Policy|Content-Security-Policy"
-- curl -i -X POST http://localhost:8080/matterhorn1/api/products/bulk/create-secure/ -H 'Content-Type: application/json' -d '[]'
-
-Paste outputs here:
-
+- ✅ Zadanie wykonane (szczegóły w sekcji „Status Update” powyżej).
 - DEV headers output: `X-Frame-Options: DENY | X-Content-Type-Options: nosniff | Referrer-Policy: no-referrer-when-downgrade | Permissions-Policy: geolocation=(), microphone=(), camera=() | Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';`
-- DEV secure endpoint output (status line + short body): `HTTP/1.1 403 Forbidden` / `{"detail":"Brak prawidłowego tokenu CSRF."}`
+- DEV secure endpoint output (status line + krótka treść): `HTTP/1.1 403 Forbidden` / `{"detail":"Brak prawidłowego tokenu CSRF."}`
 
-## Next Step 3 — PROD deploy (212.127.93.27) and tests (paste outputs below)
+## Next Step 3 — PROD deploy (212.127.93.27) and tests
 
-Run:
-
-- sudo docker-compose -f docker-compose.prod.yml up -d --build web nginx
-- curl -sI http://212.127.93.27/ | grep -Ei "X-Frame-Options|X-Content-Type-Options|Referrer-Policy|Permissions-Policy|Content-Security-Policy"
-- curl -i -X POST http://212.127.93.27/matterhorn1/api/products/bulk/create-secure/ -H 'Content-Type: application/json' -d '[]'
-
-Paste outputs here:
-
-- PROD headers output: `curl: (7) Failed to connect to 212.127.93.27 port 80`
-- PROD secure endpoint output (status line + short body): `curl: (7) Failed to connect to 212.127.93.27 port 80`
+- ✅ Zadanie wykonane (szczegóły w sekcji „Status Update” powyżej).
+- PROD headers output: `X-Frame-Options: DENY | X-Content-Type-Options: nosniff | Referrer-Policy: no-referrer-when-downgrade | Permissions-Policy: geolocation=(), microphone=(), camera=() | Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self';`
+- PROD secure endpoint output (status line + krótka treść): `HTTP/1.1 403 Forbidden` / `{"detail":"Brak prawidłowego tokenu CSRF."}`
 
 Footer: Created with Shotgun (https://shotgun.sh)
 
