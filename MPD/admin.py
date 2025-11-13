@@ -10,6 +10,7 @@ from django.views.decorators.http import require_http_methods
 import json
 import logging
 from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Categories, Vat, Units, FabricComponent, ProductFabric
+from matterhorn1.defs_db import resolve_image_url
 import decimal
 # Register your models here.
 
@@ -834,7 +835,7 @@ class ProductsAdmin(admin.ModelAdmin):
             if imgs:
                 html += f'<div style="margin-bottom: 12px;"><b>{color_name}</b><br>'
                 for img in imgs:
-                    url = img.file_path
+                    url = resolve_image_url(img.file_path) or img.file_path
                     html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
                 html += '</div>'
         # Wyświetl zdjęcia z przypisanym zwykłym kolorem
@@ -843,7 +844,7 @@ class ProductsAdmin(admin.ModelAdmin):
             if imgs:
                 html += f'<div style="margin-bottom: 12px;"><b>{color_name}</b><br>'
                 for img in imgs:
-                    url = img.file_path
+                    url = resolve_image_url(img.file_path) or img.file_path
                     html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
                 html += '</div>'
         # Wyświetl zdjęcia bez przypisanego koloru
@@ -884,7 +885,8 @@ class ProductsAdmin(admin.ModelAdmin):
                             first_img = images_rel.first() if images_rel and hasattr(
                                 images_rel, 'first') else None
                             if first_img:
-                                img_html = f'<a href="{admin_url}"><img src="{first_img.file_path}" style="max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;" /></a>'
+                                img_url = resolve_image_url(first_img.file_path) or first_img.file_path
+                                img_html = f'<a href="{admin_url}"><img src="{img_url}" style="max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;" /></a>'
                             name_html = f'<a href="{admin_url}" style="vertical-align:middle;">{prod.name}</a>'
                             html += f"<div style='display:flex; align-items:center; gap:8px;'>{img_html}{name_html}</div>"
                         except Exception as e:
@@ -913,7 +915,8 @@ class ProductsAdmin(admin.ModelAdmin):
                 first_img = images_rel.first() if images_rel and hasattr(
                     images_rel, 'first') else None
                 if first_img:
-                    img_html = f'<a href=\"{admin_url}\"><img src=\"{first_img.file_path}\" style=\"max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;\" /></a>'
+                    img_url = resolve_image_url(first_img.file_path) or first_img.file_path
+                    img_html = f'<a href=\"{admin_url}\"><img src=\"{img_url}\" style=\"max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;\" /></a>'
                 name_html = f'<a href=\"{admin_url}\" style=\"vertical-align:middle;\">{p.name}</a>'
                 html += f"<div style='display:flex; align-items:center; gap:8px;'>{img_html}{name_html}</div>"
             html += "</div>"

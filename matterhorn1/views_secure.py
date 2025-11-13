@@ -31,6 +31,7 @@ from .serializers import (
     BulkVariantSerializer,
     BulkImageSerializer,
 )
+from .defs_db import resolve_image_url
 
 logger = logging.getLogger(__name__)
 
@@ -579,7 +580,7 @@ class ImageBulkCreateAPI(BulkThrottleMixin, APIView):
                 if not product_id:
                     errors.append(
                         {
-                            'image_url': image_data.get('image_url', 'unknown'),
+                            'image_url': resolve_image_url(image_data.get('image_url')) or image_data.get('image_url', 'unknown'),
                             'errors': {'product_id': ['Product ID jest wymagane']},
                         }
                     )
@@ -594,14 +595,14 @@ class ImageBulkCreateAPI(BulkThrottleMixin, APIView):
                     else:
                         errors.append(
                             {
-                                'image_url': image_data.get('image_url', 'unknown'),
+                                'image_url': resolve_image_url(image_data.get('image_url')) or image_data.get('image_url', 'unknown'),
                                 'errors': serializer.errors,
                             }
                         )
                 except Product.DoesNotExist:
                     errors.append(
                         {
-                            'image_url': image_data.get('image_url', 'unknown'),
+                            'image_url': resolve_image_url(image_data.get('image_url')) or image_data.get('image_url', 'unknown'),
                             'errors': {'product_id': ['Produkt nie istnieje']},
                         }
                     )
@@ -609,7 +610,7 @@ class ImageBulkCreateAPI(BulkThrottleMixin, APIView):
                     logger.exception('Błąd podczas tworzenia obrazu produktu')
                     errors.append(
                         {
-                            'image_url': image_data.get('image_url', 'unknown'),
+                            'image_url': resolve_image_url(image_data.get('image_url')) or image_data.get('image_url', 'unknown'),
                             'errors': [str(exc)],
                         }
                     )
