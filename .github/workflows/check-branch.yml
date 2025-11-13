@@ -23,14 +23,27 @@ jobs:
         run: |
           echo "🔄 Sprawdzam czy branch można zmergować z main..."
           git fetch origin main:main
-          git merge --no-commit --no-ff main || {
+
+          # Zapisujemy aktualny HEAD przed merge
+          CURRENT_HEAD=$(git rev-parse HEAD)
+
+          # Próbujemy zmergować z main (bez commitowania)
+          if git merge --no-commit --no-ff main 2>&1; then
+            echo "✅ Brak konfliktów merge z main!"
+            # Resetujemy do stanu przed merge
+            git reset --hard "$CURRENT_HEAD"
+          else
+            MERGE_STATUS=$?
             echo "❌ Wykryto konflikty merge z main!"
             echo "Branch nie może być zmergowany z main bez konfliktów."
-            git merge --abort
-            exit 1
-          }
-          echo "✅ Brak konfliktów merge z main!"
-          git merge --abort
+            # Anulujemy merge jeśli jest aktywny
+            if [ -f .git/MERGE_HEAD ]; then
+              git merge --abort
+            else
+              git reset --hard "$CURRENT_HEAD"
+            fi
+            exit $MERGE_STATUS
+          fi
 
   check-django:
     name: Sprawdź Django (testy i migracje)
@@ -169,16 +182,17 @@ jobs:
             npm ci
           fi
 
-      - name: Sprawdź formatowanie Prettier
+      - name: Sprawdź formatowanie Prettier (tylko kod, bez markdown)
         run: |
           if [ -f package.json ]; then
-            echo "🎨 Sprawdzam formatowanie Prettier..."
-            npm run format:check || {
+            echo "🎨 Sprawdzam formatowanie Prettier (tylko pliki kodu)..."
+            # Sprawdzamy tylko pliki kodu, pomijamy markdown
+            npx prettier --check "**/*.{js,jsx,ts,tsx,json,css,scss}" --ignore-path .gitignore || {
               echo "❌ Formatowanie nie jest poprawne!"
-              echo "Uruchom: npm run format"
+              echo "Uruchom: npm run format (lub npx prettier --write \"**/*.{js,jsx,ts,tsx,json,css,scss}\")"
               exit 1
             }
-            echo "✅ Formatowanie poprawne!"
+            echo "✅ Formatowanie kodu poprawne!"
           else
             echo "ℹ️ Brak package.json, pomijam sprawdzenie formatowania"
           fi

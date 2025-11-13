@@ -408,8 +408,9 @@ class FullXMLExporter(BaseXMLExporter):
                     if code_producer:
                         size_attrs.append(
                             f'code_producer="{escape(code_producer)}"')
+                        size_attrs_str = ' '.join(size_attrs)
                         xml.append(
-                            f'        <size {' '.join(size_attrs)}>'
+                            f'        <size {size_attrs_str}>'
                         )
                         stock_price = StockAndPrices.objects.using(
                             'MPD').filter(variant=variant).first()
@@ -2335,8 +2336,9 @@ class FullChangeXMLExporter(BaseXMLExporter):
                     if code_producer:
                         size_attrs.append(
                             f'code_producer="{escape(code_producer)}"')
+                    size_attrs_str = ' '.join(size_attrs)
                     xml.append(
-                        f'        <size {' '.join(size_attrs)}>'
+                        f'        <size {size_attrs_str}>'
                     )
                     stock_price = StockAndPrices.objects.using(
                         'MPD').filter(variant=variant).first()
