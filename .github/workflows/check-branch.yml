@@ -22,6 +22,10 @@ jobs:
       - name: Sprawdź konflikty merge z main
         run: |
           echo "🔄 Sprawdzam czy branch można zmergować z main..."
+          # Konfiguruj git user (wymagane dla merge)
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
           git fetch origin main:main
 
           # Zapisujemy aktualny HEAD przed merge
