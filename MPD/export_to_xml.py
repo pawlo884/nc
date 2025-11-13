@@ -411,8 +411,9 @@ class FullXMLExporter(BaseXMLExporter):
                     if code_producer:
                         size_attrs.append(
                             f'code_producer="{escape(code_producer)}"')
+                        size_attrs_str = ' '.join(size_attrs)
                         xml.append(
-                            f'        <size {' '.join(size_attrs)}>'
+                            f'        <size {size_attrs_str}>'
                         )
                         stock_price = StockAndPrices.objects.using(
                             'MPD').filter(variant=variant).first()
@@ -1928,8 +1929,9 @@ class UnitsXMLExporter(BaseXMLExporter):
             local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         units = Units.objects.using('MPD').all()
         for unit in units:
+            unit_name = escape(unit.name) if unit.name else ''
             xml.append(
-                f'  <unit id="{unit.unit_id}" name="{escape(unit.name) if unit.name else ''}"/>')
+                f'  <unit id="{unit.unit_id}" name="{unit_name}"/>')
         xml.append('</units>')
         return '\n'.join(xml)
 
@@ -2339,8 +2341,9 @@ class FullChangeXMLExporter(BaseXMLExporter):
                     if code_producer:
                         size_attrs.append(
                             f'code_producer="{escape(code_producer)}"')
+                    size_attrs_str = ' '.join(size_attrs)
                     xml.append(
-                        f'        <size {' '.join(size_attrs)}>'
+                        f'        <size {size_attrs_str}>'
                     )
                     stock_price = StockAndPrices.objects.using(
                         'MPD').filter(variant=variant).first()

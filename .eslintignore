@@ -1,0 +1,48 @@
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.min.js
+
+# Config files
+webpack.config.js
+*.config.js
+rollup.config.js
+vite.config.js
+
+# Static files directories
+static/
+staticfiles/
+media/
+
+# Django migrations
+*/migrations/
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment files
+.env*
+!.env.example
+
+# Documentation
+*.md
+docs/
+
+# Test files (optional - można włączyć jeśli chcesz sprawdzać testy)
+# **/*.test.js
+# **/*.spec.js
+

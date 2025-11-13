@@ -4,12 +4,19 @@
 # To use this workflow, you will need to set up a .github/labeler.yml
 # file with configuration.  For more information, see:
 # https://github.com/actions/labeler
+#
+# ⚠️ WYŁĄCZONY: Wymaga pliku .github/labeler.yml, który nie jest skonfigurowany
+# Workflow jest wyłączony - zmieniono trigger na workflow_dispatch (tylko ręczne uruchomienie)
 
 name: Labeler
-on: [pull_request_target]
+# Wyłączony - zmieniono z pull_request_target na workflow_dispatch
+# on: [pull_request_target]
+on: [workflow_dispatch] # Tylko ręczne uruchomienie - workflow nie uruchomi się automatycznie
 
 jobs:
   label:
+    # Wyłączony - wymaga pliku .github/labeler.yml
+    if: false
 
     runs-on: ubuntu-latest
     permissions:
@@ -17,6 +24,6 @@ jobs:
       pull-requests: write
 
     steps:
-    - uses: actions/labeler@v4
-      with:
-        repo-token: "${{ secrets.GITHUB_TOKEN }}"
+      - uses: actions/labeler@v4
+        with:
+          repo-token: '${{ secrets.GITHUB_TOKEN }}'
