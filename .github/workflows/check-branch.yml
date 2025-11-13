@@ -156,7 +156,8 @@ jobs:
           DJANGO_SETTINGS_MODULE: nc.settings.dev
         run: |
           echo "🧪 Uruchamiam testy Django..."
-          python manage.py test --settings=nc.settings.dev --verbosity=2 --keepdb || {
+          # Django test automatycznie tworzy testową bazę danych i uruchamia migracje
+          python manage.py test --settings=nc.settings.dev --verbosity=2 || {
             echo "❌ Testy nie przeszły!"
             exit 1
           }
@@ -201,7 +202,8 @@ jobs:
         run: |
           if [ -f package.json ]; then
             echo "🔍 Sprawdzam linting ESLint..."
-            npm run lint || {
+            # ESLint automatycznie używa .eslintignore jeśli istnieje
+            npm run lint -- --ignore-path .eslintignore || {
               echo "❌ Linting wykrył błędy!"
               echo "Uruchom: npm run lint:fix"
               exit 1

@@ -4,13 +4,17 @@
 # To use this workflow, you will need to set up a .github/labeler.yml
 # file with configuration.  For more information, see:
 # https://github.com/actions/labeler
+#
+# ⚠️ WYŁĄCZONY: Wymaga pliku .github/labeler.yml, który nie jest skonfigurowany
 
 name: Labeler
 on: [pull_request_target]
 
 jobs:
   label:
-
+    # Wyłączony - wymaga pliku .github/labeler.yml
+    if: false
+    
     runs-on: ubuntu-latest
     permissions:
       contents: read
