@@ -56,6 +56,11 @@ jobs:
           git fetch origin
           git reset --hard origin/main
           
+          # Ustaw uprawnienia dla katalogów migrations (potrzebne dla makemigrations w kontenerze)
+          echo "🔐 Ustawianie uprawnień dla katalogów migrations..."
+          find . -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true
+          find . -type f -path "*/migrations/*.py" -exec chmod 644 {} \; 2>/dev/null || true
+          
           # Przebuduj i zrestartuj kontenery (używa docker-compose.prod.yml)
           # Używamy BuildKit dla lepszej wydajności i cache'owania
           echo "🐳 Rebuilding and restarting containers..."
