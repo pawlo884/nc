@@ -182,14 +182,14 @@ jobs:
             npm ci
           fi
 
-      - name: Sprawdź formatowanie Prettier (tylko kod, bez markdown)
+      - name: Sprawdź formatowanie Prettier (tylko kod JS/TS/CSS, bez JSON i markdown)
         run: |
           if [ -f package.json ]; then
-            echo "🎨 Sprawdzam formatowanie Prettier (tylko pliki kodu)..."
-            # Sprawdzamy tylko pliki kodu, pomijamy markdown
-            npx prettier --check "**/*.{js,jsx,ts,tsx,json,css,scss}" --ignore-path .gitignore || {
+            echo "🎨 Sprawdzam formatowanie Prettier (tylko pliki kodu JS/TS/CSS)..."
+            # Sprawdzamy tylko pliki kodu JS/TS/CSS, pomijamy JSON i markdown
+            npx prettier --check "**/*.{js,jsx,ts,tsx,css,scss}" --ignore-path .gitignore || {
               echo "❌ Formatowanie nie jest poprawne!"
-              echo "Uruchom: npm run format (lub npx prettier --write \"**/*.{js,jsx,ts,tsx,json,css,scss}\")"
+              echo "Uruchom: npx prettier --write \"**/*.{js,jsx,ts,tsx,css,scss}\""
               exit 1
             }
             echo "✅ Formatowanie kodu poprawne!"

@@ -1925,8 +1925,9 @@ class UnitsXMLExporter(BaseXMLExporter):
             local_now.strftime('%Y-%m-%d %H:%M:%S'), local_expires.strftime('%Y-%m-%d %H:%M:%S')))
         units = Units.objects.using('MPD').all()
         for unit in units:
+            unit_name = escape(unit.name) if unit.name else ''
             xml.append(
-                f'  <unit id="{unit.unit_id}" name="{escape(unit.name) if unit.name else ''}"/>')
+                f'  <unit id="{unit.unit_id}" name="{unit_name}"/>')
         xml.append('</units>')
         return '\n'.join(xml)
 
