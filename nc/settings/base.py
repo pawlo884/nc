@@ -444,7 +444,17 @@ except ImportError:
     SPECTACULAR_SETTINGS = {}
 
 # Storage configuration (MinIO / S3-compatible)
-if os.getenv('AWS_STORAGE_BUCKET_NAME'):
+MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT')
+MINIO_BUCKET_NAME = os.getenv('MINIO_BUCKET_NAME')
+MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY')
+MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY')
+
+S3_ENDPOINT = MINIO_ENDPOINT or os.getenv('AWS_S3_ENDPOINT_URL')
+S3_BUCKET_NAME = MINIO_BUCKET_NAME or os.getenv('AWS_STORAGE_BUCKET_NAME')
+S3_ACCESS_KEY = MINIO_ACCESS_KEY or os.getenv('AWS_ACCESS_KEY_ID')
+S3_SECRET_KEY = MINIO_SECRET_KEY or os.getenv('AWS_SECRET_ACCESS_KEY')
+
+if S3_BUCKET_NAME and S3_ACCESS_KEY and S3_SECRET_KEY:
     try:
         import storages  # noqa: F401
     except ImportError:
@@ -454,14 +464,21 @@ if os.getenv('AWS_STORAGE_BUCKET_NAME'):
             INSTALLED_APPS.append('storages')
 
         DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-        AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-        AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
-        AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-1')
-        AWS_S3_ENDPOINT_URL = os.getenv('AWS_S3_ENDPOINT_URL')
+        AWS_ACCESS_KEY_ID = S3_ACCESS_KEY
+        AWS_SECRET_ACCESS_KEY = S3_SECRET_KEY
+        AWS_STORAGE_BUCKET_NAME = S3_BUCKET_NAME
+        AWS_S3_REGION_NAME = (
+            os.getenv('MINIO_REGION')
+            or os.getenv('AWS_S3_REGION_NAME')
+            or 'us-east-1'
+        )
+        AWS_S3_ENDPOINT_URL = S3_ENDPOINT
         AWS_S3_ADDRESSING_STYLE = os.getenv('AWS_S3_ADDRESSING_STYLE', 'path')
         AWS_S3_SIGNATURE_VERSION = os.getenv('AWS_S3_SIGNATURE_VERSION', 's3v4')
-        AWS_S3_VERIFY = os.getenv('AWS_S3_VERIFY', 'true').lower() == 'true'
+        if MINIO_ENDPOINT:
+            AWS_S3_VERIFY = os.getenv('MINIO_VERIFY_SSL', 'false').lower() == 'true'
+        else:
+            AWS_S3_VERIFY = os.getenv('AWS_S3_VERIFY', 'true').lower() == 'true'
         AWS_DEFAULT_ACL = os.getenv('AWS_DEFAULT_ACL') or None
         AWS_QUERYSTRING_AUTH = os.getenv('AWS_QUERYSTRING_AUTH', 'false').lower() == 'true'
 

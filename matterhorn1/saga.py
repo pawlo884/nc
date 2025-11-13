@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from django.db import connections
 from django.utils import timezone
 from . import saga_variants
+from .defs_db import resolve_image_url
 
 logger = logging.getLogger(__name__)
 
@@ -853,25 +854,27 @@ class SagaService:
                 for idx, (image_url, image_order) in enumerate(images, 1):
                     if image_url:
                         # Upload do bucketa
-                        bucket_url = upload_image_to_bucket_and_get_url(
+                        bucket_key = upload_image_to_bucket_and_get_url(
                             image_path=image_url,
                             product_id=mpd_product_id,
                             producer_color_name=producer_color_name,
                             image_number=idx
                         )
 
-                        if bucket_url:
+                        if bucket_key:
+                            bucket_url = resolve_image_url(bucket_key)
                             # Zapisz do MPD
                             mpd_cursor.execute("""
                                 INSERT INTO product_images (product_id, file_path)
                                 VALUES (%s, %s)
                                 ON CONFLICT (product_id, file_path) DO NOTHING
-                            """, [mpd_product_id, bucket_url])
+                            """, [mpd_product_id, bucket_key])
 
                             uploaded_count += 1
                             uploaded_images.append({
                                 'original_url': image_url,
                                 'uploaded_url': bucket_url,
+                                'storage_key': bucket_key,
                                 'order': image_order or idx
                             })
                             logger.info(

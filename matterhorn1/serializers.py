@@ -120,24 +120,26 @@ class ProductDetailsSerializer(serializers.ModelSerializer):
 class ProductImageSerializer(serializers.ModelSerializer):
     """Serializer dla obrazów produktu"""
 
+    public_url = serializers.SerializerMethodField()
+
     class Meta:
         model = ProductImage
-        fields = ['image_url', 'order']
+        fields = ['image_url', 'order', 'public_url']
 
     def validate_image_url(self, value):
         """Walidacja URL obrazu"""
         if not value:
             raise serializers.ValidationError("URL obrazu jest wymagany")
-        if not value.startswith(('http://', 'https://')):
-            raise serializers.ValidationError(
-                "URL musi zaczynać się od http:// lub https://")
-        return value
+        return normalize_storage_key(value)
 
     def validate_order(self, value):
         """Walidacja kolejności"""
         if value < 0:
             raise serializers.ValidationError("Kolejność nie może być ujemna")
         return value
+
+    def get_public_url(self, obj):
+        return resolve_image_url(obj.image_url)
 
 
 @extend_schema_serializer(

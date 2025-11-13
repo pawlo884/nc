@@ -26,6 +26,7 @@ from .models import (
     Product, Brand, Category,
     ProductImage, ProductVariant, ApiSyncLog
 )
+from .defs_db import resolve_image_url
 from .serializers import (
     ProductSerializer, BrandSerializer, CategorySerializer,
     ProductVariantSerializer, ProductImageSerializer,
@@ -817,7 +818,7 @@ class ImageBulkCreateView(View):
                     product_id = image_data.get('product_id')
                     if not product_id:
                         errors.append({
-                            'image_url': image_data.get('image_url', 'unknown'),
+                            'image_url': resolve_image_url(image_data.get('image_url')) or image_data.get('image_url', 'unknown'),
                             'errors': {'product_id': ['Product ID jest wymagane']}
                         })
                         continue
@@ -832,12 +833,12 @@ class ImageBulkCreateView(View):
                             created_objects.append(image)
                         else:
                             errors.append({
-                                'image_url': image_data.get('image_url', 'unknown'),
+                                'image_url': resolve_image_url(image_data.get('image_url')) or image_data.get('image_url', 'unknown'),
                                 'errors': serializer.errors
                             })
                     except Product.DoesNotExist:
                         errors.append({
-                            'image_url': image_data.get('image_url', 'unknown'),
+                            'image_url': resolve_image_url(image_data.get('image_url')) or image_data.get('image_url', 'unknown'),
                             'errors': {'product_id': ['Produkt nie istnieje']}
                         })
 
@@ -984,7 +985,7 @@ def get_product_details(request, product_id):
         images = []
         for image in product.images.all().order_by('order'):
             images.append({
-                'image_url': image.image_url,
+                'image_url': resolve_image_url(image.image_url) or image.image_url,
                 'order': image.order
             })
 
