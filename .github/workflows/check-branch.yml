@@ -22,31 +22,47 @@ jobs:
       - name: Sprawdź konflikty merge z main
         run: |
           echo "🔄 Sprawdzam czy branch można zmergować z main..."
-          # Konfiguruj git user (wymagane dla merge)
+          # Konfiguruj git user (wymagane dla operacji git)
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
 
-          git fetch origin main:main
+          # Pobierz main
+          git fetch origin main:main 2>&1 || {
+            echo "⚠️ Nie można pobrać main, sprawdzam czy istnieje..."
+            git fetch origin main 2>&1 || exit 1
+          }
 
           # Zapisujemy aktualny HEAD przed merge
           CURRENT_HEAD=$(git rev-parse HEAD)
+          MAIN_HEAD=$(git rev-parse main 2>/dev/null || git rev-parse origin/main)
 
-          # Próbujemy zmergować z main (bez commitowania)
-          if git merge --no-commit --no-ff main 2>&1; then
-            echo "✅ Brak konfliktów merge z main!"
-            # Resetujemy do stanu przed merge
-            git reset --hard "$CURRENT_HEAD"
-          else
-            MERGE_STATUS=$?
+          # Sprawdź konflikty używając git merge-tree (nie wymaga faktycznego merge)
+          MERGE_TREE_OUTPUT=$(git merge-tree $(git merge-base HEAD $MAIN_HEAD) HEAD $MAIN_HEAD 2>&1) || MERGE_TREE_EXIT=$?
+
+          if echo "$MERGE_TREE_OUTPUT" | grep -q "^+<<<<<<<"; then
             echo "❌ Wykryto konflikty merge z main!"
             echo "Branch nie może być zmergowany z main bez konfliktów."
-            # Anulujemy merge jeśli jest aktywny
-            if [ -f .git/MERGE_HEAD ]; then
-              git merge --abort
-            else
+            echo "Konfliktujące pliki:"
+            echo "$MERGE_TREE_OUTPUT" | grep -E "^\+<<<<<<<" | sed 's/^+<<<<<<< //' | head -5
+            exit 1
+          elif [ -n "$MERGE_TREE_EXIT" ] && [ $MERGE_TREE_EXIT -ne 0 ]; then
+            # Fallback do tradycyjnego merge jeśli merge-tree nie działa
+            echo "⚠️ merge-tree nie zadziałał, używam tradycyjnego merge..."
+            if git merge --no-commit --no-ff $MAIN_HEAD 2>&1; then
+              echo "✅ Brak konfliktów merge z main!"
               git reset --hard "$CURRENT_HEAD"
+            else
+              echo "❌ Wykryto konflikty merge z main!"
+              echo "Branch nie może być zmergowany z main bez konfliktów."
+              if [ -f .git/MERGE_HEAD ]; then
+                git merge --abort
+              else
+                git reset --hard "$CURRENT_HEAD"
+              fi
+              exit 1
             fi
-            exit $MERGE_STATUS
+          else
+            echo "✅ Brak konfliktów merge z main!"
           fi
 
   check-django:
