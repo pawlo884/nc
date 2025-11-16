@@ -1,5 +1,11 @@
 # Zmiany
 
+## <small>1.0.1 (2025-11-16)</small>
+
+* fix(build): nie blokuj collectstatic bez konfiguracji MINIO/S3 (tryb no-storage) ([7ad0747](https://github.com/pawlo884/nc/commit/7ad0747))
+* chore(ci): merge semantic-release setup ([87af795](https://github.com/pawlo884/nc/commit/87af795))
+* chore(ci): uruchamiaj deploy-vps po udanym release ([a600610](https://github.com/pawlo884/nc/commit/a600610))
+
 ## 1.0.0 (2025-11-16)
 
 * . ([b351368](https://github.com/pawlo884/nc/commit/b351368))
