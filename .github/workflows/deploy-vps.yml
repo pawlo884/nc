@@ -1,13 +1,19 @@
 name: Deploy to VPS
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:  # Pozwala na ręczne uruchomienie z GitHub UI
+  # Uruchamiaj po zakończeniu workflow "Release" na gałęzi main
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+    branches: [main]
+  # Ręczne wywołanie z UI
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Wykonuj tylko, jeśli workflow Release zakończył się sukcesem
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     
     steps:
     - name: Test SSH connection
