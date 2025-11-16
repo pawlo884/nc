@@ -50,10 +50,19 @@ else:
         if DO_SPACES_BUCKET and DO_SPACES_REGION else None
     )
 
+# Brak wymaganej konfiguracji nie powinien blokować operacji niezwiązanych ze storage
+# (np. collectstatic w czasie builda). Zamiast wyjątku ustawiamy tryb "no-storage".
 if not all([S3_BUCKET, S3_ACCESS_KEY, S3_SECRET]):
-    raise RuntimeError(
-        "Brak wymaganej konfiguracji MinIO/S3. Ustaw MINIO_* lub DO_SPACES_* w pliku .env."
+    logger.warning(
+        "Brak wymaganej konfiguracji MinIO/S3 (MINIO_* lub DO_SPACES_*). "
+        "Przechodzę w tryb no-storage (upload/DELETE będą pomijane)."
     )
+    S3_BUCKET = S3_BUCKET or "no-storage"
+    S3_REGION = S3_REGION if 'S3_REGION' in globals() else None
+    S3_ENDPOINT = S3_ENDPOINT if 'S3_ENDPOINT' in globals() else None
+    S3_ACCESS_KEY = S3_ACCESS_KEY or None
+    S3_SECRET = S3_SECRET or None
+    PUBLIC_BASE_URL = None
 
 BUCKET_PUBLIC_BASE_URL = PUBLIC_BASE_URL
 
@@ -91,13 +100,16 @@ def resolve_image_url(value: str) -> str | None:
     """Zwróć publiczny URL niezależnie od tego, czy w bazie jest pełny adres czy klucz."""
     return build_public_url(normalize_storage_key(value))
 
-s3_client = boto3.client(
-    's3',
-    region_name=S3_REGION,
-    endpoint_url=S3_ENDPOINT,
-    aws_access_key_id=S3_ACCESS_KEY,
-    aws_secret_access_key=S3_SECRET
-)
+if all([S3_ACCESS_KEY, S3_SECRET]):
+    s3_client = boto3.client(
+        's3',
+        region_name=S3_REGION,
+        endpoint_url=S3_ENDPOINT,
+        aws_access_key_id=S3_ACCESS_KEY,
+        aws_secret_access_key=S3_SECRET
+    )
+else:
+    s3_client = None
 
 
 def upload_image_to_bucket_and_get_url(image_path, product_id, producer_color_name=None, image_number=1):
@@ -172,6 +184,9 @@ def upload_image_to_bucket_and_get_url(image_path, product_id, producer_color_na
                     f"Odczytano plik lokalny, rozmiar: {len(file_data)} bajtów")
 
         # Prześlij do S3
+        if not s3_client:
+            logger.warning("Tryb no-storage: pomijam upload do S3")
+            return None
         logger.info(f"Przesyłanie pliku do S3: {new_path}")
         try:
             s3_client.put_object(
@@ -205,6 +220,9 @@ def delete_product_folder_from_bucket(product_id):
         product_id (int): ID produktu
     """
     try:
+        if not s3_client:
+            logger.warning("Tryb no-storage: pomijam usuwanie z bucketa")
+            return
         is_production = os.getenv(
             "DJANGO_SETTINGS_MODULE") == 'nc.settings.prod'
         bucket_folder = "MPD" if is_production else "MPD_test"
