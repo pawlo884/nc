@@ -146,7 +146,7 @@ MIDDLEWARE = [
 
 # Security settings for production
 SECURE_SSL_REDIRECT = False  # Tymczasowo wyłączone, ponieważ nie mamy jeszcze HTTPS
-SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = False  # Wyłączone dla dostępu po HTTP (bez HTTPS)
 SECURE_HSTS_SECONDS = None  # Tymczasowo wyłączone
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
@@ -166,7 +166,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://212.127.93.27:8001',
     'https://212.127.93.27',
 ]
-CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = False  # Wyłączone dla logowania po HTTP (bez HTTPS)
 CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
 
