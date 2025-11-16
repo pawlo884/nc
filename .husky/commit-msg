@@ -5,9 +5,10 @@ if [ -n "$CI" ]; then
   exit 0
 fi
 
-# Husky shim (zapewnia poprawne zmienne i PATH)
-if [ -f "$(dirname -- "$0")/_/husky.sh" ]; then
-  . "$(dirname -- "$0")/_/husky.sh"
+# Nie blokuj commitów, jeśli Husky nie przekazał ścieżki (np. Windows Git Bash)
+if [ -z "$1" ]; then
+  echo "commit-msg: brak ścieżki pliku commita – pomijam commitlint"
+  exit 0
 fi
 
 npx --no commitlint --edit "$1"
