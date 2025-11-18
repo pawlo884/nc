@@ -17,7 +17,8 @@ MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', 'http://localhost:9000')
 MINIO_PUBLIC_URL = os.getenv('MINIO_PUBLIC_URL')
 MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY')
 MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY')
-MINIO_BUCKET = os.getenv('MINIO_BUCKET') or os.getenv('MINIO_BUCKET_NAME')  # Obsługa obu wariantów
+MINIO_BUCKET = os.getenv('MINIO_BUCKET') or os.getenv(
+    'MINIO_BUCKET_NAME')  # Obsługa obu wariantów
 
 # Kompatybilność wsteczna
 if not MINIO_BUCKET:
@@ -90,18 +91,20 @@ try:
     print(f"✅ Znaleziono {len(buckets)} bucketów:")
     for bucket in buckets:
         print(f"   - {bucket}")
-    
+
     # Jeśli MINIO_BUCKET nie jest ustawiony, użyj pierwszego dostępnego
     if not MINIO_BUCKET:
         if buckets:
             MINIO_BUCKET = buckets[0]
-            print(f"\n⚠️  MINIO_BUCKET nie był ustawiony - używam pierwszego dostępnego: '{MINIO_BUCKET}'")
+            print(
+                f"\n⚠️  MINIO_BUCKET nie był ustawiony - używam pierwszego dostępnego: '{MINIO_BUCKET}'")
         else:
             print("❌ Brak dostępnych bucketów!")
             sys.exit(1)
     elif MINIO_BUCKET not in buckets:
         print(f"⚠️  Bucket '{MINIO_BUCKET}' nie istnieje w liście!")
-        print(f"   Dostępne buckety: {', '.join(buckets) if buckets else 'BRAK'}")
+        print(
+            f"   Dostępne buckety: {', '.join(buckets) if buckets else 'BRAK'}")
         if buckets:
             MINIO_BUCKET = buckets[0]
             print(f"   Używam pierwszego dostępnego: '{MINIO_BUCKET}'")
@@ -137,7 +140,7 @@ print(f"\n📋 Test 3: Upload testowego pliku do '{MINIO_BUCKET}'...")
 try:
     test_content = b"Test file content for MinIO upload"
     test_key = "MPD_test/test_upload.txt"
-    
+
     s3_client.put_object(
         Bucket=MINIO_BUCKET,
         Key=test_key,
@@ -145,12 +148,12 @@ try:
         ContentType='text/plain'
     )
     print(f"✅ Plik testowy przesłany: {test_key}")
-    
+
     # Sprawdź czy plik istnieje
     try:
         s3_client.head_object(Bucket=MINIO_BUCKET, Key=test_key)
         print(f"✅ Zweryfikowano obecność pliku w MinIO")
-        
+
         # Pobierz plik z powrotem
         response = s3_client.get_object(Bucket=MINIO_BUCKET, Key=test_key)
         downloaded_content = response['Body'].read()
@@ -158,14 +161,14 @@ try:
             print(f"✅ Pobrano plik z MinIO - zawartość zgodna")
         else:
             print(f"⚠️  Pobrano plik z MinIO - zawartość różna!")
-        
+
         # Usuń testowy plik
         s3_client.delete_object(Bucket=MINIO_BUCKET, Key=test_key)
         print(f"✅ Usunięto testowy plik")
-        
+
     except ClientError as e:
         print(f"⚠️  Nie można zweryfikować/pobrać pliku: {str(e)}")
-        
+
 except ClientError as e:
     error_code = e.response.get('Error', {}).get('Code', '')
     error_message = e.response.get('Error', {}).get('Message', str(e))
@@ -180,9 +183,11 @@ print(f"\n📋 Test 4: Listowanie obiektów w bucketcie '{MINIO_BUCKET}'...")
 try:
     response = s3_client.list_objects_v2(Bucket=MINIO_BUCKET, MaxKeys=10)
     if 'Contents' in response:
-        print(f"✅ Znaleziono {len(response['Contents'])} obiektów (pierwsze 10):")
+        print(
+            f"✅ Znaleziono {len(response['Contents'])} obiektów (pierwsze 10):")
         for obj in response['Contents'][:10]:
-            print(f"   - {obj['Key']} ({obj['Size']} bajtów, zmodyfikowany: {obj['LastModified']})")
+            print(
+                f"   - {obj['Key']} ({obj['Size']} bajtów, zmodyfikowany: {obj['LastModified']})")
     else:
         print(f"ℹ️  Bucket jest pusty")
 except ClientError as e:
@@ -195,4 +200,3 @@ except Exception as e:
 print("\n" + "=" * 60)
 print("✅ Test zakończony")
 print("=" * 60)
-

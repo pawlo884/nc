@@ -27,9 +27,12 @@ class WebAgentTask(models.Model):
     )
     url = models.URLField(blank=True, null=True, verbose_name='URL')
     # Pola do organizacji pracy per marka
-    brand_id = models.IntegerField(blank=True, null=True, verbose_name='ID marki', db_index=True)
-    brand_name = models.CharField(max_length=255, blank=True, null=True, verbose_name='Nazwa marki', db_index=True)
-    priority = models.IntegerField(default=0, verbose_name='Priorytet', help_text='Wyższa wartość = wyższy priorytet')
+    brand_id = models.IntegerField(
+        blank=True, null=True, verbose_name='ID marki', db_index=True)
+    brand_name = models.CharField(
+        max_length=255, blank=True, null=True, verbose_name='Nazwa marki', db_index=True)
+    priority = models.IntegerField(
+        default=0, verbose_name='Priorytet', help_text='Wyższa wartość = wyższy priorytet')
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
