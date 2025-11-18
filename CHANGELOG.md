@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.0.2 (2025-11-18)</small>
+
+* fix: flower memory ([349d77c](https://github.com/pawlo884/nc/commit/349d77c))
+
 ## <small>1.0.1 (2025-11-16)</small>
 
 * fix(build): nie blokuj collectstatic bez konfiguracji MINIO/S3 (tryb no-storage) ([7ad0747](https://github.com/pawlo884/nc/commit/7ad0747))
