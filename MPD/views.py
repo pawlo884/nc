@@ -15,7 +15,7 @@ from .export_to_xml import GatewayXMLExporter, FullXMLExporter, LightXMLExporter
 import logging
 from django.http import HttpResponse
 import requests
-from matterhorn1.defs_db import DO_SPACES_BUCKET, DO_SPACES_REGION
+from matterhorn1.defs_db import DO_SPACES_BUCKET, DO_SPACES_REGION, MINIO_ENDPOINT, MINIO_BUCKET
 from django.urls import reverse
 
 from django.views.decorators.csrf import csrf_exempt
@@ -213,7 +213,13 @@ XML_FILES = [
     "full", "full_change", "light", "categories", "sizes", "producers", "units", "parameters", "stocks", "series", "warranties", "preset"
 ]
 
-BUCKET_URL = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/matterhorn/"
+# Buduj URL bucketa - dla MinIO lub DO Spaces
+if MINIO_ENDPOINT and MINIO_BUCKET and 'digitaloceanspaces.com' not in str(MINIO_ENDPOINT):
+    # MinIO
+    BUCKET_URL = f"{MINIO_ENDPOINT}/{MINIO_BUCKET}/MPD_test/xml/matterhorn/"
+else:
+    # DigitalOcean Spaces (kompatybilność wsteczna)
+    BUCKET_URL = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/MPD_test/xml/matterhorn/" if DO_SPACES_BUCKET and DO_SPACES_REGION else ""
 XML_FILE_MAP = {
     "full": "full.xml",
     "full_change": "full_change.xml",

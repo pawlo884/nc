@@ -5,24 +5,27 @@ from .models import WebAgentTask, WebAgentLog, WebAgentConfig
 @admin.register(WebAgentTask)
 class WebAgentTaskAdmin(admin.ModelAdmin):
     list_display = [
-        'name', 'task_type', 'status', 'url', 
+        'name', 'brand_name', 'task_type', 'status', 'priority', 'url', 
         'created_at', 'started_at', 'completed_at'
     ]
     list_filter = [
-        'status', 'task_type', 'created_at', 
+        'status', 'task_type', 'brand_name', 'priority', 'created_at', 
         'started_at', 'completed_at'
     ]
-    search_fields = ['name', 'url', 'error_message']
+    search_fields = ['name', 'brand_name', 'url', 'error_message']
     readonly_fields = [
         'created_at', 'updated_at', 'started_at', 
         'completed_at', 'celery_task_id'
     ]
     list_per_page = 25
-    ordering = ['-created_at']
+    ordering = ['-priority', '-created_at']
     
     fieldsets = (
         ('Podstawowe informacje', {
             'fields': ('name', 'task_type', 'status', 'url')
+        }),
+        ('Organizacja per marka', {
+            'fields': ('brand_id', 'brand_name', 'priority')
         }),
         ('Dane techniczne', {
             'fields': ('config', 'result', 'celery_task_id')

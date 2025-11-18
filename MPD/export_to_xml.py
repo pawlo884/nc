@@ -1,6 +1,6 @@
 import os
 import hashlib
-from matterhorn1.defs_db import s3_client, DO_SPACES_BUCKET, DO_SPACES_REGION
+from matterhorn1.defs_db import s3_client, DO_SPACES_BUCKET, DO_SPACES_REGION, MINIO_ENDPOINT, MINIO_BUCKET
 import logging
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
@@ -117,14 +117,27 @@ class BaseXMLExporter:
             bucket_path = f"MPD_test/xml/matterhorn/{self.filename}"
             with open(local_file_path, 'rb') as f:
                 file_data = f.read()
-            s3_client.put_object(
-                Bucket=DO_SPACES_BUCKET,
-                Key=bucket_path,
-                Body=file_data,
-                ContentType='application/xml',
-                ACL='public-read'
-            )
-            file_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/{bucket_path}"
+            # Dla MinIO nie używamy ACL (publiczny dostęp jest konfigurowany przez bucket policy)
+            # Dla DO Spaces używamy ACL='public-read'
+            put_object_params = {
+                'Bucket': MINIO_BUCKET,
+                'Key': bucket_path,
+                'Body': file_data,
+                'ContentType': 'application/xml'
+            }
+            
+            # Dodaj ACL tylko dla DO Spaces (kompatybilność wsteczna)
+            if MINIO_ENDPOINT and 'digitaloceanspaces.com' in str(MINIO_ENDPOINT):
+                put_object_params['ACL'] = 'public-read'
+            
+            s3_client.put_object(**put_object_params)
+            # Buduj URL - dla MinIO lub DO Spaces
+            if MINIO_ENDPOINT and MINIO_BUCKET and 'digitaloceanspaces.com' not in str(MINIO_ENDPOINT):
+                # MinIO
+                file_url = f"{MINIO_ENDPOINT}/{MINIO_BUCKET}/{bucket_path}"
+            else:
+                # DigitalOcean Spaces (kompatybilność wsteczna)
+                file_url = f"https://{DO_SPACES_BUCKET}.{DO_SPACES_REGION}.digitaloceanspaces.com/{bucket_path}" if DO_SPACES_BUCKET and DO_SPACES_REGION else None
             logger.info(
                 f"Plik XML został pomyślnie przesłany do bucketa: {file_url}")
             return file_url

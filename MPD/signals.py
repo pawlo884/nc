@@ -66,12 +66,14 @@ def capture_variant_ids(sender, instance, using, **kwargs):
 
 @receiver(post_delete, sender=Products)
 def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
-    if using == 'MPD':
+    """Usuń mapowanie produktu z bazy matterhorn1 po usunięciu produktu z MPD"""
+    # Sprawdź czy używamy bazy MPD (może być 'MPD' lub 'mpd' w zależności od konfiguracji)
+    if using in ['MPD', 'mpd']:
         try:
             logger.info(
-                f"Rozpoczęto usuwanie mapowań dla produktu MPD ID: {instance.id}")
+                f"Rozpoczęto usuwanie mapowań dla produktu MPD ID: {instance.id} (using: {using})")
 
-            # Usunięcie produktu z tabeli products w matterhorn1
+            # Usunięcie mapowania produktu w matterhorn1
             with connections['matterhorn1'].cursor() as cursor:
                 cursor.execute(
                     """
@@ -84,7 +86,13 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                 )
                 products_updated = cursor.rowcount
                 logger.info(
-                    f"Zaktualizowano {products_updated} rekordów w tabeli product")
+                    f"Zaktualizowano {products_updated} rekordów w tabeli product (mapped_product_uid = {instance.id})")
+                
+                # Sprawdź czy rzeczywiście zaktualizowano
+                if products_updated == 0:
+                    logger.warning(f"Nie znaleziono produktów z mapped_product_uid = {instance.id} w matterhorn1")
+                else:
+                    logger.info(f"✅ Pomyślnie usunięto mapowanie dla {products_updated} produktów")
 
             # Usunięcie wartości variant_id z mapped_variant_uid w tabeli product_variants w matterhorn1
             if hasattr(instance, 'variant_ids') and instance.variant_ids:
@@ -105,13 +113,14 @@ def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
                 logger.info("Brak variant_id do usunięcia")
 
             logger.info(
-                f"Zakończono usuwanie mapowań dla produktu MPD ID: {instance.id}")
+                f"✅ Zakończono usuwanie mapowań dla produktu MPD ID: {instance.id}")
 
         except Exception as e:
-            error_message = f"Błąd podczas usuwania mapowań dla produktu MPD ID: {instance.id} - {str(e)}"
+            error_message = f"❌ Błąd podczas usuwania mapowań dla produktu MPD ID: {instance.id} - {str(e)}"
             logger.error(error_message)
             logger.error(traceback.format_exc())
-            raise  # Ponownie rzucamy wyjątek, aby Django wiedział o błędzie
+            # Nie rzucamy wyjątku - pozwalamy Django kontynuować usuwanie
+            # raise  # Odkomentuj jeśli chcesz zatrzymać usuwanie przy błędzie
 
 
 @receiver(pre_delete, sender=Products)

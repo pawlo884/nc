@@ -581,7 +581,7 @@
             {% else %}
             <!-- KROK 14: UPLOAD ZDJĘĆ -->
             <div class="form-row" style="margin-top:20px;">
-                <button type="button" onclick="uploadImages()" style="background:#28a745; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Upload zdjęć do bucketa</button>
+                <button type="button" onclick="uploadImages()" style="background:#28a745; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Upload zdjęć do MinIO</button>
                 <div id="status-message" style="margin-top:10px; padding:10px; border-radius:4px; display:none;"></div>
             </div>
             {% endif %}
@@ -617,36 +617,34 @@ document.addEventListener('DOMContentLoaded', function() {
             const producerColorName = row.querySelector('.producer-color-input').value;
             const producerCode = row.querySelector('.producer-code-input').value;
             
-            if (confirm('Czy na pewno chcesz przypisać ten produkt do MPD ID ' + mpdId + '?')) {
-                const formData = new FormData();
-                
-                formData.append('main_color_id', mainColorId);
-                formData.append('producer_color_name', producerColorName);
-                formData.append('producer_code', producerCode);
-                
-                fetch(`/admin/matterhorn1/product/assign-mapping/${document.querySelector('[name=product_id]').value}/${mpdId}/`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    },
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    const statusMessage = document.getElementById('status-message');
-                    statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
-                    statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
-                    if (data.success) {
-                        setTimeout(() => { window.location.reload(); }, 1500);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    const statusMessage = document.getElementById('status-message');
-                    statusMessage.className = 'status-message error';
-                    statusMessage.textContent = 'Wystąpił błąd podczas przypisywania produktu.';
-                });
-            }
+            const formData = new FormData();
+            
+            formData.append('main_color_id', mainColorId);
+            formData.append('producer_color_name', producerColorName);
+            formData.append('producer_code', producerCode);
+            
+            fetch(`/admin/matterhorn1/product/assign-mapping/${document.querySelector('[name=product_id]').value}/${mpdId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const statusMessage = document.getElementById('status-message');
+                statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+                statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+                if (data.success) {
+                    setTimeout(() => { window.location.reload(); }, 1500);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const statusMessage = document.getElementById('status-message');
+                statusMessage.className = 'status-message error';
+                statusMessage.textContent = 'Wystąpił błąd podczas przypisywania produktu.';
+            });
         });
     });
 

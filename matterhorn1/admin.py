@@ -1047,36 +1047,86 @@ class ProductAdmin(admin.ModelAdmin):
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
     def upload_images(self, request, product_id):
-        """Upload obrazów produktu do bucketa i zapis do MPD"""
+        """Upload obrazów produktu do MinIO i zapis do MPD"""
         if request.method == 'POST':
             try:
+                import logging
+                logger = logging.getLogger(__name__)
+                
                 product = Product.objects.get(id=product_id)
-                if not product.is_mapped:
+                
+                # Sprawdź czy produkt ma zdjęcia
+                images_count = product.images.count()
+                logger.info(f"Produkt {product_id} ma {images_count} zdjęć")
+                
+                if images_count == 0:
                     return JsonResponse({
                         'success': False,
-                        'error': 'Produkt musi być zmapowany do MPD'
+                        'error': 'Produkt nie ma zdjęć do uploadu'
+                    })
+                
+                if not product.is_mapped or not product.mapped_product_uid:
+                    logger.warning(f"Produkt {product_id} nie jest zmapowany (is_mapped={product.is_mapped}, mapped_product_uid={product.mapped_product_uid})")
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Produkt musi być zmapowany do MPD (is_mapped={product.is_mapped}, mapped_product_uid={product.mapped_product_uid})'
                     })
 
+                logger.info(f"Rozpoczynam upload zdjęć dla produktu {product_id}, MPD ID: {product.mapped_product_uid}, liczba zdjęć: {images_count}")
+                
                 uploaded_images = []
+                errors = []
+                
                 for i, image in enumerate(product.images.all().order_by('order'), 1):
                     if image.image_url:
-                        # Upload do bucketa
-                        bucket_url = self._upload_image_to_bucket(
-                            image_url=image.image_url,
-                            product_id=product.mapped_product_uid,
-                            color_name=product.color,
-                            image_number=i
-                        )
-                        if bucket_url:
-                            # Zapisz do MPD
-                            self._save_image_to_mpd(
-                                product.mapped_product_uid, bucket_url)
-                            uploaded_images.append({
-                                'original_url': image.image_url,
-                                'uploaded_url': bucket_url,
-                                'order': image.order
-                            })
+                        try:
+                            logger.info(f"Upload zdjęcia {i}: {image.image_url}")
+                            # Upload do MinIO
+                            bucket_url = self._upload_image_to_bucket(
+                                image_url=image.image_url,
+                                product_id=product.mapped_product_uid,
+                                color_name=product.color,
+                                image_number=i
+                            )
+                            
+                            if bucket_url:
+                                logger.info(f"Zdjęcie {i} przesłane do MinIO: {bucket_url}")
+                                # Zapisz do MPD
+                                try:
+                                    self._save_image_to_mpd(
+                                        product.mapped_product_uid, bucket_url)
+                                    logger.info(f"Zdjęcie {i} zapisane w MPD")
+                                    uploaded_images.append({
+                                        'original_url': image.image_url,
+                                        'uploaded_url': bucket_url,
+                                        'order': image.order
+                                    })
+                                except Exception as e:
+                                    error_msg = f"Błąd zapisu zdjęcia {i} do MPD: {str(e)}"
+                                    logger.error(error_msg)
+                                    errors.append(error_msg)
+                            else:
+                                error_msg = f"Błąd uploadu zdjęcia {i} do MinIO - brak URL"
+                                # Sprawdź czy to może być problem z Cloudflare
+                                if 'cloudflare' in str(image.image_url).lower() or '500' in str(image.image_url):
+                                    error_msg += " (Możliwa awaria Cloudflare - nie można pobrać zdjęcia z serwera)"
+                                logger.error(error_msg)
+                                errors.append(error_msg)
+                        except Exception as e:
+                            error_msg = f"Błąd podczas przetwarzania zdjęcia {i}: {str(e)}"
+                            logger.error(error_msg)
+                            import traceback
+                            logger.error(traceback.format_exc())
+                            errors.append(error_msg)
 
+                if errors:
+                    return JsonResponse({
+                        'success': len(uploaded_images) > 0,
+                        'message': f'Uploadowano {len(uploaded_images)} z {len(list(product.images.all()))} obrazów',
+                        'images': uploaded_images,
+                        'errors': errors
+                    })
+                
                 return JsonResponse({
                     'success': True,
                     'message': f'Uploadowano {len(uploaded_images)} obrazów',
@@ -1084,6 +1134,11 @@ class ProductAdmin(admin.ModelAdmin):
                 })
 
             except Exception as e:
+                import logging
+                import traceback
+                logger = logging.getLogger(__name__)
+                logger.error(f"Błąd podczas uploadu zdjęć: {str(e)}")
+                logger.error(traceback.format_exc())
                 return JsonResponse({
                     'success': False,
                     'error': str(e)

@@ -26,6 +26,10 @@ class WebAgentTask(models.Model):
         verbose_name='Typ zadania'
     )
     url = models.URLField(blank=True, null=True, verbose_name='URL')
+    # Pola do organizacji pracy per marka
+    brand_id = models.IntegerField(blank=True, null=True, verbose_name='ID marki', db_index=True)
+    brand_name = models.CharField(max_length=255, blank=True, null=True, verbose_name='Nazwa marki', db_index=True)
+    priority = models.IntegerField(default=0, verbose_name='Priorytet', help_text='Wyższa wartość = wyższy priorytet')
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -72,7 +76,11 @@ class WebAgentTask(models.Model):
         db_table = 'web_agent_tasks'
         verbose_name = 'Zadanie agenta web'
         verbose_name_plural = 'Zadania agenta web'
-        ordering = ['-created_at']
+        ordering = ['-priority', '-created_at']
+        indexes = [
+            models.Index(fields=['brand_id', 'status']),
+            models.Index(fields=['brand_name', 'status']),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"

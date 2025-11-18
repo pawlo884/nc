@@ -45,6 +45,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
     'http://192.168.50.63',
     'http://192.168.50.63:8000',
     'http://83.168.79.109',
@@ -76,6 +78,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
     "http://192.168.50.63:8000",
     "http://83.168.79.109:8000",
 ]
@@ -129,6 +133,7 @@ CELERY_TASK_SOFT_TIME_LIMIT = 3300  # 55 minut soft limit
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Usuń WhiteNoise z middleware w development - Nginx obsługuje pliki statyczne
+# Debug Toolbar wyłączony - przesłania przyciski w automatyzacji przeglądarki
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -139,5 +144,5 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
+    # 'debug_toolbar.middleware.DebugToolbarMiddleware',  # Wyłączony - przesłania przyciski
 ]
