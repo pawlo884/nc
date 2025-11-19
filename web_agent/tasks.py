@@ -4,9 +4,23 @@ from celery import shared_task
 from django.utils import timezone
 from django.db import transaction
 from .models import WebAgentTask, WebAgentLog
-from .browser_automation import scrape_with_browser, execute_browser_actions
 
 logger = logging.getLogger(__name__)
+
+# Import funkcji przeglądarki z obsługą błędów
+try:
+    from .browser_automation import scrape_with_browser, execute_browser_actions
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f'Playwright nie jest dostępny: {str(e)}. Funkcje przeglądarki będą niedostępne.')
+    PLAYWRIGHT_AVAILABLE = False
+    
+    # Stwórz funkcje zastępcze
+    def scrape_with_browser(*args, **kwargs):
+        raise ImportError('Playwright nie jest zainstalowany. Zainstaluj: pip install playwright && playwright install chromium')
+    
+    def execute_browser_actions(*args, **kwargs):
+        raise ImportError('Playwright nie jest zainstalowany. Zainstaluj: pip install playwright && playwright install chromium')
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), max_retries=3, countdown=60)

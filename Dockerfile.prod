@@ -62,8 +62,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libxshmfence1 && \
     rm -rf /var/lib/apt/lists/*
 
-# Zainstaluj Chromium dla Playwright (binaria przeglądarki)
-RUN python -m playwright install chromium
+# Zainstaluj Chromium dla Playwright systemowo (dostępne dla wszystkich użytkowników)
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright
+RUN python -m playwright install chromium && \
+    chmod -R 755 /usr/local/share/playwright
 
 # Skopiuj tylko potrzebne pliki (bez dev)
 COPY manage.py .
@@ -90,7 +92,8 @@ RUN touch /app/logs/security.log /app/logs/django.log && \
 RUN chown -R celery:celery /app /var/lib/celery /var/lib/flower && \
     chmod 755 /var/lib/celery /var/lib/flower && \
     chmod 755 /app/logs/matterhorn && \
-    chmod +x /app/docker-entrypoint.sh
+    chmod +x /app/docker-entrypoint.sh && \
+    chmod -R 755 /usr/local/share/playwright
 
 # Ustaw zmienną środowiskową PRZED collectstatic
 ENV DJANGO_SETTINGS_MODULE=nc.settings.prod

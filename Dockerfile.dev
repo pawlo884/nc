@@ -58,8 +58,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libxshmfence1 && \
     rm -rf /var/lib/apt/lists/*
 
-# Zainstaluj Chromium dla Playwright (bez automatycznych deps, mamy je wyżej)
-RUN python -m playwright install chromium
+# Zainstaluj Chromium dla Playwright systemowo (dostępne dla wszystkich użytkowników)
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/playwright
+RUN python -m playwright install chromium && \
+    chmod -R 755 /usr/local/share/playwright
 
 # Skopiuj cały projekt (dla dev możemy wszystko)
 COPY . .
@@ -71,7 +73,8 @@ RUN mkdir -p /app/staticfiles /app/logs/matterhorn /var/lib/celery
 RUN chown -R celery:celery /app /var/lib/celery && \
     chmod 755 /var/lib/celery && \
     chmod 755 /app/logs/matterhorn && \
-    chmod +x /app/docker-entrypoint.sh
+    chmod +x /app/docker-entrypoint.sh && \
+    chmod -R 755 /usr/local/share/playwright
 
 # Zbierz pliki statyczne (z --skip-checks dla dev)
 RUN python manage.py collectstatic --noinput --clear --skip-checks
