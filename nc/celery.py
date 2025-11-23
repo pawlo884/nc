@@ -28,10 +28,10 @@ app.conf.update(
 # Konfiguracja routingu tasków - routing do odpowiednich kolejek
 app.conf.task_routes = {
     # ML taski → kolejka 'ml' (osobny worker z PyTorch)
-    'web_agent.tasks.generate_embeddings': {'queue': 'ml'},
-    'web_agent.tasks.semantic_search': {'queue': 'ml'},
-    'web_agent.tasks.generate_product_embeddings': {'queue': 'ml'},
-    'web_agent.tasks.find_similar_products': {'queue': 'ml'},
+    # 'web_agent.tasks.generate_embeddings': {'queue': 'ml'},  # do dodania gdy będą taski
+    # 'web_agent.tasks.semantic_search': {'queue': 'ml'},  # do dodania gdy będą taski
+    # 'web_agent.tasks.generate_product_embeddings': {'queue': 'ml'},  # do dodania gdy będą taski
+    # 'web_agent.tasks.find_similar_products': {'queue': 'ml'},  # do dodania gdy będą taski
 
     # Task importu trafia do kolejki 'import'
     'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
