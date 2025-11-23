@@ -59,8 +59,7 @@ services:
       || true && python manage.py makemigrations && python manage.py migrate --database=default
       --noinput && python manage.py migrate admin_interface --database=default --noinput
       && python manage.py migrate matterhorn1 --database=matterhorn1 --noinput &&
-      python manage.py migrate MPD --database=MPD --noinput && python manage.py migrate
-      web_agent --database=web_agent --noinput && gunicorn nc.wsgi:application --bind
+      python manage.py migrate MPD --database=MPD --noinput && gunicorn nc.wsgi:application --bind
       0.0.0.0:8000 --workers 2 --worker-class sync --timeout 300 --keep-alive 5 --max-requests
       1000 --max-requests-jitter 100 --preload --access-logfile - --error-logfile
       - --log-level warning --capture-output --worker-tmp-dir /dev/shm --graceful-timeout
