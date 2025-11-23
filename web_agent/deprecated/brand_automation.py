@@ -716,7 +716,7 @@ def get_brand_filter_config(
     category_name: str = None,
     active: bool = True,
     is_mapped: bool = False,
-    base_url: str = 'http://localhost:8000',
+    base_url: str = 'http://localhost:8080',
     username: str = None,
     password: str = None,
     env_file: str = '.env.dev',
@@ -756,7 +756,7 @@ def get_brand_filter_config(
     )
 
     config = {
-        'headless': True,
+        'headless': False,
         'actions': [
             {
                 'type': 'navigate',
@@ -887,12 +887,12 @@ def get_brand_filter_config(
             # Kliknij w pierwszy produkt z listy
             {
                 'type': 'wait_for',
-                'selector': 'table tbody tr:first-child td a',
+                'selector': 'table.changelist tbody tr, table#result_list tbody tr, table tbody tr',
                 'timeout': 10000
             },
             {
                 'type': 'click',
-                'selector': 'table tbody tr:first-child td a',
+                'selector': 'table.changelist tbody tr:first-child td a, table#result_list tbody tr:first-child td a, table tbody tr:first-child td a',
                 'timeout': 10000
             },
             # Poczekaj na załadowanie strony szczegółów produktu
@@ -1029,10 +1029,10 @@ def get_brand_filter_config(
                     if (productMapped) {
                         const changelistUrl = sessionStorage.getItem('changelist_url');
                         if (changelistUrl) {
-                            window.location.href = changelistUrl;
+                            console.log('Produkt został zmapowany - zwracam URL do nawigacji przez Playwright:', changelistUrl);
                             return {
                                 navigating_to_changelist: true,
-                                url: changelistUrl
+                                navigate_to_url: changelistUrl  // URL do nawigacji przez Playwright
                             };
                         }
                     }
@@ -1046,7 +1046,7 @@ def get_brand_filter_config(
             # Poczekaj na załadowanie listingu jeśli nawigowaliśmy
             {
                 'type': 'wait_for',
-                'selector': 'table#result_list tbody tr',
+                'selector': 'table.changelist tbody tr, table#result_list tbody tr, table tbody tr',
                 'timeout': 15000,
                 'optional': True
             },
@@ -1070,7 +1070,7 @@ def get_brand_filter_config(
                     
                     // Sprawdź czy jesteśmy na liście produktów
                     const isChangelist = window.location.pathname.includes('/admin/matterhorn1/product/') && 
-                                       !window.location.pathname.match(/\\\\/\\\\d+\\\\/change\\\\//);
+                                       !window.location.pathname.match(/\\/\\d+\\/change\\//);
                     
                     if (!isChangelist) {{
                         return {{ next_product_found: false, reason: 'not_on_changelist', current_path: window.location.pathname }};
@@ -1091,7 +1091,14 @@ def get_brand_filter_config(
                     }}
                     
                     // Znajdź pierwszy produkt z listy, który nie jest jeszcze zmapowany
-                    const rows = document.querySelectorAll('table#result_list tbody tr');
+                    // Użyj różnych selektorów dla kompatybilności
+                    let rows = document.querySelectorAll('table#result_list tbody tr');
+                    if (rows.length === 0) {{
+                        rows = document.querySelectorAll('table.changelist tbody tr');
+                    }}
+                    if (rows.length === 0) {{
+                        rows = document.querySelectorAll('table tbody tr');
+                    }}
                     let nextProductLink = null;
                     
                     for (const row of rows) {{
@@ -1108,11 +1115,11 @@ def get_brand_filter_config(
                     }}
                     
                     if (nextProductLink) {{
-                        console.log('Przechodzę do następnego produktu:', nextProductLink);
-                        window.location.href = nextProductLink;
+                        console.log('Przechodzę do następnego produktu - zwracam URL do nawigacji przez Playwright:', nextProductLink);
                         return {{
                             next_product_found: true,
                             next_product_url: nextProductLink,
+                            navigate_to_url: nextProductLink,  // URL do nawigacji przez Playwright
                             products_processed: productsProcessed,
                             max_products: maxProducts
                         }};
@@ -1150,6 +1157,68 @@ def get_brand_filter_config(
                     const productUid = document.querySelector('input[name="product_uid"]')?.value || '';
                     const productColor = document.querySelector('input[name="color"]')?.value || '';
                     const isMapped = document.querySelector('input[name="is_mapped"]')?.checked || false;
+                    
+                    // WAŻNE: Sprawdź czy produkt jest już zmapowany PRZED dalszym przetwarzaniem
+                    // Jeśli jest zmapowany, pomiń ten produkt i przejdź do następnego
+                    // Sprawdź również mapped_product_uid - jeśli istnieje, produkt jest zmapowany
+                    const mappedProductUid = document.querySelector('input[name="mapped_product_uid"]')?.value || '';
+                    const hasMappedUid = mappedProductUid && mappedProductUid.trim() !== '' && mappedProductUid.trim() !== '-';
+                    
+                    // Sprawdź również w fieldset (może być wyświetlony inaczej)
+                    const fieldsetText = document.querySelector('.field-mapped_product_uid')?.textContent || '';
+                    const hasMappedUidInFieldset = fieldsetText && fieldsetText.trim() !== '' && fieldsetText.trim() !== '-';
+                    
+                    const isReallyMapped = isMapped || hasMappedUid || hasMappedUidInFieldset;
+                    
+                    console.log('=== SPRAWDZANIE CZY PRODUKT JEST ZMAPOWANY ===');
+                    console.log('isMapped (checkbox):', isMapped);
+                    console.log('mapped_product_uid (input):', mappedProductUid);
+                    console.log('hasMappedUid:', hasMappedUid);
+                    console.log('hasMappedUidInFieldset:', hasMappedUidInFieldset);
+                    console.log('isReallyMapped:', isReallyMapped);
+                    
+                    if (isReallyMapped) {
+                        console.log('✅ Produkt jest już zmapowany - pomijam i przechodzę do następnego');
+                        
+                        // Zwiększ licznik przetworzonych produktów (pomijamy ten, ale liczymy go jako przetworzony)
+                        const productsProcessed = parseInt(sessionStorage.getItem('products_processed') || '0') + 1;
+                        sessionStorage.setItem('products_processed', productsProcessed.toString());
+                        
+                        // Zwróć informację o potrzebie nawigacji do listy produktów
+                        // NIE używamy window.location.href - zamiast tego zwracamy URL do nawigacji przez Playwright
+                        const changelistUrl = sessionStorage.getItem('changelist_url');
+                        if (changelistUrl) {
+                            console.log('Produkt jest zmapowany - zwracam URL do nawigacji przez Playwright:', changelistUrl);
+                            return {
+                                product_id: productId,
+                                product_name: productName,
+                                is_mapped: true,
+                                has_mapped_uid: hasMappedUid || hasMappedUidInFieldset,
+                                skip: true,
+                                reason: 'already_mapped',
+                                message: 'Produkt jest już zmapowany - przechodzę do następnego',
+                                can_continue: true,
+                                next_product_found: true,  // Przechodzimy do następnego produktu
+                                navigate_to_url: changelistUrl,  // URL do nawigacji przez Playwright
+                                products_processed: productsProcessed
+                            };
+                        }
+                        
+                        // Jeśli nie ma changelist_url, zwróć informację że trzeba przejść do następnego
+                        return {
+                            product_id: productId,
+                            product_name: productName,
+                            is_mapped: true,
+                            has_mapped_uid: hasMappedUid || hasMappedUidInFieldset,
+                            skip: true,
+                            reason: 'already_mapped',
+                            message: 'Produkt jest już zmapowany - pomijam',
+                            can_continue: true,
+                            next_product_found: true  // Agent powinien przejść do następnego produktu
+                        };
+                    }
+                    
+                    console.log('❌ Produkt NIE jest zmapowany - przetwarzam dalej');
                     
                     // Pobierz suggested_products z tabeli HTML
                     const suggestedTable = document.querySelector('table tbody');
@@ -2685,8 +2754,11 @@ def get_brand_filter_config(
                     
                     // Nawiguj tylko jeśli produkt został zmapowany
                     if (shouldReturn && shouldReturn.should_return) {
-                        window.location.href = shouldReturn.changelist_url;
-                        return { navigating_back: true };
+                        console.log('Produkt został zmapowany - zwracam URL do nawigacji przez Playwright:', shouldReturn.changelist_url);
+                        return { 
+                            navigating_back: true,
+                            navigate_to_url: shouldReturn.changelist_url  // URL do nawigacji przez Playwright
+                        };
                     }
                     return { navigating_back: false };
                 })()'''
@@ -2716,7 +2788,7 @@ def get_brand_filter_config(
             },
             {
                 'type': 'wait_for',
-                'selector': 'table#result_list tbody tr',
+                'selector': 'table.changelist tbody tr, table#result_list tbody tr, table tbody tr',
                 'timeout': 10000,
                 'optional': True
             },
@@ -2765,10 +2837,11 @@ def get_brand_filter_config(
                             next_product_found: true,
                             next_product_url: nextProductLink
                         };
-                        window.location.href = nextProductLink;
+                        console.log('Przechodzę do następnego produktu - zwracam URL do nawigacji przez Playwright:', nextProductLink);
                         return {
                             next_product_found: true,
                             next_product_url: nextProductLink,
+                            navigate_to_url: nextProductLink,  // URL do nawigacji przez Playwright
                             navigating: true
                         };
                     }
@@ -3000,10 +3073,49 @@ def get_brand_filter_config(
                     return result;
                 })()'''
             },
-            # Poczekaj jeszcze chwilę na pełne przeładowanie strony po utworzeniu produktu
+            # WAŻNE: Poczekaj dłużej na pełne przeładowanie strony i aktualizację bazy danych
+            # Po utworzeniu produktu, Django musi zaktualizować is_mapped w bazie
+            # Jeśli wrócimy za szybko do listy, produkt może jeszcze nie być oznaczony jako zmapowany
             {
                 'type': 'wait',
-                'seconds': 5
+                'seconds': 8  # Zwiększone z 5 do 8 sekund - dajemy czas na aktualizację bazy
+            },
+            # Sprawdź ponownie czy produkt został utworzony i czy is_mapped jest zaktualizowane
+            {
+                'type': 'evaluate',
+                'expression': '''(() => {
+                    console.log('=== SPRAWDZANIE PO OSTATECZNYM OCZEKIWANIU ===');
+                    const isMappedInput = document.querySelector('input[name="is_mapped"]');
+                    const isMappedValue = isMappedInput?.value === 'True' || isMappedInput?.checked === true;
+                    const isMappedDisplay = document.querySelector('.field-is_mapped')?.textContent?.trim() === 'True' ||
+                                          document.querySelector('.field-is_mapped img[alt="True"]') !== null;
+                    const isMapped = isMappedValue || isMappedDisplay;
+                    
+                    const mappedProductUid = document.querySelector('input[name="mapped_product_uid"]')?.value || '';
+                    const hasMappedUid = mappedProductUid && mappedProductUid.trim() !== '' && mappedProductUid.trim() !== '-';
+                    
+                    console.log('Po oczekiwaniu - is_mapped:', isMapped);
+                    console.log('Po oczekiwaniu - mapped_product_uid:', mappedProductUid);
+                    console.log('Po oczekiwaniu - hasMappedUid:', hasMappedUid);
+                    
+                    // Zaktualizuj window.__productCreated z najnowszymi danymi
+                    if (window.__productCreated) {
+                        window.__productCreated.is_mapped = isMapped;
+                        window.__productCreated.has_mapped_uid = hasMappedUid;
+                        window.__productCreated.mapped_product_uid = mappedProductUid;
+                        if (isMapped || hasMappedUid) {
+                            window.__productCreated.product_created = true;
+                        }
+                    }
+                    
+                    return {
+                        final_check: true,
+                        is_mapped: isMapped,
+                        has_mapped_uid: hasMappedUid,
+                        mapped_product_uid: mappedProductUid,
+                        product_created: isMapped || hasMappedUid
+                    };
+                })()'''
             },
             # Sprawdź czy mapped_product_uid jest już dostępne (może wymagać przeładowania strony)
             {
@@ -3232,12 +3344,15 @@ def get_brand_filter_config(
             {
                 'type': 'evaluate',
                 'expression': '''(() => {
+                    console.log('=== SPRAWDZANIE CZY PRODUKT ZOSTAŁ UTWORZONY ===');
                     // Sprawdź czy produkt został utworzony - użyj wyniku z poprzedniej akcji
                     const productCreatedResult = window.__productCreated || {};
                     const productCreated = productCreatedResult.product_created === true;
+                    console.log('Product created (z window.__productCreated):', productCreated);
                     
                     // Jeśli nie ma wyniku, sprawdź ręcznie
                     if (!productCreated) {
+                        console.log('Sprawdzam ręcznie czy produkt został utworzony...');
                         const statusMsg = document.getElementById('status-message');
                         const isMappedInput = document.querySelector('input[name="is_mapped"]');
                         const isMappedValue = isMappedInput?.value === 'True' || isMappedInput?.checked === true;
@@ -3256,9 +3371,16 @@ def get_brand_filter_config(
                             statusText.toLowerCase().includes('sukces')
                         );
                         
+                        console.log('Status message:', statusText);
+                        console.log('is_mapped:', isMapped);
+                        console.log('has_mapped_uid:', hasMappedUid);
+                        console.log('has_success_message:', hasSuccessMessage);
+                        
                         const productCreatedManual = hasSuccessMessage || isMapped || hasMappedUid;
+                        console.log('Product created (ręcznie):', productCreatedManual);
                         
                         if (!productCreatedManual) {
+                            console.log('Produkt NIE został jeszcze utworzony - czekam...');
                             return {
                                 navigating_back: false,
                                 reason: 'product_not_created_yet',
@@ -3270,16 +3392,22 @@ def get_brand_filter_config(
                         }
                     }
                     
+                    console.log('✅ Produkt został utworzony - przechodzę do listy produktów');
+                    
                     // Zwiększ licznik przetworzonych produktów
                     const productsProcessed = parseInt(sessionStorage.getItem('products_processed') || '0') + 1;
                     sessionStorage.setItem('products_processed', productsProcessed.toString());
+                    console.log('Licznik przetworzonych produktów:', productsProcessed);
                     
                     // Sprawdź czy już jesteśmy na liście produktów (strona się przeładowała i wróciła do produktu)
                     const isChangelist = window.location.pathname.includes('/admin/matterhorn1/product/') && 
                                        !window.location.pathname.match(/\\/\\d+\\/change\\//);
+                    console.log('Czy jesteśmy na liście produktów:', isChangelist);
+                    console.log('Obecny URL:', window.location.href);
                     
                     if (isChangelist) {
                         // Już jesteśmy na liście, nie trzeba nawigować
+                        console.log('Już jesteśmy na liście produktów - nie trzeba nawigować');
                         return {
                             navigating_back: false,
                             already_on_changelist: true,
@@ -3289,17 +3417,23 @@ def get_brand_filter_config(
                     }
                     
                     const changelistUrl = sessionStorage.getItem('changelist_url');
+                    console.log('Zapisany changelist_url:', changelistUrl);
+                    
                     if (changelistUrl) {
-                        window.location.href = changelistUrl;
+                        // WAŻNE: Zwróć URL do nawigacji przez Playwright zamiast window.location.href
+                        // To zapobiega problemom z zamkniętą przeglądarką
+                        console.log('🔄 Wracam do listy produktów - zwracam URL do nawigacji przez Playwright:', changelistUrl);
                         return {
                             navigating_back: true,
-                            url: changelistUrl,
-                            products_processed: productsProcessed
+                            navigate_to_url: changelistUrl,  // URL do nawigacji przez Playwright
+                            products_processed: productsProcessed,
+                            note: 'Odświeżam listę produktów aby zaktualizować status is_mapped'
                         };
                     }
                     
                     // Jeśli nie ma zapisanego URL, skonstruuj go z obecnego URL
                     const currentUrl = window.location.href;
+                    console.log('Brak zapisanego URL, konstruuję z obecnego URL:', currentUrl);
                     const changelistMatch = currentUrl.match(/admin\\/matterhorn1\\/product\\/(\\d+)\\/change\\//);
                     if (changelistMatch) {
                         // Wyciągnij parametry z URL
@@ -3310,25 +3444,71 @@ def get_brand_filter_config(
                         
                         const baseUrl = currentUrl.split('/admin/')[0];
                         const changelistUrl = `${baseUrl}/admin/matterhorn1/product/?brand__id__exact=${brandId}&active__exact=${active}&is_mapped__exact=${isMapped}`;
-                        window.location.href = changelistUrl;
+                        console.log('Skonstruowany URL:', changelistUrl);
                         return {
                             navigating_back: true,
-                            url: changelistUrl,
+                            navigate_to_url: changelistUrl,  // URL do nawigacji przez Playwright
                             constructed: true
                         };
                     }
                     
+                    console.error('❌ Nie można skonstruować URL do listingu');
                     return {
                         navigating_back: false,
-                        error: 'Nie można skonstruować URL do listingu'
+                        error: 'Nie można skonstruować URL do listingu',
+                        current_url: currentUrl
                     };
+                })()'''
+            },
+            # Poczekaj na przeładowanie strony po nawigacji (nawigacja przez Playwright czeka automatycznie, ale dajemy dodatkowy czas)
+            {
+                'type': 'wait',
+                'seconds': 2
+            },
+            # Poczekaj na załadowanie listingu - sprawdź czy jesteśmy na właściwej stronie
+            {
+                'type': 'evaluate',
+                'expression': '''(() => {
+                    console.log('=== SPRAWDZANIE CZY JESTEŚMY NA LIŚCIE PRODUKTÓW ===');
+                    const currentPath = window.location.pathname;
+                    const isChangelist = currentPath.includes('/admin/matterhorn1/product/') && 
+                                       !currentPath.match(/\\/\\d+\\/change\\//);
+                    console.log('Obecna ścieżka:', currentPath);
+                    console.log('Czy jesteśmy na liście produktów:', isChangelist);
+                    
+                    if (!isChangelist) {
+                        console.log('⚠️ NIE jesteśmy na liście produktów - czekam dalej...');
+                        return { skip_wait: false, waiting_for_changelist: true, current_path: currentPath };
+                    }
+                    
+                    console.log('✅ Jesteśmy na liście produktów');
+                    return { skip_wait: false, on_changelist: true, current_path: currentPath };
                 })()'''
             },
             # Poczekaj na załadowanie listingu
             {
                 'type': 'wait_for',
-                'selector': 'table#result_list tbody tr',
-                'timeout': 15000
+                'selector': 'table.changelist tbody tr, table#result_list tbody tr, table tbody tr',
+                'timeout': 20000  # Zwiększony timeout
+            },
+            # Dodatkowe sprawdzenie czy tabela jest załadowana
+            {
+                'type': 'evaluate',
+                'expression': '''(() => {
+                    console.log('=== SPRAWDZANIE CZY TABELA JEST ZAŁADOWANA ===');
+                    const table = document.querySelector('table#result_list tbody');
+                    const rows = table ? table.querySelectorAll('tr') : [];
+                    console.log('Liczba wierszy w tabeli:', rows.length);
+                    console.log('Tabela istnieje:', !!table);
+                    
+                    if (rows.length === 0) {
+                        console.log('⚠️ Tabela jest pusta lub nie załadowana');
+                        return { table_loaded: false, rows_count: 0 };
+                    }
+                    
+                    console.log('✅ Tabela jest załadowana, liczba wierszy:', rows.length);
+                    return { table_loaded: true, rows_count: rows.length };
+                })()'''
             },
             # Przejdź do następnego niezmapowanego produktu z listy (z limitem max_products)
             {
@@ -3349,27 +3529,53 @@ def get_brand_filter_config(
                     }}
                     
                     // Znajdź pierwszy produkt z listy, który nie jest jeszcze zmapowany
-                    const rows = document.querySelectorAll('table#result_list tbody tr');
+                    // Użyj różnych selektorów dla kompatybilności
+                    let rows = document.querySelectorAll('table#result_list tbody tr');
+                    if (rows.length === 0) {{
+                        rows = document.querySelectorAll('table.changelist tbody tr');
+                    }}
+                    if (rows.length === 0) {{
+                        rows = document.querySelectorAll('table tbody tr');
+                    }}
                     let nextProductLink = null;
                     
-                    for (const row of rows) {{
+                    console.log('=== SZUKANIE NASTĘPNEGO NIEZMAPOWANEGO PRODUKTU ===');
+                    console.log('Liczba wierszy w tabeli:', rows.length);
+                    
+                    for (let idx = 0; idx < rows.length; idx++) {{
+                        const row = rows[idx];
                         const link = row.querySelector('td.field-name a');
                         const isMappedCell = row.querySelector('td.field-is_mapped');
-                        const isMapped = isMappedCell?.textContent?.trim() === 'True' || 
-                                        isMappedCell?.querySelector('img[alt="True"]') !== null;
+                        
+                        // Sprawdź is_mapped na kilka sposobów
+                        const isMappedText = isMappedCell?.textContent?.trim() || '';
+                        const isMappedImg = isMappedCell?.querySelector('img[alt="True"]') !== null;
+                        const isMapped = isMappedText === 'True' || isMappedImg;
+                        
+                        const productName = link?.textContent?.trim() || '';
+                        const productId = link?.href?.match(/\\/(\\d+)\\/change\\//)?.[1] || 'unknown';
+                        
+                        console.log('Wiersz ' + (idx + 1) + ': ID=' + productId + ', Nazwa="' + productName.substring(0, 50) + '...", is_mapped=' + isMapped);
                         
                         if (link && !isMapped) {{
                             nextProductLink = link.href;
+                            console.log('Znaleziono niezmapowany produkt: ' + nextProductLink);
                             break;
+                        }} else if (link && isMapped) {{
+                            console.log('Produkt ' + productId + ' jest już zmapowany - pomijam');
                         }}
                     }}
                     
+                    if (!nextProductLink) {{
+                        console.log('❌ Nie znaleziono żadnego niezmapowanego produktu');
+                    }}
+                    
                     if (nextProductLink) {{
-                        console.log('Przechodzę do następnego produktu po utworzeniu:', nextProductLink);
-                        window.location.href = nextProductLink;
+                        console.log('Przechodzę do następnego produktu po utworzeniu - zwracam URL do nawigacji przez Playwright:', nextProductLink);
                         return {{
                             next_product_found: true,
                             next_product_url: nextProductLink,
+                            navigate_to_url: nextProductLink,  // URL do nawigacji przez Playwright
                             products_processed: productsProcessed,
                             max_products: maxProducts
                         }};
@@ -3418,7 +3624,14 @@ def get_brand_filter_config(
                     
                     if (isChangelist) {{
                         // Sprawdź czy są jeszcze niezmapowane produkty
-                        const rows = document.querySelectorAll('table#result_list tbody tr');
+                        // Użyj różnych selektorów dla kompatybilności
+                        let rows = document.querySelectorAll('table#result_list tbody tr');
+                        if (rows.length === 0) {{
+                            rows = document.querySelectorAll('table.changelist tbody tr');
+                        }}
+                        if (rows.length === 0) {{
+                            rows = document.querySelectorAll('table tbody tr');
+                        }}
                         let hasUnmapped = false;
                         
                         for (const row of rows) {{
@@ -3462,7 +3675,7 @@ def create_brand_automation_task_config(
     category_name: str = None,
     active: bool = True,
     is_mapped: bool = False,
-    base_url: str = 'http://localhost:8000',
+    base_url: str = 'http://localhost:8080',
     username: str = None,
     password: str = None,
     env_file: str = '.env.dev',
@@ -3520,7 +3733,7 @@ def create_brand_automation_task_config(
 
 
 def create_automation_tasks_for_all_brands(
-    base_url: str = 'http://localhost:8000',
+    base_url: str = 'http://localhost:8080',
     username: str = None,
     password: str = None,
     env_file: str = '.env.dev',

@@ -3,10 +3,10 @@ Komenda Django do tworzenia zadań automatyzacji dla każdej marki osobno
 """
 from django.core.management.base import BaseCommand
 from web_agent.models import WebAgentTask
-from web_agent.brand_automation import (
+from web_agent.config_builders import (
     get_all_brands,
     get_all_categories,
-    create_brand_automation_task_config
+    create_brand_task_config
 )
 
 
@@ -141,7 +141,7 @@ class Command(BaseCommand):
                 )
                 return
 
-            task_config = create_brand_automation_task_config(
+            task_config = create_brand_task_config(
                 brand_id=brand_id,
                 brand_name=brand_name,
                 category_id=category_id,

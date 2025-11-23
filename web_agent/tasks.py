@@ -7,20 +7,16 @@ from .models import WebAgentTask, WebAgentLog
 
 logger = logging.getLogger(__name__)
 
-# Import funkcji przeglądarki z obsługą błędów
+# Import nowego agenta
 try:
-    from .browser_automation import scrape_with_browser, execute_browser_actions
-    PLAYWRIGHT_AVAILABLE = True
+    from .agent import run_agent_sync
+    AGENT_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f'Playwright nie jest dostępny: {str(e)}. Funkcje przeglądarki będą niedostępne.')
-    PLAYWRIGHT_AVAILABLE = False
+    logger.warning(f'Nowy agent nie jest dostępny: {str(e)}. Funkcje automatyzacji będą niedostępne.')
+    AGENT_AVAILABLE = False
     
-    # Stwórz funkcje zastępcze
-    def scrape_with_browser(*args, **kwargs):
-        raise ImportError('Playwright nie jest zainstalowany. Zainstaluj: pip install playwright && playwright install chromium')
-    
-    def execute_browser_actions(*args, **kwargs):
-        raise ImportError('Playwright nie jest zainstalowany. Zainstaluj: pip install playwright && playwright install chromium')
+    def run_agent_sync(*args, **kwargs):
+        raise ImportError('Agent nie jest dostępny. Sprawdź instalację Playwright.')
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), max_retries=3, countdown=60)
@@ -326,49 +322,107 @@ def perform_automation_task(task):
     """Wykonuje zadanie automatyzacji - obsługuje zarówno HTTP jak i akcje przeglądarki"""
     try:
         config = task.config
-        actions = config.get('actions', [])
-
-        if not actions:
-            raise ValueError('Lista akcji nie została podana')
-
-        # Sprawdź czy są akcje przeglądarki
-        browser_actions = []
-        other_actions = []
-
-        for action in actions:
-            action_type = action.get('type')
-            # Akcje przeglądarki wymagają Playwright
-            if action_type in ['navigate', 'click', 'fill', 'fill_form', 'wait_for',
-                               'screenshot', 'evaluate', 'get_text']:
-                browser_actions.append(action)
-            else:
-                other_actions.append(action)
-
         results = []
-
-        # Wykonaj akcje przeglądarki jeśli są
-        if browser_actions:
+        
+        # Sprawdź czy to nowy format konfiguracji (z products_url)
+        if config.get('products_url') and AGENT_AVAILABLE:
+            # Nowy format - użyj nowego agenta
             headless = config.get('headless', True)
-            logger.info(
-                f'Wykonywanie {len(browser_actions)} akcji przeglądarki')
-
-            browser_results = execute_browser_actions(
-                browser_actions, headless=headless)
-
-            for browser_result in browser_results:
-                results.append(browser_result)
-
-                # Dodaj log o akcji
-                WebAgentLog.objects.create(
-                    task=task,
-                    level='INFO' if browser_result.get('success') else 'ERROR',
-                    message=f'Wykonano akcję przeglądarki: {browser_result.get("action")}',
-                    extra_data={
-                        'action': browser_result.get('action'),
-                        'result': browser_result,
-                        'success': browser_result.get('success')
-                    }
+            base_url = config.get('base_url', task.url)
+            products_url = config.get('products_url')
+            max_products = config.get('max_products', 10)
+            username = config.get('username')
+            password = config.get('password')
+            
+            logger.info(f'Używam nowego agenta dla zadania {task.id}')
+            logger.info(f'  Base URL: {base_url}')
+            logger.info(f'  Products URL: {products_url}')
+            logger.info(f'  Max products: {max_products}')
+            
+            try:
+                result = run_agent_sync(
+                    base_url=base_url,
+                    products_url=products_url,
+                    headless=headless,
+                    username=username,
+                    password=password,
+                    max_products=max_products
                 )
+                
+                # Konwertuj wyniki do formatu kompatybilnego
+                for r in result.get('results', []):
+                    action_type = r.get('action_type', 'unknown')
+                    results.append({
+                        'action': action_type,
+                        'success': r.get('success', False),
+                        'result': r.get('data', {}),
+                        'error': r.get('error')
+                    })
+                    
+                    # Dodaj log o akcji
+                    WebAgentLog.objects.create(
+                        task=task,
+                        level='INFO' if r.get('success') else 'ERROR',
+                        message=f'Wykonano akcję: {action_type}',
+                        extra_data={
+                            'action': action_type,
+                            'result': r,
+                            'success': r.get('success')
+                        }
+                    )
+                    
+            except Exception as e:
+                logger.error(f'Błąd nowego agenta: {str(e)}')
+                raise
+                
+        else:
+            # Stary format - użyj starego agenta (fallback)
+            actions = config.get('actions', [])
+            
+            if not actions:
+                raise ValueError('Lista akcji nie została podana lub brak products_url w konfiguracji')
+            
+            logger.warning(f'Zadanie {task.id} używa starego formatu konfiguracji')
+            
+            # Sprawdź czy są akcje przeglądarki
+            browser_actions = []
+            other_actions = []
+
+            for action in actions:
+                action_type = action.get('type')
+                # Akcje przeglądarki wymagają Playwright
+                if action_type in ['navigate', 'click', 'fill', 'fill_form', 'wait_for',
+                                   'screenshot', 'evaluate', 'get_text']:
+                    browser_actions.append(action)
+                else:
+                    other_actions.append(action)
+
+            # Wykonaj akcje przeglądarki jeśli są
+            if browser_actions:
+                headless = config.get('headless', True)
+                logger.info(f'Wykonywanie {len(browser_actions)} akcji przeglądarki (stary format)')
+
+                try:
+                    from .deprecated.browser_automation import execute_browser_actions
+                    browser_results = execute_browser_actions(browser_actions, headless=headless)
+                except ImportError:
+                    logger.error('Stary agent nie jest dostępny w deprecated/')
+                    raise
+
+                for browser_result in browser_results:
+                    results.append(browser_result)
+
+                    # Dodaj log o akcji
+                    WebAgentLog.objects.create(
+                        task=task,
+                        level='INFO' if browser_result.get('success') else 'ERROR',
+                        message=f'Wykonano akcję przeglądarki: {browser_result.get("action")}',
+                        extra_data={
+                            'action': browser_result.get('action'),
+                            'result': browser_result,
+                            'success': browser_result.get('success')
+                        }
+                    )
 
         # Wykonaj pozostałe akcje (HTTP, przetwarzanie danych)
         for action in other_actions:

@@ -16,7 +16,7 @@ def load_env_vars(env_file: str = '.env.dev') -> Dict[str, str]:
 
 
 def get_django_admin_login_config(
-    base_url: str = 'http://localhost:8000',
+    base_url: str = 'http://localhost:8080',
     username: str = None,
     password: str = None,
     env_file: str = '.env.dev'
@@ -97,7 +97,7 @@ def get_django_admin_login_config(
 
 
 def get_django_admin_products_config(
-    base_url: str = 'http://localhost:8000',
+    base_url: str = 'http://localhost:8080',
     username: str = None,
     password: str = None,
     env_file: str = '.env.dev'
@@ -170,6 +170,6 @@ def create_automation_task_config(config_type: str = 'products', **kwargs) -> Di
     return {
         'name': f'Django Admin - {config_type.capitalize()}',
         'task_type': 'automation',
-        'url': kwargs.get('base_url', 'http://localhost:8000'),
+        'url': kwargs.get('base_url', 'http://localhost:8080'),
         'config': config
     }

@@ -4,9 +4,9 @@ Użycie: python manage.py create_brand_task --brand-name "Marko" --settings=nc.s
 """
 from django.core.management.base import BaseCommand
 from web_agent.models import WebAgentTask
-from web_agent.brand_automation import (
+from web_agent.config_builders import (
     get_all_brands,
-    create_brand_automation_task_config
+    create_brand_task_config
 )
 
 
@@ -118,7 +118,7 @@ class Command(BaseCommand):
         )
 
         # Utwórz konfigurację zadania
-        task_config = create_brand_automation_task_config(
+        task_config = create_brand_task_config(
             brand_id=brand_id,
             brand_name=brand_name,
             active=active,

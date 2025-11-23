@@ -3,6 +3,7 @@ Moduł do automatyzacji przeglądarki używając Playwright
 """
 import logging
 import asyncio
+import traceback
 from typing import Dict, List, Optional, Any
 from playwright.async_api import async_playwright, Browser, Page, BrowserContext
 from django.utils import timezone
@@ -83,7 +84,9 @@ class BrowserAutomation:
                     'Strona nie została utworzona. Wywołaj start() najpierw.')
 
             await self.page.goto(url, wait_until=wait_until, timeout=timeout)
-            logger.info(f'Nawigacja do: {url}')
+            logger.info(f'📍 Nawigacja do: {url}')
+            logger.info(
+                f'   Obecny URL przed nawigacją: {self.page.url if hasattr(self, "page") and self.page else "N/A"}')
 
             return {
                 'url': url,
@@ -128,7 +131,20 @@ class BrowserAutomation:
                 raise RuntimeError('Strona nie została utworzona.')
 
             await self.page.click(selector, timeout=timeout)
-            logger.info(f'Kliknięcie w element: {selector}')
+            logger.info(f'🖱️  Kliknięcie w element: {selector}')
+            logger.info(f'   Sprawdzam czy element istnieje...')
+            element_exists = await self.page.locator(selector).count() > 0
+            logger.info(f'   Element istnieje: {element_exists}')
+            if not element_exists:
+                logger.warning(f'   ⚠️  Element nie istnieje na stronie!')
+                logger.info(f'   Obecny URL: {self.page.url}')
+                try:
+                    page_content = await self.page.content()
+                    logger.info(
+                        f'   Zawartość strony (pierwsze 500 znaków): {page_content[:500]}')
+                except Exception as e:
+                    logger.warning(
+                        f'   Nie można pobrać zawartości strony: {str(e)}')
 
             return {
                 'action': 'click',
@@ -217,7 +233,12 @@ class BrowserAutomation:
             }
 
         except Exception as e:
-            logger.error(f'Błąd podczas oczekiwania: {str(e)}')
+            logger.error(f'❌ Błąd podczas oczekiwania: {str(e)}')
+            logger.error(f'   Selector: {selector}')
+            logger.error(f'   Text: {text}')
+            logger.error(f'   Timeout: {timeout}ms')
+            import traceback
+            logger.error(f'   Traceback: {traceback.format_exc()}')
             raise
 
     async def take_screenshot(self, full_page: bool = False, path: Optional[str] = None):
@@ -256,7 +277,11 @@ class BrowserAutomation:
             }
 
         except Exception as e:
-            logger.error(f'Błąd podczas wykonywania JavaScript: {str(e)}')
+            logger.error(f'❌ Błąd podczas wykonywania JavaScript: {str(e)}')
+            logger.error(
+                f'   Expression (pierwsze 500 znaków): {expression[:500] if expression else "None"}')
+            import traceback
+            logger.error(f'   Traceback: {traceback.format_exc()}')
             raise
 
     async def get_text(self, selector: str):
@@ -281,6 +306,9 @@ class BrowserAutomation:
 
     async def execute_actions(self, actions: List[Dict[str, Any]]):
         """Wykonuje listę akcji z obsługą pętli dla produktów"""
+        logger.info(f'🚀 Rozpoczynam wykonywanie {len(actions)} akcji')
+        logger.info(
+            f'📋 Pierwsze 5 akcji: {[a.get("type") for a in actions[:5]]}')
         results = []
 
         # Znajdź indeks akcji która zaczyna sekwencję produktu
@@ -322,6 +350,12 @@ class BrowserAutomation:
             iteration += 1
             action = actions[i]
             action_type = action.get('type')
+
+            logger.info(
+                f'📋 Wykonuję akcję {i+1}/{len(actions)}: {action_type} (iteracja: {iteration})')
+            if action_type in ['navigate', 'click', 'fill']:
+                logger.info(
+                    f'   Szczegóły: {action.get("url") or action.get("selector") or action.get("value", "")[:50]}')
 
             try:
                 if action_type == 'navigate':
@@ -634,6 +668,29 @@ class BrowserAutomation:
                 else:
                     result = {'error': f'Nieznany typ akcji: {action_type}'}
 
+                # Loguj wynik akcji
+                if 'error' in result:
+                    logger.error(
+                        f'❌ Akcja {i+1} zakończona błędem: {result.get("error", "Unknown error")}')
+                else:
+                    logger.info(f'✅ Akcja {i+1} zakończona pomyślnie')
+                    if isinstance(result, dict):
+                        # Loguj kluczowe informacje z wyniku
+                        if 'result' in result and isinstance(result['result'], dict):
+                            result_dict = result['result']
+                            if 'skip' in result_dict:
+                                logger.info(
+                                    f'   ⏭️  Pominięto: {result_dict.get("reason", "unknown")}')
+                            if 'next_product_found' in result_dict:
+                                logger.info(
+                                    f'   ➡️  Następny produkt: {result_dict.get("next_product_found", False)}')
+                            if 'product_created' in result_dict:
+                                logger.info(
+                                    f'   ✅ Produkt utworzony: {result_dict.get("product_created", False)}')
+                            if 'navigating_back' in result_dict:
+                                logger.info(
+                                    f'   🔙 Powrót do listy: {result_dict.get("navigating_back", False)}')
+
                 results.append({
                     'action': action_type,
                     'result': result,
@@ -646,6 +703,25 @@ class BrowserAutomation:
                     evaluate_result = result.get('result') if isinstance(
                         result, dict) and 'result' in result else result
                     if isinstance(evaluate_result, dict):
+                        # Sprawdź czy jest potrzeba nawigacji przez Playwright (zamiast window.location.href)
+                        navigate_to_url = evaluate_result.get(
+                            'navigate_to_url')
+                        if navigate_to_url:
+                            logger.info(
+                                f'🔄 Nawigacja przez Playwright do: {navigate_to_url}')
+                            try:
+                                await self.navigate(navigate_to_url, wait_until='load', timeout=30000)
+                                logger.info(
+                                    f'✅ Nawigacja zakończona pomyślnie')
+                                # Zaktualizuj wynik akcji
+                                evaluate_result['navigated'] = True
+                                evaluate_result['final_url'] = self.page.url if self.page else None
+                            except Exception as nav_error:
+                                logger.error(
+                                    f'❌ Błąd nawigacji: {str(nav_error)}')
+                                evaluate_result['navigation_error'] = str(
+                                    nav_error)
+
                         # Sprawdź czy automatyzacja powinna kontynuować (przejść do następnego produktu)
                         automation_completed = evaluate_result.get(
                             'automation_completed', False)
@@ -721,14 +797,21 @@ class BrowserAutomation:
 
             except Exception as e:
                 # Jeśli akcja jest opcjonalna, nie traktuj błędu jako krytyczny
-                if action.get('optional', False):
+                optional = action.get('optional', False)
+                if optional:
+                    logger.warning(
+                        f'⚠️ Błąd podczas wykonywania opcjonalnej akcji {action_type} (indeks {i}): {str(e)}')
                     results.append({
                         'action': action_type,
                         'error': str(e),
                         'success': False,
-                        'skipped': True
+                        'skipped': True,
+                        'optional': True
                     })
                 else:
+                    logger.error(
+                        f'❌ Błąd podczas wykonywania akcji {action_type} (indeks {i}): {str(e)}')
+                    logger.error(f'   Traceback: {traceback.format_exc()}')
                     results.append({
                         'action': action_type,
                         'error': str(e),

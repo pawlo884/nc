@@ -3,7 +3,7 @@ Komenda Django do tworzenia zadania automatyzacji dla Django Admin
 """
 from django.core.management.base import BaseCommand
 from web_agent.models import WebAgentTask
-from web_agent.django_admin_automation import create_automation_task_config
+from web_agent.config_builders import create_django_admin_task_config
 
 
 class Command(BaseCommand):
@@ -53,11 +53,11 @@ class Command(BaseCommand):
             f'Tworzenie zadania automatyzacji Django Admin ({config_type})...')
 
         # Utwórz konfigurację
-        task_config = create_automation_task_config(
-            config_type=config_type,
+        task_config = create_django_admin_task_config(
             base_url=base_url,
             username=username,
-            password=password
+            password=password,
+            config_type=config_type
         )
 
         # Użyj niestandardowej nazwy jeśli podano

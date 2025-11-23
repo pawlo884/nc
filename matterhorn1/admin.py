@@ -1074,6 +1074,26 @@ class ProductAdmin(admin.ModelAdmin):
 
                 logger.info(f"Rozpoczynam upload zdjęć dla produktu {product_id}, MPD ID: {product.mapped_product_uid}, liczba zdjęć: {images_count}")
                 
+                # Pobierz producer_color_name z MPD (zamiast product.color z matterhorn1)
+                producer_color_name = None
+                with connections['MPD'].cursor() as cursor:
+                    cursor.execute("""
+                        SELECT c.name
+                        FROM product_variants pv
+                        LEFT JOIN colors c ON pv.producer_color_id = c.id
+                        WHERE pv.product_id = %s
+                        LIMIT 1
+                    """, [product.mapped_product_uid])
+                    result = cursor.fetchone()
+                    if result:
+                        producer_color_name = result[0]
+                
+                # Jeśli nie znaleziono w MPD, użyj product.color jako fallback
+                if not producer_color_name:
+                    producer_color_name = product.color
+                
+                logger.info(f"Używam producer_color_name: {producer_color_name} (zamiast product.color: {product.color})")
+                
                 uploaded_images = []
                 errors = []
                 
@@ -1081,11 +1101,11 @@ class ProductAdmin(admin.ModelAdmin):
                     if image.image_url:
                         try:
                             logger.info(f"Upload zdjęcia {i}: {image.image_url}")
-                            # Upload do MinIO
+                            # Upload do MinIO - używaj producer_color_name z MPD, nie product.color
                             bucket_url = self._upload_image_to_bucket(
                                 image_url=image.image_url,
                                 product_id=product.mapped_product_uid,
-                                color_name=product.color,
+                                color_name=producer_color_name,
                                 image_number=i
                             )
                             
