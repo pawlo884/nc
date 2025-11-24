@@ -91,9 +91,12 @@ class Matterhorn1Router:
         if model._meta.app_label == 'matterhorn1':
             # Na produkcji używaj 'matterhorn1', lokalnie 'zzz_matterhorn1'
             from django.conf import settings
+            django_env = os.getenv('DJANGO_ENV')
+            if django_env == 'prod' and 'matterhorn1' in settings.DATABASES:
+                return 'matterhorn1'
             if 'zzz_matterhorn1' in settings.DATABASES:
                 return 'zzz_matterhorn1'
-            elif 'matterhorn1' in settings.DATABASES:
+            if 'matterhorn1' in settings.DATABASES:
                 return 'matterhorn1'
         return None
 
@@ -101,9 +104,12 @@ class Matterhorn1Router:
         if model._meta.app_label == 'matterhorn1':
             # Na produkcji używaj 'matterhorn1', lokalnie 'zzz_matterhorn1'
             from django.conf import settings
+            django_env = os.getenv('DJANGO_ENV')
+            if django_env == 'prod' and 'matterhorn1' in settings.DATABASES:
+                return 'matterhorn1'
             if 'zzz_matterhorn1' in settings.DATABASES:
                 return 'zzz_matterhorn1'
-            elif 'matterhorn1' in settings.DATABASES:
+            if 'matterhorn1' in settings.DATABASES:
                 return 'matterhorn1'
         return None
 
@@ -115,9 +121,12 @@ class Matterhorn1Router:
         if app_label == 'matterhorn1':
             # Na produkcji używaj 'matterhorn1', lokalnie 'zzz_matterhorn1'
             from django.conf import settings
+            django_env = os.getenv('DJANGO_ENV')
+            if django_env == 'prod' and 'matterhorn1' in settings.DATABASES:
+                return db == 'matterhorn1'
             if 'zzz_matterhorn1' in settings.DATABASES:
                 return db == 'zzz_matterhorn1'
-            elif 'matterhorn1' in settings.DATABASES:
+            if 'matterhorn1' in settings.DATABASES:
                 return db == 'matterhorn1'
         return None
 
