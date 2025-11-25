@@ -80,7 +80,6 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     # 'matterhorn',  # usunięta stara aplikacja
     'MPD',
-    'web_agent',
     'matterhorn1',
 ]
 
@@ -177,32 +176,6 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
-    'zzz_web_agent': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('WEB_AGENT_NAME'),
-        'USER': os.getenv('WEB_AGENT_USER'),
-        'PASSWORD': os.getenv('WEB_AGENT_PASSWORD'),
-        'HOST': os.getenv('WEB_AGENT_DB_HOST'),
-        'PORT': os.getenv('WEB_AGENT_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
-        'OPTIONS': {
-            'connect_timeout': 60,
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-    'web_agent': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('WEB_AGENT_NAME'),
-        'USER': os.getenv('WEB_AGENT_USER'),
-        'PASSWORD': os.getenv('WEB_AGENT_PASSWORD'),
-        'HOST': os.getenv('WEB_AGENT_DB_HOST'),
-        'PORT': os.getenv('WEB_AGENT_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
-        'OPTIONS': {
-            'connect_timeout': 60,
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
     'matterhorn1': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('MATTERHORN1_DB_NAME'),
@@ -234,7 +207,6 @@ DATABASES = {
 # Database routers
 DATABASE_ROUTERS = [
     'nc.db_routers.MPDRouter',
-    'nc.db_routers.WebAgentRouter',
     'nc.db_routers.Matterhorn1Router',
     'nc.db_routers.DefaultRouter',
 ]

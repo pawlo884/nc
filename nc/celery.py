@@ -14,7 +14,7 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
 # Explicit import tasków MPD (force registration)
-app.autodiscover_tasks(['MPD', 'matterhorn1', 'web_agent'])
+app.autodiscover_tasks(['MPD', 'matterhorn1'])
 
 # Konfiguracja tasków
 app.conf.update(
@@ -27,19 +27,12 @@ app.conf.update(
 
 # Konfiguracja routingu tasków - routing do odpowiednich kolejek
 app.conf.task_routes = {
-    # ML taski → kolejka 'ml' (osobny worker z PyTorch)
-    # 'web_agent.tasks.generate_embeddings': {'queue': 'ml'},  # do dodania gdy będą taski
-    # 'web_agent.tasks.semantic_search': {'queue': 'ml'},  # do dodania gdy będą taski
-    # 'web_agent.tasks.generate_product_embeddings': {'queue': 'ml'},  # do dodania gdy będą taski
-    # 'web_agent.tasks.find_similar_products': {'queue': 'ml'},  # do dodania gdy będą taski
-
     # Task importu trafia do kolejki 'import'
     'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
 
     # Pozostałe taski używają domyślnej kolejki
     'matterhorn1.tasks.*': {'queue': 'default'},
     'MPD.tasks.*': {'queue': 'default'},
-    'web_agent.tasks.*': {'queue': 'default'},
 }
 
 # Konfiguracja retry

@@ -68,16 +68,14 @@ numpy==2.2.0
 ### Routing tasków (`nc/celery.py`)
 ```python
 app.conf.task_routes = {
-    # ML taski → kolejka 'ml' (osobny worker z PyTorch)
-    'web_agent.tasks.generate_embeddings': {'queue': 'ml'},
-    'web_agent.tasks.semantic_search': {'queue': 'ml'},
-    
     # Import → kolejka 'import'
     'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
-    
+
     # Reszta → kolejka 'default'
     'matterhorn1.tasks.*': {'queue': 'default'},
+    'MPD.tasks.*': {'queue': 'default'},
 }
+# Kolejka 'ml' zostanie dodana przy pierwszym zadaniu ML.
 ```
 
 ---
@@ -157,7 +155,7 @@ docker-compose -f docker-compose.prod.ml.yml down
 - `requirements.ml.txt` - nowe pakiety ML
 - `Dockerfile.ml` - zmiana konfiguracji kontenera
 
-**NIE monitorowane**: `web_agent/tasks.py` - kod jest kopiowany w runtime, PyTorch już jest!
+**NIE monitorowane**: moduły z zadaniami ML (kod kopiowany w runtime, PyTorch już jest!)
 
 ### Rezultat:
 - 99% deploymentów: **3-5 minut** ⚡
@@ -181,7 +179,7 @@ docker-compose -f docker-compose.prod.ml.yml down
 
 ### Tworzenie taska ML:
 ```python
-# web_agent/tasks.py
+# ml_tasks.py
 from celery import shared_task
 
 @shared_task(queue='ml', bind=True)
@@ -201,21 +199,21 @@ def semantic_search(query, documents):
     """
     from sentence_transformers import SentenceTransformer
     from sklearn.metrics.pairwise import cosine_similarity
-    
+
     model = SentenceTransformer('all-MiniLM-L6-v2')
     query_embedding = model.encode([query])
     doc_embeddings = model.encode(documents)
-    
+
     similarities = cosine_similarity(query_embedding, doc_embeddings)[0]
     top_indices = similarities.argsort()[-5:][::-1]
-    
+
     return [{'index': int(i), 'score': float(similarities[i])} for i in top_indices]
 ```
 
 ### Wywołanie:
 ```python
 # Z dowolnego miejsca w Django
-from web_agent.tasks import generate_embeddings
+from ml_tasks import generate_embeddings
 
 result = generate_embeddings.delay(['tekst 1', 'tekst 2'])
 embeddings = result.get(timeout=30)
@@ -314,7 +312,7 @@ TORCH_HOME=/app/ml_models/torch
 
 ## 📝 TODO - Implementacja tasków ML
 
-Gdy będzie potrzeba ML, dodaj taski w `web_agent/tasks.py`:
+Gdy będzie potrzeba ML, dodaj taski w dedykowanym module (np. `ml_tasks.py`):
 
 - [ ] `generate_embeddings` - generowanie embeddingów dla tekstów
 - [ ] `semantic_search` - wyszukiwanie semantyczne

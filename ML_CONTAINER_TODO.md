@@ -34,16 +34,14 @@ Osobny kontener Docker dla tasków ML (embeddings, semantic search) z PyTorch, a
 ### 4. Celery routing (nc/celery.py) ✅
 ```python
 app.conf.task_routes = {
-    # ML taski → kolejka 'ml'
-    'web_agent.tasks.generate_embeddings': {'queue': 'ml'},
-    'web_agent.tasks.semantic_search': {'queue': 'ml'},
-    
     # Import → kolejka 'import'
     'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
-    
+
     # Reszta → kolejka 'default'
     'matterhorn1.tasks.*': {'queue': 'default'},
+    'MPD.tasks.*': {'queue': 'default'},
 }
+# Kolejka 'ml' zostanie dodana razem z pierwszym zadaniem ML.
 ```
 
 ### 5. GitHub Actions ✅

@@ -38,7 +38,6 @@ urlpatterns = [
         '<li><a href="/admin/">Admin Panel</a></li>'
         '<li><a href="/mpd/">MPD Application</a></li>'
         '<li><a href="/matterhorn1/">Matterhorn1 Application</a></li>'
-        '<li><a href="/web_agent/">Web Agent Application</a></li>'
         '</ul></body></html>'
     )),
 ]
@@ -58,7 +57,6 @@ urlpatterns += i18n_patterns(
     # path('matterhorn/', include('matterhorn.urls')),  # stara aplikacja usunięta
     path('mpd/', include('MPD.urls')),
     path('matterhorn1/', include('matterhorn1.urls')),
-    path('web_agent/', include('web_agent.urls')),
     prefix_default_language=False
 )
 

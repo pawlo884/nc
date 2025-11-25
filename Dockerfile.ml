@@ -35,7 +35,6 @@ COPY manage.py .
 COPY nc/ ./nc/
 COPY matterhorn1/ ./matterhorn1/
 COPY MPD/ ./MPD/
-COPY web_agent/ ./web_agent/
 COPY nginx.conf .
 COPY redis.conf .
 COPY package.json .

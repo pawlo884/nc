@@ -113,7 +113,6 @@ Upewnij się, że `.dockerignore` nie blokuje ważnych plików:
 !matterhorn/
 !matterhorn1/
 !MPD/
-!web_agent/
 !static/
 !nginx.conf
 !redis.conf

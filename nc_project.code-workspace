@@ -13,8 +13,7 @@
 			"${workspaceFolder}\\nc",
 			"${workspaceFolder}\\matterhorn",
 			"${workspaceFolder}\\matterhorn1",
-			"${workspaceFolder}\\MPD",
-			"${workspaceFolder}\\web_agent"
+			"${workspaceFolder}\\MPD"
 		],
 		"python.analysis.typeCheckingMode": "basic",
 		"python.testing.pytestEnabled": false,

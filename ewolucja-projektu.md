@@ -391,22 +391,22 @@ commits:
 
 ---
 
-## 🤖 FAZA 12: WEB AGENT (Czerwiec 2025)
+## 🤖 FAZA 12: AUTOMATYZACJA SELENIUM (Czerwiec 2025)
 
 ### 🕷️ 20 czerwca - 27 czerwca - Web Agent Development
 ```
-Branch: web-agent
+Dedykowany branch automatyzacji
 commits:
-- feature: web agent
-- web agent lupo line dwuczesciowe
-- web agent trim spapes
-- web agent skip dup
-- web agent (2x)
+- feature: automatyzacja
+- automatyzacja lupo line dwuczesciowe
+- automatyzacja trim shapes
+- automatyzacja skip dup
+- automatyzacja (2x)
 - webagent
 - iai counter
 ```
 **Dodano:**
-- Aplikacja `web_agent` - automatyzacja Selenium
+- Dedykowana aplikacja automatyzacji Selenium (później usunięta)
 - Scraping Lupo Line
 - Skip duplikatów
 - Counter IAI
@@ -417,7 +417,7 @@ commits:
 
 ### 🌐 27-30 czerwca - XML API Endpoints
 ```
-commits (w branch web-agent):
+commits (kontynuacja prac automatyzacji):
 - eksporty xml
 - xml bagno (2x)
 - xml endpointy (4x)
@@ -557,11 +557,11 @@ commits:
 - Saga models (logowanie)
 - Automatyczna kompensacja
 
-### 🔀 26 sierpnia - Merge Web-Agent
+### 🔀 26 sierpnia - Konsolidacja automatyzacji
 ```
-merge web-agent → main
+merge automatyzacji → main
 ```
-**Rezultat:** Web agent i Matterhorn1 w głównej gałęzi!
+**Rezultat:** Moduł automatyzacji i Matterhorn1 w głównej gałęzi!
 
 ---
 
@@ -648,9 +648,9 @@ commits:
 ### 🔄 5-6 października - Refactoring
 ```
 commits:
-- refactor: -matterhorn, -webagent, +qdrant
-- refaktor: +webagent
-- Aktualizacja ustawie dev i modeli web_agent
+- refactor: -matterhorn, +qdrant
+- refaktor: porządki automatyzacji
+- Aktualizacja ustawień dev (sekcja automatyzacji)
 ```
 **Przygotowanie:** Infrastruktura pod Qdrant (vector database)
 
@@ -714,7 +714,7 @@ commit: feat: ml packages
 ### Kluczowe momenty:
 - **358 commitów** od 30 stycznia do 8 października 2025
 - **22 główne fazy rozwoju**
-- **15+ branch features** (feat_matterhorn, MPD-other, xml-export, web-agent, etc.)
+- **15+ branch features** (feat_matterhorn, MPD-other, xml-export, automatyzacja, etc.)
 - **5 głównych merge'ów**
 
 ### Główne osiągnięcia:
@@ -739,16 +739,16 @@ Luty 2025:         Matterhorn, Celery, Production
 Marzec 2025:       MPD development, Mapowanie
 Kwiecień 2025:     Defs optimization, Redis config
 Maj 2025:          XML export rozpoczęty
-Czerwiec 2025:     Web Agent, XML endpoints
+Czerwiec 2025:     Automatyzacja Selenium, XML endpoints
 Lipiec 2025:       Export optimization, Matterhorn1
-Sierpień 2025:     Saga Pattern, Merge web-agent
+Sierpień 2025:     Saga Pattern, konsolidacja automatyzacji
 Październik 2025:  Zero-downtime, ML separation
 ```
 
 ### Najważniejsze merge'e:
 1. **feat_matterhorn** → main (6 lutego)
 2. **MPD-other** → main (27 marca)
-3. **web-agent** → main (26 sierpnia)
+3. **automatyzacja** → main (26 sierpnia)
 4. **feature/updates** → main (2 października)
 5. **Zero-downtime scripts** (6 października)
 
@@ -773,7 +773,7 @@ Październik 2025:  Zero-downtime, ML separation
 - Django 5.2.4
 
 ### Backend Services:
-- PostgreSQL (5 baz danych: zzz_default, zzz_matterhorn, zzz_MPD, zzz_web_agent, zzz_matterhorn1)
+- PostgreSQL (4 bazy danych: zzz_default, zzz_matterhorn, zzz_MPD, zzz_matterhorn1)
 - Redis (cache + Celery broker)
 - Celery Workers:
   - celery-default (domyślne taski)

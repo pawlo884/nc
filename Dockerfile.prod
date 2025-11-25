@@ -32,7 +32,6 @@ COPY nc/ ./nc/
 # COPY matterhorn/ ./matterhorn/  # Katalog nie istnieje - usunięty
 COPY matterhorn1/ ./matterhorn1/
 COPY MPD/ ./MPD/
-COPY web_agent/ ./web_agent/
 # COPY static/ ./static/  # Nie kopiujemy - zostanie utworzony przez collectstatic
 COPY nginx.conf .
 COPY redis.conf .
