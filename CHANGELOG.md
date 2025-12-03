@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.3.0 (2025-12-03)
+
+* feat: oznaczenie postgres i redis jako NIETYKALNE kontenery ([97bd0e4](https://github.com/pawlo884/nc/commit/97bd0e4))
+* fix: KRYTYCZNE - postgres i redis są NIETYKALNE podczas deployment ([0b25383](https://github.com/pawlo884/nc/commit/0b25383))
+
 ## <small>1.2.6 (2025-12-03)</small>
 
 * fix: zatrzymaj stary nginx przed uruchomieniem nginx-router ([2484fcf](https://github.com/pawlo884/nc/commit/2484fcf))
