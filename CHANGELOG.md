@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.1.1 (2025-12-03)</small>
+
+* merge: synchronizacja main z origin ([fb8c1f5](https://github.com/pawlo884/nc/commit/fb8c1f5))
+* fix: wycisz logi DisallowedHost i blokuj CONNECT attacks ([874c21f](https://github.com/pawlo884/nc/commit/874c21f))
+
 ## 1.1.0 (2025-12-03)
 
 * feat: Blue-Green Deployment z zero downtime ([a4cf25f](https://github.com/pawlo884/nc/commit/a4cf25f))
