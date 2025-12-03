@@ -134,9 +134,21 @@ deploy() {
         sleep 2
     fi
     
+    # Sprawdź czy postgres i redis działają (powinny być nietykalne!)
+    if ! docker ps --format '{{.Names}}' | grep -q "^nc-postgres-1$"; then
+        log_error "❌ PostgreSQL (nc-postgres-1) nie działa! To jest krytyczne!"
+        exit 1
+    fi
+    if ! docker ps --format '{{.Names}}' | grep -q "^nc-redis-1$"; then
+        log_error "❌ Redis (nc-redis-1) nie działa! To jest krytyczne!"
+        exit 1
+    fi
+    log_success "✅ PostgreSQL i Redis działają (nietykalne)"
+    
+    # Uruchom tylko nginx-router (postgres i redis są już uruchomione i nietykalne!)
     if ! docker ps --format '{{.Names}}' | grep -q "nc-nginx-router"; then
         log_warning "⚠️ NGINX router nie działa, uruchamiam..."
-        if ! docker-compose -f docker-compose.blue-green.yml up -d nginx-router postgres redis; then
+        if ! docker-compose -f docker-compose.blue-green.yml up -d nginx-router; then
             log_error "❌ Nie udało się uruchomić NGINX router"
             exit 1
         fi
