@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.0.4 (2025-12-03)</small>
+
+* Merge remote-tracking branch 'origin/main' ([68f6dab](https://github.com/pawlo884/nc/commit/68f6dab))
+* Revert "perf: optymalizacja połączeń PostgreSQL - connection pooling (CONN_MAX_AGE=600)" ([4593a49](https://github.com/pawlo884/nc/commit/4593a49))
+
 ## <small>1.0.3 (2025-12-03)</small>
 
 * perf: optymalizacja połączeń PostgreSQL - connection pooling (CONN_MAX_AGE=600) ([8bf7bc2](https://github.com/pawlo884/nc/commit/8bf7bc2))
