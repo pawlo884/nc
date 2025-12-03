@@ -13,7 +13,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     gcc \
     g++ \
     libpq-dev \
-    postgresql-client
+    postgresql-client \
+    curl
 
 # Utwórz użytkownika
 RUN groupadd -r celery && useradd -r -g celery -u 1001 celery

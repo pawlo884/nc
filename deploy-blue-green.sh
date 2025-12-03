@@ -56,23 +56,36 @@ get_active_environment() {
 # Health check
 health_check() {
     local environment=$1
-    local max_attempts=30
+    local max_attempts=60  # Zwiększone z 30 do 60 (2 minuty)
     local attempt=1
     
     log_info "🏥 Health check dla ${environment}..."
+    log_info "⏳ Czekam na zakończenie migracji..."
     
     while [ $attempt -le $max_attempts ]; do
+        # Sprawdź czy kontener jeszcze działa
+        if ! docker ps --filter "name=nc-web-${environment}" --filter "status=running" --format '{{.Names}}' | grep -q "nc-web-${environment}"; then
+            log_error "❌ Kontener ${environment} nie działa!"
+            return 1
+        fi
+        
+        # Sprawdź czy Django odpowiada
         if docker exec nc-web-${environment} curl -sf http://localhost:8000/admin/ > /dev/null 2>&1; then
             log_success "✅ ${environment} jest zdrowy!"
             return 0
         fi
         
-        log_info "Próba $attempt/$max_attempts..."
+        # Pokaż co 10 prób
+        if [ $((attempt % 10)) -eq 0 ]; then
+            log_info "Próba $attempt/$max_attempts..."
+        fi
         sleep 2
         ((attempt++))
     done
     
-    log_error "❌ ${environment} nie przeszedł health check!"
+    log_error "❌ ${environment} nie przeszedł health check po $((max_attempts * 2)) sekundach!"
+    log_info "📋 Ostatnie logi kontenera:"
+    docker logs nc-web-${environment} --tail 50
     return 1
 }
 

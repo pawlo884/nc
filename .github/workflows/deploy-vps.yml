@@ -95,8 +95,21 @@ jobs:
           docker-compose -f docker-compose.blue-green.yml ps || echo "⚠️ Could not get status!"
           
           # Sprawdź który environment jest aktywny
-          ACTIVE_ENV=$(./deploy-blue-green.sh status | grep "Active environment" | awk '{print $3}')
+          ACTIVE_ENV=$(./deploy-blue-green.sh status | grep "🔀 Active environment:" | awk '{print $4}')
           echo "🔀 Active environment: ${ACTIVE_ENV}"
+          
+          # Jeśli nie ma aktywnego environment, sprawdź kontenery
+          if [ -z "$ACTIVE_ENV" ] || [ "$ACTIVE_ENV" = "" ]; then
+            echo "⚠️ Nie można wykryć aktywnego environment, sprawdzam kontenery..."
+            if docker ps --format '{{.Names}}' | grep -q "nc-web-blue"; then
+              ACTIVE_ENV="blue"
+            elif docker ps --format '{{.Names}}' | grep -q "nc-web-green"; then
+              ACTIVE_ENV="green"
+            else
+              echo "❌ Żaden environment nie działa!"
+              exit 1
+            fi
+          fi
           
           # Sprawdź migracje i bazę danych na aktywnym kontenerze
           echo "🗄️ Checking database migrations..."
