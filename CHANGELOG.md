@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.3.2 (2025-12-03)</small>
+
+* fix: restart kontenerów Celery podczas blue-green deployment ([547c289](https://github.com/pawlo884/nc/commit/547c289))
+
 ## <small>1.3.1 (2025-12-03)</small>
 
 * fix: naprawa błędu duplikatów w bulk update INVENTORY - zmiana .get() na .filter().first() ([7e4bed9](https://github.com/pawlo884/nc/commit/7e4bed9))
