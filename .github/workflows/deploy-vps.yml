@@ -67,21 +67,20 @@ jobs:
           find . -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true
           find . -type f -path "*/migrations/*.py" -exec chmod 644 {} \; 2>/dev/null || true
           
-          # Przebuduj i zrestartuj kontenery (używa docker-compose.prod.yml)
-          # Używamy BuildKit dla lepszej wydajności i cache'owania
-          echo "🐳 Rebuilding and restarting containers..."
+          # Blue-Green Deployment - Zero Downtime
+          echo "🔵🟢 Starting Blue-Green Deployment..."
           export DOCKER_BUILDKIT=1
           export COMPOSE_DOCKER_CLI_BUILD=1
           
-          # WAŻNE: Nie odtwarzaj postgres i redis - tylko kontenery aplikacji!
-          echo "🛑 Zatrzymywanie kontenerów aplikacji (postgres i redis zostają nietknięte)..."
-          docker-compose -f docker-compose.prod.yml stop web celery-default celery-import celery-beat flower nginx static-init || true
+          # Nadaj uprawnienia wykonywania dla skryptu
+          chmod +x deploy-blue-green.sh
           
-          echo "🔨 Rebuilding kontenerów aplikacji..."
-          docker-compose -f docker-compose.prod.yml build --no-cache web celery-default celery-import celery-beat flower static-init
+          # Wykonaj blue-green deployment
+          ./deploy-blue-green.sh deploy
           
-          echo "🚀 Uruchamianie wszystkich kontenerów (postgres i redis pozostają nietknięte)..."
-          docker-compose -f docker-compose.prod.yml up -d
+          # Pokaż status po deploy
+          echo "📊 Deployment status:"
+          ./deploy-blue-green.sh status
           
           # Czekaj aż kontener się uruchomi
           echo "⏳ Waiting for containers to be ready..."
