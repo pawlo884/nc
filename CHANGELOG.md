@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.2.6 (2025-12-03)</small>
+
+* fix: zatrzymaj stary nginx przed uruchomieniem nginx-router ([2484fcf](https://github.com/pawlo884/nc/commit/2484fcf))
+
 ## <small>1.2.5 (2025-12-03)</small>
 
 * fix: KRYTYCZNE - dodaj automatyczne uruchamianie nginx-router w Blue-Green ([3cbec4c](https://github.com/pawlo884/nc/commit/3cbec4c)), closes [#3](https://github.com/pawlo884/nc/issues/3)
