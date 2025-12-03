@@ -5,6 +5,17 @@ Skrypt do uruchamiania automatyzacji z parametrami
 """
 import os
 import sys
+
+# WAŻNE: Załaduj zmienne środowiskowe PRZED importem Django!
+from dotenv import load_dotenv
+load_dotenv('.env.dev')
+
+# DEBUG: Sprawdź czy zmienne zostały załadowane
+print(f"DEBUG: DEFAULT_DB_PORT = {os.getenv('DEFAULT_DB_PORT')}")
+print(f"DEBUG: DEFAULT_DB_PASSWORD = {'***' if os.getenv('DEFAULT_DB_PASSWORD') else 'BRAK'}")
+print(f"DEBUG: MATTERHORN1_DB_PORT = {os.getenv('MATTERHORN1_DB_PORT')}")
+
+# Teraz można zaimportować Django
 import django
 
 # Ustaw settings Django
