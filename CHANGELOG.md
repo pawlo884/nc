@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.2.3 (2025-12-03)</small>
+
+* fix: napraw blue-green deployment health check ([d3a5d77](https://github.com/pawlo884/nc/commit/d3a5d77))
+
 ## <small>1.2.2 (2025-12-03)</small>
 
 * chore: usuń PgBouncer - niekompatybilny z multi-database setup ([903cf16](https://github.com/pawlo884/nc/commit/903cf16))
