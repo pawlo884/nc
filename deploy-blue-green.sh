@@ -229,11 +229,19 @@ deploy() {
     # 3. Build nowego obrazu
     log_info "🔨 Budowanie nowego obrazu..."
     export DOCKER_BUILDKIT=1
-    # ✅ Bezpieczne - buduje tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
-    if ! docker-compose -f docker-compose.blue-green.yml build --no-cache web-${TARGET}; then
+    # ✅ Bezpieczne - buduje web-${TARGET} i kontenery Celery (używają tego samego obrazu), nie dotyka nietykalnych kontenerów
+    if ! docker-compose -f docker-compose.blue-green.yml build --no-cache web-${TARGET} celery-default celery-import celery-beat flower; then
         log_error "❌ Nie udało się zbudować obrazu"
         exit 1
     fi
+    
+    # 3.5. Restart kontenerów Celery z nowym obrazem
+    log_info "🔄 Restartowanie kontenerów Celery z nowym obrazem..."
+    # ✅ Bezpieczne - restartuje tylko kontenery Celery, nie dotyka nietykalnych kontenerów
+    docker-compose -f docker-compose.blue-green.yml up -d --force-recreate --no-deps celery-default celery-import celery-beat flower 2>/dev/null || {
+        log_warning "⚠️ Nie udało się zrestartować kontenerów Celery, kontynuuję..."
+    }
+    log_success "✅ Kontenery Celery zrestartowane"
     
     # 4. Zatrzymaj stary kontener target (jeśli istnieje)
     log_info "🛑 Zatrzymywanie starego kontenera ${TARGET}..."
