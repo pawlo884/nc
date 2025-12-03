@@ -72,8 +72,16 @@ jobs:
           echo "🐳 Rebuilding and restarting containers..."
           export DOCKER_BUILDKIT=1
           export COMPOSE_DOCKER_CLI_BUILD=1
-          docker-compose -f docker-compose.prod.yml build --no-cache
-          docker-compose -f docker-compose.prod.yml up -d --force-recreate
+          
+          # WAŻNE: Nie odtwarzaj postgres i redis - tylko kontenery aplikacji!
+          echo "🛑 Zatrzymywanie kontenerów aplikacji (postgres i redis zostają nietknięte)..."
+          docker-compose -f docker-compose.prod.yml stop web celery-default celery-import celery-beat flower nginx static-init || true
+          
+          echo "🔨 Rebuilding kontenerów aplikacji..."
+          docker-compose -f docker-compose.prod.yml build --no-cache web celery-default celery-import celery-beat flower static-init
+          
+          echo "🚀 Uruchamianie wszystkich kontenerów (postgres i redis pozostają nietknięte)..."
+          docker-compose -f docker-compose.prod.yml up -d
           
           # Czekaj aż kontener się uruchomi
           echo "⏳ Waiting for containers to be ready..."
