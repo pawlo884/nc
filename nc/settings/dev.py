@@ -1,62 +1,12 @@
 import socket
 from .base import *
 
-# Development używa baz z przedrostkiem zzz_
-# Nadpisujemy bazy z base.py na wersje dev
-DATABASES = {
-    'zzz_default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DEFAULT_DB_NAME'),
-        'USER': os.getenv('DEFAULT_DB_USER'),
-        'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
-        'HOST': os.getenv('DEFAULT_DB_HOST'),
-        'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 60,
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'
-        }
-    },
-    'zzz_MPD': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('MPD_DB_NAME'),
-        'USER': os.getenv('MPD_DB_USER'),
-        'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
-        'HOST': os.getenv('MPD_DB_HOST'),
-        'PORT': os.getenv('MPD_DB_PORT'),
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 60,
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'
-        }
-    },
-    'zzz_matterhorn1': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('MATTERHORN1_DB_NAME'),
-        'USER': os.getenv('MATTERHORN1_DB_USER'),
-        'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
-        'HOST': os.getenv('MATTERHORN1_DB_HOST'),
-        'PORT': os.getenv('MATTERHORN1_DB_PORT'),
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 60,
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'
-        }
-    },
-    'zzz_web_agent': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('WEB_AGENT_DB_NAME'),
-        'USER': os.getenv('WEB_AGENT_DB_USER'),
-        'PASSWORD': os.getenv('WEB_AGENT_DB_PASSWORD'),
-        'HOST': os.getenv('WEB_AGENT_DB_HOST'),
-        'PORT': os.getenv('WEB_AGENT_DB_PORT'),
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 60,
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'
-        }
-    },
-}
+# Development rozszerza DATABASES z base.py o wersje z zzz_
+# Dodajemy bazy z przedrostkiem zzz_ (routery wybiorą je automatycznie)
+DATABASES['zzz_default'] = DATABASES['default'].copy()
+DATABASES['zzz_MPD'] = DATABASES['MPD'].copy()
+DATABASES['zzz_matterhorn1'] = DATABASES['matterhorn1'].copy()
+DATABASES['zzz_web_agent'] = DATABASES['web_agent'].copy()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!'
