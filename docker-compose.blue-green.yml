@@ -125,6 +125,12 @@ services:
   # ==========================================
   # SHARED SERVICES (nie są duplikowane)
   # ==========================================
+  # ⚠️⚠️⚠️  NIETYKALNE KONTENERY - NIGDY NIE DOTYKAĆ!  ⚠️⚠️⚠️
+  # Te kontenery są używane tylko do sprawdzenia konfiguracji w docker-compose
+  # NIGDY nie uruchamiaj dla nich: docker-compose up/stop/restart
+  # Kontenery te są zarządzane osobno i zawierają dane produkcyjne!
+  # ==========================================
+  # ⚠️ NIETYKALNY: PostgreSQL - baza danych z wszystkimi danymi produkcyjnymi
   postgres:
     image: postgres:18-alpine
     container_name: nc-postgres-1
@@ -152,6 +158,7 @@ services:
     labels:
       - "nc.protected=true"
 
+  # ⚠️ NIETYKALNY: Redis - cache i sesje, dane produkcyjne
   redis:
     image: redis:7.2-alpine
     container_name: nc-redis-1
