@@ -46,6 +46,17 @@ docker-compose -f docker-compose.prod.yml restart web celery-default celery-impo
 
 ## Konfiguracja
 
+### Wszystkie bazy danych Django
+PgBouncer jest skonfigurowany dla **wszystkich 3 baz** używanych przez Django:
+```yaml
+DATABASE_URLS: |
+  zzz_default=postgres://user:pass@postgres:5432/zzz_default
+  zzz_matterhorn1=postgres://user:pass@postgres:5432/zzz_matterhorn1
+  zzz_MPD=postgres://user:pass@postgres:5432/zzz_MPD
+```
+
+Django routing (`default`, `matterhorn1`, `MPD`) działa przez PgBouncer.
+
 ### Pool Mode: `transaction`
 - Kompatybilny z `CONN_MAX_AGE = 0`
 - Połączenie zwalniane po każdej transakcji

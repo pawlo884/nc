@@ -9,8 +9,11 @@ services:
     container_name: nc-pgbouncer
     restart: unless-stopped
     environment:
-      # Podstawowa konfiguracja
-      DATABASE_URL: "postgres://${DEFAULT_DB_USER}:${DEFAULT_DB_PASSWORD}@postgres:5432/${DEFAULT_DB_NAME}"
+      # WSZYSTKIE bazy danych Django (używamy DATABASE_URLS plural!)
+      DATABASE_URLS: |
+        zzz_default=postgres://${DEFAULT_DB_USER}:${DEFAULT_DB_PASSWORD}@postgres:5432/${DEFAULT_DB_NAME}
+        zzz_matterhorn1=postgres://${MATTERHORN1_DB_USER}:${MATTERHORN1_DB_PASSWORD}@postgres:5432/${MATTERHORN1_DB_NAME}
+        zzz_MPD=postgres://${MPD_DB_USER}:${MPD_DB_PASSWORD}@postgres:5432/${MPD_DB_NAME}
       POOL_MODE: transaction  # transaction mode (CONN_MAX_AGE=0 kompatybilny)
       MAX_CLIENT_CONN: 1000   # Max połączeń od klientów (Django)
       DEFAULT_POOL_SIZE: 25   # Ilość połączeń do PostgreSQL per database
