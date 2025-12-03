@@ -1,5 +1,14 @@
 # Zmiany
 
+## <small>1.0.3 (2025-12-03)</small>
+
+* perf: optymalizacja połączeń PostgreSQL - connection pooling (CONN_MAX_AGE=600) ([8bf7bc2](https://github.com/pawlo884/nc/commit/8bf7bc2))
+* chore: remove all files from web_agent for restart ([a9bd98f](https://github.com/pawlo884/nc/commit/a9bd98f))
+* chore: remove web_agent app ([d850265](https://github.com/pawlo884/nc/commit/d850265))
+* chore: restart web_agent app with minimal initialization files ([056d664](https://github.com/pawlo884/nc/commit/056d664))
+* Fix matterhorn1 router for prod ([beec955](https://github.com/pawlo884/nc/commit/beec955))
+* Naprawa kontenera web: usunięcie migracji web_agent i duplikatów w flower ([d461a1e](https://github.com/pawlo884/nc/commit/d461a1e))
+
 ## <small>1.0.2 (2025-11-18)</small>
 
 * fix: flower memory ([349d77c](https://github.com/pawlo884/nc/commit/349d77c))
