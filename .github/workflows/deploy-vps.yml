@@ -71,6 +71,7 @@ jobs:
           echo "🔵🟢 Starting Blue-Green Deployment..."
           export DOCKER_BUILDKIT=1
           export COMPOSE_DOCKER_CLI_BUILD=1
+          export ENVIRONMENT=prod
           
           # Nadaj uprawnienia wykonywania dla skryptu
           chmod +x deploy-blue-green.sh
@@ -89,19 +90,23 @@ jobs:
           # Migracje są już w komendzie startowej web, ale sprawdzamy czy się wykonały
           echo "🔄 Checking if migrations completed..."
           
-          # Sprawdź status
-          echo "📊 Container status:"
-          docker-compose -f docker-compose.prod.yml ps || echo "⚠️ Could not get status!"
+          # Sprawdź status kontenerów blue-green
+          echo "📊 Container status (Blue-Green):"
+          docker-compose -f docker-compose.blue-green.yml ps || echo "⚠️ Could not get status!"
           
-          # Sprawdź migracje i bazę danych
+          # Sprawdź który environment jest aktywny
+          ACTIVE_ENV=$(./deploy-blue-green.sh status | grep "Active environment" | awk '{print $3}')
+          echo "🔀 Active environment: ${ACTIVE_ENV}"
+          
+          # Sprawdź migracje i bazę danych na aktywnym kontenerze
           echo "🗄️ Checking database migrations..."
-          docker-compose -f docker-compose.prod.yml exec -T web python manage.py showmigrations --settings=nc.settings.prod || echo "⚠️ Could not check migrations"
+          docker exec nc-web-${ACTIVE_ENV} python manage.py showmigrations --settings=nc.settings.prod || echo "⚠️ Could not check migrations"
           
           # Sprawdź czy baza jest pusta (czy są tabele)
           echo "📋 Checking if database is initialized..."
-          docker-compose -f docker-compose.prod.yml exec -T web python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
+          docker exec nc-web-${ACTIVE_ENV} python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
           
-          echo "📋 Recent logs (web):"
-          docker-compose -f docker-compose.prod.yml logs web --tail 50 || echo "⚠️ Could not get logs"
+          echo "📋 Recent logs (active web):"
+          docker logs nc-web-${ACTIVE_ENV} --tail 50 || echo "⚠️ Could not get logs"
           
           echo "✅ Deployment completed!"

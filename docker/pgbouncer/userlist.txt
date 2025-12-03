@@ -1,5 +1,0 @@
-; PgBouncer userlist - format: "username" "password_hash"
-; UWAGA: To jest placeholder - hasła są konfigurowane w pgbouncer.ini
-; Dla production użyj: echo -n "passwordPASSWORD" | md5sum
-"nc" "md5placeholder"
-

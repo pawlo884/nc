@@ -13,18 +13,19 @@ services:
     command:
       - /bin/bash
       - -c
-      - find /app -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true
-        && find /app -type f -path '*/migrations/*.py' -exec chmod 644 {} \; 2>/dev/null || true
-        && echo "🔵 BLUE: Uruchamianie migracji..." 
-        && python manage.py migrate --database=default --noinput
-        && python manage.py migrate admin_interface --database=default --noinput
-        && python manage.py migrate matterhorn1 --database=matterhorn1 --noinput
-        && python manage.py migrate MPD --database=MPD --noinput
-        && echo "✅ BLUE: Migracje zakończone"
-        && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class sync 
-        --timeout 300 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 
-        --preload --access-logfile - --error-logfile - --log-level warning 
-        --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30 
+      - >
+        find /app -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true &&
+        find /app -type f -path '*/migrations/*.py' -exec chmod 644 {} \; 2>/dev/null || true &&
+        echo "🔵 BLUE: Uruchamianie migracji..." &&
+        python manage.py migrate --database=default --noinput &&
+        python manage.py migrate admin_interface --database=default --noinput &&
+        python manage.py migrate matterhorn1 --database=matterhorn1 --noinput &&
+        python manage.py migrate MPD --database=MPD --noinput &&
+        echo "✅ BLUE: Migracje zakończone" &&
+        gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class sync
+        --timeout 300 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100
+        --preload --access-logfile - --error-logfile - --log-level warning
+        --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30
         --limit-request-line 8190 --limit-request-fields 100 --limit-request-field_size 8190
     volumes:
       - .:/app
@@ -60,18 +61,19 @@ services:
     command:
       - /bin/bash
       - -c
-      - find /app -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true
-        && find /app -type f -path '*/migrations/*.py' -exec chmod 644 {} \; 2>/dev/null || true
-        && echo "🟢 GREEN: Uruchamianie migracji..." 
-        && python manage.py migrate --database=default --noinput
-        && python manage.py migrate admin_interface --database=default --noinput
-        && python manage.py migrate matterhorn1 --database=matterhorn1 --noinput
-        && python manage.py migrate MPD --database=MPD --noinput
-        && echo "✅ GREEN: Migracje zakończone"
-        && gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class sync 
-        --timeout 300 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 
-        --preload --access-logfile - --error-logfile - --log-level warning 
-        --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30 
+      - >
+        find /app -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true &&
+        find /app -type f -path '*/migrations/*.py' -exec chmod 644 {} \; 2>/dev/null || true &&
+        echo "🟢 GREEN: Uruchamianie migracji..." &&
+        python manage.py migrate --database=default --noinput &&
+        python manage.py migrate admin_interface --database=default --noinput &&
+        python manage.py migrate matterhorn1 --database=matterhorn1 --noinput &&
+        python manage.py migrate MPD --database=MPD --noinput &&
+        echo "✅ GREEN: Migracje zakończone" &&
+        gunicorn nc.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class sync
+        --timeout 300 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100
+        --preload --access-logfile - --error-logfile - --log-level warning
+        --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30
         --limit-request-line 8190 --limit-request-fields 100 --limit-request-field_size 8190
     volumes:
       - .:/app
@@ -181,7 +183,8 @@ services:
     command:
       - /bin/bash
       - -c
-      - sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1
+      - >
+        sleep 20 && celery -A nc.celery worker -Q default --loglevel=info --concurrency=1
         --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
     volumes:
       - .:/app
@@ -213,7 +216,8 @@ services:
     command:
       - /bin/bash
       - -c
-      - sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1
+      - >
+        sleep 20 && celery -A nc.celery worker -Q import --loglevel=info --concurrency=1
         --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
     volumes:
       - .:/app
@@ -274,7 +278,8 @@ services:
     command:
       - /bin/bash
       - -c
-      - sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - >
+        sleep 20 && celery -A nc.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
         flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True
         --db=/var/lib/flower/flower.db --inspect_timeout=30
     ports:
