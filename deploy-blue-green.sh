@@ -122,7 +122,21 @@ deploy() {
     log_info "🚀 Rozpoczynam Blue-Green Deployment"
     echo "=================================="
     
-    # 1. Określ aktywny environment
+    # 1. Upewnij się że nginx-router działa
+    log_info "🔍 Sprawdzanie NGINX router..."
+    if ! docker ps --format '{{.Names}}' | grep -q "nc-nginx-router"; then
+        log_warning "⚠️ NGINX router nie działa, uruchamiam..."
+        if ! docker-compose -f docker-compose.blue-green.yml up -d nginx-router postgres redis; then
+            log_error "❌ Nie udało się uruchomić NGINX router"
+            exit 1
+        fi
+        log_success "✅ NGINX router uruchomiony"
+        sleep 5
+    else
+        log_success "✅ NGINX router już działa"
+    fi
+    
+    # 2. Określ aktywny environment
     ACTIVE=$(get_active_environment)
     
     if [ "$ACTIVE" = "blue" ]; then
@@ -133,44 +147,50 @@ deploy() {
         log_info "🟢 Aktywny: GREEN → 🔵 Deploy na: BLUE"
     fi
     
-    # 2. Build nowego obrazu
+    # 3. Build nowego obrazu
     log_info "🔨 Budowanie nowego obrazu..."
     export DOCKER_BUILDKIT=1
-    docker-compose -f docker-compose.blue-green.yml build --no-cache web-${TARGET}
-    
-    # 3. Zatrzymaj stary kontener target (jeśli istnieje)
-    log_info "🛑 Zatrzymywanie starego kontenera ${TARGET}..."
-    docker-compose -f docker-compose.blue-green.yml stop web-${TARGET} || true
-    
-    # 4. Uruchom nowy kontener
-    log_info "▶️  Uruchamianie nowego kontenera ${TARGET}..."
-    docker-compose -f docker-compose.blue-green.yml up -d web-${TARGET}
-    
-    # 5. Poczekaj na uruchomienie
-    sleep 10
-    
-    # 6. Health check
-    if ! health_check $TARGET; then
-        log_error "❌ Deployment failed - health check nie przeszedł"
-        log_warning "🔙 Rollback: ${TARGET} nie zostanie aktywowany"
-        docker-compose -f docker-compose.blue-green.yml stop web-${TARGET}
+    if ! docker-compose -f docker-compose.blue-green.yml build --no-cache web-${TARGET}; then
+        log_error "❌ Nie udało się zbudować obrazu"
         exit 1
     fi
     
-    # 7. Przełącz NGINX na nowy environment
+    # 4. Zatrzymaj stary kontener target (jeśli istnieje)
+    log_info "🛑 Zatrzymywanie starego kontenera ${TARGET}..."
+    docker-compose -f docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || true
+    
+    # 5. Uruchom nowy kontener
+    log_info "▶️  Uruchamianie nowego kontenera ${TARGET}..."
+    if ! docker-compose -f docker-compose.blue-green.yml up -d web-${TARGET}; then
+        log_error "❌ Nie udało się uruchomić kontenera ${TARGET}"
+        exit 1
+    fi
+    
+    # 6. Poczekaj na uruchomienie
+    sleep 10
+    
+    # 7. Health check
+    if ! health_check $TARGET; then
+        log_error "❌ Deployment failed - health check nie przeszedł"
+        log_warning "🔙 Rollback: ${TARGET} nie zostanie aktywowany"
+        docker-compose -f docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${TARGET}"
+        exit 1
+    fi
+    
+    # 8. Przełącz NGINX na nowy environment
     if ! switch_nginx $TARGET; then
         log_error "❌ Nie udało się przełączyć NGINX"
         exit 1
     fi
     
-    # 8. Opcjonalnie: poczekaj chwilę i zatrzymaj stary environment
+    # 9. Opcjonalnie: poczekaj chwilę i zatrzymaj stary environment
     log_info "⏳ Czekam 30s przed zatrzymaniem ${ACTIVE}..."
     sleep 30
     
     log_info "🛑 Zatrzymywanie starego środowiska ${ACTIVE}..."
-    docker-compose -f docker-compose.blue-green.yml stop web-${ACTIVE}
+    docker-compose -f docker-compose.blue-green.yml stop web-${ACTIVE} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${ACTIVE}"
     
-    # 9. Sukces!
+    # 10. Sukces!
     log_success "🎉 Deployment zakończony pomyślnie!"
     log_success "✅ Aktywny environment: ${TARGET}"
     log_info "ℹ️  Stary environment (${ACTIVE}) jest zatrzymany i gotowy do rollback"
@@ -199,7 +219,10 @@ rollback() {
     log_info "Rollback z ${ACTIVE} na ${TARGET}..."
     
     # Uruchom stary environment
-    docker-compose -f docker-compose.blue-green.yml up -d web-${TARGET}
+    if ! docker-compose -f docker-compose.blue-green.yml up -d web-${TARGET}; then
+        log_error "❌ Nie udało się uruchomić kontenera ${TARGET} podczas rollback"
+        exit 1
+    fi
     
     # Health check
     if ! health_check $TARGET; then
