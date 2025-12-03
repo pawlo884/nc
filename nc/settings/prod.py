@@ -65,7 +65,7 @@ LOGGING = {
         },
         'django.security.DisallowedHost': {
             'handlers': ['console'],
-            'level': 'WARNING',
+            'level': 'CRITICAL',  # Zmienione z WARNING na CRITICAL aby nie logować każdego ataku
             'propagate': False,
         },
         'django.request': {
