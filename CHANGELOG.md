@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.2.5 (2025-12-03)</small>
+
+* fix: KRYTYCZNE - dodaj automatyczne uruchamianie nginx-router w Blue-Green ([3cbec4c](https://github.com/pawlo884/nc/commit/3cbec4c)), closes [#3](https://github.com/pawlo884/nc/issues/3)
+
 ## <small>1.2.4 (2025-12-03)</small>
 
 * fix: obsługa błędów w deploy-blue-green.sh przy set -e ([bef2578](https://github.com/pawlo884/nc/commit/bef2578))
