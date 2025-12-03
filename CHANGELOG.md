@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.2.2 (2025-12-03)</small>
+
+* chore: usuń PgBouncer - niekompatybilny z multi-database setup ([903cf16](https://github.com/pawlo884/nc/commit/903cf16))
+* fix: PgBouncer config przez pgbouncer.ini dla wszystkich 3 baz ([0afe6fd](https://github.com/pawlo884/nc/commit/0afe6fd))
+
 ## <small>1.2.1 (2025-12-03)</small>
 
 * merge: PgBouncer multi-database fix ([6ee0f51](https://github.com/pawlo884/nc/commit/6ee0f51))
