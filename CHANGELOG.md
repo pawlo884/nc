@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.3.3 (2025-12-03)</small>
+
+* fix: usunięcie automatycznych migracji z produkcji - migracje należy wykonywać ręcznie ([a8ab925](https://github.com/pawlo884/nc/commit/a8ab925))
+
 ## <small>1.3.2 (2025-12-03)</small>
 
 * fix: restart kontenerów Celery podczas blue-green deployment ([547c289](https://github.com/pawlo884/nc/commit/547c289))
