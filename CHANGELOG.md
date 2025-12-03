@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.1.0 (2025-12-03)
+
+* feat: Blue-Green Deployment z zero downtime ([a4cf25f](https://github.com/pawlo884/nc/commit/a4cf25f))
+* feat: zaktualizuj GitHub Actions dla Blue-Green Deployment ([79d9f7a](https://github.com/pawlo884/nc/commit/79d9f7a))
+
 ## <small>1.0.5 (2025-12-03)</small>
 
 * fix: ochrona PostgreSQL przed odtwarzaniem podczas deploy ([41c8d57](https://github.com/pawlo884/nc/commit/41c8d57))
