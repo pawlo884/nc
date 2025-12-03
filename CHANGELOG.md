@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.2.0 (2025-12-03)
+
+* merge: PgBouncer integration ([f2b6122](https://github.com/pawlo884/nc/commit/f2b6122))
+* feat: dodaj PgBouncer connection pooler dla szybkich połączeń DB ([f91d50d](https://github.com/pawlo884/nc/commit/f91d50d))
+
 ## <small>1.1.1 (2025-12-03)</small>
 
 * merge: synchronizacja main z origin ([fb8c1f5](https://github.com/pawlo884/nc/commit/fb8c1f5))
