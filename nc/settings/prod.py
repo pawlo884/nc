@@ -1,6 +1,13 @@
 import os
 from .base import *
 
+# Aliasy produkcyjne baz danych (wskazują na te same bazy co zzz_)
+# W produkcji używamy nazw bez przedrostka zzz_
+DATABASES['default'] = DATABASES['zzz_default']
+DATABASES['MPD'] = DATABASES['zzz_MPD']
+DATABASES['matterhorn1'] = DATABASES['zzz_matterhorn1']
+DATABASES['web_agent'] = DATABASES['zzz_web_agent']
+
 # Usuń debug_toolbar z INSTALLED_APPS w produkcji
 if 'debug_toolbar' in INSTALLED_APPS:
     INSTALLED_APPS.remove('debug_toolbar')

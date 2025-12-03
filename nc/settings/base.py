@@ -124,20 +124,10 @@ TEMPLATES = [
 
 
 # Database
+# Development używa tylko baz z przedrostkiem zzz_
+# Produkcja używa aliasów bez przedrostka (aliasy wskazują na te same bazy)
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DEFAULT_DB_NAME'),
-        'USER': os.getenv('DEFAULT_DB_USER'),
-        'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
-        'HOST': os.getenv('DEFAULT_DB_HOST'),
-        'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
-        'OPTIONS': {
-            'connect_timeout': 60,
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
+    # Development databases (zawsze z przedrostkiem zzz_)
     'zzz_default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DEFAULT_DB_NAME'),
@@ -145,19 +135,6 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
-        'OPTIONS': {
-            'connect_timeout': 60,
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-    'MPD': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('MPD_DB_NAME'),
-        'USER': os.getenv('MPD_DB_USER'),
-        'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
-        'HOST': os.getenv('MPD_DB_HOST'),
-        'PORT': os.getenv('MPD_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
             'connect_timeout': 60,
@@ -177,19 +154,6 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
-    'matterhorn1': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('MATTERHORN1_DB_NAME'),
-        'USER': os.getenv('MATTERHORN1_DB_USER'),
-        'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
-        'HOST': os.getenv('MATTERHORN1_DB_HOST'),
-        'PORT': os.getenv('MATTERHORN1_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
-        'OPTIONS': {
-            'connect_timeout': 60,
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
     'zzz_matterhorn1': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('MATTERHORN1_DB_NAME'),
@@ -202,13 +166,27 @@ DATABASES = {
             'connect_timeout': 60,
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
-    }
+    },
+    'zzz_web_agent': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('WEB_AGENT_DB_NAME'),
+        'USER': os.getenv('WEB_AGENT_DB_USER'),
+        'PASSWORD': os.getenv('WEB_AGENT_DB_PASSWORD'),
+        'HOST': os.getenv('WEB_AGENT_DB_HOST'),
+        'PORT': os.getenv('WEB_AGENT_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+            'connect_timeout': 60,
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
+        }
+    },
 }
 
 # Database routers
 DATABASE_ROUTERS = [
     'nc.db_routers.MPDRouter',
     'nc.db_routers.Matterhorn1Router',
+    'nc.db_routers.WebAgentRouter',
     'nc.db_routers.DefaultRouter',
 ]
 
