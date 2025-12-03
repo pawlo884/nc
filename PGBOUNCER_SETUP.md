@@ -28,7 +28,21 @@
 docker-compose -f docker-compose.pgbouncer.yml up -d
 ```
 
-### 2. Zmień `.env.prod` - Podłącz Django do PgBouncer
+### 2. Skonfiguruj hasła w pgbouncer.ini
+
+**WAŻNE:** Przed uruchomieniem edytuj `docker/pgbouncer/pgbouncer.ini` i zamień `password=prod_password` na prawdziwe hasła:
+
+```bash
+# Edytuj docker/pgbouncer/pgbouncer.ini
+nano docker/pgbouncer/pgbouncer.ini
+
+# Zmień:
+zzz_default = host=postgres port=5432 dbname=zzz_default user=nc password=TWOJE_HASLO_DEFAULT pool_size=25
+zzz_matterhorn1 = host=postgres port=5432 dbname=zzz_matterhorn1 user=nc password=TWOJE_HASLO_MATTERHORN1 pool_size=25
+zzz_MPD = host=postgres port=5432 dbname=zzz_MPD user=nc password=TWOJE_HASLO_MPD pool_size=25
+```
+
+### 3. Zmień `.env.prod` - Podłącz Django do PgBouncer
 ```bash
 # Zamiast:
 # DEFAULT_DB_HOST=postgres
@@ -37,6 +51,10 @@ docker-compose -f docker-compose.pgbouncer.yml up -d
 # Użyj:
 DEFAULT_DB_HOST=pgbouncer
 DEFAULT_DB_PORT=5432
+
+# To samo dla pozostałych:
+MATTERHORN1_DB_HOST=pgbouncer
+MPD_DB_HOST=pgbouncer
 ```
 
 ### 3. Restart aplikacji
