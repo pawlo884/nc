@@ -124,6 +124,16 @@ deploy() {
     
     # 1. Upewnij się że nginx-router działa
     log_info "🔍 Sprawdzanie NGINX router..."
+    
+    # Sprawdź czy stary nginx (z prod.yml) działa i zatrzymaj go
+    if docker ps --format '{{.Names}}' | grep -q "^nc-nginx-1$"; then
+        log_warning "⚠️ Stary NGINX (nc-nginx-1) działa, zatrzymuję go..."
+        docker stop nc-nginx-1 2>/dev/null || true
+        docker rm nc-nginx-1 2>/dev/null || true
+        log_success "✅ Stary NGINX zatrzymany"
+        sleep 2
+    fi
+    
     if ! docker ps --format '{{.Names}}' | grep -q "nc-nginx-router"; then
         log_warning "⚠️ NGINX router nie działa, uruchamiam..."
         if ! docker-compose -f docker-compose.blue-green.yml up -d nginx-router postgres redis; then
