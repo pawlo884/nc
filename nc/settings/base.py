@@ -131,9 +131,9 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 600,  # Utrzymuj połączenia przez 10 minut dla wydajności
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 10,  # Zmniejszony timeout połączenia do 10 sekund
+            'connect_timeout': 60,
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -144,9 +144,9 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 600,  # Utrzymuj połączenia przez 10 minut dla wydajności
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 10,  # Zmniejszony timeout połączenia do 10 sekund
+            'connect_timeout': 60,
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -157,9 +157,9 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
-        'CONN_MAX_AGE': 600,  # Utrzymuj połączenia przez 10 minut dla wydajności
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 10,  # Zmniejszony timeout połączenia do 10 sekund
+            'connect_timeout': 60,
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -170,9 +170,9 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
-        'CONN_MAX_AGE': 600,  # Utrzymuj połączenia przez 10 minut dla wydajności
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 10,  # Zmniejszony timeout połączenia do 10 sekund
+            'connect_timeout': 60,
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -183,9 +183,9 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN1_DB_HOST'),
         'PORT': os.getenv('MATTERHORN1_DB_PORT'),
-        'CONN_MAX_AGE': 600,  # Utrzymuj połączenia przez 10 minut dla wydajności
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 10,  # Zmniejszony timeout połączenia do 10 sekund
+            'connect_timeout': 60,
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -196,9 +196,9 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN1_DB_HOST'),
         'PORT': os.getenv('MATTERHORN1_DB_PORT'),
-        'CONN_MAX_AGE': 600,  # Utrzymuj połączenia przez 10 minut dla wydajności
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 10,  # Zmniejszony timeout połączenia do 10 sekund
+            'connect_timeout': 60,
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     }
