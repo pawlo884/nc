@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.3.1 (2025-12-03)</small>
+
+* fix: naprawa błędu duplikatów w bulk update INVENTORY - zmiana .get() na .filter().first() ([7e4bed9](https://github.com/pawlo884/nc/commit/7e4bed9))
+
 ## 1.3.0 (2025-12-03)
 
 * feat: oznaczenie postgres i redis jako NIETYKALNE kontenery ([97bd0e4](https://github.com/pawlo884/nc/commit/97bd0e4))
