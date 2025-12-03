@@ -20,9 +20,8 @@ chmod 666 /app/logs/django.log
 if [ "$DJANGO_SETTINGS_MODULE" = "nc.settings.prod" ]; then
     echo "🔧 Sprawdzanie plików statycznych w produkcji..."
     
-    # Uruchom migracje (potrzebne dla admin_interface)
-    echo "🔄 Uruchamianie migracji..."
-    python manage.py migrate --noinput
+    # USUNIĘTO: Migracje są uruchamiane w komendzie startowej web w docker-compose.prod.yml
+    # Nie robimy tutaj migracji aby uniknąć podwójnego uruchamiania
     
     # Sprawdź czy pliki admin_interface istnieją
     if [ ! -d "/app/staticfiles/admin_interface" ]; then

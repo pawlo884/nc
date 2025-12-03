@@ -1,5 +1,86 @@
 # Zmiany
 
+## <small>1.3.4 (2025-12-03)</small>
+
+* Revert "fix: naprawa błędu duplikatów w bulk update INVENTORY - zmiana .get() na .filter().first()" ([2026bd7](https://github.com/pawlo884/nc/commit/2026bd7))
+
+## <small>1.3.3 (2025-12-03)</small>
+
+* fix: usunięcie automatycznych migracji z produkcji - migracje należy wykonywać ręcznie ([a8ab925](https://github.com/pawlo884/nc/commit/a8ab925))
+
+## <small>1.3.2 (2025-12-03)</small>
+
+* fix: restart kontenerów Celery podczas blue-green deployment ([547c289](https://github.com/pawlo884/nc/commit/547c289))
+
+## <small>1.3.1 (2025-12-03)</small>
+
+* fix: naprawa błędu duplikatów w bulk update INVENTORY - zmiana .get() na .filter().first() ([7e4bed9](https://github.com/pawlo884/nc/commit/7e4bed9))
+
+## 1.3.0 (2025-12-03)
+
+* feat: oznaczenie postgres i redis jako NIETYKALNE kontenery ([97bd0e4](https://github.com/pawlo884/nc/commit/97bd0e4))
+* fix: KRYTYCZNE - postgres i redis są NIETYKALNE podczas deployment ([0b25383](https://github.com/pawlo884/nc/commit/0b25383))
+
+## <small>1.2.6 (2025-12-03)</small>
+
+* fix: zatrzymaj stary nginx przed uruchomieniem nginx-router ([2484fcf](https://github.com/pawlo884/nc/commit/2484fcf))
+
+## <small>1.2.5 (2025-12-03)</small>
+
+* fix: KRYTYCZNE - dodaj automatyczne uruchamianie nginx-router w Blue-Green ([3cbec4c](https://github.com/pawlo884/nc/commit/3cbec4c)), closes [#3](https://github.com/pawlo884/nc/issues/3)
+
+## <small>1.2.4 (2025-12-03)</small>
+
+* fix: obsługa błędów w deploy-blue-green.sh przy set -e ([bef2578](https://github.com/pawlo884/nc/commit/bef2578))
+
+## <small>1.2.3 (2025-12-03)</small>
+
+* fix: napraw blue-green deployment health check ([d3a5d77](https://github.com/pawlo884/nc/commit/d3a5d77))
+
+## <small>1.2.2 (2025-12-03)</small>
+
+* chore: usuń PgBouncer - niekompatybilny z multi-database setup ([903cf16](https://github.com/pawlo884/nc/commit/903cf16))
+* fix: PgBouncer config przez pgbouncer.ini dla wszystkich 3 baz ([0afe6fd](https://github.com/pawlo884/nc/commit/0afe6fd))
+
+## <small>1.2.1 (2025-12-03)</small>
+
+* merge: PgBouncer multi-database fix ([6ee0f51](https://github.com/pawlo884/nc/commit/6ee0f51))
+* fix: PgBouncer dla WSZYSTKICH baz Django (default, matterhorn1, MPD) ([21cc8c3](https://github.com/pawlo884/nc/commit/21cc8c3))
+* fix: przyspiesz pierwsze połączenie do PostgreSQL ([818f703](https://github.com/pawlo884/nc/commit/818f703))
+
+## 1.2.0 (2025-12-03)
+
+* merge: PgBouncer integration ([f2b6122](https://github.com/pawlo884/nc/commit/f2b6122))
+* feat: dodaj PgBouncer connection pooler dla szybkich połączeń DB ([f91d50d](https://github.com/pawlo884/nc/commit/f91d50d))
+
+## <small>1.1.1 (2025-12-03)</small>
+
+* merge: synchronizacja main z origin ([fb8c1f5](https://github.com/pawlo884/nc/commit/fb8c1f5))
+* fix: wycisz logi DisallowedHost i blokuj CONNECT attacks ([874c21f](https://github.com/pawlo884/nc/commit/874c21f))
+
+## 1.1.0 (2025-12-03)
+
+* feat: Blue-Green Deployment z zero downtime ([a4cf25f](https://github.com/pawlo884/nc/commit/a4cf25f))
+* feat: zaktualizuj GitHub Actions dla Blue-Green Deployment ([79d9f7a](https://github.com/pawlo884/nc/commit/79d9f7a))
+
+## <small>1.0.5 (2025-12-03)</small>
+
+* fix: ochrona PostgreSQL przed odtwarzaniem podczas deploy ([41c8d57](https://github.com/pawlo884/nc/commit/41c8d57))
+
+## <small>1.0.4 (2025-12-03)</small>
+
+* Merge remote-tracking branch 'origin/main' ([68f6dab](https://github.com/pawlo884/nc/commit/68f6dab))
+* Revert "perf: optymalizacja połączeń PostgreSQL - connection pooling (CONN_MAX_AGE=600)" ([4593a49](https://github.com/pawlo884/nc/commit/4593a49))
+
+## <small>1.0.3 (2025-12-03)</small>
+
+* perf: optymalizacja połączeń PostgreSQL - connection pooling (CONN_MAX_AGE=600) ([8bf7bc2](https://github.com/pawlo884/nc/commit/8bf7bc2))
+* chore: remove all files from web_agent for restart ([a9bd98f](https://github.com/pawlo884/nc/commit/a9bd98f))
+* chore: remove web_agent app ([d850265](https://github.com/pawlo884/nc/commit/d850265))
+* chore: restart web_agent app with minimal initialization files ([056d664](https://github.com/pawlo884/nc/commit/056d664))
+* Fix matterhorn1 router for prod ([beec955](https://github.com/pawlo884/nc/commit/beec955))
+* Naprawa kontenera web: usunięcie migracji web_agent i duplikatów w flower ([d461a1e](https://github.com/pawlo884/nc/commit/d461a1e))
+
 ## <small>1.0.2 (2025-11-18)</small>
 
 * fix: flower memory ([349d77c](https://github.com/pawlo884/nc/commit/349d77c))

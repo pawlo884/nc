@@ -67,13 +67,21 @@ jobs:
           find . -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true
           find . -type f -path "*/migrations/*.py" -exec chmod 644 {} \; 2>/dev/null || true
           
-          # Przebuduj i zrestartuj kontenery (używa docker-compose.prod.yml)
-          # Używamy BuildKit dla lepszej wydajności i cache'owania
-          echo "🐳 Rebuilding and restarting containers..."
+          # Blue-Green Deployment - Zero Downtime
+          echo "🔵🟢 Starting Blue-Green Deployment..."
           export DOCKER_BUILDKIT=1
           export COMPOSE_DOCKER_CLI_BUILD=1
-          docker-compose -f docker-compose.prod.yml build --no-cache
-          docker-compose -f docker-compose.prod.yml up -d --force-recreate
+          export ENVIRONMENT=prod
+          
+          # Nadaj uprawnienia wykonywania dla skryptu
+          chmod +x deploy-blue-green.sh
+          
+          # Wykonaj blue-green deployment
+          ./deploy-blue-green.sh deploy
+          
+          # Pokaż status po deploy
+          echo "📊 Deployment status:"
+          ./deploy-blue-green.sh status
           
           # Czekaj aż kontener się uruchomi
           echo "⏳ Waiting for containers to be ready..."
@@ -82,19 +90,36 @@ jobs:
           # Migracje są już w komendzie startowej web, ale sprawdzamy czy się wykonały
           echo "🔄 Checking if migrations completed..."
           
-          # Sprawdź status
-          echo "📊 Container status:"
-          docker-compose -f docker-compose.prod.yml ps || echo "⚠️ Could not get status!"
+          # Sprawdź status kontenerów blue-green
+          echo "📊 Container status (Blue-Green):"
+          docker-compose -f docker-compose.blue-green.yml ps || echo "⚠️ Could not get status!"
           
-          # Sprawdź migracje i bazę danych
+          # Sprawdź który environment jest aktywny
+          ACTIVE_ENV=$(./deploy-blue-green.sh status | grep "🔀 Active environment:" | awk '{print $4}')
+          echo "🔀 Active environment: ${ACTIVE_ENV}"
+          
+          # Jeśli nie ma aktywnego environment, sprawdź kontenery
+          if [ -z "$ACTIVE_ENV" ] || [ "$ACTIVE_ENV" = "" ]; then
+            echo "⚠️ Nie można wykryć aktywnego environment, sprawdzam kontenery..."
+            if docker ps --format '{{.Names}}' | grep -q "nc-web-blue"; then
+              ACTIVE_ENV="blue"
+            elif docker ps --format '{{.Names}}' | grep -q "nc-web-green"; then
+              ACTIVE_ENV="green"
+            else
+              echo "❌ Żaden environment nie działa!"
+              exit 1
+            fi
+          fi
+          
+          # Sprawdź migracje i bazę danych na aktywnym kontenerze
           echo "🗄️ Checking database migrations..."
-          docker-compose -f docker-compose.prod.yml exec -T web python manage.py showmigrations --settings=nc.settings.prod || echo "⚠️ Could not check migrations"
+          docker exec nc-web-${ACTIVE_ENV} python manage.py showmigrations --settings=nc.settings.prod || echo "⚠️ Could not check migrations"
           
           # Sprawdź czy baza jest pusta (czy są tabele)
           echo "📋 Checking if database is initialized..."
-          docker-compose -f docker-compose.prod.yml exec -T web python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
+          docker exec nc-web-${ACTIVE_ENV} python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
           
-          echo "📋 Recent logs (web):"
-          docker-compose -f docker-compose.prod.yml logs web --tail 50 || echo "⚠️ Could not get logs"
+          echo "📋 Recent logs (active web):"
+          docker logs nc-web-${ACTIVE_ENV} --tail 50 || echo "⚠️ Could not get logs"
           
           echo "✅ Deployment completed!"

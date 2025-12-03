@@ -136,7 +136,28 @@ DATABASES = {
         'PORT': os.getenv('DEFAULT_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 60,
+            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5, # 5 prób
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
+        }
+    },
+    'zzz_default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DEFAULT_DB_NAME'),
+        'USER': os.getenv('DEFAULT_DB_USER'),
+        'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
+        'HOST': os.getenv('DEFAULT_DB_HOST'),
+        'PORT': os.getenv('DEFAULT_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5, # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -149,7 +170,28 @@ DATABASES = {
         'PORT': os.getenv('MPD_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 60,
+            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5, # 5 prób
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
+        }
+    },
+    'zzz_MPD': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('MPD_DB_NAME'),
+        'USER': os.getenv('MPD_DB_USER'),
+        'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
+        'HOST': os.getenv('MPD_DB_HOST'),
+        'PORT': os.getenv('MPD_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'OPTIONS': {
+            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5, # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -162,7 +204,11 @@ DATABASES = {
         'PORT': os.getenv('MATTERHORN1_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 60,
+            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5, # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -175,7 +221,11 @@ DATABASES = {
         'PORT': os.getenv('WEB_AGENT_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
         'OPTIONS': {
-            'connect_timeout': 60,
+            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5, # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
