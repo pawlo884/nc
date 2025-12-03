@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # PGBOUNCER - Connection Pooler dla PostgreSQL
+  # ==========================================
+  pgbouncer:
+    image: edoburu/pgbouncer:1.21.0
+    container_name: nc-pgbouncer
+    restart: unless-stopped
+    environment:
+      # Podstawowa konfiguracja
+      DATABASE_URL: "postgres://${DEFAULT_DB_USER}:${DEFAULT_DB_PASSWORD}@postgres:5432/${DEFAULT_DB_NAME}"
+      POOL_MODE: transaction  # transaction mode (CONN_MAX_AGE=0 kompatybilny)
+      MAX_CLIENT_CONN: 1000   # Max połączeń od klientów (Django)
+      DEFAULT_POOL_SIZE: 25   # Ilość połączeń do PostgreSQL per database
+      RESERVE_POOL_SIZE: 10   # Dodatkowe połączenia w rezerwie
+      RESERVE_POOL_TIMEOUT: 3 # Timeout dla reserve pool
+      SERVER_IDLE_TIMEOUT: 600 # 10 minut
+      SERVER_LIFETIME: 3600    # 1 godzina
+      SERVER_CONNECT_TIMEOUT: 15
+      QUERY_TIMEOUT: 0         # Bez limitu (Django kontroluje)
+      QUERY_WAIT_TIMEOUT: 120  # 2 minuty czekania na połączenie
+      MAX_DB_CONNECTIONS: 100  # Max połączeń do pojedynczej bazy
+      MAX_USER_CONNECTIONS: 100
+      ADMIN_USERS: ${DEFAULT_DB_USER}
+      STATS_USERS: ${DEFAULT_DB_USER}
+      LOG_CONNECTIONS: 1
+      LOG_DISCONNECTIONS: 1
+      LOG_POOLER_ERRORS: 1
+      VERBOSE: 0
+      TZ: Europe/Warsaw
+    ports:
+      - "6432:5432"  # PgBouncer na porcie 6432 (zamiast bezpośrednio 5432)
+    networks:
+      - nc_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "5432", "-U", "${DEFAULT_DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "nc.type=database-pooler"
+      - "nc.protected=true"
+
+networks:
+  nc_network:
+    external: true
+
