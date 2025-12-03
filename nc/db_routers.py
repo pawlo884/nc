@@ -91,13 +91,13 @@ class Matterhorn1Router:
 
 class DefaultRouter:
     """
-    Router dla aplikacji systemowych Django
+    Router dla aplikacji systemowych Django i web_agent
     """
 
     def db_for_read(self, model, **hints):
-        # Aplikacje systemowe Django idą do bazy default
+        # Aplikacje systemowe Django i web_agent idą do bazy default
         system_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
-                       'django_celery_results', 'admin_interface', 'colorfield']
+                      'django_celery_results', 'admin_interface', 'colorfield', 'web_agent']
         if model._meta.app_label in system_apps:
             # Na produkcji używaj 'default', lokalnie 'zzz_default'
             from django.conf import settings
@@ -108,9 +108,9 @@ class DefaultRouter:
         return None
 
     def db_for_write(self, model, **hints):
-        # Aplikacje systemowe Django idą do bazy default
+        # Aplikacje systemowe Django i web_agent idą do bazy default
         system_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
-                       'django_celery_results', 'admin_interface', 'colorfield']
+                      'django_celery_results', 'admin_interface', 'colorfield', 'web_agent']
         if model._meta.app_label in system_apps:
             # Na produkcji używaj 'default', lokalnie 'zzz_default'
             from django.conf import settings
@@ -125,9 +125,9 @@ class DefaultRouter:
         return True
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
-        # Aplikacje systemowe Django idą do bazy default
+        # Aplikacje systemowe Django i web_agent idą do bazy default
         system_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
-                       'django_celery_results', 'admin_interface', 'colorfield']
+                      'django_celery_results', 'admin_interface', 'colorfield', 'web_agent']
         if app_label in system_apps:
             # Na produkcji używaj 'default', lokalnie 'zzz_default'
             from django.conf import settings

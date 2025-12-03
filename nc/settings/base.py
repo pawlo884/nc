@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     # 'matterhorn',  # usunięta stara aplikacja
     'MPD',
     'matterhorn1',
+    'web_agent',
 ]
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
@@ -446,13 +447,17 @@ if S3_BUCKET_NAME and S3_ACCESS_KEY and S3_SECRET_KEY:
         )
         AWS_S3_ENDPOINT_URL = S3_ENDPOINT
         AWS_S3_ADDRESSING_STYLE = os.getenv('AWS_S3_ADDRESSING_STYLE', 'path')
-        AWS_S3_SIGNATURE_VERSION = os.getenv('AWS_S3_SIGNATURE_VERSION', 's3v4')
+        AWS_S3_SIGNATURE_VERSION = os.getenv(
+            'AWS_S3_SIGNATURE_VERSION', 's3v4')
         if MINIO_ENDPOINT:
-            AWS_S3_VERIFY = os.getenv('MINIO_VERIFY_SSL', 'false').lower() == 'true'
+            AWS_S3_VERIFY = os.getenv(
+                'MINIO_VERIFY_SSL', 'false').lower() == 'true'
         else:
-            AWS_S3_VERIFY = os.getenv('AWS_S3_VERIFY', 'true').lower() == 'true'
+            AWS_S3_VERIFY = os.getenv(
+                'AWS_S3_VERIFY', 'true').lower() == 'true'
         AWS_DEFAULT_ACL = os.getenv('AWS_DEFAULT_ACL') or None
-        AWS_QUERYSTRING_AUTH = os.getenv('AWS_QUERYSTRING_AUTH', 'false').lower() == 'true'
+        AWS_QUERYSTRING_AUTH = os.getenv(
+            'AWS_QUERYSTRING_AUTH', 'false').lower() == 'true'
 
         if AWS_S3_ENDPOINT_URL and AWS_STORAGE_BUCKET_NAME:
             MEDIA_URL = os.getenv(

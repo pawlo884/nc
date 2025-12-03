@@ -60,6 +60,11 @@ urlpatterns += i18n_patterns(
     prefix_default_language=False
 )
 
+# API URLs (bez i18n)
+urlpatterns += [
+    path('api/web-agent/', include('web_agent.urls')),
+]
+
 if settings.DEBUG:
     urlpatterns += [
         path('__debug__/', include('debug_toolbar.urls')),
