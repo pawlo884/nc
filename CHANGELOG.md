@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.0.5 (2025-12-03)</small>
+
+* fix: ochrona PostgreSQL przed odtwarzaniem podczas deploy ([41c8d57](https://github.com/pawlo884/nc/commit/41c8d57))
+
 ## <small>1.0.4 (2025-12-03)</small>
 
 * Merge remote-tracking branch 'origin/main' ([68f6dab](https://github.com/pawlo884/nc/commit/68f6dab))
