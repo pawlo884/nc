@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.3.5 (2025-12-03)</small>
+
+* perf: optymalizacja db_routers - cache'owanie settings i DJANGO_ENV ([cf11b40](https://github.com/pawlo884/nc/commit/cf11b40))
+
 ## <small>1.3.4 (2025-12-03)</small>
 
 * Revert "fix: naprawa błędu duplikatów w bulk update INVENTORY - zmiana .get() na .filter().first()" ([2026bd7](https://github.com/pawlo884/nc/commit/2026bd7))
