@@ -9,19 +9,19 @@ class MPDRouter:
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'MPD':
             from django.conf import settings
-            if os.getenv('DJANGO_ENV') == 'prod' and 'MPD' in settings.DATABASES:
-                return 'MPD'
+            # Development używa zzz_MPD, produkcja MPD
             if 'zzz_MPD' in settings.DATABASES:
                 return 'zzz_MPD'
+            return 'MPD'
         return None
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label == 'MPD':
             from django.conf import settings
-            if os.getenv('DJANGO_ENV') == 'prod' and 'MPD' in settings.DATABASES:
-                return 'MPD'
+            # Development używa zzz_MPD, produkcja MPD
             if 'zzz_MPD' in settings.DATABASES:
                 return 'zzz_MPD'
+            return 'MPD'
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -33,10 +33,10 @@ class MPDRouter:
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'MPD':
             from django.conf import settings
-            if os.getenv('DJANGO_ENV') == 'prod' and 'MPD' in settings.DATABASES:
-                return db == 'MPD'
+            # Development używa zzz_MPD, produkcja MPD
             if 'zzz_MPD' in settings.DATABASES:
                 return db == 'zzz_MPD'
+            return db == 'MPD'
         return None
 
 
@@ -47,28 +47,20 @@ class Matterhorn1Router:
 
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'matterhorn1':
-            # Na produkcji używaj 'matterhorn1', lokalnie 'zzz_matterhorn1'
             from django.conf import settings
-            django_env = os.getenv('DJANGO_ENV')
-            if django_env == 'prod' and 'matterhorn1' in settings.DATABASES:
-                return 'matterhorn1'
+            # Development używa zzz_matterhorn1, produkcja matterhorn1
             if 'zzz_matterhorn1' in settings.DATABASES:
                 return 'zzz_matterhorn1'
-            if 'matterhorn1' in settings.DATABASES:
-                return 'matterhorn1'
+            return 'matterhorn1'
         return None
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label == 'matterhorn1':
-            # Na produkcji używaj 'matterhorn1', lokalnie 'zzz_matterhorn1'
             from django.conf import settings
-            django_env = os.getenv('DJANGO_ENV')
-            if django_env == 'prod' and 'matterhorn1' in settings.DATABASES:
-                return 'matterhorn1'
+            # Development używa zzz_matterhorn1, produkcja matterhorn1
             if 'zzz_matterhorn1' in settings.DATABASES:
                 return 'zzz_matterhorn1'
-            if 'matterhorn1' in settings.DATABASES:
-                return 'matterhorn1'
+            return 'matterhorn1'
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -77,15 +69,11 @@ class Matterhorn1Router:
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'matterhorn1':
-            # Na produkcji używaj 'matterhorn1', lokalnie 'zzz_matterhorn1'
             from django.conf import settings
-            django_env = os.getenv('DJANGO_ENV')
-            if django_env == 'prod' and 'matterhorn1' in settings.DATABASES:
-                return db == 'matterhorn1'
+            # Development używa zzz_matterhorn1, produkcja matterhorn1
             if 'zzz_matterhorn1' in settings.DATABASES:
                 return db == 'zzz_matterhorn1'
-            if 'matterhorn1' in settings.DATABASES:
-                return db == 'matterhorn1'
+            return db == 'matterhorn1'
         return None
 
 
@@ -97,19 +85,19 @@ class WebAgentRouter:
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'web_agent':
             from django.conf import settings
-            if os.getenv('DJANGO_ENV') == 'prod' and 'web_agent' in settings.DATABASES:
-                return 'web_agent'
+            # Development używa zzz_web_agent, produkcja web_agent
             if 'zzz_web_agent' in settings.DATABASES:
                 return 'zzz_web_agent'
+            return 'web_agent'
         return None
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label == 'web_agent':
             from django.conf import settings
-            if os.getenv('DJANGO_ENV') == 'prod' and 'web_agent' in settings.DATABASES:
-                return 'web_agent'
+            # Development używa zzz_web_agent, produkcja web_agent
             if 'zzz_web_agent' in settings.DATABASES:
                 return 'zzz_web_agent'
+            return 'web_agent'
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -121,10 +109,10 @@ class WebAgentRouter:
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'web_agent':
             from django.conf import settings
-            if os.getenv('DJANGO_ENV') == 'prod' and 'web_agent' in settings.DATABASES:
-                return db == 'web_agent'
+            # Development używa zzz_web_agent, produkcja web_agent
             if 'zzz_web_agent' in settings.DATABASES:
                 return db == 'zzz_web_agent'
+            return db == 'web_agent'
         return None
 
 

@@ -124,11 +124,10 @@ TEMPLATES = [
 
 
 # Database
-# Development używa tylko baz z przedrostkiem zzz_
-# Produkcja używa aliasów bez przedrostka (aliasy wskazują na te same bazy)
+# Base zawiera konfigurację produkcyjną (bez przedrostka zzz_)
+# Development (dev.py) nadpisuje na wersje z przedrostkiem zzz_
 DATABASES = {
-    # Development databases (zawsze z przedrostkiem zzz_)
-    'zzz_default': {
+    'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DEFAULT_DB_NAME'),
         'USER': os.getenv('DEFAULT_DB_USER'),
@@ -141,7 +140,7 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
-    'zzz_MPD': {
+    'MPD': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('MPD_DB_NAME'),
         'USER': os.getenv('MPD_DB_USER'),
@@ -154,7 +153,7 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
-    'zzz_matterhorn1': {
+    'matterhorn1': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('MATTERHORN1_DB_NAME'),
         'USER': os.getenv('MATTERHORN1_DB_USER'),
@@ -167,7 +166,7 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
-    'zzz_web_agent': {
+    'web_agent': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('WEB_AGENT_DB_NAME'),
         'USER': os.getenv('WEB_AGENT_DB_USER'),
