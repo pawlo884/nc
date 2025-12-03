@@ -1,5 +1,11 @@
 # Zmiany
 
+## <small>1.2.1 (2025-12-03)</small>
+
+* merge: PgBouncer multi-database fix ([6ee0f51](https://github.com/pawlo884/nc/commit/6ee0f51))
+* fix: PgBouncer dla WSZYSTKICH baz Django (default, matterhorn1, MPD) ([21cc8c3](https://github.com/pawlo884/nc/commit/21cc8c3))
+* fix: przyspiesz pierwsze połączenie do PostgreSQL ([818f703](https://github.com/pawlo884/nc/commit/818f703))
+
 ## 1.2.0 (2025-12-03)
 
 * merge: PgBouncer integration ([f2b6122](https://github.com/pawlo884/nc/commit/f2b6122))
