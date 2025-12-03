@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.2.4 (2025-12-03)</small>
+
+* fix: obsługa błędów w deploy-blue-green.sh przy set -e ([bef2578](https://github.com/pawlo884/nc/commit/bef2578))
+
 ## <small>1.2.3 (2025-12-03)</small>
 
 * fix: napraw blue-green deployment health check ([d3a5d77](https://github.com/pawlo884/nc/commit/d3a5d77))
