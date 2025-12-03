@@ -746,41 +746,20 @@ def _create_related_objects_for_products(products):
 
                     try:
                         # Sprawdź czy wariant istnieje
-                        existing_variants = ProductVariant.objects.using('matterhorn1').filter(
+                        existing_variant = ProductVariant.objects.using('matterhorn1').get(
                             variant_uid=variant_uid)
-                        
-                        variant_count = existing_variants.count()
-                        
-                        if variant_count == 0:
-                            # Utwórz nowy
-                            variants_to_create.append(ProductVariant(
-                                variant_uid=variant_uid,
-                                product=product,
-                                name=variant_data.get('name', 'Unknown'),
-                                stock=variant_data.get('stock', 0),
-                                max_processing_time=variant_data.get(
-                                    'max_processing_time', 0),
-                                ean=variant_data.get('ean', '')
-                            ))
-                        else:
-                            # Użyj pierwszego wariantu (obsługa duplikatów)
-                            if variant_count > 1:
-                                logger.warning(
-                                    f"⚠️ Znaleziono {variant_count} duplikatów wariantu z variant_uid={variant_uid}. Używam pierwszego.")
-                            existing_variant = existing_variants.first()
-                            # Aktualizuj istniejący
-                            existing_variant.name = variant_data.get(
-                                'name', existing_variant.name)
-                            existing_variant.stock = variant_data.get(
-                                'stock', existing_variant.stock)
-                            existing_variant.max_processing_time = variant_data.get(
-                                'max_processing_time', existing_variant.max_processing_time)
-                            existing_variant.ean = variant_data.get(
-                                'ean', existing_variant.ean)
-                            variants_to_update.append(existing_variant)
-                    except Exception as e:
-                        # Inny błąd - zaloguj i utwórz nowy
-                        logger.warning(f"Błąd podczas znajdowania wariantu {variant_uid}: {e}")
+                        # Aktualizuj istniejący
+                        existing_variant.name = variant_data.get(
+                            'name', existing_variant.name)
+                        existing_variant.stock = variant_data.get(
+                            'stock', existing_variant.stock)
+                        existing_variant.max_processing_time = variant_data.get(
+                            'max_processing_time', existing_variant.max_processing_time)
+                        existing_variant.ean = variant_data.get(
+                            'ean', existing_variant.ean)
+                        variants_to_update.append(existing_variant)
+                    except ProductVariant.DoesNotExist:
+                        # Utwórz nowy
                         variants_to_create.append(ProductVariant(
                             variant_uid=variant_uid,
                             product=product,
@@ -1200,22 +1179,8 @@ def _bulk_update_inventory(inventory_data):
 
             # Znajdź produkt
             try:
-                products = Product.objects.using(
-                    'matterhorn1').filter(product_uid=int(product_uid))
-                
-                product_count = products.count()
-                
-                if product_count == 0:
-                    # Produkt nie istnieje - pomiń
-                    continue
-                elif product_count > 1:
-                    # Występują duplikaty - użyj pierwszego i zaloguj ostrzeżenie
-                    logger.warning(
-                        f"⚠️ Znaleziono {product_count} duplikatów produktu z product_uid={product_uid}. Używam pierwszego.")
-                    product = products.first()
-                else:
-                    # Dokładnie jeden produkt - OK
-                    product = products.first()
+                product = Product.objects.using(
+                    'matterhorn1').get(product_uid=int(product_uid))
 
                 # Aktualizuj warianty (w INVENTORY API dane są w 'inventory')
                 variants_data = item.get('inventory', [])
@@ -1238,24 +1203,10 @@ def _bulk_update_inventory(inventory_data):
 
                     # Znajdź wariant
                     try:
-                        variants = ProductVariant.objects.using('matterhorn1').filter(
+                        variant = ProductVariant.objects.using('matterhorn1').get(
                             variant_uid=variant_uid,
                             product=product
                         )
-                        
-                        variant_count = variants.count()
-                        
-                        if variant_count == 0:
-                            # Wariant nie istnieje - pomiń
-                            continue
-                        elif variant_count > 1:
-                            # Występują duplikaty - użyj pierwszego i zaloguj ostrzeżenie
-                            logger.warning(
-                                f"⚠️ Znaleziono {variant_count} duplikatów wariantu z variant_uid={variant_uid} dla produktu {product_uid}. Używam pierwszego.")
-                            variant = variants.first()
-                        else:
-                            # Dokładnie jeden wariant - OK
-                            variant = variants.first()
 
                         # Aktualizuj stan magazynowy
                         new_stock = int(variant_data.get('stock', 0)) if variant_data.get(
@@ -1274,14 +1225,12 @@ def _bulk_update_inventory(inventory_data):
                             variant.stock = new_stock
                             variants_to_update.append(variant)
 
-                    except Exception as e:
-                        # Inny błąd - zaloguj i pomiń
-                        logger.warning(f"Błąd podczas znajdowania wariantu {variant_uid} dla produktu {product_uid}: {e}")
+                    except ProductVariant.DoesNotExist:
+                        # Wariant nie istnieje - pomiń
                         continue
 
-            except Exception as e:
-                # Inny błąd - zaloguj i pomiń
-                logger.warning(f"Błąd podczas znajdowania produktu {product_uid}: {e}")
+            except Product.DoesNotExist:
+                # Produkt nie istnieje - pomiń
                 continue
 
         # Bulk update wariantów
