@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.3.4 (2025-12-03)</small>
+
+* Revert "fix: naprawa błędu duplikatów w bulk update INVENTORY - zmiana .get() na .filter().first()" ([2026bd7](https://github.com/pawlo884/nc/commit/2026bd7))
+
 ## <small>1.3.3 (2025-12-03)</small>
 
 * fix: usunięcie automatycznych migracji z produkcji - migracje należy wykonywać ręcznie ([a8ab925](https://github.com/pawlo884/nc/commit/a8ab925))
