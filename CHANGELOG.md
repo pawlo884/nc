@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.3.6 (2025-12-04)</small>
+
+* perf: optymalizacja db_routers - lazy evaluation zamiast cache przy imporcie ([458855e](https://github.com/pawlo884/nc/commit/458855e))
+* routers ([53db589](https://github.com/pawlo884/nc/commit/53db589))
+
 ## <small>1.3.5 (2025-12-03)</small>
 
 * perf: optymalizacja db_routers - cache'owanie settings i DJANGO_ENV ([cf11b40](https://github.com/pawlo884/nc/commit/cf11b40))
