@@ -155,9 +155,16 @@ switch_nginx() {
     # Backup aktualnej konfiguracji
     cp nginx-blue-green.conf nginx-blue-green.conf.backup
     
-    # Zmień upstream backend_active
-    sed -i.bak "s/server web-blue:8000/server web-${target}:8000/g" nginx-blue-green.conf
-    sed -i.bak "s/X-Deployment-Color \"blue\"/X-Deployment-Color \"${target}\"/g" nginx-blue-green.conf
+    # Określ aktualny aktywny environment (blue lub green)
+    if [ "$target" = "blue" ]; then
+        current="green"
+    else
+        current="blue"
+    fi
+    
+    # Zmień TYLKO upstream backend_active (nie zmieniaj backend_blue i backend_green!)
+    sed -i.bak "/^upstream backend_active {/,/^}/ s/server web-${current}:8000/server web-${target}:8000/" nginx-blue-green.conf
+    sed -i.bak "s/X-Deployment-Color \"${current}\"/X-Deployment-Color \"${target}\"/g" nginx-blue-green.conf
     
     # Przeładuj NGINX
     docker exec nc-nginx-router nginx -t && docker exec nc-nginx-router nginx -s reload
