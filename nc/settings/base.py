@@ -131,7 +131,7 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
             'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
             'keepalives': 1,       # Włącz TCP keepalive
@@ -148,7 +148,7 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
             'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
             'keepalives': 1,       # Włącz TCP keepalive
@@ -165,7 +165,7 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
             'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
             'keepalives': 1,       # Włącz TCP keepalive
@@ -182,7 +182,7 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
             'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
             'keepalives': 1,       # Włącz TCP keepalive
@@ -199,7 +199,7 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN1_DB_HOST'),
         'PORT': os.getenv('MATTERHORN1_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
             'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
             'keepalives': 1,       # Włącz TCP keepalive
@@ -216,7 +216,7 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN1_DB_HOST'),
         'PORT': os.getenv('MATTERHORN1_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Zamykaj połączenia natychmiast po użyciu
+        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
             'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
             'keepalives': 1,       # Włącz TCP keepalive
