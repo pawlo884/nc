@@ -29,13 +29,15 @@ class BrowserAutomation:
             password: Hasło użytkownika
             headless: Czy uruchomić przeglądarkę w trybie headless
         """
+        # Usuń /admin/ z końca URL jeśli jest
+        base_url = base_url.rstrip('/').replace('/admin', '')
         self.base_url = base_url.rstrip('/')
         self.username = username
         self.password = password
         self.headless = headless
         self.driver: Optional[webdriver.Chrome] = None
         self.wait: Optional[WebDriverWait] = None
-        logger.info(f"BrowserAutomation zainicjalizowany dla {base_url}")
+        logger.info(f"BrowserAutomation zainicjalizowany dla {self.base_url}")
     
     def start_browser(self):
         """Uruchomienie przeglądarki Chrome"""

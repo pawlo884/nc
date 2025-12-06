@@ -3,10 +3,8 @@ Management command do uruchomienia automatyzacji wypełniania formularzy MPD
 """
 from django.core.management.base import BaseCommand
 from web_agent.automation.browser_automation import BrowserAutomation
-from web_agent.automation.ai_processor import AIProcessor
-from web_agent.automation.product_processor import ProductProcessor
-from web_agent.models import AutomationRun, ProductProcessingLog
-from matterhorn1.models import Product, Brand, Category
+from web_agent.models import AutomationRun
+from matterhorn1.models import Brand, Category
 import os
 
 
@@ -14,30 +12,47 @@ class Command(BaseCommand):
     help = 'Uruchom automatyzację wypełniania formularzy MPD'
 
     def add_arguments(self, parser):
-        parser.add_argument('--brand', type=str, required=True, help='Nazwa marki')
-        parser.add_argument('--category', type=str, help='Nazwa kategorii')
-        parser.add_argument('--limit', type=int, default=5, help='Maksymalna liczba produktów')
+        parser.add_argument('--brand', type=str, help='Nazwa marki (opcjonalne)')
+        parser.add_argument('--category', type=str, help='Nazwa kategorii (opcjonalne)')
+        parser.add_argument('--active', type=str, help='Filtr active (true/false, opcjonalne)')
+        parser.add_argument('--is_mapped', type=str, help='Filtr is_mapped (true/false, opcjonalne)')
 
     def handle(self, *args, **options):
-        brand_name = options['brand']
+        brand_name = options.get('brand')
         category_name = options.get('category')
-        limit = options['limit']
+        
+        # Konwertuj stringi na boolean
+        active_filter = None
+        if options.get('active'):
+            active_filter = options.get('active').lower() in ('true', '1', 'yes', 'tak')
+        
+        is_mapped_filter = None
+        if options.get('is_mapped'):
+            is_mapped_filter = options.get('is_mapped').lower() in ('true', '1', 'yes', 'tak')
 
-        self.stdout.write(f"\nAUTOMATYZACJA MPD")
-        self.stdout.write(f"   Marka: {brand_name}")
+        self.stdout.write(f"\nURUCHOMIENIE AGENTA")
+        self.stdout.write(f"   Marka: {brand_name or 'Wszystkie'}")
         self.stdout.write(f"   Kategoria: {category_name or 'Wszystkie'}")
-        self.stdout.write(f"   Limit: {limit}\n")
+        if active_filter is not None:
+            self.stdout.write(f"   Active: {active_filter}")
+        if is_mapped_filter is not None:
+            self.stdout.write(f"   Is Mapped: {is_mapped_filter}")
+        self.stdout.write("")
 
-        # Znajdź brand i category ID
-        try:
-            brand = Brand.objects.using('matterhorn1').get(name__iexact=brand_name)
-            brand_id = int(brand.brand_id)
-            self.stdout.write(f"[OK] Znaleziono marke: {brand.name} (ID: {brand_id})")
-        except Brand.DoesNotExist:
-            self.stdout.write(self.style.ERROR(f"[ERROR] Nie znaleziono marki: {brand_name}"))
-            return
+        # Znajdź brand i category ID tylko jeśli podano
+        brand_id = None
+        brand = None
+        if brand_name:
+            try:
+                brand = Brand.objects.using('matterhorn1').get(name__iexact=brand_name)
+                brand_id = int(brand.brand_id)
+                self.stdout.write(f"[OK] Znaleziono marke: {brand.name} (ID: {brand_id})")
+            except Brand.DoesNotExist:
+                self.stdout.write(self.style.ERROR(f"[ERROR] Nie znaleziono marki: {brand_name}"))
+                return
 
         category_id = None
+        category = None
         if category_name:
             try:
                 category = Category.objects.using('matterhorn1').filter(name__icontains=category_name).first()
@@ -45,80 +60,87 @@ class Command(BaseCommand):
                     category_id = int(category.category_id)
                     self.stdout.write(f"[OK] Znaleziono kategorie: {category.name} (ID: {category_id})")
                 else:
-                    self.stdout.write(self.style.WARNING(f"[WARNING] Nie znaleziono kategorii: {category_name}, uzywam wszystkich"))
+                    self.stdout.write(self.style.WARNING(f"[WARNING] Nie znaleziono kategorii: {category_name}"))
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f"[WARNING] Blad podczas wyszukiwania kategorii: {e}, uzywam wszystkich"))
+                self.stdout.write(self.style.WARNING(f"[WARNING] Blad podczas wyszukiwania kategorii: {e}"))
 
         # Utwórz AutomationRun
+        filters = {}
+        if active_filter is not None:
+            filters['active'] = active_filter
+        if is_mapped_filter is not None:
+            filters['is_mapped'] = is_mapped_filter
+            
         automation_run = AutomationRun.objects.using('zzz_default').create(
             status='running',
             brand_id=brand_id,
             category_id=category_id,
-            filters={'active': True, 'is_mapped': False}
+            filters=filters
         )
         self.stdout.write(f"\n[OK] Utworzono AutomationRun ID: {automation_run.id}\n")
 
         # Konfiguracja
-        base_url = os.getenv('WEB_AGENT_BASE_URL', 'http://localhost:8000')
+        base_url = os.getenv('WEB_AGENT_BASE_URL', 'http://localhost:8000/admin/')
         admin_username = os.getenv('DJANGO_ADMIN_USERNAME', 'admin')
         admin_password = os.getenv('DJANGO_ADMIN_PASSWORD', '')
-        openai_key = os.getenv('OPENAI_API_KEY', '')
 
-        if not admin_password or not openai_key:
-            self.stdout.write(self.style.ERROR("[ERROR] Brak DJANGO_ADMIN_PASSWORD lub OPENAI_API_KEY w .env.dev"))
+        if not admin_password:
+            self.stdout.write(self.style.ERROR("[ERROR] Brak DJANGO_ADMIN_PASSWORD w .env.dev"))
             automation_run.status = 'failed'
             automation_run.error_message = "Brak konfiguracji"
             automation_run.save(using='zzz_default')
             return
 
         try:
-            # Inicjalizuj komponenty
+            # Inicjalizuj przeglądarkę
             browser = BrowserAutomation(base_url, admin_username, admin_password, headless=False)
-            ai = AIProcessor(openai_key)
-            processor = ProductProcessor(browser, ai, automation_run)
 
             # Uruchom przeglądarkę
+            self.stdout.write("\n[INFO] Uruchamianie przeglądarki...")
             browser.start_browser()
-            if not browser.login_admin():
-                raise Exception("Nie udało się zalogować")
+            
+            # Zaloguj się do admin
+            self.stdout.write("[INFO] Logowanie do admin...")
+            browser.login_to_admin()
+            self.stdout.write(self.style.SUCCESS("[OK] Zalogowano do admin"))
 
-            # Pobierz produkty
-            products = processor.get_products_to_process(
-                brand_id=brand_id,
-                category_id=category_id,
-                limit=limit,
-                filters={'active': True, 'is_mapped': False}
-            )
+            # Przygotuj filtry tylko jeśli są podane
+            automation_filters = {}
+            
+            if brand_id and brand:
+                automation_filters['brand_id'] = brand_id
+                automation_filters['brand_name'] = brand.name
+                self.stdout.write(f"\n[INFO] Filtr marki: {brand.name}")
+            
+            if category_id:
+                automation_filters['category_id'] = category_id
+                self.stdout.write(f"[INFO] Filtr kategorii: {category_name}")
+            
+            if active_filter is not None:
+                automation_filters['active'] = active_filter
+                self.stdout.write(f"[INFO] Filtr active: {active_filter}")
+            
+            if is_mapped_filter is not None:
+                automation_filters['is_mapped'] = is_mapped_filter
+                self.stdout.write(f"[INFO] Filtr is_mapped: {is_mapped_filter}")
 
-            if not products:
-                self.stdout.write(self.style.WARNING("[WARNING] Brak produktow do przetworzenia"))
-                automation_run.status = 'completed'
-                automation_run.save(using='zzz_default')
-                return
+            # Przejdź do listy produktów (z filtrami lub bez)
+            self.stdout.write(f"\n[INFO] Przechodzenie do listy produktów...")
+            if not automation_filters:
+                self.stdout.write("   Brak filtrów - wyświetlanie wszystkich produktów")
+            
+            browser.navigate_to_product_list(automation_filters if automation_filters else None)
+            
+            if automation_filters:
+                self.stdout.write(self.style.SUCCESS("\n[OK] Przeglądarka otwarta z wybranymi filtrami!"))
+            else:
+                self.stdout.write(self.style.SUCCESS("\n[OK] Przeglądarka otwarta - wszystkie produkty!"))
+            self.stdout.write("[INFO] Przeglądarka pozostanie otwarta. Możesz teraz ręcznie przetwarzać produkty.")
+            self.stdout.write(f"\n   AutomationRun ID: {automation_run.id}")
+            self.stdout.write(f"   Wyniki: http://localhost:8000/admin/web_agent/automationrun/{automation_run.id}/\n")
 
-            self.stdout.write(f"\n[INFO] Znaleziono {len(products)} produktow do przetworzenia\n")
-
-            # Przetwarzaj
-            for i, product in enumerate(products, 1):
-                self.stdout.write(f"\n{'='*70}")
-                self.stdout.write(f"Produkt {i}/{len(products)}: {product.name[:60]}...")
-                self.stdout.write(f"{'='*70}")
-
-                success = processor.process_product(product)
-                if success:
-                    self.stdout.write(self.style.SUCCESS(f"[OK] Sukces!"))
-                else:
-                    self.stdout.write(self.style.ERROR(f"[ERROR] Blad"))
-
-            # Zakończ
-            automation_run.status = 'completed'
-            automation_run.save(using='zzz_default')
-
-            self.stdout.write(f"\n\n[OK] AUTOMATYZACJA ZAKONCZONA!")
-            self.stdout.write(f"   Przetworzono: {automation_run.products_processed}")
-            self.stdout.write(f"   Sukcesow: {automation_run.products_success}")
-            self.stdout.write(f"   Bledow: {automation_run.products_failed}")
-            self.stdout.write(f"\n   Wyniki: http://localhost:8000/admin/web_agent/automationrun/{automation_run.id}/\n")
+            # Zostaw przeglądarkę otwartą - nie zamykaj!
+            # Użytkownik może teraz ręcznie przetwarzać produkty
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"\n[ERROR] Blad: {e}"))
@@ -127,7 +149,6 @@ class Command(BaseCommand):
             automation_run.status = 'failed'
             automation_run.error_message = str(e)
             automation_run.save(using='zzz_default')
-        finally:
             if 'browser' in locals():
-                browser.stop_browser()
+                browser.close_browser()
 
