@@ -205,10 +205,23 @@ deploy() {
         verify_no_protected_containers "nginx-router"
         
         # ⚠️ WAŻNE: Tylko nginx-router, bez postgres i redis!
+        # Zapisz timestamp PostgreSQL przed operacją
+        POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+        
         if ! docker-compose -f docker-compose.blue-green.yml up -d nginx-router; then
             log_error "❌ Nie udało się uruchomić NGINX router"
             exit 1
         fi
+        
+        # Sprawdź czy PostgreSQL nie został przypadkiem odtworzony
+        POSTGRES_STARTED_AFTER=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+        if [ -n "$POSTGRES_STARTED_BEFORE" ] && [ "$POSTGRES_STARTED_BEFORE" != "$POSTGRES_STARTED_AFTER" ]; then
+            log_error "❌ KRYTYCZNE: PostgreSQL został odtworzony podczas deploya!"
+            log_error "❌ Started before: $POSTGRES_STARTED_BEFORE"
+            log_error "❌ Started after:  $POSTGRES_STARTED_AFTER"
+            exit 1
+        fi
+        
         log_success "✅ NGINX router uruchomiony"
         sleep 5
     else
@@ -229,9 +242,22 @@ deploy() {
     # 3. Build nowego obrazu
     log_info "🔨 Budowanie nowego obrazu..."
     export DOCKER_BUILDKIT=1
+    
+    # Zapisz timestamp PostgreSQL przed operacją
+    POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+    
     # ✅ Bezpieczne - buduje web-${TARGET} i kontenery Celery (używają tego samego obrazu), nie dotyka nietykalnych kontenerów
     if ! docker-compose -f docker-compose.blue-green.yml build --no-cache web-${TARGET} celery-default celery-import celery-beat flower; then
         log_error "❌ Nie udało się zbudować obrazu"
+        exit 1
+    fi
+    
+    # Sprawdź czy PostgreSQL nie został przypadkiem odtworzony
+    POSTGRES_STARTED_AFTER=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+    if [ -n "$POSTGRES_STARTED_BEFORE" ] && [ "$POSTGRES_STARTED_BEFORE" != "$POSTGRES_STARTED_AFTER" ]; then
+        log_error "❌ KRYTYCZNE: PostgreSQL został odtworzony podczas builda!"
+        log_error "❌ Started before: $POSTGRES_STARTED_BEFORE"
+        log_error "❌ Started after:  $POSTGRES_STARTED_AFTER"
         exit 1
     fi
     

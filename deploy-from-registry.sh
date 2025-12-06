@@ -58,13 +58,13 @@ echo "   Downtime: ~2-5 sekund"
 
 SWITCH_START=$(date +%s)
 
-# Stop kontenerów
-docker-compose -f $COMPOSE_FILE stop
+# Stop tylko kontenerów aplikacji (BEZ postgres i redis!)
+docker-compose -f $COMPOSE_FILE stop web celery-default celery-import celery-beat flower nginx static-init
 
-# Remove kontenerów (volumes zostają!)
-docker-compose -f $COMPOSE_FILE rm -f
+# Remove tylko kontenerów aplikacji (volumes zostają!)
+docker-compose -f $COMPOSE_FILE rm -f web celery-default celery-import celery-beat flower nginx static-init
 
-# Start z nowym obrazem
+# Start z nowym obrazem (postgres i redis pozostają nietknięte)
 docker-compose -f $COMPOSE_FILE up -d
 
 SWITCH_END=$(date +%s)
@@ -104,7 +104,9 @@ if [ "$HEALTH_OK" != "true" ]; then
     
     if [ -n "$BACKUP_TAG" ]; then
         docker tag $BACKUP_TAG $OLD_TAG
-        docker-compose -f $COMPOSE_FILE up -d --force-recreate
+        # Rollback tylko kontenerów aplikacji (BEZ postgres i redis!)
+        docker-compose -f $COMPOSE_FILE stop web celery-default celery-import celery-beat flower nginx static-init
+        docker-compose -f $COMPOSE_FILE up -d --force-recreate --no-deps web celery-default celery-import celery-beat flower nginx static-init
         echo "✅ Rollback zakończony"
     fi
     
@@ -135,6 +137,7 @@ echo "   Backup: $BACKUP_TAG"
 echo ""
 echo "💡 W razie problemów rollback:"
 echo "   docker tag $BACKUP_TAG $OLD_TAG"
-echo "   docker-compose -f $COMPOSE_FILE up -d --force-recreate"
+echo "   docker-compose -f $COMPOSE_FILE stop web celery-default celery-import celery-beat flower nginx static-init"
+echo "   docker-compose -f $COMPOSE_FILE up -d --force-recreate --no-deps web celery-default celery-import celery-beat flower nginx static-init"
 echo ""
 

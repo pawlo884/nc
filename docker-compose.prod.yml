@@ -21,6 +21,11 @@ services:
     networks:
     - nc_network
     user: 1001:1001
+  # ⚠️⚠️⚠️  NIETYKALNY KONTENER - NIGDY NIE DOTYKAĆ!  ⚠️⚠️⚠️
+  # Ten kontener zawiera dane produkcyjne i jest całkowicie nietykalny.
+  # ❌ NIGDY nie używaj dla niego: --force-recreate, stop, rm, restart
+  # ✅ Tylko sprawdzaj czy działa (docker ps) i jego zdrowie (health check)
+  # Jeśli ten kontener nie działa - deployment MUSI się zatrzymać!
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped

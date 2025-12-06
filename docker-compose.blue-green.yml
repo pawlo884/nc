@@ -132,6 +132,10 @@ services:
       POSTGRES_PASSWORD: ${DEFAULT_DB_PASSWORD:-prod_password}
       POSTGRES_DB: ${DEFAULT_DB_NAME:-zzz_default}
       TZ: Europe/Warsaw
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DEFAULT_DB_USER:-nc}"]
       interval: 10s
@@ -143,6 +147,7 @@ services:
     volumes:
       - /mnt/data2tb/docker/volumes/nc_postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/initdb.d:/docker-entrypoint-initdb.d:ro
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     networks:
       - nc_network
     labels:
