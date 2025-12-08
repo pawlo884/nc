@@ -155,9 +155,16 @@ switch_nginx() {
     # Backup aktualnej konfiguracji
     cp nginx-blue-green.conf nginx-blue-green.conf.backup
     
-    # Zmień upstream backend_active
-    sed -i.bak "s/server web-blue:8000/server web-${target}:8000/g" nginx-blue-green.conf
-    sed -i.bak "s/X-Deployment-Color \"blue\"/X-Deployment-Color \"${target}\"/g" nginx-blue-green.conf
+    # Określ aktualny aktywny environment (blue lub green)
+    if [ "$target" = "blue" ]; then
+        current="green"
+    else
+        current="blue"
+    fi
+    
+    # Zmień TYLKO upstream backend_active (nie zmieniaj backend_blue i backend_green!)
+    sed -i.bak "/^upstream backend_active {/,/^}/ s/server web-${current}:8000/server web-${target}:8000/" nginx-blue-green.conf
+    sed -i.bak "s/X-Deployment-Color \"${current}\"/X-Deployment-Color \"${target}\"/g" nginx-blue-green.conf
     
     # Przeładuj NGINX
     docker exec nc-nginx-router nginx -t && docker exec nc-nginx-router nginx -s reload
@@ -178,6 +185,14 @@ switch_nginx() {
 deploy() {
     log_info "🚀 Rozpoczynam Blue-Green Deployment"
     echo "=================================="
+    
+    # 0. Zapisz timestamp PostgreSQL PRZED jakimikolwiek operacjami
+    POSTGRES_STARTED_BEFORE_DEPLOY=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+    if [ -z "$POSTGRES_STARTED_BEFORE_DEPLOY" ]; then
+        log_error "❌ KRYTYCZNE: Nie można sprawdzić statusu PostgreSQL!"
+        exit 1
+    fi
+    log_info "📝 PostgreSQL StartedAt przed deploy: $POSTGRES_STARTED_BEFORE_DEPLOY"
     
     # 1. Upewnij się że nginx-router działa
     log_info "🔍 Sprawdzanie NGINX router..."
@@ -205,10 +220,23 @@ deploy() {
         verify_no_protected_containers "nginx-router"
         
         # ⚠️ WAŻNE: Tylko nginx-router, bez postgres i redis!
+        # Zapisz timestamp PostgreSQL przed operacją
+        POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+        
         if ! docker-compose -f docker-compose.blue-green.yml up -d nginx-router; then
             log_error "❌ Nie udało się uruchomić NGINX router"
             exit 1
         fi
+        
+        # Sprawdź czy PostgreSQL nie został przypadkiem odtworzony
+        POSTGRES_STARTED_AFTER=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+        if [ -n "$POSTGRES_STARTED_BEFORE" ] && [ "$POSTGRES_STARTED_BEFORE" != "$POSTGRES_STARTED_AFTER" ]; then
+            log_error "❌ KRYTYCZNE: PostgreSQL został odtworzony podczas deploya!"
+            log_error "❌ Started before: $POSTGRES_STARTED_BEFORE"
+            log_error "❌ Started after:  $POSTGRES_STARTED_AFTER"
+            exit 1
+        fi
+        
         log_success "✅ NGINX router uruchomiony"
         sleep 5
     else
@@ -229,9 +257,22 @@ deploy() {
     # 3. Build nowego obrazu
     log_info "🔨 Budowanie nowego obrazu..."
     export DOCKER_BUILDKIT=1
+    
+    # Zapisz timestamp PostgreSQL przed operacją
+    POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+    
     # ✅ Bezpieczne - buduje web-${TARGET} i kontenery Celery (używają tego samego obrazu), nie dotyka nietykalnych kontenerów
     if ! docker-compose -f docker-compose.blue-green.yml build --no-cache web-${TARGET} celery-default celery-import celery-beat flower; then
         log_error "❌ Nie udało się zbudować obrazu"
+        exit 1
+    fi
+    
+    # Sprawdź czy PostgreSQL nie został przypadkiem odtworzony
+    POSTGRES_STARTED_AFTER=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+    if [ -n "$POSTGRES_STARTED_BEFORE" ] && [ "$POSTGRES_STARTED_BEFORE" != "$POSTGRES_STARTED_AFTER" ]; then
+        log_error "❌ KRYTYCZNE: PostgreSQL został odtworzony podczas builda!"
+        log_error "❌ Started before: $POSTGRES_STARTED_BEFORE"
+        log_error "❌ Started after:  $POSTGRES_STARTED_AFTER"
         exit 1
     fi
     
@@ -282,7 +323,19 @@ deploy() {
     # ✅ Bezpieczne - zatrzymuje tylko web-${ACTIVE}, nie dotyka nietykalnych kontenerów
     docker-compose -f docker-compose.blue-green.yml stop web-${ACTIVE} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${ACTIVE}"
     
-    # 10. Sukces!
+    # 10. Finalna weryfikacja - sprawdź czy PostgreSQL nie został odtworzony
+    POSTGRES_STARTED_AFTER_DEPLOY=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
+    if [ -n "$POSTGRES_STARTED_BEFORE_DEPLOY" ] && [ "$POSTGRES_STARTED_BEFORE_DEPLOY" != "$POSTGRES_STARTED_AFTER_DEPLOY" ]; then
+        log_error "❌ KRYTYCZNE: PostgreSQL został odtworzony podczas deploya!"
+        log_error "❌ Started before: $POSTGRES_STARTED_BEFORE_DEPLOY"
+        log_error "❌ Started after:  $POSTGRES_STARTED_AFTER_DEPLOY"
+        log_error "❌ Deployment zakończony, ale PostgreSQL został odtworzony - sprawdź logi!"
+        exit 1
+    else
+        log_success "✅ PostgreSQL pozostał nietknięty (StartedAt: $POSTGRES_STARTED_AFTER_DEPLOY)"
+    fi
+    
+    # 11. Sukces!
     log_success "🎉 Deployment zakończony pomyślnie!"
     log_success "✅ Aktywny environment: ${TARGET}"
     log_info "ℹ️  Stary environment (${ACTIVE}) jest zatrzymany i gotowy do rollback"

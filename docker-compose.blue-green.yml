@@ -37,8 +37,16 @@ services:
     networks:
       - nc_network
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/admin/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     user: 1001:1001
     labels:
       - "nc.deployment=blue"
@@ -80,8 +88,16 @@ services:
     networks:
       - nc_network
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/admin/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     user: 1001:1001
     labels:
       - "nc.deployment=green"
@@ -96,6 +112,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8001:8001"
     volumes:
       - ./nginx-blue-green.conf:/etc/nginx/conf.d/default.conf
       - /mnt/data2tb/docker/volumes/nc_static_volume:/app/staticfiles
@@ -104,8 +121,10 @@ services:
     environment:
       - TZ=Europe/Warsaw
     depends_on:
-      - web-blue
-      - web-green
+      web-blue:
+        condition: service_started
+      web-green:
+        condition: service_started
     restart: always
     networks:
       - nc_network
@@ -132,6 +151,10 @@ services:
       POSTGRES_PASSWORD: ${DEFAULT_DB_PASSWORD:-prod_password}
       POSTGRES_DB: ${DEFAULT_DB_NAME:-zzz_default}
       TZ: Europe/Warsaw
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DEFAULT_DB_USER:-nc}"]
       interval: 10s
@@ -143,6 +166,7 @@ services:
     volumes:
       - /mnt/data2tb/docker/volumes/nc_postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/initdb.d:/docker-entrypoint-initdb.d:ro
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     networks:
       - nc_network
     labels:

@@ -47,9 +47,10 @@ echo "🔄 Przywracam backup: $SELECTED_BACKUP"
 # Oznacz backup jako current
 docker tag $SELECTED_BACKUP "nc-app:current"
 
-# Restart kontenerów z nowym/starym obrazem
-echo "🔄 Restartuję kontenery..."
-docker-compose -f $COMPOSE_FILE up -d --force-recreate
+# Restart tylko kontenerów aplikacji (BEZ postgres i redis!)
+echo "🔄 Restartuję kontenery aplikacji (PostgreSQL i Redis pozostają nietknięte)..."
+docker-compose -f $COMPOSE_FILE stop web celery-default celery-import celery-beat flower nginx static-init 2>/dev/null || true
+docker-compose -f $COMPOSE_FILE up -d --force-recreate --no-deps web celery-default celery-import celery-beat flower nginx static-init
 
 echo ""
 echo "✅ ROLLBACK ZAKOŃCZONY!"

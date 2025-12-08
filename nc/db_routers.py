@@ -1,5 +1,42 @@
 import os
 
+# Cache'owanie dostępnych baz danych - lazy evaluation
+_MPD_DB = None
+_MATTERHORN1_DB = None
+_DEFAULT_DB = None
+
+
+def _get_mpd_db():
+    """Lazy evaluation dla bazy MPD"""
+    global _MPD_DB
+    if _MPD_DB is None:
+        from django.conf import settings
+        _MPD_DB = 'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD'
+    return _MPD_DB
+
+
+def _get_matterhorn1_db():
+    """Lazy evaluation dla bazy matterhorn1"""
+    global _MATTERHORN1_DB
+    if _MATTERHORN1_DB is None:
+        from django.conf import settings
+        _MATTERHORN1_DB = 'zzz_matterhorn1' if 'zzz_matterhorn1' in settings.DATABASES else 'matterhorn1'
+    return _MATTERHORN1_DB
+
+
+def _get_default_db():
+    """Lazy evaluation dla bazy default"""
+    global _DEFAULT_DB
+    if _DEFAULT_DB is None:
+        from django.conf import settings
+        if 'zzz_default' in settings.DATABASES:
+            _DEFAULT_DB = 'zzz_default'
+        elif 'default' in settings.DATABASES:
+            _DEFAULT_DB = 'default'
+        else:
+            _DEFAULT_DB = False  # Używamy False zamiast None dla cache'owania
+    return _DEFAULT_DB if _DEFAULT_DB is not False else None
+
 
 class MPDRouter:
     """
@@ -8,20 +45,12 @@ class MPDRouter:
 
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'MPD':
-            from django.conf import settings
-            # Development używa zzz_MPD, produkcja MPD
-            if 'zzz_MPD' in settings.DATABASES:
-                return 'zzz_MPD'
-            return 'MPD'
+            return _get_mpd_db()
         return None
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label == 'MPD':
-            from django.conf import settings
-            # Development używa zzz_MPD, produkcja MPD
-            if 'zzz_MPD' in settings.DATABASES:
-                return 'zzz_MPD'
-            return 'MPD'
+            return _get_mpd_db()
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -32,11 +61,7 @@ class MPDRouter:
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'MPD':
-            from django.conf import settings
-            # Development używa zzz_MPD, produkcja MPD
-            if 'zzz_MPD' in settings.DATABASES:
-                return db == 'zzz_MPD'
-            return db == 'MPD'
+            return db == _get_mpd_db()
         return None
 
 
@@ -47,20 +72,12 @@ class Matterhorn1Router:
 
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'matterhorn1':
-            from django.conf import settings
-            # Development używa zzz_matterhorn1, produkcja matterhorn1
-            if 'zzz_matterhorn1' in settings.DATABASES:
-                return 'zzz_matterhorn1'
-            return 'matterhorn1'
+            return _get_matterhorn1_db()
         return None
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label == 'matterhorn1':
-            from django.conf import settings
-            # Development używa zzz_matterhorn1, produkcja matterhorn1
-            if 'zzz_matterhorn1' in settings.DATABASES:
-                return 'zzz_matterhorn1'
-            return 'matterhorn1'
+            return _get_matterhorn1_db()
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -69,11 +86,7 @@ class Matterhorn1Router:
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'matterhorn1':
-            from django.conf import settings
-            # Development używa zzz_matterhorn1, produkcja matterhorn1
-            if 'zzz_matterhorn1' in settings.DATABASES:
-                return db == 'zzz_matterhorn1'
-            return db == 'matterhorn1'
+            return db == _get_matterhorn1_db()
         return None
 
 
@@ -120,31 +133,22 @@ class DefaultRouter:
     """
     Router dla aplikacji systemowych Django (bez web_agent)
     """
+    # Lista aplikacji systemowych - tworzona raz jako atrybut klasy
+    SYSTEM_APPS = frozenset([
+        'admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
+        'django_celery_results', 'admin_interface', 'colorfield'
+    ])
 
     def db_for_read(self, model, **hints):
         # Aplikacje systemowe Django idą do bazy default
-        system_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
-                      'django_celery_results', 'admin_interface', 'colorfield']
-        if model._meta.app_label in system_apps:
-            # Na produkcji używaj 'default', lokalnie 'zzz_default'
-            from django.conf import settings
-            if 'zzz_default' in settings.DATABASES:
-                return 'zzz_default'
-            elif 'default' in settings.DATABASES:
-                return 'default'
+        if model._meta.app_label in self.SYSTEM_APPS:
+            return _get_default_db()
         return None
 
     def db_for_write(self, model, **hints):
         # Aplikacje systemowe Django idą do bazy default
-        system_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
-                      'django_celery_results', 'admin_interface', 'colorfield']
-        if model._meta.app_label in system_apps:
-            # Na produkcji używaj 'default', lokalnie 'zzz_default'
-            from django.conf import settings
-            if 'zzz_default' in settings.DATABASES:
-                return 'zzz_default'
-            elif 'default' in settings.DATABASES:
-                return 'default'
+        if model._meta.app_label in self.SYSTEM_APPS:
+            return _get_default_db()
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -153,16 +157,9 @@ class DefaultRouter:
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         # Aplikacje systemowe Django idą do bazy default
-        system_apps = ['admin', 'auth', 'contenttypes', 'sessions', 'django_celery_beat',
-                      'django_celery_results', 'admin_interface', 'colorfield']
-        if app_label in system_apps:
-            # Na produkcji używaj 'default', lokalnie 'zzz_default'
-            from django.conf import settings
-            if 'zzz_default' in settings.DATABASES:
-                return db == 'zzz_default'
-            elif 'default' in settings.DATABASES:
-                return db == 'default'
-            # Jeśli nie ma bazy default, nie pozwalaj na migracje
-            return False
-
+        if app_label in self.SYSTEM_APPS:
+            default_db = _get_default_db()
+            if default_db is None:
+                return False
+            return db == default_db
         return None
