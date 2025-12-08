@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.3.8 (2025-12-08)</small>
+
+* fix: poprawka portu 8001 i healthcheck w blue-green deployment ([4fb1d03](https://github.com/pawlo884/nc/commit/4fb1d03))
+
 ## <small>1.3.7 (2025-12-08)</small>
 
 * fix: naprawa konfiguracji nginx dla blue-green deployment ([9d51390](https://github.com/pawlo884/nc/commit/9d51390))
