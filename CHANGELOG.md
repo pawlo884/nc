@@ -1,5 +1,18 @@
 # Zmiany
 
+## <small>1.3.7 (2025-12-08)</small>
+
+* fix: naprawa konfiguracji nginx dla blue-green deployment ([9d51390](https://github.com/pawlo884/nc/commit/9d51390))
+* chore: optymalizacja Docker i konfiguracja połączeń do bazy danych ([993559b](https://github.com/pawlo884/nc/commit/993559b))
+* chore: update selenium to 4.39.0 and urllib3 to 2.6.0 ([519bedf](https://github.com/pawlo884/nc/commit/519bedf))
+* Naprawa: backend_green wskazuje na web-green zamiast web-blue ([3a803ab](https://github.com/pawlo884/nc/commit/3a803ab))
+* Naprawa: Blue-Green deployment - poprawka switch_nginx i konfiguracja nginx ([78e228c](https://github.com/pawlo884/nc/commit/78e228c))
+* Naprawa: PostgreSQL listen_addresses i dodatkowe zabezpieczenia przed restartem ([53e6454](https://github.com/pawlo884/nc/commit/53e6454))
+* Naprawa: Zabezpieczenie PostgreSQL przed restartem podczas deploya ([0bbbe0a](https://github.com/pawlo884/nc/commit/0bbbe0a))
+* Aktualizacja pakietów: naprawa podatności bezpieczeństwa (Django 5.2.8, urllib3, tornado, mcp, reque ([ff44842](https://github.com/pawlo884/nc/commit/ff44842))
+* ipus ([c85e68e](https://github.com/pawlo884/nc/commit/c85e68e))
+* Merge branch 'main' of origin into main ([0be2e4b](https://github.com/pawlo884/nc/commit/0be2e4b))
+
 ## <small>1.3.6 (2025-12-04)</small>
 
 * perf: optymalizacja db_routers - lazy evaluation zamiast cache przy imporcie ([458855e](https://github.com/pawlo884/nc/commit/458855e))
