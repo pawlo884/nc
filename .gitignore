@@ -30,3 +30,4 @@ static/
 .env.dev1
 backups/*
 ..env.prod
+nginx-blue-green.conf

@@ -6,9 +6,17 @@
   "trailingComma": "es5",
   "bracketSpacing": true,
   "arrowParens": "avoid",
-  "endOfLine": "auto",
+  "endOfLine": "lf",
   "jsxSingleQuote": false,
   "quoteProps": "as-needed",
-  "jsxBracketSameLine": false,
-  "proseWrap": "preserve"
+  "proseWrap": "preserve",
+  "overrides": [
+    {
+      "files": "*.md",
+      "options": {
+        "proseWrap": "preserve",
+        "printWidth": 100
+      }
+    }
+  ]
 } 
