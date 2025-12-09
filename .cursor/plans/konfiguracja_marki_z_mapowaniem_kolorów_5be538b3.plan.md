@@ -82,7 +82,17 @@ python manage.py run_automation --brand "Marko" --settings=nc.settings.dev
 # Jeśli marka ma konfigurację:
 # - Zastosuje domyślne filtry z BrandConfig
 # - Zmapuje kolory producenta zgodnie z color_mapping
+# - Ulepszy i sformatuje opis produktu przez AI
+# - Wyszuka atrybuty w opisie używając embeddings + cosine similarity
+# - Automatycznie zaznaczy znalezione atrybuty w formularzu MPD
 ```
+
+## Technologie ML
+
+- **sentence-transformers** - generowanie embeddings (model: 'all-MiniLM-L6-v2' lub podobny)
+- **cosine similarity** - obliczanie podobieństwa między embeddings
+- **Celery taski ML** - wykonywane w kontenerze `celery-ml` (kolejka 'ml')
+- **Próg podobieństwa** - domyślnie 0.7 (70%), konfigurowalny w BrandConfig
 
 ## Zarządzanie konfiguracjami
 

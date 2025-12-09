@@ -190,3 +190,4 @@ echo "✅ PostgreSQL działa poprawnie"
 
 **Wniosek:** PostgreSQL i Redis są teraz **w pełni chronione** podczas deploy! 🛡️
 
+

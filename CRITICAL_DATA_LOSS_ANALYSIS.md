@@ -197,3 +197,4 @@ def check_postgres_volume():
 4. ⏳ Odzyskaj dane (backup lub API)
 5. ✅ Napraw deploy workflow (już zrobione w poprzednich commitach)
 
+
