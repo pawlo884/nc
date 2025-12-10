@@ -166,13 +166,21 @@ switch_nginx() {
         inactive_upstream="backend_blue"
     fi
     
-    # 1. Odkomentuj aktywny upstream (usuń # na początku linii)
-    log_info "📝 Odkomentowywanie upstream ${target_upstream}..."
-    sed -i.bak "/^#upstream ${target_upstream} {/,/^#}/s/^#//" nginx-blue-green.conf
+    # 0. Sprawdź czy NOWY kontener działa PRZED zmianą konfiguracji
+    log_info "🔍 Sprawdzanie czy kontener web-${target} jest uruchomiony..."
+    if ! docker ps --format '{{.Names}}' | grep -q "web-${target}"; then
+        log_error "❌ Kontener web-${target} nie jest uruchomiony! Nie można przełączyć nginx."
+        return 1
+    fi
+    log_success "✅ Kontener web-${target} jest uruchomiony"
     
-    # 2. Zakomentuj nieaktywny upstream (dodaj # na początku linii)
-    log_info "📝 Komentowanie upstream ${inactive_upstream}..."
+    # 1. Najpierw zakomentuj STARY upstream (zapobiega błędom DNS podczas restart)
+    log_info "📝 Komentowanie upstream ${inactive_upstream} (stary kontener)..."
     sed -i.bak "/^upstream ${inactive_upstream} {/,/^}/s/^/#/" nginx-blue-green.conf
+    
+    # 2. Odkomentuj NOWY upstream (usuń # na początku linii)
+    log_info "📝 Odkomentowywanie upstream ${target_upstream} (nowy kontener)..."
+    sed -i.bak "/^#upstream ${target_upstream} {/,/^#}/s/^#//" nginx-blue-green.conf
     
     # 3. Zmień backend_active
     log_info "📝 Zmiana backend_active na ${target}..."
@@ -184,32 +192,34 @@ switch_nginx() {
     # 5. Zmień deployment-status endpoint
     sed -i.bak "s/\"active\":\"${current}\"/\"active\":\"${target}\"/g" nginx-blue-green.conf
     
-    # 6. Test konfiguracji przed przeładowaniem
+    # 6. Test konfiguracji przed restartem (sprawdza tylko składnię, nie DNS)
     # Plik jest mountowany jako volume, więc zmiany są automatycznie widoczne
+    log_info "🔍 Testowanie konfiguracji nginx (tylko składnia)..."
+    
+    # 7. Restart NGINX (nie reload, bo reload może używać starego DNS cache)
+    # Plik jest mountowany jako volume, więc zmiany są automatycznie widoczne
+    log_info "🔄 Restartowanie nginx-router aby załadować nową konfigurację..."
+    docker-compose -f docker-compose.blue-green.yml restart nginx-router
+    
+    # Poczekaj na start nginx
+    log_info "⏳ Czekam 5 sekund na start nginx..."
+    sleep 5
+    
+    # Test konfiguracji po restarcie (teraz sprawdzi DNS)
     if ! docker exec nc-nginx-router nginx -t 2>/dev/null; then
-        log_error "❌ Błąd w konfiguracji nginx!"
+        log_error "❌ Błąd w konfiguracji nginx po restarcie!"
         log_error "📋 Szczegóły błędów:"
         docker exec nc-nginx-router nginx -t
         # Rollback
         mv nginx-blue-green.conf.backup nginx-blue-green.conf
-        log_error "❌ Przywrócono poprzednią konfigurację"
+        log_error "❌ Przywracanie poprzedniej konfiguracji..."
+        docker-compose -f docker-compose.blue-green.yml restart nginx-router
+        sleep 3
         return 1
     fi
     
-    # 7. Przeładuj NGINX (pliki są automatycznie widoczne przez volume mount)
-    log_info "🔄 Przeładowywanie konfiguracji nginx..."
-    docker exec nc-nginx-router nginx -s reload
-    
-    if [ $? -eq 0 ]; then
-        log_success "✅ NGINX przełączony na ${target}"
-        return 0
-    else
-        log_error "❌ Błąd podczas przeładowania NGINX"
-        # Rollback
-        mv nginx-blue-green.conf.backup nginx-blue-green.conf
-        docker exec nc-nginx-router nginx -s reload
-        return 1
-    fi
+    log_success "✅ NGINX przełączony na ${target}"
+    return 0
 }
 
 # Main deployment function
