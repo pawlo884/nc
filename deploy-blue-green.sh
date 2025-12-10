@@ -158,22 +158,53 @@ switch_nginx() {
     # Określ aktualny aktywny environment (blue lub green)
     if [ "$target" = "blue" ]; then
         current="green"
+        target_upstream="backend_blue"
+        inactive_upstream="backend_green"
     else
         current="blue"
+        target_upstream="backend_green"
+        inactive_upstream="backend_blue"
     fi
     
-    # Zmień TYLKO upstream backend_active (nie zmieniaj backend_blue i backend_green!)
+    # 1. Odkomentuj aktywny upstream (usuń # na początku linii)
+    log_info "📝 Odkomentowywanie upstream ${target_upstream}..."
+    sed -i.bak "/^#upstream ${target_upstream} {/,/^#}/s/^#//" nginx-blue-green.conf
+    
+    # 2. Zakomentuj nieaktywny upstream (dodaj # na początku linii)
+    log_info "📝 Komentowanie upstream ${inactive_upstream}..."
+    sed -i.bak "/^upstream ${inactive_upstream} {/,/^}/s/^/#/" nginx-blue-green.conf
+    
+    # 3. Zmień backend_active
+    log_info "📝 Zmiana backend_active na ${target}..."
     sed -i.bak "/^upstream backend_active {/,/^}/ s/server web-${current}:8000/server web-${target}:8000/" nginx-blue-green.conf
+    
+    # 4. Zmień X-Deployment-Color header
     sed -i.bak "s/X-Deployment-Color \"${current}\"/X-Deployment-Color \"${target}\"/g" nginx-blue-green.conf
     
-    # Przeładuj NGINX
-    docker exec nc-nginx-router nginx -t && docker exec nc-nginx-router nginx -s reload
+    # 5. Zmień deployment-status endpoint
+    sed -i.bak "s/\"active\":\"${current}\"/\"active\":\"${target}\"/g" nginx-blue-green.conf
+    
+    # 6. Test konfiguracji przed przeładowaniem
+    # Plik jest mountowany jako volume, więc zmiany są automatycznie widoczne
+    if ! docker exec nc-nginx-router nginx -t 2>/dev/null; then
+        log_error "❌ Błąd w konfiguracji nginx!"
+        log_error "📋 Szczegóły błędów:"
+        docker exec nc-nginx-router nginx -t
+        # Rollback
+        mv nginx-blue-green.conf.backup nginx-blue-green.conf
+        log_error "❌ Przywrócono poprzednią konfigurację"
+        return 1
+    fi
+    
+    # 7. Przeładuj NGINX (pliki są automatycznie widoczne przez volume mount)
+    log_info "🔄 Przeładowywanie konfiguracji nginx..."
+    docker exec nc-nginx-router nginx -s reload
     
     if [ $? -eq 0 ]; then
         log_success "✅ NGINX przełączony na ${target}"
         return 0
     else
-        log_error "❌ Błąd podczas przełączania NGINX"
+        log_error "❌ Błąd podczas przeładowania NGINX"
         # Rollback
         mv nginx-blue-green.conf.backup nginx-blue-green.conf
         docker exec nc-nginx-router nginx -s reload
