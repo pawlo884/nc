@@ -67,8 +67,27 @@ class ProductDetailsInline(admin.StackedInline):
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 0
-    fields = ['image_url', 'order']
-    readonly_fields = ['image_url']
+    fields = ['image_url_link', 'order']
+    readonly_fields = ['image_url_link']
+
+    def image_url_link(self, obj):
+        """Wyświetl URL obrazu jako klikalny link"""
+        if obj and obj.image_url:
+            # Użyj oryginalnego URL - nie normalizuj, bo to może być zewnętrzny URL
+            url = obj.image_url
+            # Jeśli URL nie zaczyna się od http/https, spróbuj dodać
+            if not url.startswith(('http://', 'https://')):
+                url = f"http://matterhorn-wholesale.com/{url.lstrip('/')}"
+
+            display_text = url[:50] + '...' if len(url) > 50 else url
+            return format_html(
+                '<a href="{}" target="_blank" title="{}">{}</a>',
+                url,
+                url,
+                display_text
+            )
+        return '-'
+    image_url_link.short_description = 'Link do zdjęcia'
 
 
 class ProductVariantInline(admin.TabularInline):
@@ -1063,7 +1082,8 @@ class ProductAdmin(admin.ModelAdmin):
                     if image.image_url:
                         # Upload do bucketa
                         bucket_key = self._upload_image_to_bucket(
-                            image_url=resolve_image_url(image.image_url) or image.image_url,
+                            image_url=resolve_image_url(
+                                image.image_url) or image.image_url,
                             product_id=product.mapped_product_uid,
                             color_name=product.color,
                             image_number=i
@@ -1635,10 +1655,10 @@ class ProductDetailsAdmin(admin.ModelAdmin):
 
 @admin.register(ProductImage)
 class ProductImageAdmin(admin.ModelAdmin):
-    list_display = ['product', 'image_url', 'order', 'created_at']
+    list_display = ['product', 'image_url_link', 'order', 'created_at']
     list_filter = ['created_at']
     search_fields = ['product__name', 'product__product_uid', 'image_url']
-    readonly_fields = ['created_at']
+    readonly_fields = ['created_at', 'image_url_link']
     ordering = ['-created_at']
 
     fieldsets = (
@@ -1646,13 +1666,31 @@ class ProductImageAdmin(admin.ModelAdmin):
             'fields': ('product',)
         }),
         ('Obraz', {
-            'fields': ('image_url', 'order')
+            'fields': ('image_url_link', 'order')
         }),
         ('Metadane', {
             'fields': ('created_at',),
             'classes': ('collapse',)
         }),
     )
+
+    def image_url_link(self, obj):
+        """Wyświetl URL obrazu jako klikalny link"""
+        if obj.image_url:
+            # Rozwiąż URL używając resolve_image_url, jeśli to nie zadziała, użyj oryginalnego
+            resolved_url = resolve_image_url(obj.image_url) or obj.image_url
+            # Jeśli URL nie zaczyna się od http/https, spróbuj dodać
+            if not resolved_url.startswith(('http://', 'https://')):
+                resolved_url = obj.image_url
+            return format_html(
+                '<a href="{}" target="_blank" title="{}">{}</a>',
+                resolved_url,
+                resolved_url,
+                resolved_url[:80] +
+                '...' if len(resolved_url) > 80 else resolved_url
+            )
+        return '-'
+    image_url_link.short_description = 'Link do zdjęcia'
 
 
 @admin.register(ProductVariant)
