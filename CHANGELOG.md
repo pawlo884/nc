@@ -1,5 +1,9 @@
 # Zmiany
 
+## 1.4.0 (2025-12-10)
+
+* feat: add image thumbnails with lazy loading and display original URLs from matterhorn1 ([3863f1c](https://github.com/pawlo884/nc/commit/3863f1c))
+
 ## <small>1.3.10 (2025-12-10)</small>
 
 * fix: automatyczne przełączanie upstreamów w nginx podczas blue-green deployment ([d78732c](https://github.com/pawlo884/nc/commit/d78732c))
