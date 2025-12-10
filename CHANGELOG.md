@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.4.1 (2025-12-10)</small>
+
+* fix: naprawa automatycznego przełączania nginx w blue-green deployment ([1284e46](https://github.com/pawlo884/nc/commit/1284e46))
+
 ## 1.4.0 (2025-12-10)
 
 * feat: add image thumbnails with lazy loading and display original URLs from matterhorn1 ([3863f1c](https://github.com/pawlo884/nc/commit/3863f1c))
