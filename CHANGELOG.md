@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.3.9 (2025-12-10)</small>
+
+* fix: update matterhorn1 admin and tasks files ([d51b583](https://github.com/pawlo884/nc/commit/d51b583))
+
 ## <small>1.3.8 (2025-12-08)</small>
 
 * fix: poprawka portu 8001 i healthcheck w blue-green deployment ([4fb1d03](https://github.com/pawlo884/nc/commit/4fb1d03))
