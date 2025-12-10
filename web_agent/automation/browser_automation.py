@@ -580,6 +580,15 @@ class BrowserAutomation:
                         logger.info("Kliknięto w pierwszy produkt z listy")
                         print("[DEBUG] Kliknięto w pierwszy produkt z listy")
                         time.sleep(3)  # Czekaj na załadowanie strony produktu
+
+                        # Po załadowaniu strony produktu, edytuj nazwę
+                        try:
+                            self.update_product_name()
+                        except Exception as e_name:
+                            logger.warning(
+                                f"Błąd podczas edycji nazwy produktu: {e_name}")
+                            print(
+                                f"[DEBUG] Błąd podczas edycji nazwy produktu: {e_name}")
                     else:
                         # Jeśli nie ma linka, kliknij w cały wiersz
                         logger.info("Brak linka, klikam w cały wiersz...")
@@ -938,6 +947,148 @@ class BrowserAutomation:
         except Exception as e:
             logger.error(f"Błąd podczas oczekiwania na wynik: {e}")
             return {'success': False, 'message': str(e), 'mpd_product_id': None}
+
+    def update_product_name(self):
+        """
+        Edycja nazwy produktu w polu mpd_name.
+        Przetwarza nazwę z formatu: "Kostium dwuczęściowy Kostium kąpielowy Model Ada M-803 (1) Lilia - Marko"
+        na format: "Kostium kąpielowy Ada"
+        """
+        try:
+            logger.info("Rozpoczynam edycję nazwy produktu...")
+            print("[DEBUG] Rozpoczynam edycję nazwy produktu...")
+
+            # Czekaj na załadowanie pola mpd_name
+            name_field = self.wait.until(
+                EC.presence_of_element_located((By.ID, "mpd_name"))
+            )
+
+            # Pobierz obecną nazwę
+            current_name = name_field.get_attribute("value") or ""
+            logger.info(f"Obecna nazwa produktu: {current_name}")
+            print(f"[DEBUG] Obecna nazwa produktu: {current_name}")
+
+            # Przetwórz nazwę
+            new_name = self._process_product_name(current_name)
+            logger.info(f"Nowa nazwa produktu: {new_name}")
+            print(f"[DEBUG] Nowa nazwa produktu: {new_name}")
+
+            # Wyczyść pole i wpisz nową nazwę
+            name_field.clear()
+            time.sleep(0.3)
+            name_field.send_keys(new_name)
+            time.sleep(0.5)
+
+            # Znajdź przycisk "Zapisz" i kliknij
+            save_button = self.driver.find_element(
+                By.XPATH, "//button[@onclick=\"updateField('name', 'mpd_name')\"]"
+            )
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView(true);", save_button)
+            time.sleep(0.3)
+            save_button.click()
+            logger.info("Kliknięto przycisk 'Zapisz' dla nazwy produktu")
+            print("[DEBUG] Kliknięto przycisk 'Zapisz' dla nazwy produktu")
+            time.sleep(2)  # Czekaj na zapisanie
+
+        except Exception as e:
+            logger.error(f"Błąd podczas edycji nazwy produktu: {e}")
+            print(f"[DEBUG] Błąd podczas edycji nazwy produktu: {e}")
+            raise
+
+    def _process_product_name(self, name: str) -> str:
+        """
+        Przetwarza nazwę produktu z formatu pełnego na uproszczony.
+
+        Przykład:
+        Input: " Kostium dwuczęściowy Kostium kąpielowy Model Ada M-803 (1) Lilia - Marko "
+        Output: "Kostium kąpielowy Ada"
+        """
+        if not name:
+            return ""
+
+        # Usuń białe znaki na początku i końcu
+        name = name.strip()
+
+        # Podziel na słowa
+        words = name.split()
+
+        # Znajdź "Kostium kąpielowy" (lub podobne)
+        result_parts = []
+        found_kostium_kapielowy = False
+        found_model = False
+
+        i = 0
+        while i < len(words):
+            word = words[i]
+            word_lower = word.lower()
+
+            # Szukaj "Kostium kąpielowy" (pomiń "Kostium dwuczęściowy")
+            if word_lower == "kostium" and i + 1 < len(words):
+                next_word = words[i + 1].lower()
+                if next_word in ["kąpielowy", "kapielowy", "kąpielowe", "kapielowe"]:
+                    if not found_kostium_kapielowy:
+                        result_parts.append("Kostium")
+                        result_parts.append("kąpielowy")
+                        found_kostium_kapielowy = True
+                        i += 2
+                        continue
+                elif next_word in ["dwuczęściowy", "dwuczesciowy", "dwuczęściowe", "dwuczesciowe"]:
+                    # Pomiń "Kostium dwuczęściowy"
+                    i += 2
+                    continue
+
+            # Szukaj "Model" i następujące po nim słowo (nazwa modelu)
+            if word_lower == "model" and i + 1 < len(words):
+                model_name = words[i + 1]
+                # Usuń znaki specjalne z nazwy modelu jeśli są
+                model_name_clean = model_name.strip('()[]{}.,;:')
+                if model_name_clean and not found_model:
+                    result_parts.append(model_name_clean)
+                    found_model = True
+                    i += 2
+                    continue
+
+            # Pomiń znaki specjalne, numery w nawiasach, marki na końcu
+            if word_lower in ["-", "–", "—"]:
+                # Jeśli jest "-" to prawdopodobnie kończy się marką, przestań przetwarzać
+                break
+
+            # Pomiń numery w nawiasach jak "(1)", "(2)" itp.
+            if word.startswith('(') and word.endswith(')'):
+                try:
+                    int(word[1:-1])
+                    i += 1
+                    continue
+                except ValueError:
+                    pass
+
+            # Pomiń kody modeli jak "M-803", "M-123" itp.
+            if '-' in word and len(word) > 2 and word[0].isupper() and word[1] == '-':
+                i += 1
+                continue
+
+            i += 1
+
+        # Jeśli nie znaleziono "Kostium kąpielowy", spróbuj znaleźć "Kostium"
+        if not found_kostium_kapielowy:
+            for i, word in enumerate(words):
+                if word.lower() == "kostium" and i + 1 < len(words):
+                    next_word = words[i + 1].lower()
+                    if next_word not in ["dwuczęściowy", "dwuczesciowy"]:
+                        result_parts.insert(0, "Kostium")
+                        if next_word not in ["kąpielowy", "kapielowy"]:
+                            result_parts.append(next_word)
+                        break
+
+        # Połącz części w wynik
+        result = " ".join(result_parts).strip()
+
+        # Jeśli wynik jest pusty, zwróć oryginalną nazwę (bez białych znaków)
+        if not result:
+            return name.strip()
+
+        return result
 
     def close_browser(self):
         """Zamknięcie przeglądarki"""

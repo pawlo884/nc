@@ -152,12 +152,14 @@ class Command(BaseCommand):
 
             if category_id:
                 automation_filters['category_id'] = category_id
-                automation_filters['category_name'] = category_name  # Dodaj nazwę kategorii do filtrów
+                # Dodaj nazwę kategorii do filtrów
+                automation_filters['category_name'] = category_name
                 self.stdout.write(f"[INFO] Filtr kategorii: {category_name}")
             elif category_name:
                 # Jeśli nie znaleziono w bazie, ale podano nazwę, spróbuj użyć oryginalnej nazwy
                 automation_filters['category_name'] = category_name
-                self.stdout.write(f"[INFO] Filtr kategorii (bez ID): {category_name}")
+                self.stdout.write(
+                    f"[INFO] Filtr kategorii (bez ID): {category_name}")
 
             if active_filter is not None:
                 automation_filters['active'] = active_filter
