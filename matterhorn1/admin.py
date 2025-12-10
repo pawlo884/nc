@@ -70,24 +70,42 @@ class ProductImageInline(admin.TabularInline):
     fields = ['image_url_link', 'order']
     readonly_fields = ['image_url_link']
 
-    def image_url_link(self, obj):
-        """Wyświetl URL obrazu jako klikalny link"""
-        if obj and obj.image_url:
-            # Użyj oryginalnego URL - nie normalizuj, bo to może być zewnętrzny URL
-            url = obj.image_url
-            # Jeśli URL nie zaczyna się od http/https, spróbuj dodać
-            if not url.startswith(('http://', 'https://')):
-                url = f"http://matterhorn-wholesale.com/{url.lstrip('/')}"
+    class Media:
+        css = {
+            'all': ('matterhorn1/css/product-image-thumbnails.css',)
+        }
 
-            display_text = url[:50] + '...' if len(url) > 50 else url
+    def image_url_link(self, obj):
+        """Wyświetl miniatury obrazów z lazy loadingiem - używamy oryginalnego URL z bazy"""
+        if obj and obj.image_url:
+            # Użyj oryginalnego URL z bazy bez transformacji
+            original_url = obj.image_url
+
+            # Jeśli URL nie zaczyna się od http/https, dodaj bazowy URL Matterhorn
+            display_url = original_url
+            if not original_url.startswith(('http://', 'https://')):
+                display_url = f"http://matterhorn-wholesale.com/{original_url.lstrip('/')}"
+
+            # Wyświetl miniaturę z lazy loadingiem - skalowanie w przeglądarce (w locie)
+            # Używamy width/height w HTML + CSS do skalowania bez ładowania pełnego obrazu
             return format_html(
-                '<a href="{}" target="_blank" title="{}">{}</a>',
-                url,
-                url,
-                display_text
+                '<div class="product-image-thumbnail">'
+                '<a href="{}" target="_blank" title="{}" class="thumbnail-link">'
+                '<img src="{}" alt="Obraz produktu" loading="lazy" width="120" height="120" '
+                'class="thumbnail-image" style="object-fit: contain; width: 120px; height: 120px; max-width: 120px; max-height: 120px;" '
+                'onerror="this.onerror=null; this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2RkZCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5CcmFrIG9icmF6dTwvdGV4dD48L3N2Zz4=\';" />'
+                '</a>'
+                '<div class="thumbnail-url" title="{}">{}</div>'
+                '</div>',
+                display_url,
+                original_url,  # Tytuł z oryginalnym URL z bazy
+                display_url,
+                original_url,  # Pełny oryginalny URL w tooltip
+                original_url[:60] +
+                '...' if len(original_url) > 60 else original_url
             )
         return '-'
-    image_url_link.short_description = 'Link do zdjęcia'
+    image_url_link.short_description = 'Miniatura zdjęcia'
 
 
 class ProductVariantInline(admin.TabularInline):
@@ -1675,19 +1693,22 @@ class ProductImageAdmin(admin.ModelAdmin):
     )
 
     def image_url_link(self, obj):
-        """Wyświetl URL obrazu jako klikalny link"""
+        """Wyświetl oryginalny URL obrazu z bazy jako klikalny link"""
         if obj.image_url:
-            # Rozwiąż URL używając resolve_image_url, jeśli to nie zadziała, użyj oryginalnego
-            resolved_url = resolve_image_url(obj.image_url) or obj.image_url
-            # Jeśli URL nie zaczyna się od http/https, spróbuj dodać
-            if not resolved_url.startswith(('http://', 'https://')):
-                resolved_url = obj.image_url
+            # Użyj oryginalnego URL z bazy bez transformacji
+            original_url = obj.image_url
+
+            # Jeśli URL nie zaczyna się od http/https, dodaj bazowy URL Matterhorn
+            display_url = original_url
+            if not original_url.startswith(('http://', 'https://')):
+                display_url = f"http://matterhorn-wholesale.com/{original_url.lstrip('/')}"
+
             return format_html(
                 '<a href="{}" target="_blank" title="{}">{}</a>',
-                resolved_url,
-                resolved_url,
-                resolved_url[:80] +
-                '...' if len(resolved_url) > 80 else resolved_url
+                display_url,
+                original_url,  # Pełny oryginalny URL w tooltip
+                original_url[:80] +
+                '...' if len(original_url) > 80 else original_url
             )
         return '-'
     image_url_link.short_description = 'Link do zdjęcia'
