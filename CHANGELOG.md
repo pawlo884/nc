@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.3.10 (2025-12-10)</small>
+
+* fix: automatyczne przełączanie upstreamów w nginx podczas blue-green deployment ([d78732c](https://github.com/pawlo884/nc/commit/d78732c))
+
 ## <small>1.3.9 (2025-12-10)</small>
 
 * fix: update matterhorn1 admin and tasks files ([d51b583](https://github.com/pawlo884/nc/commit/d51b583))
