@@ -67,8 +67,45 @@ class ProductDetailsInline(admin.StackedInline):
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 0
-    fields = ['image_url', 'order']
-    readonly_fields = ['image_url']
+    fields = ['image_url_link', 'order']
+    readonly_fields = ['image_url_link']
+
+    class Media:
+        css = {
+            'all': ('matterhorn1/css/product-image-thumbnails.css',)
+        }
+
+    def image_url_link(self, obj):
+        """Wyświetl miniatury obrazów z lazy loadingiem - używamy oryginalnego URL z bazy"""
+        if obj and obj.image_url:
+            # Użyj oryginalnego URL z bazy bez transformacji
+            original_url = obj.image_url
+
+            # Jeśli URL nie zaczyna się od http/https, dodaj bazowy URL Matterhorn
+            display_url = original_url
+            if not original_url.startswith(('http://', 'https://')):
+                display_url = f"http://matterhorn-wholesale.com/{original_url.lstrip('/')}"
+
+            # Wyświetl miniaturę z lazy loadingiem - skalowanie w przeglądarce (w locie)
+            # Używamy width/height w HTML + CSS do skalowania bez ładowania pełnego obrazu
+            return format_html(
+                '<div class="product-image-thumbnail">'
+                '<a href="{}" target="_blank" title="{}" class="thumbnail-link">'
+                '<img src="{}" alt="Obraz produktu" loading="lazy" width="120" height="120" '
+                'class="thumbnail-image" style="object-fit: contain; width: 120px; height: 120px; max-width: 120px; max-height: 120px;" '
+                'onerror="this.onerror=null; this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2RkZCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5CcmFrIG9icmF6dTwvdGV4dD48L3N2Zz4=\';" />'
+                '</a>'
+                '<div class="thumbnail-url" title="{}">{}</div>'
+                '</div>',
+                display_url,
+                original_url,  # Tytuł z oryginalnym URL z bazy
+                display_url,
+                original_url,  # Pełny oryginalny URL w tooltip
+                original_url[:60] +
+                '...' if len(original_url) > 60 else original_url
+            )
+        return '-'
+    image_url_link.short_description = 'Miniatura zdjęcia'
 
 
 class ProductVariantInline(admin.TabularInline):
@@ -1063,7 +1100,8 @@ class ProductAdmin(admin.ModelAdmin):
                     if image.image_url:
                         # Upload do bucketa
                         bucket_key = self._upload_image_to_bucket(
-                            image_url=resolve_image_url(image.image_url) or image.image_url,
+                            image_url=resolve_image_url(
+                                image.image_url) or image.image_url,
                             product_id=product.mapped_product_uid,
                             color_name=product.color,
                             image_number=i
@@ -1635,10 +1673,10 @@ class ProductDetailsAdmin(admin.ModelAdmin):
 
 @admin.register(ProductImage)
 class ProductImageAdmin(admin.ModelAdmin):
-    list_display = ['product', 'image_url', 'order', 'created_at']
+    list_display = ['product', 'image_url_link', 'order', 'created_at']
     list_filter = ['created_at']
     search_fields = ['product__name', 'product__product_uid', 'image_url']
-    readonly_fields = ['created_at']
+    readonly_fields = ['created_at', 'image_url_link']
     ordering = ['-created_at']
 
     fieldsets = (
@@ -1646,13 +1684,34 @@ class ProductImageAdmin(admin.ModelAdmin):
             'fields': ('product',)
         }),
         ('Obraz', {
-            'fields': ('image_url', 'order')
+            'fields': ('image_url_link', 'order')
         }),
         ('Metadane', {
             'fields': ('created_at',),
             'classes': ('collapse',)
         }),
     )
+
+    def image_url_link(self, obj):
+        """Wyświetl oryginalny URL obrazu z bazy jako klikalny link"""
+        if obj.image_url:
+            # Użyj oryginalnego URL z bazy bez transformacji
+            original_url = obj.image_url
+
+            # Jeśli URL nie zaczyna się od http/https, dodaj bazowy URL Matterhorn
+            display_url = original_url
+            if not original_url.startswith(('http://', 'https://')):
+                display_url = f"http://matterhorn-wholesale.com/{original_url.lstrip('/')}"
+
+            return format_html(
+                '<a href="{}" target="_blank" title="{}">{}</a>',
+                display_url,
+                original_url,  # Pełny oryginalny URL w tooltip
+                original_url[:80] +
+                '...' if len(original_url) > 80 else original_url
+            )
+        return '-'
+    image_url_link.short_description = 'Link do zdjęcia'
 
 
 @admin.register(ProductVariant)

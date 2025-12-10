@@ -44,87 +44,143 @@ def remove_variants_mapping_in_matterhorn(sender, instance, using, **kwargs):
 
 
 @receiver(pre_delete, sender=Products)
-def capture_variant_ids(sender, instance, using, **kwargs):
-    if using == 'MPD':
+def capture_variant_ids(sender, instance, using=None, **kwargs):
+    # Sprawdź czy to produkt z bazy MPD
+    db = using or getattr(instance, '_state', {}).db or 'default'
+    if db != 'MPD' and 'MPD' not in str(db):
         try:
-            # Pobranie variant_id PRZED usunięciem produktu
-            with connections['MPD'].cursor() as master_cursor:
-                master_cursor.execute(
-                    """
-                    SELECT variant_id FROM product_variants
-                    WHERE product_id = %s
-                    """, [instance.id]
-                )
-                instance.variant_ids = [row[0]
-                                        for row in master_cursor.fetchall()]
+            # Sprawdź czy produkt istnieje w bazie MPD
+            Products.objects.using('MPD').get(id=instance.id)
+            db = 'MPD'
+        except (Products.DoesNotExist, Exception):
+            return
+    
+    try:
+        # Pobranie variant_id PRZED usunięciem produktu
+        with connections['MPD'].cursor() as master_cursor:
+            master_cursor.execute(
+                """
+                SELECT variant_id FROM product_variants
+                WHERE product_id = %s
+                """, [instance.id]
+            )
+            instance.variant_ids = [row[0]
+                                    for row in master_cursor.fetchall()]
 
-            print(
-                f"Pobrane variant_id przed usunięciem: {instance.variant_ids}")
-        except Exception as e:
-            print(f"Błąd pobierania variant_id: {e}")
+        logger.info(
+            f"Pobrane variant_id przed usunięciem produktu {instance.id}: {instance.variant_ids}")
+    except Exception as e:
+        logger.warning(f"Błąd pobierania variant_id dla produktu {instance.id}: {e}")
+        instance.variant_ids = []
 
 
 @receiver(post_delete, sender=Products)
-def remove_mapping_in_matterhorn(sender, instance, using, **kwargs):
-    if using == 'MPD':
+def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
+    # Sprawdź czy to produkt z bazy MPD - sprawdź using lub _state.db
+    db = using or getattr(instance, '_state', {}).db or 'default'
+    if db != 'MPD' and 'MPD' not in str(db):
+        # Sprawdź czy instancja pochodzi z bazy MPD przez sprawdzenie czy istnieje w MPD
         try:
-            logger.info(
-                f"Rozpoczęto usuwanie mapowań dla produktu MPD ID: {instance.id}")
+            # Próbuj znaleźć produkt w bazie MPD
+            Products.objects.using('MPD').get(id=instance.id)
+            db = 'MPD'
+        except (Products.DoesNotExist, Exception):
+            logger.debug(f"Produkt {instance.id} nie jest z bazy MPD, pomijam signal")
+            return
+    
+    try:
+        logger.info(
+            f"Rozpoczęto usuwanie mapowań dla produktu MPD ID: {instance.id}")
 
-            # Usunięcie produktu z tabeli products w matterhorn1
+        # Pobierz variant_ids przed usunięciem (jeśli nie zostały już pobrane)
+        variant_ids = []
+        if not hasattr(instance, 'variant_ids') or not instance.variant_ids:
+            try:
+                with connections['MPD'].cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT variant_id FROM product_variants
+                        WHERE product_id = %s
+                        """, [instance.id]
+                    )
+                    variant_ids = [row[0] for row in cursor.fetchall()]
+            except Exception as e:
+                logger.warning(f"Nie udało się pobrać variant_ids: {e}")
+        else:
+            variant_ids = instance.variant_ids
+
+        # Usunięcie produktu z tabeli products w matterhorn1
+        with connections['matterhorn1'].cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE product 
+                SET mapped_product_uid = NULL,
+                    is_mapped = False,
+                    updated_at = NOW()
+                WHERE mapped_product_uid = %s
+                """, [instance.id]
+            )
+            products_updated = cursor.rowcount
+            logger.info(
+                f"Zaktualizowano {products_updated} rekordów w tabeli product (mapped_product_uid = {instance.id})")
+
+        # Usunięcie wartości variant_id z mapped_variant_uid w tabeli product_variants w matterhorn1
+        if variant_ids:
             with connections['matterhorn1'].cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE product 
-                    SET mapped_product_uid = NULL,
+                placeholders = ', '.join(['%s'] * len(variant_ids))
+                cursor.execute(f"""
+                    UPDATE productvariant
+                    SET mapped_variant_uid = NULL,
                         is_mapped = False,
                         updated_at = NOW()
-                    WHERE mapped_product_uid = %s
-                    """, [instance.id]
-                )
-                products_updated = cursor.rowcount
+                    WHERE mapped_variant_uid IN ({placeholders})
+                    """, variant_ids)
+                variants_updated = cursor.rowcount
                 logger.info(
-                    f"Zaktualizowano {products_updated} rekordów w tabeli product")
+                    f"Zaktualizowano {variants_updated} rekordów w tabeli product_variants (variant_ids: {variant_ids})")
+        else:
+            logger.info("Brak variant_id do usunięcia")
 
-            # Usunięcie wartości variant_id z mapped_variant_uid w tabeli product_variants w matterhorn1
-            if hasattr(instance, 'variant_ids') and instance.variant_ids:
-                with connections['matterhorn1'].cursor() as cursor:
-                    placeholders = ', '.join(
-                        ['%s'] * len(instance.variant_ids))
-                    cursor.execute(f"""
-                        UPDATE productvariant
-                        SET mapped_variant_uid = NULL,
-                            is_mapped = False,
-                            updated_at = NOW()
-                        WHERE mapped_variant_uid IN ({placeholders})
-                        """, instance.variant_ids)
-                    variants_updated = cursor.rowcount
-                    logger.info(
-                        f"Zaktualizowano {variants_updated} rekordów w tabeli product_variants")
-            else:
-                logger.info("Brak variant_id do usunięcia")
+        logger.info(
+            f"Zakończono usuwanie mapowań dla produktu MPD ID: {instance.id}")
 
-            logger.info(
-                f"Zakończono usuwanie mapowań dla produktu MPD ID: {instance.id}")
-
-        except Exception as e:
-            error_message = f"Błąd podczas usuwania mapowań dla produktu MPD ID: {instance.id} - {str(e)}"
-            logger.error(error_message)
-            logger.error(traceback.format_exc())
-            raise  # Ponownie rzucamy wyjątek, aby Django wiedział o błędzie
+    except Exception as e:
+        error_message = f"Błąd podczas usuwania mapowań dla produktu MPD ID: {instance.id} - {str(e)}"
+        logger.error(error_message)
+        logger.error(traceback.format_exc())
+        # Nie rzucamy wyjątku, aby nie blokować usuwania produktu
 
 
 @receiver(pre_delete, sender=Products)
-def product_pre_delete(sender, instance, **kwargs):
-    message = f"Przed usunięciem produktu: {instance.id} - {instance.name}"
-    print(message)
+def product_pre_delete(sender, instance, using=None, **kwargs):
+    # Sprawdź czy to produkt z bazy MPD
+    db = using or getattr(instance, '_state', {}).db or 'default'
+    if db != 'MPD' and 'MPD' not in str(db):
+        try:
+            # Sprawdź czy produkt istnieje w bazie MPD
+            Products.objects.using('MPD').get(id=instance.id)
+            db = 'MPD'
+        except (Products.DoesNotExist, Exception):
+            return
+    
+    message = f"Przed usunięciem produktu MPD: {instance.id} - {instance.name}"
     logger.info(message)
 
 
 @receiver(post_delete, sender=Products)
-def product_post_delete(sender, instance, **kwargs):
-    message = f"Po usunięciu produktu: {instance.id} - {instance.name}"
-    print(message)
+def product_post_delete(sender, instance, using=None, **kwargs):
+    # Sprawdź czy to produkt z bazy MPD
+    db = using or getattr(instance, '_state', {}).db or 'default'
+    if db != 'MPD' and 'MPD' not in str(db):
+        try:
+            # Sprawdź czy produkt istnieje w bazie MPD (jeśli jeszcze istnieje)
+            Products.objects.using('MPD').get(id=instance.id)
+            db = 'MPD'
+        except (Products.DoesNotExist, Exception):
+            # Produkt już usunięty lub nie z bazy MPD
+            return
+    
+    message = f"Po usunięciu produktu MPD: {instance.id} - {instance.name}"
     logger.info(message)
     # Usuwanie folderu z bucketa
     try:

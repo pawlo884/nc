@@ -939,8 +939,9 @@ def _prepare_product_create(item):
     if item.get('images'):
         product._images_to_create = []
         for i, image_url in enumerate(item['images']):
+            # Zapisz oryginalny URL z API - bez normalizacji
             product._images_to_create.append({
-                'image_url': normalize_storage_key(image_url),
+                'image_url': image_url,  # Oryginalny URL z API Matterhorn
                 'order': i
             })
 
@@ -1027,8 +1028,9 @@ def _prepare_product_update(product, item):
     if item.get('images'):
         product._images_to_create = []
         for i, image_url in enumerate(item['images']):
+            # Zapisz oryginalny URL z API - bez normalizacji
             product._images_to_create.append({
-                'image_url': normalize_storage_key(image_url),
+                'image_url': image_url,  # Oryginalny URL z API Matterhorn
                 'order': i
             })
 
