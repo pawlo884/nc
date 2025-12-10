@@ -3,7 +3,7 @@ Management command do uruchomienia automatyzacji wypełniania formularzy MPD
 """
 from django.core.management.base import BaseCommand
 from web_agent.automation.browser_automation import BrowserAutomation
-from web_agent.models import AutomationRun
+from web_agent.models import AutomationRun, BrandConfig
 from matterhorn1.models import Brand, Category
 import os
 
@@ -12,23 +12,29 @@ class Command(BaseCommand):
     help = 'Uruchom automatyzację wypełniania formularzy MPD'
 
     def add_arguments(self, parser):
-        parser.add_argument('--brand', type=str, help='Nazwa marki (opcjonalne)')
-        parser.add_argument('--category', type=str, help='Nazwa kategorii (opcjonalne)')
-        parser.add_argument('--active', type=str, help='Filtr active (true/false, opcjonalne)')
-        parser.add_argument('--is_mapped', type=str, help='Filtr is_mapped (true/false, opcjonalne)')
+        parser.add_argument('--brand', type=str,
+                            help='Nazwa marki (opcjonalne)')
+        parser.add_argument('--category', type=str,
+                            help='Nazwa kategorii (opcjonalne)')
+        parser.add_argument('--active', type=str,
+                            help='Filtr active (true/false, opcjonalne)')
+        parser.add_argument('--is_mapped', type=str,
+                            help='Filtr is_mapped (true/false, opcjonalne)')
 
     def handle(self, *args, **options):
         brand_name = options.get('brand')
         category_name = options.get('category')
-        
+
         # Konwertuj stringi na boolean
         active_filter = None
         if options.get('active'):
-            active_filter = options.get('active').lower() in ('true', '1', 'yes', 'tak')
-        
+            active_filter = options.get('active').lower() in (
+                'true', '1', 'yes', 'tak')
+
         is_mapped_filter = None
         if options.get('is_mapped'):
-            is_mapped_filter = options.get('is_mapped').lower() in ('true', '1', 'yes', 'tak')
+            is_mapped_filter = options.get(
+                'is_mapped').lower() in ('true', '1', 'yes', 'tak')
 
         self.stdout.write(f"\nURUCHOMIENIE AGENTA")
         self.stdout.write(f"   Marka: {brand_name or 'Wszystkie'}")
@@ -42,63 +48,95 @@ class Command(BaseCommand):
         # Znajdź brand i category ID tylko jeśli podano
         brand_id = None
         brand = None
+        brand_config = None
         if brand_name:
             try:
-                brand = Brand.objects.using('matterhorn1').get(name__iexact=brand_name)
+                brand = Brand.objects.using(
+                    'matterhorn1').get(name__iexact=brand_name)
                 brand_id = int(brand.brand_id)
-                self.stdout.write(f"[OK] Znaleziono marke: {brand.name} (ID: {brand_id})")
+                self.stdout.write(
+                    f"[OK] Znaleziono marke: {brand.name} (ID: {brand_id})")
+
+                # Sprawdź czy istnieje konfiguracja dla tej marki
+                try:
+                    brand_config = BrandConfig.objects.get(brand_id=brand_id)
+                    self.stdout.write(self.style.SUCCESS(
+                        f"[OK] Znaleziono konfigurację marki: {brand_config.brand_name}"))
+                except BrandConfig.DoesNotExist:
+                    self.stdout.write(self.style.WARNING(
+                        f"[WARNING] Brak konfiguracji dla marki {brand_name}"))
             except Brand.DoesNotExist:
-                self.stdout.write(self.style.ERROR(f"[ERROR] Nie znaleziono marki: {brand_name}"))
+                self.stdout.write(self.style.ERROR(
+                    f"[ERROR] Nie znaleziono marki: {brand_name}"))
                 return
 
         category_id = None
         category = None
         if category_name:
             try:
-                category = Category.objects.using('matterhorn1').filter(name__icontains=category_name).first()
+                category = Category.objects.using('matterhorn1').filter(
+                    name__icontains=category_name).first()
                 if category:
                     category_id = int(category.category_id)
-                    self.stdout.write(f"[OK] Znaleziono kategorie: {category.name} (ID: {category_id})")
+                    self.stdout.write(
+                        f"[OK] Znaleziono kategorie: {category.name} (ID: {category_id})")
                 else:
-                    self.stdout.write(self.style.WARNING(f"[WARNING] Nie znaleziono kategorii: {category_name}"))
+                    self.stdout.write(self.style.WARNING(
+                        f"[WARNING] Nie znaleziono kategorii: {category_name}"))
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f"[WARNING] Blad podczas wyszukiwania kategorii: {e}"))
+                self.stdout.write(self.style.WARNING(
+                    f"[WARNING] Blad podczas wyszukiwania kategorii: {e}"))
 
         # Utwórz AutomationRun
+        # Użyj domyślnych filtrów z konfiguracji marki, jeśli nie podano w parametrach
         filters = {}
         if active_filter is not None:
             filters['active'] = active_filter
+        elif brand_config and brand_config.default_active_filter is not None:
+            filters['active'] = brand_config.default_active_filter
+            self.stdout.write(
+                f"[INFO] Użyto domyślnego filtra active z konfiguracji: {brand_config.default_active_filter}")
+
         if is_mapped_filter is not None:
             filters['is_mapped'] = is_mapped_filter
-            
-        automation_run = AutomationRun.objects.using('zzz_default').create(
+        elif brand_config and brand_config.default_is_mapped_filter is not None:
+            filters['is_mapped'] = brand_config.default_is_mapped_filter
+            self.stdout.write(
+                f"[INFO] Użyto domyślnego filtra is_mapped z konfiguracji: {brand_config.default_is_mapped_filter}")
+
+        # AutomationRun automatycznie trafi do bazy web_agent dzięki WebAgentRouter
+        automation_run = AutomationRun.objects.create(
             status='running',
             brand_id=brand_id,
             category_id=category_id,
             filters=filters
         )
-        self.stdout.write(f"\n[OK] Utworzono AutomationRun ID: {automation_run.id}\n")
+        self.stdout.write(
+            f"\n[OK] Utworzono AutomationRun ID: {automation_run.id}\n")
 
         # Konfiguracja
-        base_url = os.getenv('WEB_AGENT_BASE_URL', 'http://localhost:8000/admin/')
+        base_url = os.getenv('WEB_AGENT_BASE_URL',
+                             'http://localhost:8080/admin/')
         admin_username = os.getenv('DJANGO_ADMIN_USERNAME', 'admin')
         admin_password = os.getenv('DJANGO_ADMIN_PASSWORD', '')
 
         if not admin_password:
-            self.stdout.write(self.style.ERROR("[ERROR] Brak DJANGO_ADMIN_PASSWORD w .env.dev"))
+            self.stdout.write(self.style.ERROR(
+                "[ERROR] Brak DJANGO_ADMIN_PASSWORD w .env.dev"))
             automation_run.status = 'failed'
             automation_run.error_message = "Brak konfiguracji"
-            automation_run.save(using='zzz_default')
+            automation_run.save()
             return
 
         try:
             # Inicjalizuj przeglądarkę
-            browser = BrowserAutomation(base_url, admin_username, admin_password, headless=False)
+            browser = BrowserAutomation(
+                base_url, admin_username, admin_password, headless=False)
 
             # Uruchom przeglądarkę
             self.stdout.write("\n[INFO] Uruchamianie przeglądarki...")
             browser.start_browser()
-            
+
             # Zaloguj się do admin
             self.stdout.write("[INFO] Logowanie do admin...")
             browser.login_to_admin()
@@ -106,38 +144,57 @@ class Command(BaseCommand):
 
             # Przygotuj filtry tylko jeśli są podane
             automation_filters = {}
-            
+
             if brand_id and brand:
                 automation_filters['brand_id'] = brand_id
                 automation_filters['brand_name'] = brand.name
                 self.stdout.write(f"\n[INFO] Filtr marki: {brand.name}")
-            
+
             if category_id:
                 automation_filters['category_id'] = category_id
+                automation_filters['category_name'] = category_name  # Dodaj nazwę kategorii do filtrów
                 self.stdout.write(f"[INFO] Filtr kategorii: {category_name}")
-            
+            elif category_name:
+                # Jeśli nie znaleziono w bazie, ale podano nazwę, spróbuj użyć oryginalnej nazwy
+                automation_filters['category_name'] = category_name
+                self.stdout.write(f"[INFO] Filtr kategorii (bez ID): {category_name}")
+
             if active_filter is not None:
                 automation_filters['active'] = active_filter
                 self.stdout.write(f"[INFO] Filtr active: {active_filter}")
-            
+
             if is_mapped_filter is not None:
                 automation_filters['is_mapped'] = is_mapped_filter
-                self.stdout.write(f"[INFO] Filtr is_mapped: {is_mapped_filter}")
+                self.stdout.write(
+                    f"[INFO] Filtr is_mapped: {is_mapped_filter}")
 
             # Przejdź do listy produktów (z filtrami lub bez)
             self.stdout.write(f"\n[INFO] Przechodzenie do listy produktów...")
             if not automation_filters:
-                self.stdout.write("   Brak filtrów - wyświetlanie wszystkich produktów")
-            
-            browser.navigate_to_product_list(automation_filters if automation_filters else None)
-            
+                self.stdout.write(
+                    "   Brak filtrów - wyświetlanie wszystkich produktów")
+
+            browser.navigate_to_product_list(
+                automation_filters if automation_filters else None)
+
             if automation_filters:
-                self.stdout.write(self.style.SUCCESS("\n[OK] Przeglądarka otwarta z wybranymi filtrami!"))
+                self.stdout.write(self.style.SUCCESS(
+                    "\n[OK] Przeglądarka otwarta z wybranymi filtrami!"))
             else:
-                self.stdout.write(self.style.SUCCESS("\n[OK] Przeglądarka otwarta - wszystkie produkty!"))
-            self.stdout.write("[INFO] Przeglądarka pozostanie otwarta. Możesz teraz ręcznie przetwarzać produkty.")
+                self.stdout.write(self.style.SUCCESS(
+                    "\n[OK] Przeglądarka otwarta - wszystkie produkty!"))
+            self.stdout.write(
+                "[INFO] Przeglądarka pozostanie otwarta. Możesz teraz ręcznie przetwarzać produkty.")
             self.stdout.write(f"\n   AutomationRun ID: {automation_run.id}")
-            self.stdout.write(f"   Wyniki: http://localhost:8000/admin/web_agent/automationrun/{automation_run.id}/\n")
+            # Pobierz port z base_url lub użyj domyślnego 8080
+            port = '8080'
+            if base_url:
+                import re
+                match = re.search(r':(\d+)', base_url)
+                if match:
+                    port = match.group(1)
+            self.stdout.write(
+                f"   Wyniki: http://localhost:{port}/admin/web_agent/automationrun/{automation_run.id}/\n")
 
             # Zostaw przeglądarkę otwartą - nie zamykaj!
             # Użytkownik może teraz ręcznie przetwarzać produkty
@@ -148,7 +205,6 @@ class Command(BaseCommand):
             traceback.print_exc()
             automation_run.status = 'failed'
             automation_run.error_message = str(e)
-            automation_run.save(using='zzz_default')
+            automation_run.save()
             if 'browser' in locals():
                 browser.close_browser()
-

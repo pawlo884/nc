@@ -12,17 +12,19 @@ logger = logging.getLogger(__name__)
 class ProductProcessor:
     """Klasa do przetwarzania produktów - łączy automatyzację przeglądarki z AI"""
     
-    def __init__(self, browser_automation: BrowserAutomation, ai_processor: AIProcessor):
+    def __init__(self, browser_automation: BrowserAutomation, ai_processor: AIProcessor, brand_config=None):
         """
         Inicjalizacja procesora produktów.
         
         Args:
             browser_automation: Instancja BrowserAutomation
             ai_processor: Instancja AIProcessor
+            brand_config: Opcjonalna konfiguracja marki (BrandConfig)
         """
         self.browser_automation = browser_automation
         self.ai_processor = ai_processor
-        logger.info("ProductProcessor zainicjalizowany")
+        self.brand_config = brand_config
+        logger.info(f"ProductProcessor zainicjalizowany (brand_config: {brand_config.brand_name if brand_config else 'brak'})")
     
     def get_product_from_database(self, product_id: int) -> Optional[Dict]:
         """
@@ -151,7 +153,7 @@ class ProductProcessor:
             'brand_name': product_data.get('brand_name', ''),
             'size_category': self._determine_size_category(product_data, variants),
             'producer_code': self._get_producer_code_from_variants(variants) if variants else '',
-            'producer_color_name': product_data.get('color', ''),
+            'producer_color_name': self.map_producer_color(product_data.get('color', '')),
             'series_name': self._extract_series_name(product_data.get('name', '')),
         }
         
@@ -206,6 +208,34 @@ class ProductProcessor:
                 return variant['producer_code']
         
         return ''
+    
+    def map_producer_color(self, color_name: str) -> str:
+        """
+        Mapuje kolor producenta zgodnie z konfiguracją marki.
+        
+        Args:
+            color_name: Oryginalna nazwa koloru producenta
+            
+        Returns:
+            Zmapowana nazwa koloru lub oryginalna, jeśli brak mapowania
+        """
+        if not color_name or not self.brand_config:
+            return color_name or ''
+        
+        color_mapping = self.brand_config.color_mapping
+        if not color_mapping:
+            return color_name
+        
+        # Sprawdź czy istnieje mapowanie (case-insensitive)
+        color_name_lower = color_name.lower().strip()
+        for original, mapped in color_mapping.items():
+            if original.lower().strip() == color_name_lower:
+                logger.info(f"Zmapowano kolor: '{color_name}' -> '{mapped}'")
+                return mapped
+        
+        # Jeśli nie znaleziono mapowania, zwróć oryginalną nazwę
+        logger.debug(f"Brak mapowania dla koloru: '{color_name}'")
+        return color_name
     
     def _extract_series_name(self, product_name: str) -> str:
         """

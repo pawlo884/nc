@@ -2,7 +2,7 @@
 Konfiguracja admin dla aplikacji web_agent.
 """
 from django.contrib import admin
-from .models import AutomationRun, ProductProcessingLog
+from .models import AutomationRun, ProductProcessingLog, BrandConfig
 
 
 @admin.register(AutomationRun)
@@ -56,6 +56,40 @@ class ProductProcessingLogAdmin(admin.ModelAdmin):
         }),
         ('Dane przetwarzania', {
             'fields': ('processing_data',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(BrandConfig)
+class BrandConfigAdmin(admin.ModelAdmin):
+    """Admin dla BrandConfig"""
+    list_display = [
+        'brand_name', 'brand_id', 'default_active_filter', 
+        'default_is_mapped_filter', 'similarity_threshold', 'updated_at'
+    ]
+    list_filter = ['default_active_filter', 'default_is_mapped_filter', 'created_at', 'updated_at']
+    search_fields = ['brand_name', 'brand_id']
+    readonly_fields = ['created_at', 'updated_at']
+    date_hierarchy = 'updated_at'
+    
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('brand_id', 'brand_name')
+        }),
+        ('Domyślne filtry', {
+            'fields': ('default_active_filter', 'default_is_mapped_filter')
+        }),
+        ('Mapowanie kolorów', {
+            'fields': ('color_mapping',),
+            'description': 'Mapowanie kolorów producenta w formacie JSON: {"Dark Brown": "Ciemny Brąz", "Beige": "Beż"}'
+        }),
+        ('Atrybuty i wyszukiwanie', {
+            'fields': ('attributes', 'similarity_threshold'),
+            'description': 'Lista atrybutów do wyszukiwania w opisie produktu oraz próg podobieństwa dla cosine similarity'
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )

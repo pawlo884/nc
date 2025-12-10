@@ -12,6 +12,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -147,95 +148,309 @@ class BrowserAutomation:
                         # Znajdź panel filtrów
                         filter_panel = self.driver.find_element(By.ID, "changelist-filter")
                         
-                        # Znajdź link z nazwą marki w panelu filtrów
-                        # Szukamy linka który zawiera nazwę marki w tekście
-                        brand_links = filter_panel.find_elements(By.TAG_NAME, "a")
+                        # Sprawdź czy sekcja "brand" jest zwinięta - jeśli tak, rozwiń ją
+                        try:
+                            # Szukaj nagłówka sekcji z "brand" (może być "Pokaż ilości po brand" lub podobne)
+                            # Spróbuj różne selektory
+                            brand_sections = filter_panel.find_elements(By.XPATH, ".//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'brand') or contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'marka')]")
+                            if not brand_sections:
+                                # Spróbuj znaleźć przez aria-labelledby lub inne atrybuty
+                                brand_sections = filter_panel.find_elements(By.XPATH, ".//*[contains(translate(@aria-labelledby, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'brand') or contains(translate(@id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'brand')]")
+                            
+                            if not brand_sections:
+                                # Spróbuj znaleźć wszystkie h3 w panelu i kliknąć w ten który zawiera "brand" lub "marka"
+                                all_h3 = filter_panel.find_elements(By.TAG_NAME, "h3")
+                                for h3 in all_h3:
+                                    h3_text = h3.text.lower()
+                                    if 'brand' in h3_text or 'marka' in h3_text:
+                                        brand_sections = [h3]
+                                        break
+                            
+                            print(f"[DEBUG] Znaleziono {len(brand_sections)} sekcji brand")
+                            
+                            for section in brand_sections:
+                                # Sprawdź czy sekcja jest zwinięta (collapsed)
+                                try:
+                                    parent = section.find_element(By.XPATH, "./..")
+                                    parent_class = parent.get_attribute('class') or ''
+                                    if 'collapsed' in parent_class or 'closed' in parent_class:
+                                        logger.info("Rozwijanie sekcji filtrów brand...")
+                                        section.click()
+                                        time.sleep(2)
+                                except Exception as e2:
+                                    # Spróbuj kliknąć bezpośrednio w nagłówek
+                                    logger.info("Próba rozwinięcia sekcji brand przez kliknięcie w nagłówek...")
+                                    section.click()
+                                    time.sleep(2)
+                        except Exception as e:
+                            logger.debug(f"Sekcja brand może być już rozwinięta: {e}")
                         
-                        for link in brand_links:
-                            link_text = link.text.strip()
-                            # Sprawdź czy link zawiera nazwę marki (może być format "Nazwa (123)")
-                            if brand_name.lower() in link_text.lower() and 'brand__id__exact' in link.get_attribute('href'):
-                                logger.info(f"Znaleziono filtr marki: {link_text}")
-                                # Przewiń do elementu
-                                self.driver.execute_script("arguments[0].scrollIntoView(true);", link)
-                                time.sleep(0.5)
-                                # Kliknij
-                                link.click()
-                                logger.info(f"Kliknięto filtr marki: {brand_name}")
-                                time.sleep(3)
-                                break
-                        else:
+                        # Filtry są w dropdownach (select) w divach z klasą "list-filter-dropdown"
+                        # Struktura: <div class="list-filter-dropdown"><h3> po brand </h3><select>...</select></div>
+                        brand_found = False
+                        try:
+                            # Znajdź div z klasą "list-filter-dropdown" który zawiera h3 z tekstem "po brand"
+                            brand_dropdowns = filter_panel.find_elements(By.XPATH, 
+                                ".//div[@class='list-filter-dropdown'][.//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'brand')]]")
+                            
+                            if brand_dropdowns:
+                                # Znajdź select w tym divie
+                                brand_selects = brand_dropdowns[0].find_elements(By.TAG_NAME, "select")
+                                print(f"[DEBUG] Znaleziono {len(brand_selects)} selectów w dropdownie brand")
+                            
+                            if brand_selects:
+                                from selenium.webdriver.support.ui import Select
+                                select = Select(brand_selects[0])
+                                logger.info(f"Znaleziono dropdown brand, szukam opcji: {brand_name}")
+                                print(f"[DEBUG] Znaleziono dropdown brand, szukam opcji: {brand_name}")
+                                
+                                # Wypisz wszystkie opcje do debugowania
+                                options = select.options
+                                print(f"[DEBUG] Dostępne opcje w dropdown brand ({len(options)}):")
+                                for i, opt in enumerate(options[:10]):  # Pierwsze 10
+                                    print(f"  {i+1}. '{opt.text}'")
+                                
+                                # Spróbuj wybrać po dokładnym tekście (może być "Marko (174)")
+                                try:
+                                    select.select_by_visible_text(brand_name)
+                                    logger.info(f"Wybrano markę z dropdowna (dokładne): {brand_name}")
+                                    print(f"[DEBUG] Wybrano markę z dropdowna (dokładne): {brand_name}")
+                                    time.sleep(2)
+                                    brand_found = True
+                                except:
+                                    # Spróbuj po częściowym dopasowaniu (ignoruj liczbę w nawiasach)
+                                    for option in options:
+                                        option_text = option.text.strip()
+                                        option_text_clean = option_text.split('(')[0].strip()
+                                        
+                                        if brand_name.lower() == option_text_clean.lower():
+                                            select.select_by_visible_text(option_text)
+                                            logger.info(f"Wybrano markę z dropdowna: {option_text}")
+                                            time.sleep(2)
+                                            brand_found = True
+                                            break
+                                    
+                                    if not brand_found:
+                                        # Spróbuj częściowe dopasowanie
+                                        for option in options:
+                                            option_text = option.text.strip()
+                                            option_text_clean = option_text.split('(')[0].strip()
+                                            
+                                            if brand_name.lower() in option_text_clean.lower():
+                                                select.select_by_visible_text(option_text)
+                                                logger.info(f"Wybrano markę z dropdowna (częściowe): {option_text}")
+                                                time.sleep(2)
+                                                brand_found = True
+                                                break
+                            else:
+                                logger.warning("Nie znaleziono dropdowna brand w panelu filtrów")
+                        except Exception as e2:
+                            logger.warning(f"Błąd podczas wyboru marki z dropdowna: {e2}")
+                        
+                        if not brand_found:
                             logger.warning(f"Nie znaleziono filtra dla marki: {brand_name}")
                     except Exception as e:
                         logger.warning(f"Błąd podczas klikania filtra marki: {e}")
                 
-                # Filtr kategorii
+                # Filtr kategorii - użyj dropdowna
                 if filters.get('category_name'):
                     category_name = filters['category_name']
                     logger.info(f"Szukanie filtra kategorii: {category_name}")
+                    print(f"[DEBUG] Szukanie filtra kategorii: {category_name}")
                     
                     try:
                         filter_panel = self.driver.find_element(By.ID, "changelist-filter")
-                        category_links = filter_panel.find_elements(By.TAG_NAME, "a")
+                        # Znajdź div z klasą "list-filter-dropdown" dla category
+                        category_dropdowns = filter_panel.find_elements(By.XPATH, 
+                            ".//div[@class='list-filter-dropdown'][.//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'category')]]")
                         
-                        for link in category_links:
-                            link_text = link.text.strip()
-                            if category_name.lower() in link_text.lower() and 'category__id__exact' in link.get_attribute('href'):
-                                logger.info(f"Znaleziono filtr kategorii: {link_text}")
-                                self.driver.execute_script("arguments[0].scrollIntoView(true);", link)
-                                time.sleep(0.5)
-                                link.click()
-                                logger.info(f"Kliknięto filtr kategorii: {category_name}")
-                                time.sleep(3)
-                                break
+                        print(f"[DEBUG] Znaleziono {len(category_dropdowns)} dropdownów kategorii")
+                        
+                        if category_dropdowns:
+                            category_selects = category_dropdowns[0].find_elements(By.TAG_NAME, "select")
+                            print(f"[DEBUG] Znaleziono {len(category_selects)} selectów w dropdownie kategorii")
+                            
+                            if category_selects:
+                                from selenium.webdriver.support.ui import Select
+                                select = Select(category_selects[0])
+                                
+                                # Wypisz wszystkie opcje do debugowania (szukaj "kostiumy")
+                                options = select.options
+                                print(f"[DEBUG] Dostępne opcje w dropdown kategorii ({len(options)}):")
+                                kostiumy_options = []
+                                for i, opt in enumerate(options):
+                                    opt_text = opt.text.strip()
+                                    if 'kostiumy' in opt_text.lower() or 'kostium' in opt_text.lower():
+                                        kostiumy_options.append(opt_text)
+                                    if i < 10:
+                                        print(f"  {i+1}. '{opt_text}'")
+                                
+                                if kostiumy_options:
+                                    print(f"[DEBUG] Opcje z 'kostiumy': {kostiumy_options}")
+                                
+                                # Funkcja do normalizacji polskich znaków (tylko do porównań)
+                                def normalize_for_comparison(text):
+                                    """Normalizuje polskie znaki diakrytyczne dla porównań"""
+                                    replacements = {
+                                        'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n',
+                                        'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z',
+                                        'Ą': 'a', 'Ć': 'c', 'Ę': 'e', 'Ł': 'l', 'Ń': 'n',
+                                        'Ó': 'o', 'Ś': 's', 'Ź': 'z', 'Ż': 'z'
+                                    }
+                                    text_lower = text.lower()
+                                    for old, new in replacements.items():
+                                        text_lower = text_lower.replace(old, new)
+                                    return text_lower
+                                
+                                # Funkcja do obliczania podobieństwa słów (uwzględnia różnice w pisowni)
+                                def word_similarity(word1, word2):
+                                    """Oblicza podobieństwo między dwoma słowami"""
+                                    w1 = normalize_for_comparison(word1)
+                                    w2 = normalize_for_comparison(word2)
+                                    
+                                    # Dokładne dopasowanie po normalizacji
+                                    if w1 == w2:
+                                        return 1.0
+                                    
+                                    # Sprawdź czy jedno słowo zawiera się w drugim
+                                    if w1 in w2 or w2 in w1:
+                                        return 0.8
+                                    
+                                    # Oblicz podobieństwo na podstawie wspólnych liter
+                                    common_chars = set(w1) & set(w2)
+                                    all_chars = set(w1) | set(w2)
+                                    
+                                    if not all_chars:
+                                        return 0.0
+                                    
+                                    return len(common_chars) / len(all_chars)
+                                
+                                # Funkcja do obliczania podobieństwa z preferencją dla dokładniejszych dopasowań
+                                def calculate_similarity(query, option):
+                                    """Oblicza podobieństwo z preferencją dla opcji zawierających wszystkie słowa z zapytania"""
+                                    # Podziel na słowa (bez normalizacji dla porównań słowo-słowo)
+                                    query_words = [w for w in query.lower().split() if len(w) > 1]
+                                    option_words = [w for w in option.lower().split() if len(w) > 1]
+                                    
+                                    if not query_words or not option_words:
+                                        return 0.0
+                                    
+                                    # Dla każdego słowa z zapytania znajdź najlepsze dopasowanie w opcji
+                                    total_similarity = 0.0
+                                    matched_words = set()
+                                    
+                                    for q_word in query_words:
+                                        best_match_score = 0.0
+                                        best_match_word = None
+                                        
+                                        for o_word in option_words:
+                                            if o_word in matched_words:
+                                                continue
+                                            
+                                            similarity = word_similarity(q_word, o_word)
+                                            if similarity > best_match_score:
+                                                best_match_score = similarity
+                                                best_match_word = o_word
+                                        
+                                        if best_match_word:
+                                            matched_words.add(best_match_word)
+                                        
+                                        total_similarity += best_match_score
+                                    
+                                    # Średnie podobieństwo
+                                    avg_similarity = total_similarity / len(query_words) if query_words else 0.0
+                                    
+                                    # Bonus jeśli wszystkie słowa z zapytania mają dobre dopasowanie
+                                    if avg_similarity > 0.7:
+                                        avg_similarity = min(1.0, avg_similarity + 0.2)
+                                    
+                                    return avg_similarity
+                                
+                                # Spróbuj znaleźć opcję z kategorią używając podobieństwa z preferencją dla dokładnych dopasowań
+                                category_found = False
+                                best_match = None
+                                best_similarity = -1.0
+                                
+                                print(f"[DEBUG] Szukanie kategorii '{category_name}' w {len(options)} opcjach...")
+                                
+                                for option in options:
+                                    option_text = option.text.strip()
+                                    option_text_clean = option_text.split('(')[0].strip()
+                                    
+                                    # Pomiń opcję "Wszystko"
+                                    if option_text_clean.lower() in ['wszystko', 'all', '']:
+                                        continue
+                                    
+                                    similarity = calculate_similarity(category_name, option_text_clean)
+                                    
+                                    # Wypisz szczegóły dla opcji z "kostiumy"
+                                    if 'kostiumy' in option_text_clean.lower():
+                                        print(f"[DEBUG] '{option_text_clean}': similarity={similarity:.3f}")
+                                    
+                                    if similarity > best_similarity:
+                                        best_similarity = similarity
+                                        best_match = option_text
+                                
+                                # Wybierz najlepsze dopasowanie (nawet jeśli similarity jest niskie, ale wybierz najlepsze)
+                                if best_match and best_similarity > 0:
+                                    select.select_by_visible_text(best_match)
+                                    logger.info(f"Wybrano kategorię z dropdowna (similarity: {best_similarity:.2f}): {best_match}")
+                                    print(f"[DEBUG] Wybrano kategorię z dropdowna (similarity: {best_similarity:.2f}): {best_match}")
+                                    time.sleep(2)
+                                    category_found = True
+                                else:
+                                    logger.warning(f"Nie znaleziono kategorii '{category_name}' w dropdownie (najlepsze podobieństwo: {best_similarity:.2f})")
+                                    print(f"[DEBUG] Nie znaleziono kategorii '{category_name}' w dropdownie (najlepsze podobieństwo: {best_similarity:.2f})")
                         else:
-                            logger.warning(f"Nie znaleziono filtra dla kategorii: {category_name}")
+                            logger.warning(f"Nie znaleziono dropdowna dla kategorii: {category_name}")
+                            print(f"[DEBUG] Nie znaleziono dropdowna dla kategorii: {category_name}")
                     except Exception as e:
-                        logger.warning(f"Błąd podczas klikania filtra kategorii: {e}")
+                        logger.warning(f"Błąd podczas wyboru kategorii z dropdowna: {e}")
+                        print(f"[DEBUG] Błąd podczas wyboru kategorii z dropdowna: {e}")
+                        import traceback
+                        traceback.print_exc()
                 
-                # Filtr active
+                # Filtr active - użyj dropdowna
                 if filters.get('active') is not None:
                     logger.info(f"Szukanie filtra active: {filters['active']}")
                     
                     try:
                         filter_panel = self.driver.find_element(By.ID, "changelist-filter")
-                        active_links = filter_panel.find_elements(By.TAG_NAME, "a")
+                        active_dropdowns = filter_panel.find_elements(By.XPATH, 
+                            ".//div[@class='list-filter-dropdown'][.//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'active')]]")
                         
-                        search_text = "Tak" if filters['active'] else "Nie"
-                        
-                        for link in active_links:
-                            if 'active__exact' in link.get_attribute('href') and search_text in link.text:
-                                logger.info(f"Znaleziono filtr active: {link.text}")
-                                self.driver.execute_script("arguments[0].scrollIntoView(true);", link)
-                                time.sleep(0.5)
-                                link.click()
-                                logger.info(f"Kliknięto filtr active")
-                                time.sleep(3)
-                                break
+                        if active_dropdowns:
+                            active_selects = active_dropdowns[0].find_elements(By.TAG_NAME, "select")
+                            if active_selects:
+                                from selenium.webdriver.support.ui import Select
+                                select = Select(active_selects[0])
+                                search_text = "Tak" if filters['active'] else "Nie"
+                                select.select_by_visible_text(search_text)
+                                logger.info(f"Wybrano active z dropdowna: {search_text}")
+                                time.sleep(2)
                     except Exception as e:
-                        logger.warning(f"Błąd podczas klikania filtra active: {e}")
+                        logger.warning(f"Błąd podczas wyboru active z dropdowna: {e}")
                 
-                # Filtr is_mapped
+                # Filtr is_mapped - użyj dropdowna
                 if filters.get('is_mapped') is not None:
                     logger.info(f"Szukanie filtra is_mapped: {filters['is_mapped']}")
                     
                     try:
                         filter_panel = self.driver.find_element(By.ID, "changelist-filter")
-                        mapped_links = filter_panel.find_elements(By.TAG_NAME, "a")
+                        mapped_dropdowns = filter_panel.find_elements(By.XPATH, 
+                            ".//div[@class='list-filter-dropdown'][.//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'mapped')]]")
                         
-                        search_text = "Tak" if filters['is_mapped'] else "Nie"
-                        
-                        for link in mapped_links:
-                            if 'is_mapped__exact' in link.get_attribute('href') and search_text in link.text:
-                                logger.info(f"Znaleziono filtr is_mapped: {link.text}")
-                                self.driver.execute_script("arguments[0].scrollIntoView(true);", link)
-                                time.sleep(0.5)
-                                link.click()
-                                logger.info(f"Kliknięto filtr is_mapped")
-                                time.sleep(3)
-                                break
+                        if mapped_dropdowns:
+                            mapped_selects = mapped_dropdowns[0].find_elements(By.TAG_NAME, "select")
+                            if mapped_selects:
+                                from selenium.webdriver.support.ui import Select
+                                select = Select(mapped_selects[0])
+                                search_text = "Tak" if filters['is_mapped'] else "Nie"
+                                select.select_by_visible_text(search_text)
+                                logger.info(f"Wybrano is_mapped z dropdowna: {search_text}")
+                                time.sleep(2)
                     except Exception as e:
-                        logger.warning(f"Błąd podczas klikania filtra is_mapped: {e}")
+                        logger.warning(f"Błąd podczas wyboru is_mapped z dropdowna: {e}")
             
             # Czekaj na załadowanie listy produktów po zastosowaniu filtrów
             self.wait.until(
