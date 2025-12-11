@@ -581,7 +581,22 @@ class BrowserAutomation:
                         print("[DEBUG] Kliknięto w pierwszy produkt z listy")
                         time.sleep(3)  # Czekaj na załadowanie strony produktu
 
-                        # Po załadowaniu strony produktu, edytuj nazwę
+                        # Sprawdź czy produkt jest zmapowany do MPD
+                        # Jeśli nie, wypełnij wszystkie pola, a potem utwórz produkt
+                        is_mapped = False
+                        try:
+                            create_mpd_button = self.driver.find_element(
+                                By.ID, "create-mpd-product-btn"
+                            )
+                            logger.info("Produkt nie jest zmapowany - wypełniam pola, potem utworzę produkt w MPD")
+                            print("[DEBUG] Produkt nie jest zmapowany - wypełniam pola, potem utworzę produkt w MPD")
+                        except NoSuchElementException:
+                            is_mapped = True
+                            logger.info("Produkt jest już zmapowany do MPD")
+                            print("[DEBUG] Produkt jest już zmapowany do MPD")
+
+                        # Wypełnij wszystkie pola (nazwa, opis, itd.)
+                        # 1. Edytuj nazwę
                         try:
                             self.update_product_name()
                         except Exception as e_name:
@@ -589,6 +604,38 @@ class BrowserAutomation:
                                 f"Błąd podczas edycji nazwy produktu: {e_name}")
                             print(
                                 f"[DEBUG] Błąd podczas edycji nazwy produktu: {e_name}")
+                        
+                        # 2. Edytuj opis
+                        try:
+                            self.update_product_description()
+                        except Exception as e_desc:
+                            logger.warning(
+                                f"Błąd podczas edycji opisu produktu: {e_desc}")
+                            print(
+                                f"[DEBUG] Błąd podczas edycji opisu produktu: {e_desc}")
+                        
+                        # 3. Jeśli produkt nie jest zmapowany, utwórz go w MPD po wypełnieniu wszystkich pól
+                        if not is_mapped:
+                            try:
+                                # Znajdź przycisk ponownie (może być potrzebne po wypełnieniu pól)
+                                create_mpd_button = self.wait.until(
+                                    EC.presence_of_element_located((By.ID, "create-mpd-product-btn"))
+                                )
+                                logger.info("Klikam przycisk 'Utwórz nowy produkt w MPD'...")
+                                print("[DEBUG] Klikam przycisk 'Utwórz nowy produkt w MPD'...")
+                                self.driver.execute_script(
+                                    "arguments[0].scrollIntoView(true);", create_mpd_button)
+                                time.sleep(0.5)
+                                create_mpd_button.click()
+                                logger.info("Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
+                                print("[DEBUG] Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
+                                # Poczekaj na utworzenie produktu
+                                time.sleep(3)
+                                logger.info("Produkt został utworzony w MPD")
+                                print("[DEBUG] Produkt został utworzony w MPD")
+                            except Exception as e:
+                                logger.error(f"Błąd podczas tworzenia produktu w MPD: {e}")
+                                print(f"[DEBUG] Błąd podczas tworzenia produktu w MPD: {e}")
                     else:
                         # Jeśli nie ma linka, kliknij w cały wiersz
                         logger.info("Brak linka, klikam w cały wiersz...")
@@ -974,22 +1021,41 @@ class BrowserAutomation:
             print(f"[DEBUG] Nowa nazwa produktu: {new_name}")
 
             # Wyczyść pole i wpisz nową nazwę
-            name_field.clear()
-            time.sleep(0.3)
-            name_field.send_keys(new_name)
-            time.sleep(0.5)
-
-            # Znajdź przycisk "Zapisz" i kliknij
-            save_button = self.driver.find_element(
-                By.XPATH, "//button[@onclick=\"updateField('name', 'mpd_name')\"]"
-            )
+            # Użyj JavaScript do ustawienia wartości (bardziej niezawodne)
             self.driver.execute_script(
-                "arguments[0].scrollIntoView(true);", save_button)
+                "arguments[0].value = arguments[1];",
+                name_field,
+                new_name
+            )
             time.sleep(0.3)
-            save_button.click()
-            logger.info("Kliknięto przycisk 'Zapisz' dla nazwy produktu")
-            print("[DEBUG] Kliknięto przycisk 'Zapisz' dla nazwy produktu")
-            time.sleep(2)  # Czekaj na zapisanie
+            
+            # Wywołaj zdarzenia aby upewnić się, że zmiana została zarejestrowana
+            self.driver.execute_script(
+                """
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                """,
+                name_field
+            )
+            time.sleep(0.3)
+            
+            # Sprawdź czy wartość została ustawiona
+            actual_value = self.driver.execute_script("return arguments[0].value;", name_field)
+            if actual_value == new_name:
+                logger.info(f"Pole nazwy zostało wypełnione: {new_name}")
+                print(f"[DEBUG] Pole nazwy zostało wypełnione: {new_name}")
+            else:
+                logger.warning(f"Wartość nazwy nie została poprawnie ustawiona. Oczekiwano: {new_name}, otrzymano: {actual_value}")
+                print(f"[DEBUG] Wartość nazwy nie została poprawnie ustawiona. Oczekiwano: {new_name}, otrzymano: {actual_value}")
+                # Spróbuj przez send_keys jako fallback
+                name_field.clear()
+                time.sleep(0.2)
+                name_field.send_keys(new_name)
+                time.sleep(0.3)
+            
+            # Nie zapisujemy - zostanie zapisane przy tworzeniu produktu w MPD
+            logger.info("Pole nazwy zostało wypełnione. Nie zapisuję - zostanie zapisane przy tworzeniu produktu w MPD.")
+            print("[DEBUG] Pole nazwy zostało wypełnione. Nie zapisuję - zostanie zapisane przy tworzeniu produktu w MPD.")
 
         except Exception as e:
             logger.error(f"Błąd podczas edycji nazwy produktu: {e}")
@@ -1089,6 +1155,122 @@ class BrowserAutomation:
             return name.strip()
 
         return result
+
+    def update_product_description(self, ai_processor=None):
+        """
+        Edycja opisu produktu w polu mpd_description.
+        Ulepsza opis przez AI i zapisuje go.
+        
+        Args:
+            ai_processor: Instancja AIProcessor do ulepszania opisu. Jeśli None, tworzy nową.
+        """
+        try:
+            logger.info("Rozpoczynam edycję opisu produktu...")
+            print("[DEBUG] Rozpoczynam edycję opisu produktu...")
+
+            # Czekaj na załadowanie pola mpd_description
+            desc_field = self.wait.until(
+                EC.presence_of_element_located((By.ID, "mpd_description"))
+            )
+
+            # Pobierz obecny opis
+            current_description = desc_field.get_attribute("value") or desc_field.text or ""
+            logger.info(f"Obecny opis produktu (długość: {len(current_description)})")
+            print(f"[DEBUG] Obecny opis produktu (długość: {len(current_description)})")
+            
+            if not current_description or not current_description.strip():
+                logger.warning("Brak opisu do ulepszenia")
+                print("[DEBUG] Brak opisu do ulepszenia")
+                return
+
+            # Ulepsz opis przez AI
+            if ai_processor is None:
+                from web_agent.automation.ai_processor import AIProcessor
+                ai_processor = AIProcessor()
+            
+            logger.info("Ulepszanie opisu przez AI...")
+            print("[DEBUG] Ulepszanie opisu przez AI...")
+            enhanced_description = ai_processor.enhance_product_description(current_description)
+            
+            if not enhanced_description or enhanced_description == current_description:
+                logger.warning("Opis nie został ulepszony lub jest identyczny")
+                print("[DEBUG] Opis nie został ulepszony lub jest identyczny")
+                return
+            
+            logger.info(f"Nowy opis produktu (długość: {len(enhanced_description)})")
+            print(f"[DEBUG] Nowy opis produktu (długość: {len(enhanced_description)})")
+
+            # Wyczyść pole i ustaw nowy opis przez JavaScript (najbardziej niezawodne)
+            # Najpierw kliknij w pole aby upewnić się, że jest aktywne
+            self.driver.execute_script("arguments[0].focus();", desc_field)
+            time.sleep(0.2)
+            
+            # Wyczyść pole przez JavaScript
+            self.driver.execute_script("arguments[0].value = '';", desc_field)
+            time.sleep(0.2)
+            
+            # Ustaw wartość przez JavaScript
+            self.driver.execute_script(
+                "arguments[0].value = arguments[1];",
+                desc_field,
+                enhanced_description
+            )
+            time.sleep(0.3)
+            
+            # Wywołaj zdarzenia aby upewnić się, że zmiana została zarejestrowana
+            self.driver.execute_script(
+                """
+                var field = arguments[0];
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+                field.dispatchEvent(new Event('blur', { bubbles: true }));
+                """,
+                desc_field
+            )
+            time.sleep(0.5)
+            
+            # Sprawdź czy wartość została faktycznie ustawiona
+            actual_value = self.driver.execute_script("return arguments[0].value;", desc_field)
+            if not actual_value or len(actual_value) < len(enhanced_description) * 0.8:
+                logger.warning(f"Wartość nie została poprawnie ustawiona. Oczekiwano: {len(enhanced_description)} znaków, otrzymano: {len(actual_value) if actual_value else 0} znaków")
+                print(f"[DEBUG] Wartość nie została poprawnie ustawiona. Oczekiwano: {len(enhanced_description)} znaków, otrzymano: {len(actual_value) if actual_value else 0} znaków")
+                print(f"[DEBUG] Próbuję alternatywną metodę - send_keys")
+                
+                # Spróbuj przez send_keys jako fallback
+                desc_field.clear()
+                time.sleep(0.2)
+                desc_field.send_keys(enhanced_description)
+                time.sleep(0.5)
+                
+                # Sprawdź ponownie
+                actual_value = self.driver.execute_script("return arguments[0].value;", desc_field)
+                if not actual_value or len(actual_value) < len(enhanced_description) * 0.8:
+                    logger.error(f"Nie udało się ustawić wartości w polu opisu")
+                    print(f"[DEBUG] Nie udało się ustawić wartości w polu opisu")
+                    return
+            else:
+                logger.info(f"Wartość poprawnie ustawiona w polu (długość: {len(actual_value)})")
+                print(f"[DEBUG] Wartość poprawnie ustawiona w polu (długość: {len(actual_value)})")
+            
+            # Dodatkowe sprawdzenie - upewnij się, że wartość jest w DOM przed zapisem
+            final_check = self.driver.execute_script("return document.getElementById('mpd_description').value;")
+            if not final_check or len(final_check) < len(enhanced_description) * 0.8:
+                logger.error(f"Wartość nie jest w DOM przed zapisem. Długość: {len(final_check) if final_check else 0}")
+                print(f"[DEBUG] Wartość nie jest w DOM przed zapisem. Długość: {len(final_check) if final_check else 0}")
+                return
+            
+            time.sleep(0.5)  # Daj więcej czasu na przetworzenie
+            
+            # Pole zostało wypełnione - nie zapisujemy, użytkownik zapisze ręcznie
+            logger.info("Pole opisu zostało wypełnione ulepszonym opisem. Użytkownik może teraz ręcznie zapisać zmiany.")
+            print("[DEBUG] Pole opisu zostało wypełnione ulepszonym opisem. Użytkownik może teraz ręcznie zapisać zmiany.")
+
+        except Exception as e:
+            logger.error(f"Błąd podczas edycji opisu produktu: {e}")
+            print(f"[DEBUG] Błąd podczas edycji opisu produktu: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def close_browser(self):
         """Zamknięcie przeglądarki"""
