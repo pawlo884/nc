@@ -606,15 +606,26 @@ class BrowserAutomation:
                                 f"[DEBUG] Błąd podczas edycji nazwy produktu: {e_name}")
                         
                         # 2. Edytuj opis
+                        enhanced_description = None
                         try:
-                            self.update_product_description()
+                            enhanced_description = self.update_product_description()
                         except Exception as e_desc:
                             logger.warning(
                                 f"Błąd podczas edycji opisu produktu: {e_desc}")
                             print(
                                 f"[DEBUG] Błąd podczas edycji opisu produktu: {e_desc}")
                         
-                        # 3. Jeśli produkt nie jest zmapowany, utwórz go w MPD po wypełnieniu wszystkich pól
+                        # 3. Edytuj krótki opis (jeśli długi opis został wygenerowany)
+                        if enhanced_description:
+                            try:
+                                self.update_product_short_description(enhanced_description)
+                            except Exception as e_short_desc:
+                                logger.warning(
+                                    f"Błąd podczas edycji krótkiego opisu produktu: {e_short_desc}")
+                                print(
+                                    f"[DEBUG] Błąd podczas edycji krótkiego opisu produktu: {e_short_desc}")
+                        
+                        # 4. Jeśli produkt nie jest zmapowany, utwórz go w MPD po wypełnieniu wszystkich pól
                         if not is_mapped:
                             try:
                                 # Znajdź przycisk ponownie (może być potrzebne po wypełnieniu pól)
@@ -1193,9 +1204,9 @@ class BrowserAutomation:
             enhanced_description = ai_processor.enhance_product_description(current_description)
             
             if not enhanced_description or enhanced_description == current_description:
-                logger.warning("Opis nie został ulepszony lub jest identyczny")
-                print("[DEBUG] Opis nie został ulepszony lub jest identyczny")
-                return
+                logger.warning("Opis nie został ulepszony lub jest identyczny - użyję oryginalnego opisu")
+                print("[DEBUG] Opis nie został ulepszony lub jest identyczny - użyję oryginalnego opisu")
+                enhanced_description = current_description  # Użyj oryginalnego opisu
             
             logger.info(f"Nowy opis produktu (długość: {len(enhanced_description)})")
             print(f"[DEBUG] Nowy opis produktu (długość: {len(enhanced_description)})")
@@ -1264,13 +1275,112 @@ class BrowserAutomation:
             # Pole zostało wypełnione - nie zapisujemy, użytkownik zapisze ręcznie
             logger.info("Pole opisu zostało wypełnione ulepszonym opisem. Użytkownik może teraz ręcznie zapisać zmiany.")
             print("[DEBUG] Pole opisu zostało wypełnione ulepszonym opisem. Użytkownik może teraz ręcznie zapisać zmiany.")
+            
+            # Zwróć ulepszony opis, aby można było użyć go do krótkiego opisu
+            return enhanced_description
 
         except Exception as e:
             logger.error(f"Błąd podczas edycji opisu produktu: {e}")
             print(f"[DEBUG] Błąd podczas edycji opisu produktu: {e}")
             import traceback
             traceback.print_exc()
-            raise
+            # Zwróć oryginalny opis jako fallback, aby można było wygenerować krótki opis
+            try:
+                desc_field = self.wait.until(
+                    EC.presence_of_element_located((By.ID, "mpd_description"))
+                )
+                original_desc = desc_field.get_attribute("value") or desc_field.text or ""
+                return original_desc if original_desc else None
+            except:
+                return None
+    
+    def update_product_short_description(self, full_description: str, ai_processor=None):
+        """
+        Edycja krótkiego opisu produktu w polu mpd_short_description.
+        Tworzy skróconą wersję pełnego opisu przez AI.
+        
+        Args:
+            full_description: Pełny opis produktu do skrócenia
+            ai_processor: Instancja AIProcessor do tworzenia krótkiego opisu. Jeśli None, tworzy nową.
+        """
+        try:
+            logger.info("Rozpoczynam edycję krótkiego opisu produktu...")
+            print("[DEBUG] Rozpoczynam edycję krótkiego opisu produktu...")
+
+            # Czekaj na załadowanie pola mpd_short_description
+            short_desc_field = self.wait.until(
+                EC.presence_of_element_located((By.ID, "mpd_short_description"))
+            )
+
+            if not full_description or not full_description.strip():
+                logger.warning("Brak pełnego opisu do skrócenia")
+                print("[DEBUG] Brak pełnego opisu do skrócenia")
+                return
+
+            # Utwórz krótki opis przez AI
+            if ai_processor is None:
+                from web_agent.automation.ai_processor import AIProcessor
+                ai_processor = AIProcessor()
+            
+            logger.info("Tworzenie krótkiego opisu przez AI...")
+            print("[DEBUG] Tworzenie krótkiego opisu przez AI...")
+            short_description = ai_processor.create_short_description(full_description, max_length=250)
+            
+            if not short_description:
+                logger.warning("Nie udało się utworzyć krótkiego opisu")
+                print("[DEBUG] Nie udało się utworzyć krótkiego opisu")
+                return
+            
+            logger.info(f"Krótki opis produktu (długość: {len(short_description)})")
+            print(f"[DEBUG] Krótki opis produktu (długość: {len(short_description)})")
+
+            # Wyczyść pole i ustaw krótki opis przez JavaScript
+            self.driver.execute_script("arguments[0].focus();", short_desc_field)
+            time.sleep(0.2)
+            
+            self.driver.execute_script("arguments[0].value = '';", short_desc_field)
+            time.sleep(0.2)
+            
+            self.driver.execute_script(
+                "arguments[0].value = arguments[1];",
+                short_desc_field,
+                short_description
+            )
+            time.sleep(0.3)
+            
+            # Wywołaj zdarzenia
+            self.driver.execute_script(
+                """
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                """,
+                short_desc_field
+            )
+            time.sleep(0.5)
+            
+            # Sprawdź czy wartość została ustawiona
+            actual_value = self.driver.execute_script("return arguments[0].value;", short_desc_field)
+            if actual_value == short_description:
+                logger.info(f"Pole krótkiego opisu zostało wypełnione: {short_description[:50]}...")
+                print(f"[DEBUG] Pole krótkiego opisu zostało wypełnione (długość: {len(actual_value)})")
+            else:
+                logger.warning(f"Wartość krótkiego opisu nie została poprawnie ustawiona. Oczekiwano: {len(short_description)}, otrzymano: {len(actual_value) if actual_value else 0}")
+                print(f"[DEBUG] Wartość krótkiego opisu nie została poprawnie ustawiona")
+                # Spróbuj przez send_keys jako fallback
+                short_desc_field.clear()
+                time.sleep(0.2)
+                short_desc_field.send_keys(short_description)
+                time.sleep(0.3)
+            
+            logger.info("Pole krótkiego opisu zostało wypełnione. Nie zapisuję - zostanie zapisane przy tworzeniu produktu w MPD.")
+            print("[DEBUG] Pole krótkiego opisu zostało wypełnione. Nie zapisuję - zostanie zapisane przy tworzeniu produktu w MPD.")
+
+        except Exception as e:
+            logger.error(f"Błąd podczas edycji krótkiego opisu produktu: {e}")
+            print(f"[DEBUG] Błąd podczas edycji krótkiego opisu produktu: {e}")
+            import traceback
+            traceback.print_exc()
+            # Nie rzucaj błędu - krótki opis nie jest krytyczny
 
     def close_browser(self):
         """Zamknięcie przeglądarki"""
