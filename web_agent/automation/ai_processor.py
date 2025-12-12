@@ -176,6 +176,48 @@ class AIProcessor:
                     f"Błąd również w legacy metodzie: {fallback_error}")
                 return original_description
 
+    def _truncate_fields_to_limits(self, data: Dict) -> Dict:
+        """
+        Automatycznie skraca pola w danych do limitów zdefiniowanych w ProductDescriptionStructure.
+
+        Args:
+            data: Słownik z danymi do walidacji
+
+        Returns:
+            Słownik ze skróconymi polami
+        """
+        limits = {
+            'introduction': 200,
+            'technical_details': 300,
+            'target_audience': 150,
+            'occasions': 150,
+            'call_to_action': 100
+        }
+
+        truncated_data = data.copy()
+
+        for field, max_length in limits.items():
+            if field in truncated_data and isinstance(truncated_data[field], str):
+                if len(truncated_data[field]) > max_length:
+                    # Skróć do max_length, zachowując pełne słowa
+                    truncated = truncated_data[field][:max_length]
+                    # Znajdź ostatnią spację przed limitem, aby nie przecinać słów
+                    last_space = truncated.rfind(' ')
+                    if last_space > max_length * 0.8:  # Jeśli ostatnia spacja jest blisko końca
+                        truncated = truncated[:last_space]
+                    truncated_data[field] = truncated.strip() + '...'
+                    logger.debug(
+                        f"Skrócono pole '{field}' z {len(data[field])} do {len(truncated_data[field])} znaków")
+
+        # Skróć również key_features jeśli są zbyt długie
+        if 'key_features' in truncated_data and isinstance(truncated_data['key_features'], list):
+            truncated_data['key_features'] = [
+                feature[:200] + '...' if len(feature) > 200 else feature
+                for feature in truncated_data['key_features']
+            ]
+
+        return truncated_data
+
     def _enhance_with_structure(self, original_description: str) -> str:
         """
         Ulepsza opis produktu używając strukturyzowanej formy (Pydantic).
@@ -194,13 +236,15 @@ WYTYCZNE:
 - Zwracaj się do klienta w sposób naturalny
 - Buduj emocjonalny związek z produktem
 
-2. STRUKTURA (JSON):
-- introduction: Chwytliwe otwarcie (1-2 zdania, 50-200 znaków)
-- key_features: Lista 3-5 kluczowych cech i korzyści (każda jako osobny string)
-- technical_details: Szczegóły techniczne - materiał, krój, dopasowanie, konstrukcja (100-300 znaków)
-- target_audience: Dla kogo (typ sylwetki, styl życia) (50-150 znaków)
-- occasions: Okazje do noszenia (plaża, basen, wakacje) (50-150 znaków)
-- call_to_action: Zachęta do zakupu (1 zdanie, 20-100 znaków)
+2. STRUKTURA (JSON) - WAŻNE: PRZESTRZEGAJ DOKŁADNIE LIMITÓW ZNAKÓW:
+- introduction: Chwytliwe otwarcie (1-2 zdania, MAKSYMALNIE 200 znaków - nie przekraczaj!)
+- key_features: Lista 3-5 kluczowych cech i korzyści (każda jako osobny string, max 200 znaków każda)
+- technical_details: Szczegóły techniczne - materiał, krój, dopasowanie, konstrukcja (100-300 znaków, MAKSYMALNIE 300 znaków!)
+- target_audience: Dla kogo (typ sylwetki, styl życia) (50-150 znaków, MAKSYMALNIE 150 znaków - bardzo ważne!)
+- occasions: Okazje do noszenia (plaża, basen, wakacje) (50-150 znaków, MAKSYMALNIE 150 znaków!)
+- call_to_action: Zachęta do zakupu (1 zdanie, 20-100 znaków, MAKSYMALNIE 100 znaków!)
+
+UWAGA: Jeśli przekroczysz limity znaków, odpowiedź zostanie odrzucona. Bądź zwięzły i precyzyjny!
 
 3. CO UWZGLĘDNIĆ:
 - Rodzaj stroju (bikini, kostium, majtki, góra)
@@ -274,6 +318,9 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                 # Parsuj JSON
                 data = json.loads(content)
 
+                # Skróć pola do limitów przed walidacją
+                data = self._truncate_fields_to_limits(data)
+
                 # Waliduj przez Pydantic
                 description_structure = ProductDescriptionStructure(**data)
 
@@ -317,8 +364,13 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                             content = content.split(
                                 "```")[1].split("```")[0].strip()
 
-                        # Parsuj i waliduj
+                        # Parsuj JSON
                         data = json.loads(content)
+
+                        # Skróć pola do limitów przed walidacją
+                        data = self._truncate_fields_to_limits(data)
+
+                        # Waliduj przez Pydantic
                         description_structure = ProductDescriptionStructure(
                             **data)
                         formatted_text = description_structure.to_formatted_text()
