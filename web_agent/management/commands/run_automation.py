@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand
 from web_agent.automation.browser_automation import BrowserAutomation
 from web_agent.models import AutomationRun, BrandConfig
 from matterhorn1.models import Brand, Category
+from selenium.common.exceptions import NoSuchElementException
 import os
 
 
@@ -20,10 +21,13 @@ class Command(BaseCommand):
                             help='Filtr active (true/false, opcjonalne)')
         parser.add_argument('--is_mapped', type=str,
                             help='Filtr is_mapped (true/false, opcjonalne)')
+        parser.add_argument('--max', type=int, default=1,
+                            help='Maksymalna liczba produktów do otwarcia (domyślnie: 1)')
 
     def handle(self, *args, **options):
         brand_name = options.get('brand')
         category_name = options.get('category')
+        max_products = options.get('max')
 
         # Konwertuj stringi na boolean
         active_filter = None
@@ -185,6 +189,65 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.SUCCESS(
                     "\n[OK] Przeglądarka otwarta - wszystkie produkty!"))
+
+            # Otwórz pierwszy produkt z listy (domyślnie 1)
+            if max_products and max_products > 0:
+                self.stdout.write(
+                    f"\n[INFO] Otwieranie pierwszego produktu z listy (max: {max_products})...")
+                try:
+                    browser.open_first_product_from_list()
+                    self.stdout.write(self.style.SUCCESS(
+                        "[OK] Otworzono pierwszy produkt z listy"))
+
+                    # Edytuj pola produktu (nazwa, opis, krótki opis)
+                    self.stdout.write("\n[INFO] Edycja pól produktu...")
+                    try:
+                        browser.update_product_name()
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Zaktualizowano nazwę produktu"))
+                    except Exception as e_name:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas edycji nazwy: {e_name}"))
+
+                    try:
+                        enhanced_description = browser.update_product_description()
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Zaktualizowano opis produktu"))
+
+                        # Edytuj krótki opis jeśli długi opis został wygenerowany
+                        if enhanced_description:
+                            try:
+                                browser.update_product_short_description(
+                                    enhanced_description)
+                                self.stdout.write(self.style.SUCCESS(
+                                    "[OK] Zaktualizowano krótki opis produktu"))
+                            except Exception as e_short_desc:
+                                self.stdout.write(self.style.WARNING(
+                                    f"[WARNING] Błąd podczas edycji krótkiego opisu: {e_short_desc}"))
+                    except Exception as e_desc:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas edycji opisu: {e_desc}"))
+
+                    # Utwórz produkt w MPD (przycisk "Utwórz nowy produkt w MPD")
+                    # Jeśli przycisk istnieje, produkt nie jest zmapowany - klikamy go
+                    # Jeśli przycisk nie istnieje, produkt jest już zmapowany - nie robimy nic
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] Tworzę produkt w MPD...")
+                        browser.create_mpd_product()
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Produkt został utworzony w MPD"))
+                    except NoSuchElementException:
+                        self.stdout.write(
+                            "[INFO] Produkt jest już zmapowany - przycisk 'Utwórz nowy produkt w MPD' nie istnieje")
+                    except Exception as e_save:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas tworzenia produktu w MPD: {e_save}"))
+
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(
+                        f"[WARNING] Nie udało się otworzyć produktu: {e}"))
+
             self.stdout.write(
                 "[INFO] Przeglądarka pozostanie otwarta. Możesz teraz ręcznie przetwarzać produkty.")
             self.stdout.write(f"\n   AutomationRun ID: {automation_run.id}")
