@@ -945,11 +945,12 @@ class BrowserAutomation:
             logger.error(f"Błąd podczas oczekiwania na wynik: {e}")
             return {'success': False, 'message': str(e), 'mpd_product_id': None}
 
-    def update_product_name(self):
+    def update_product_name(self, ai_processor=None):
         """
-        Edycja nazwy produktu w polu mpd_name.
-        Przetwarza nazwę z formatu: "Kostium dwuczęściowy Kostium kąpielowy Model Ada M-803 (1) Lilia - Marko"
-        na format: "Kostium kąpielowy Ada"
+        Edycja nazwy produktu w polu mpd_name używając AI i struktury Pydantic.
+
+        Args:
+            ai_processor: Instancja AIProcessor do ulepszania nazwy. Jeśli None, tworzy nową.
         """
         try:
             logger.info("Rozpoczynam edycję nazwy produktu...")
@@ -965,8 +966,28 @@ class BrowserAutomation:
             logger.info(f"Obecna nazwa produktu: {current_name}")
             print(f"[DEBUG] Obecna nazwa produktu: {current_name}")
 
-            # Przetwórz nazwę
-            new_name = self._process_product_name(current_name)
+            if not current_name or not current_name.strip():
+                logger.warning("Brak nazwy produktu do przetworzenia")
+                print("[DEBUG] Brak nazwy produktu do przetworzenia")
+                return
+
+            # Użyj AIProcessor do ulepszenia nazwy (ze strukturą Pydantic)
+            if ai_processor is None:
+                from web_agent.automation.ai_processor import AIProcessor
+                ai_processor = AIProcessor()
+
+            logger.info("Ulepszanie nazwy przez AI...")
+            print("[DEBUG] Ulepszanie nazwy przez AI...")
+            new_name = ai_processor.enhance_product_name(
+                current_name, use_structured=True)
+
+            if not new_name or new_name == current_name:
+                logger.warning(
+                    "Nazwa nie została ulepszona lub jest identyczna - używam oryginalnej nazwy")
+                print(
+                    "[DEBUG] Nazwa nie została ulepszona lub jest identyczna - używam oryginalnej nazwy")
+                new_name = current_name.strip()
+
             logger.info(f"Nowa nazwa produktu: {new_name}")
             print(f"[DEBUG] Nowa nazwa produktu: {new_name}")
 

@@ -10,6 +10,57 @@ from pydantic import BaseModel, Field, field_validator
 logger = logging.getLogger(__name__)
 
 
+class ProductNameStructure(BaseModel):
+    """
+    Struktura nazwy produktu zapewniająca spójność i profesjonalizm.
+    Format: "Kostium kąpielowy [nazwa_modelu]"
+    """
+    base_type: str = Field(
+        ...,
+        description="Podstawowy typ produktu - zawsze 'Kostium kąpielowy'",
+        min_length=3,
+        max_length=50
+    )
+    model_name: str = Field(
+        ...,
+        description="Nazwa modelu produktu (np. 'Ada', 'Lupo', 'Elegant') - WYMAGANE",
+        min_length=1,
+        max_length=30
+    )
+    final_name: str = Field(
+        ...,
+        description="Finalna, gotowa nazwa produktu w formacie 'Kostium kąpielowy [nazwa_modelu]' (max 100 znaków)",
+        min_length=5,
+        max_length=100
+    )
+
+    def to_final_name(self) -> str:
+        """
+        Zwraca finalną nazwę produktu w formacie 'Kostium kąpielowy [nazwa_modelu]'.
+        Zawsze buduje z base_type i model_name, ignorując final_name z JSON.
+        """
+        # Zawsze buduj z base_type i model_name
+        base = "Kostium kąpielowy"  # Zawsze "Kostium kąpielowy"
+        if self.model_name and self.model_name.strip():
+            return f"{base} {self.model_name.strip()}".strip()
+        return base
+
+    @field_validator('base_type', 'final_name', 'model_name')
+    @classmethod
+    def validate_required_fields(cls, v: str) -> str:
+        """Walidacja wymaganych pól tekstowych"""
+        if not v or not v.strip():
+            raise ValueError("Pole nie może być puste")
+        return v.strip()
+
+    @field_validator('base_type')
+    @classmethod
+    def validate_base_type(cls, v: str) -> str:
+        """Walidacja base_type - zawsze zwraca 'Kostium kąpielowy'"""
+        # Zawsze zwracaj "Kostium kąpielowy" niezależnie od inputu
+        return "Kostium kąpielowy"
+
+
 class ProductDescriptionStructure(BaseModel):
     """
     Struktura opisu produktu zapewniająca spójność dla wszystkich produktów.
@@ -797,12 +848,13 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
             traceback.print_exc()
             return original_description
 
-    def enhance_product_name(self, original_name: str) -> str:
+    def enhance_product_name(self, original_name: str, use_structured: bool = True) -> str:
         """
-        Ulepsza nazwę produktu przez AI.
+        Ulepsza nazwę produktu przez AI używając struktury Pydantic.
 
         Args:
             original_name: Oryginalna nazwa produktu
+            use_structured: Czy używać strukturyzowanej formy (Pydantic). Domyślnie True.
 
         Returns:
             Ulepszona nazwa produktu
@@ -810,6 +862,198 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
         if not original_name or not original_name.strip():
             return ""
 
+        if use_structured:
+            try:
+                return self._enhance_name_with_structure(original_name)
+            except Exception as e:
+                logger.warning(
+                    f"Błąd podczas strukturyzowanego ulepszania nazwy, używam fallback: {e}")
+                return self._enhance_name_legacy(original_name)
+        else:
+            return self._enhance_name_legacy(original_name)
+
+    def _enhance_name_with_structure(self, original_name: str) -> str:
+        """
+        Ulepsza nazwę produktu używając strukturyzowanej formy (Pydantic).
+        """
+        import json
+
+        system_prompt = """Jesteś ekspertem od nazewnictwa produktów tekstylnych i modowych.
+
+TWOJE ZADANIE:
+Przekształć podaną nazwę produktu w profesjonalną nazwę dla sklepu online.
+
+WYTYCZNE:
+
+1. STRUKTURA (JSON) - WAŻNE: PRZESTRZEGAJ DOKŁADNIE LIMITÓW ZNAKÓW:
+- base_type: ZAWSZE "Kostium kąpielowy" (nie zmieniaj tego!)
+- model_name: Nazwa modelu (np. 'Ada', 'Lupo', 'Elegant') - WYMAGANE, 1-30 znaków
+- final_name: Finalna nazwa w formacie "Kostium kąpielowy [model_name]" - 5-100 znaków, MAKSYMALNIE 100 znaków!
+
+2. FORMAT FINALNEJ NAZWY:
+- Format: "Kostium kąpielowy [model_name]" (np. "Kostium kąpielowy Ada")
+- ZAWSZE zaczynaj od "Kostium kąpielowy"
+- NIE dodawaj koloru, kodu produktu, numerów w nawiasach, marki
+- NIE dodawaj niczego poza "Kostium kąpielowy" i nazwą modelu
+- Używaj wielkich liter tylko na początku wyrazów (Title Case)
+
+3. PRZYKŁADY:
+- Input: "Kostium dwuczęściowy Kostium kąpielowy Model Ada M-803 (1) Lilia - Marko"
+- Output: {"base_type": "Kostium kąpielowy", "model_name": "Ada", "final_name": "Kostium kąpielowy Ada"}
+
+- Input: "Kostium kąpielowy Model Elegant Czarny"
+- Output: {"base_type": "Kostium kąpielowy", "model_name": "Elegant", "final_name": "Kostium kąpielowy Elegant"}
+
+4. CZEGO UNIKAĆ:
+- Kodów modeli (M-803, M-123)
+- Numerów w nawiasach ((1), (2))
+- Nazwy marki na końcu (- Marko, - Lupo)
+- Kolorów (Lilia, Czarny, itp.)
+- Słowa "Model" w nazwie
+- Powtórzeń
+
+ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
+
+        user_prompt = f"Przekształć tę nazwę produktu w strukturęzowany format JSON:\n\n{original_name}"
+
+        try:
+            if self.api_type == 'openai':
+                model_name = "gpt-4o-mini"
+                if os.getenv('OPENAI_API_KEY_NOVITA') == self.api_key:
+                    model_name = "KIMI-K2-THINKING"
+
+                try:
+                    response = self.client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        response_format={"type": "json_object"},
+                        temperature=0.7,
+                        max_tokens=300,
+                        timeout=60
+                    )
+                except Exception:
+                    response = self.client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": system_prompt +
+                                "\n\nODPOWIEDŹ MUSI BYĆ TYLKO JSON, BEZ ŻADNYCH DODATKOWYCH KOMENTARZY."},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        temperature=0.7,
+                        max_tokens=300,
+                        timeout=60
+                    )
+
+                content = response.choices[0].message.content
+                if not content:
+                    raise ValueError("Pusta odpowiedź z API")
+
+                content = content.strip()
+
+                # Wyciągnij JSON z odpowiedzi
+                if "```json" in content:
+                    content = content.split("```json")[
+                        1].split("```")[0].strip()
+                elif "```" in content:
+                    content = content.split("```")[1].split("```")[0].strip()
+
+                # Parsuj JSON
+                data = json.loads(content)
+
+                # Waliduj przez Pydantic
+                name_structure = ProductNameStructure(**data)
+
+                # Zwróć finalną nazwę
+                final_name = name_structure.to_final_name()
+                logger.info(
+                    f"Nazwa ulepszona przez AI ze strukturą: {final_name}")
+                return final_name
+
+            elif self.api_type == 'huggingface':
+                max_retries = 5
+                retry_delay = 5
+
+                for attempt in range(max_retries):
+                    try:
+                        response = self.client.chat.completions.create(
+                            model="moonshotai/Kimi-K2-Thinking",
+                            messages=[
+                                {"role": "system", "content": system_prompt +
+                                    "\n\nODPOWIEDŹ MUSI BYĆ TYLKO JSON, BEZ ŻADNYCH DODATKOWYCH KOMENTARZY."},
+                                {"role": "user", "content": user_prompt}
+                            ],
+                            temperature=0.7,
+                            max_tokens=300,
+                            timeout=60
+                        )
+
+                        content = response.choices[0].message.content
+                        if not content:
+                            raise ValueError("Pusta odpowiedź z API")
+
+                        content = content.strip()
+
+                        # Wyciągnij JSON
+                        if "```json" in content:
+                            content = content.split("```json")[
+                                1].split("```")[0].strip()
+                        elif "```" in content:
+                            content = content.split(
+                                "```")[1].split("```")[0].strip()
+
+                        # Parsuj JSON
+                        data = json.loads(content)
+
+                        # Waliduj przez Pydantic
+                        name_structure = ProductNameStructure(**data)
+                        final_name = name_structure.to_final_name()
+
+                        logger.info(
+                            f"Nazwa ulepszona przez AI ze strukturą: {final_name}")
+                        return final_name
+
+                    except json.JSONDecodeError as e:
+                        logger.warning(
+                            f"Błąd parsowania JSON (próba {attempt + 1}/{max_retries}): {e}")
+                        if attempt < max_retries - 1:
+                            time.sleep(retry_delay)
+                            retry_delay = min(retry_delay * 2, 60)
+                            continue
+                        else:
+                            raise
+                    except Exception as e:
+                        error_msg = str(e)
+                        is_timeout = (
+                            "504" in error_msg or "Gateway Timeout" in error_msg or
+                            "timeout" in error_msg.lower() or "InternalServerError" in error_msg or
+                            "Request timed out" in error_msg
+                        )
+                        if is_timeout and attempt < max_retries - 1:
+                            logger.warning(
+                                f"Timeout (próba {attempt + 1}/{max_retries}), czekam {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            retry_delay = min(retry_delay * 2, 60)
+                            continue
+                        else:
+                            raise
+
+                raise ValueError(
+                    "Nie udało się wygenerować strukturyzowanej nazwy")
+            else:
+                raise ValueError(f"Nieobsługiwany typ API: {self.api_type}")
+
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas generowania strukturyzowanej nazwy: {e}")
+            raise
+
+    def _enhance_name_legacy(self, original_name: str) -> str:
+        """
+        Legacy metoda ulepszania nazwy produktu (bez struktury Pydantic).
+        """
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -833,7 +1077,7 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                 enhanced = response.choices[0].message.content.strip()
             else:
                 enhanced = original_name
-            logger.info(f"Nazwa ulepszona przez AI: {enhanced}")
+            logger.info(f"Nazwa ulepszona przez AI (legacy): {enhanced}")
             return enhanced
 
         except Exception as e:
