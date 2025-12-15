@@ -858,19 +858,29 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
         Returns:
             Ulepszona nazwa produktu
+
+        Raises:
+            Exception: Jeśli nie udało się ulepszyć nazwy
         """
         if not original_name or not original_name.strip():
-            return ""
+            raise ValueError("Oryginalna nazwa produktu jest pusta")
 
         if use_structured:
             try:
                 return self._enhance_name_with_structure(original_name)
             except Exception as e:
-                logger.warning(
-                    f"Błąd podczas strukturyzowanego ulepszania nazwy, używam fallback: {e}")
-                return self._enhance_name_legacy(original_name)
+                logger.error(
+                    f"Błąd podczas strukturyzowanego ulepszania nazwy: {e}")
+                # Nie używamy fallback - rzucamy wyjątek
+                raise Exception(
+                    f"Nie udało się ulepszyć nazwy produktu: {e}") from e
         else:
-            return self._enhance_name_legacy(original_name)
+            try:
+                return self._enhance_name_legacy(original_name)
+            except Exception as e:
+                logger.error(f"Błąd podczas ulepszania nazwy (legacy): {e}")
+                raise Exception(
+                    f"Nie udało się ulepszyć nazwy produktu: {e}") from e
 
     def _enhance_name_with_structure(self, original_name: str) -> str:
         """
@@ -922,6 +932,11 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                 if os.getenv('OPENAI_API_KEY_NOVITA') == self.api_key:
                     model_name = "KIMI-K2-THINKING"
 
+                logger.info(
+                    f"Używam API: {self.api_type}, model: {model_name}")
+                print(
+                    f"[DEBUG] Używam API: {self.api_type}, model: {model_name}")
+
                 try:
                     response = self.client.chat.completions.create(
                         model=model_name,
@@ -934,7 +949,13 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                         max_tokens=300,
                         timeout=60
                     )
-                except Exception:
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.warning(
+                        f"Błąd przy pierwszej próbie (response_format): {error_msg}")
+                    print(
+                        f"[DEBUG] Błąd przy pierwszej próbie (response_format): {error_msg}")
+                    # Spróbuj bez response_format
                     response = self.client.chat.completions.create(
                         model=model_name,
                         messages=[
@@ -947,8 +968,27 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                         timeout=60
                     )
 
+                logger.info(
+                    f"Otrzymano odpowiedź z API, liczba choices: {len(response.choices)}")
+                print(
+                    f"[DEBUG] Otrzymano odpowiedź z API, liczba choices: {len(response.choices)}")
+
+                if not response.choices:
+                    raise ValueError("Brak choices w odpowiedzi z API")
+
                 content = response.choices[0].message.content
+                logger.info(
+                    f"Content z API (długość): {len(content) if content else 0}")
+                print(
+                    f"[DEBUG] Content z API (długość): {len(content) if content else 0}")
+
                 if not content:
+                    logger.error(
+                        "Pusta odpowiedź z API - response.choices[0].message.content jest None lub pusty")
+                    print(
+                        "[DEBUG] Pusta odpowiedź z API - response.choices[0].message.content jest None lub pusty")
+                    logger.error(f"Pełna odpowiedź: {response}")
+                    print(f"[DEBUG] Pełna odpowiedź: {response}")
                     raise ValueError("Pusta odpowiedź z API")
 
                 content = content.strip()
@@ -976,6 +1016,11 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                 max_retries = 5
                 retry_delay = 5
 
+                logger.info(
+                    f"Używam API: {self.api_type}, model: moonshotai/Kimi-K2-Thinking")
+                print(
+                    f"[DEBUG] Używam API: {self.api_type}, model: moonshotai/Kimi-K2-Thinking")
+
                 for attempt in range(max_retries):
                     try:
                         response = self.client.chat.completions.create(
@@ -990,8 +1035,27 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                             timeout=60
                         )
 
+                        logger.info(
+                            f"Otrzymano odpowiedź z API (próba {attempt + 1}), liczba choices: {len(response.choices)}")
+                        print(
+                            f"[DEBUG] Otrzymano odpowiedź z API (próba {attempt + 1}), liczba choices: {len(response.choices)}")
+
+                        if not response.choices:
+                            raise ValueError("Brak choices w odpowiedzi z API")
+
                         content = response.choices[0].message.content
+                        logger.info(
+                            f"Content z API (długość): {len(content) if content else 0}")
+                        print(
+                            f"[DEBUG] Content z API (długość): {len(content) if content else 0}")
+
                         if not content:
+                            logger.error(
+                                f"Pusta odpowiedź z API (próba {attempt + 1}) - response.choices[0].message.content jest None lub pusty")
+                            print(
+                                f"[DEBUG] Pusta odpowiedź z API (próba {attempt + 1}) - response.choices[0].message.content jest None lub pusty")
+                            logger.error(f"Pełna odpowiedź: {response}")
+                            print(f"[DEBUG] Pełna odpowiedź: {response}")
                             raise ValueError("Pusta odpowiedź z API")
 
                         content = content.strip()
@@ -1048,7 +1112,89 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
         except Exception as e:
             logger.error(
                 f"Błąd podczas generowania strukturyzowanej nazwy: {e}")
-            raise
+            # Fallback: lokalna heurystyka bez użycia zewnętrznego API
+            try:
+                logger.info(
+                    "Próba użycia lokalnej heurystyki do wygenerowania nazwy produktu...")
+                print(
+                    "[DEBUG] Próba użycia lokalnej heurystyki do wygenerowania nazwy produktu...")
+                final_name = self._enhance_name_with_local_heuristics(
+                    original_name)
+                logger.info(
+                    f"Nazwa ulepszona lokalnie (heurystyka): {final_name}")
+                print(
+                    f"[DEBUG] Nazwa ulepszona lokalnie (heurystyka): {final_name}")
+                return final_name
+            except Exception as local_error:
+                logger.error(
+                    f"Błąd lokalnej heurystyki nazwy produktu: {local_error}")
+                raise
+
+    def _enhance_name_with_local_heuristics(self, original_name: str) -> str:
+        """
+        Lokalna heurystyka wyciągania nazwy modelu z oryginalnej nazwy produktu.
+
+        Cel: Zwrócić nazwę w formacie 'Kostium kąpielowy [model_name]'
+        bez użycia zewnętrznego API, gdy LLM zawiedzie.
+        """
+        import re
+
+        if not original_name or not original_name.strip():
+            raise ValueError("Oryginalna nazwa produktu jest pusta")
+
+        name = original_name.strip()
+
+        # 1. Spróbuj znaleźć nazwę modelu po słowie 'Model'
+        model_name = ""
+        match = re.search(
+            r"\bModel\s+([A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]+)", name, flags=re.IGNORECASE)
+        if match:
+            model_name = match.group(1).strip()
+
+        # 2. Jeśli nie znaleziono po 'Model', użyj prostszej heurystyki:
+        #    - usuń markę na końcu ('- Marko', '- Lupo', itp.)
+        #    - usuń fragmenty w nawiasach
+        #    - usuń kody typu 'M-803'
+        #    - usuń słowa ogólne typu 'kostium', 'dwuczęściowy', 'kąpielowy', 'model'
+        if not model_name:
+            # Usuń część po myślniku (marka)
+            base = re.split(r"\s*-\s*", name)[0]
+            # Usuń fragmenty w nawiasach
+            base = re.sub(r"\([^)]*\)", " ", base)
+            # Usuń kody typu M-803
+            base = re.sub(r"\b[A-Z]-\d+\b", " ", base)
+
+            tokens = base.split()
+            stop_words = {
+                "kostium",
+                "dwuczęściowy",
+                "dwuczesciowy",
+                "kąpielowy",
+                "kapielowy",
+                "model",
+            }
+            candidates = [
+                t for t in tokens if t.lower() not in stop_words]
+
+            # Wybierz pierwsze słowo zaczynające się wielką literą
+            for t in candidates:
+                if t and t[0].isalpha() and t[0].isupper():
+                    model_name = t.strip()
+                    break
+
+        if not model_name:
+            raise ValueError(
+                f"Nie udało się wyodrębnić nazwy modelu z nazwy produktu: '{original_name}'")
+
+        # Zbuduj strukturę zgodnie z ProductNameStructure
+        data = {
+            "base_type": "Kostium kąpielowy",
+            "model_name": model_name,
+            "final_name": f"Kostium kąpielowy {model_name}",
+        }
+
+        name_structure = ProductNameStructure(**data)
+        return name_structure.to_final_name()
 
     def _enhance_name_legacy(self, original_name: str) -> str:
         """
@@ -1082,7 +1228,8 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
         except Exception as e:
             logger.error(f"Błąd podczas ulepszania nazwy przez AI: {e}")
-            return original_name
+            raise Exception(
+                f"Nie udało się ulepszyć nazwy produktu (legacy): {e}") from e
 
     def create_short_description(self, description: str, max_length: int = 250) -> str:
         """
@@ -1315,6 +1462,503 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                             f"Błąd podczas fallback do OpenAI: {fallback_error}")
             # Fallback: użyj pierwszych max_length znaków
             return description[:max_length] if description else ""
+
+    def extract_attributes_from_description(self, description: str, available_attributes: List[Dict], similarity_threshold: float = 0.05, min_attributes: int = 3, max_attributes: int = 15) -> List[int]:
+        """
+        Wyciąga atrybuty z opisu produktu używając LLM (OpenAI API) jako głównej metody,
+        z fallbackiem do TF-IDF i cosine similarity.
+
+        Args:
+            description: Opis produktu
+            available_attributes: Lista dostępnych atrybutów z bazy MPD [{'id': int, 'name': str}, ...]
+            similarity_threshold: Próg podobieństwa (0.0-1.0), domyślnie 0.05
+            min_attributes: Minimalna liczba atrybutów do zwrócenia (jeśli są dostępne), domyślnie 3
+            max_attributes: Maksymalna liczba atrybutów do zwrócenia, domyślnie 15
+
+        Returns:
+            Lista ID atrybutów do zaznaczenia (posortowane według podobieństwa)
+        """
+        if not description or not description.strip():
+            return []
+
+        if not available_attributes:
+            return []
+
+        # Najpierw spróbuj użyć LLM do wyodrębnienia atrybutów
+        try:
+            logger.info(
+                "Próba wyodrębnienia atrybutów używając LLM (OpenAI API)...")
+            print("[DEBUG] Próba wyodrębnienia atrybutów używając LLM (OpenAI API)...")
+            llm_attributes = self._extract_attributes_with_llm(
+                description, available_attributes)
+            if llm_attributes:
+                logger.info(f"LLM wyodrębnił {len(llm_attributes)} atrybutów")
+                print(
+                    f"[DEBUG] LLM wyodrębnił {len(llm_attributes)} atrybutów")
+                return llm_attributes
+        except Exception as e:
+            logger.warning(
+                f"Błąd podczas wyodrębniania atrybutów przez LLM: {e}, używam fallback do TF-IDF")
+            print(
+                f"[DEBUG] Błąd podczas wyodrębniania atrybutów przez LLM: {e}, używam fallback do TF-IDF")
+
+        # Fallback do TF-IDF i cosine similarity
+        try:
+            # Spróbuj użyć sklearn jeśli dostępny
+            try:
+                from sklearn.feature_extraction.text import TfidfVectorizer
+                from sklearn.metrics.pairwise import cosine_similarity
+
+                logger.info(
+                    "Wyciąganie atrybutów używając TF-IDF i cosine similarity...")
+                print(
+                    "[DEBUG] Wyciąganie atrybutów używając TF-IDF i cosine similarity...")
+
+                # Debug: wyświetl wszystkie dostępne atrybuty
+                logger.info(
+                    f"Dostępne atrybuty ({len(available_attributes)}):")
+                print(
+                    f"[DEBUG] Dostępne atrybuty ({len(available_attributes)}):")
+                for attr in available_attributes:
+                    logger.info(f"  - {attr['name']} (ID: {attr['id']})")
+                    print(f"[DEBUG]   - {attr['name']} (ID: {attr['id']})")
+
+                # Przygotuj teksty do porównania
+                description_text = description.lower().strip()
+                attribute_texts = [attr['name'].lower().strip()
+                                   for attr in available_attributes]
+
+                # Użyj TF-IDF do wektoryzacji tekstów
+                vectorizer = TfidfVectorizer(
+                    analyzer='word', ngram_range=(1, 2), min_df=1, stop_words=None)
+
+                # Wektoryzuj opis i nazwy atrybutów
+                all_texts = [description_text] + attribute_texts
+                tfidf_matrix = vectorizer.fit_transform(all_texts)
+
+                # Oblicz cosine similarity między opisem a każdym atrybutem
+                description_vector = tfidf_matrix[0:1]
+                attributes_vectors = tfidf_matrix[1:]
+
+                similarities = cosine_similarity(
+                    description_vector, attributes_vectors)[0]
+
+                # Sprawdź czy nazwa atrybutu występuje w opisie (proste dopasowanie tekstowe)
+                # Jeśli tak, zwiększ podobieństwo dla tego atrybutu
+                description_lower = description_text.lower()
+                enhanced_similarities = []
+                for idx, similarity in enumerate(similarities):
+                    attr_name = available_attributes[idx]['name'].lower()
+                    # Sprawdź czy nazwa atrybutu występuje w opisie (cała fraza lub wszystkie słowa)
+                    attr_words = attr_name.split()
+                    found_in_description = False
+
+                    # Sprawdź czy cała fraza występuje
+                    if attr_name in description_lower:
+                        found_in_description = True
+                    # Sprawdź czy wszystkie słowa z nazwy atrybutu występują w opisie
+                    elif len(attr_words) > 1 and all(word in description_lower for word in attr_words if len(word) > 2):
+                        found_in_description = True
+
+                    if found_in_description:
+                        # Jeśli nazwa atrybutu występuje w opisie, zwiększ podobieństwo do 0.5
+                        enhanced_similarity = max(float(similarity), 0.5)
+                        logger.info(
+                            f"Znaleziono '{available_attributes[idx]['name']}' w opisie - zwiększam podobieństwo z {similarity:.3f} do {enhanced_similarity:.3f}")
+                        print(
+                            f"[DEBUG] Znaleziono '{available_attributes[idx]['name']}' w opisie - zwiększam podobieństwo z {similarity:.3f} do {enhanced_similarity:.3f}")
+                    else:
+                        enhanced_similarity = float(similarity)
+                    enhanced_similarities.append(
+                        (idx, enhanced_similarity, available_attributes[idx]['name']))
+
+                # Debug: wyświetl top 15 najwyższych podobieństw (po wzmocnieniu)
+                enhanced_similarities.sort(key=lambda x: x[1], reverse=True)
+                logger.info(f"Top 15 podobieństw atrybutów (po wzmocnieniu):")
+                print(f"[DEBUG] Top 15 podobieństw atrybutów (po wzmocnieniu):")
+                for idx, sim, name in enhanced_similarities[:15]:
+                    logger.info(f"  - {name}: {sim:.3f}")
+                    print(f"[DEBUG]   - {name}: {sim:.3f}")
+
+                # Zawsze weź top N atrybutów z najwyższym podobieństwem (ale tylko z podobieństwem > 0.01)
+                # To zapewnia, że nie pominiemy ważnych atrybutów jak "niski stan"
+                top_attributes = [
+                    score for score in enhanced_similarities if score[1] > 0.01][:max_attributes]
+
+                matched_attributes = []
+                for idx, sim, name in top_attributes:
+                    matched_attributes.append({
+                        'id': available_attributes[idx]['id'],
+                        'name': name,
+                        'similarity': sim
+                    })
+
+                # Posortuj według podobieństwa (malejąco)
+                matched_attributes.sort(
+                    key=lambda x: x['similarity'], reverse=True)
+
+                # Usuń wykluczające się atrybuty (zostaw tylko ten z wyższym podobieństwem)
+                matched_attributes = self._remove_conflicting_attributes(
+                    matched_attributes)
+
+                min_similarity = min(
+                    [a['similarity'] for a in matched_attributes]) if matched_attributes else 0.0
+                logger.info(
+                    f"Wybrano top {len(matched_attributes)} atrybutów z najwyższym podobieństwem (min: {min_similarity:.3f})")
+                print(
+                    f"[DEBUG] Wybrano top {len(matched_attributes)} atrybutów z najwyższym podobieństwem (min: {min_similarity:.3f})")
+
+                # Zwróć tylko ID atrybutów
+                attribute_ids = [attr['id'] for attr in matched_attributes]
+
+                if attribute_ids:
+                    logger.info(
+                        f"Znaleziono {len(attribute_ids)} atrybutów z podobieństwem >= {similarity_threshold}")
+                    for attr in matched_attributes:
+                        logger.info(
+                            f"  - {attr['name']} (ID: {attr['id']}, similarity: {attr['similarity']:.3f})")
+                        print(
+                            f"[DEBUG]   - {attr['name']} (ID: {attr['id']}, similarity: {attr['similarity']:.3f})")
+                else:
+                    logger.info(
+                        f"Nie znaleziono atrybutów z podobieństwem >= {similarity_threshold}")
+                    print(
+                        f"[DEBUG] Nie znaleziono atrybutów z podobieństwem >= {similarity_threshold}")
+
+                return attribute_ids
+
+            except ImportError:
+                # Fallback: użyj RapidFuzz dla podobieństwa tekstowego
+                logger.info(
+                    "Brak sklearn - używam RapidFuzz do podobieństwa tekstowego")
+                print(
+                    "[DEBUG] Brak sklearn - używam RapidFuzz do podobieństwa tekstowego")
+                return self._extract_attributes_with_rapidfuzz(description, available_attributes, similarity_threshold, min_attributes, max_attributes)
+
+        except Exception as e:
+            logger.error(f"Błąd podczas wyciągania atrybutów z opisu: {e}")
+            print(f"[DEBUG] Błąd podczas wyciągania atrybutów: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def _extract_attributes_with_rapidfuzz(self, description: str, available_attributes: List[Dict], similarity_threshold: float = 0.05, min_attributes: int = 3, max_attributes: int = 15) -> List[int]:
+        """
+        Wyciąga atrybuty używając RapidFuzz do podobieństwa tekstowego (fallback gdy brak sklearn).
+        """
+        try:
+            from rapidfuzz import fuzz, process
+
+            logger.info("Wyciąganie atrybutów używając RapidFuzz...")
+            print("[DEBUG] Wyciąganie atrybutów używając RapidFuzz...")
+
+            description_lower = description.lower()
+            attribute_names = {attr['id']: attr['name']
+                               for attr in available_attributes}
+
+            # Oblicz podobieństwo dla wszystkich atrybutów i wzmocnij te, które występują w opisie
+            all_attributes = []
+            for attr_id, attr_name in attribute_names.items():
+                # Oblicz podobieństwo używając ratio (cosine-like similarity)
+                similarity = fuzz.ratio(
+                    description_lower, attr_name.lower()) / 100.0
+
+                # Sprawdź czy nazwa atrybutu występuje w opisie (cała fraza lub wszystkie słowa)
+                attr_name_lower = attr_name.lower()
+                attr_words = attr_name_lower.split()
+                found_in_description = False
+
+                # Sprawdź czy cała fraza występuje
+                if attr_name_lower in description_lower:
+                    found_in_description = True
+                # Sprawdź czy wszystkie słowa z nazwy atrybutu występują w opisie
+                elif len(attr_words) > 1 and all(word in description_lower for word in attr_words if len(word) > 2):
+                    found_in_description = True
+
+                if found_in_description:
+                    # Jeśli nazwa atrybutu występuje w opisie, zwiększ podobieństwo do 0.5
+                    enhanced_similarity = max(similarity, 0.5)
+                    logger.info(
+                        f"Znaleziono '{attr_name}' w opisie - zwiększam podobieństwo z {similarity:.3f} do {enhanced_similarity:.3f}")
+                    print(
+                        f"[DEBUG] Znaleziono '{attr_name}' w opisie - zwiększam podobieństwo z {similarity:.3f} do {enhanced_similarity:.3f}")
+                else:
+                    enhanced_similarity = similarity
+
+                all_attributes.append({
+                    'id': attr_id,
+                    'name': attr_name,
+                    'similarity': enhanced_similarity
+                })
+
+            # Posortuj według podobieństwa (malejąco)
+            all_attributes.sort(key=lambda x: x['similarity'], reverse=True)
+
+            # Weź top N z podobieństwem > 0.01
+            matched_attributes = [
+                attr for attr in all_attributes if attr['similarity'] > 0.01][:max_attributes]
+
+            # Usuń wykluczające się atrybuty (zostaw tylko ten z wyższym podobieństwem)
+            matched_attributes = self._remove_conflicting_attributes(
+                matched_attributes)
+
+            min_similarity = min(
+                [a['similarity'] for a in matched_attributes]) if matched_attributes else 0.0
+            logger.info(
+                f"Wybrano top {len(matched_attributes)} atrybutów z najwyższym podobieństwem (min: {min_similarity:.3f})")
+            print(
+                f"[DEBUG] Wybrano top {len(matched_attributes)} atrybutów z najwyższym podobieństwem (min: {min_similarity:.3f})")
+
+            # Zwróć tylko ID atrybutów
+            attribute_ids = [attr['id'] for attr in matched_attributes]
+
+            if attribute_ids:
+                logger.info(
+                    f"Znaleziono {len(attribute_ids)} atrybutów z podobieństwem >= {similarity_threshold}")
+                for attr in matched_attributes:
+                    logger.info(
+                        f"  - {attr['name']} (ID: {attr['id']}, similarity: {attr['similarity']:.3f})")
+                    print(
+                        f"[DEBUG]   - {attr['name']} (ID: {attr['id']}, similarity: {attr['similarity']:.3f})")
+            else:
+                logger.info(
+                    f"Nie znaleziono atrybutów z podobieństwem >= {similarity_threshold}")
+                print(
+                    f"[DEBUG] Nie znaleziono atrybutów z podobieństwem >= {similarity_threshold}")
+
+            return attribute_ids
+
+        except ImportError:
+            # Ostateczny fallback: proste dopasowanie tekstowe
+            logger.warning(
+                "Brak RapidFuzz - używam prostego dopasowania tekstowego")
+            print("[DEBUG] Brak RapidFuzz - używam prostego dopasowania tekstowego")
+            return self._extract_attributes_simple_match(description, available_attributes, similarity_threshold, min_attributes, max_attributes)
+
+    def _extract_attributes_with_llm(self, description: str, available_attributes: List[Dict]) -> List[int]:
+        """
+        Wyodrębnia atrybuty z opisu produktu używając LLM (OpenAI API).
+
+        Args:
+            description: Opis produktu
+            available_attributes: Lista dostępnych atrybutów z bazy MPD [{'id': int, 'name': str}, ...]
+
+        Returns:
+            Lista ID atrybutów do zaznaczenia
+        """
+        import json
+        import os
+
+        # Sprawdź czy mamy dostęp do OpenAI API
+        # Dla atrybutów preferujemy zwykły OPENAI_API_KEY,
+        # HF_TOKEN / NOVITA używamy osobno np. do opisów.
+        openai_key = os.getenv('OPENAI_API_KEY') or os.getenv(
+            'OPENAI_API_KEY_NOVITA')
+        if not openai_key:
+            raise ValueError("Brak klucza OpenAI API")
+
+        from openai import OpenAI
+        client = OpenAI(api_key=openai_key)
+
+        # Przygotuj listę dostępnych atrybutów dla LLM
+        available_attrs_names = [attr['name'] for attr in available_attributes]
+        available_attrs_text = ", ".join(available_attrs_names)
+
+        system_prompt = (
+            "Jesteś ekspertem w ekstrakcji cech produktu tekstylnego. "
+            "Wyodrębnij atrybuty kostiumu kąpielowego z poniższego opisu, "
+            "zwracając wynik wyłącznie w formacie JSON. "
+            "Wybierz tylko atrybuty, które rzeczywiście występują w opisie produktu."
+        )
+
+        user_prompt = (
+            f"Opis produktu: {description}\n\n"
+            f"Dostępne atrybuty do wyboru: {available_attrs_text}\n\n"
+            "Wyodrębnij listę kluczowych atrybutów, które pasują do opisu produktu. "
+            "Zwróć wynik w formacie JSON: {\"attributes\": [\"nazwa atrybutu 1\", \"nazwa atrybutu 2\", ...]}. "
+            "Używaj dokładnie takich nazw atrybutów, jakie są w liście dostępnych atrybutów. "
+            "Wybierz tylko te atrybuty, które rzeczywiście są wspomniane w opisie produktu."
+        )
+
+        # Określ model OpenAI
+        model_name = "gpt-4o-mini"
+        if os.getenv('OPENAI_API_KEY_NOVITA') == openai_key:
+            model_name = "gpt-4o-mini"  # Można zmienić na inny model
+
+        try:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3,  # Niższa temperatura dla bardziej precyzyjnych wyników
+                max_tokens=500
+            )
+
+            content = response.choices[0].message.content
+            if not content:
+                raise ValueError("Pusta odpowiedź z OpenAI API")
+
+            # Parsuj JSON
+            result = json.loads(content)
+
+            if 'attributes' not in result or not isinstance(result['attributes'], list):
+                raise ValueError(
+                    "Nieprawidłowy format odpowiedzi z OpenAI API")
+
+            extracted_attr_names = [attr.strip()
+                                    for attr in result['attributes']]
+
+            logger.info(
+                f"LLM wyodrębnił następujące atrybuty: {extracted_attr_names}")
+            print(
+                f"[DEBUG] LLM wyodrębnił następujące atrybuty: {extracted_attr_names}")
+
+            # Dopasuj wyodrębnione nazwy do dostępnych atrybutów
+            matched_attr_ids = []
+            attr_name_to_id = {attr['name'].lower(): attr['id']
+                               for attr in available_attributes}
+
+            for extracted_name in extracted_attr_names:
+                extracted_lower = extracted_name.lower()
+                # Dokładne dopasowanie
+                if extracted_lower in attr_name_to_id:
+                    matched_attr_ids.append(attr_name_to_id[extracted_lower])
+                    logger.info(
+                        f"Dopasowano: '{extracted_name}' -> ID: {attr_name_to_id[extracted_lower]}")
+                    print(
+                        f"[DEBUG] Dopasowano: '{extracted_name}' -> ID: {attr_name_to_id[extracted_lower]}")
+                else:
+                    # Próba częściowego dopasowania
+                    matched = False
+                    for attr_name, attr_id in attr_name_to_id.items():
+                        if extracted_lower in attr_name or attr_name in extracted_lower:
+                            matched_attr_ids.append(attr_id)
+                            logger.info(
+                                f"Dopasowano częściowo: '{extracted_name}' -> '{attr_name}' (ID: {attr_id})")
+                            print(
+                                f"[DEBUG] Dopasowano częściowo: '{extracted_name}' -> '{attr_name}' (ID: {attr_id})")
+                            matched = True
+                            break
+                    if not matched:
+                        logger.warning(
+                            f"Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
+                        print(
+                            f"[DEBUG] Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
+
+            # Usuń duplikaty zachowując kolejność
+            seen = set()
+            unique_attr_ids = []
+            for attr_id in matched_attr_ids:
+                if attr_id not in seen:
+                    seen.add(attr_id)
+                    unique_attr_ids.append(attr_id)
+
+            # Usuń wykluczające się atrybuty
+            matched_attributes = [{'id': attr_id, 'name': next(attr['name'] for attr in available_attributes if attr['id'] == attr_id), 'similarity': 1.0}
+                                  for attr_id in unique_attr_ids]
+            matched_attributes = self._remove_conflicting_attributes(
+                matched_attributes)
+
+            final_attr_ids = [attr['id'] for attr in matched_attributes]
+
+            logger.info(
+                f"Finalna lista atrybutów po usunięciu konfliktów: {len(final_attr_ids)} atrybutów")
+            print(
+                f"[DEBUG] Finalna lista atrybutów po usunięciu konfliktów: {len(final_attr_ids)} atrybutów")
+
+            return final_attr_ids
+
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas wyodrębniania atrybutów przez LLM: {e}")
+            print(
+                f"[DEBUG] Błąd podczas wyodrębniania atrybutów przez LLM: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def _remove_conflicting_attributes(self, matched_attributes: List[Dict]) -> List[Dict]:
+        """
+        Usuwa wykluczające się atrybuty, pozostawiając tylko ten z wyższym podobieństwem.
+
+        Args:
+            matched_attributes: Lista atrybutów z podobieństwem [{'id': int, 'name': str, 'similarity': float}, ...]
+
+        Returns:
+            Lista atrybutów bez wykluczających się
+        """
+        # Grupy wykluczających się atrybutów (ID atrybutów)
+        conflicting_groups = [
+            # Ramiączka - odpinane vs nieodpinane
+            [12, 23],  # odpinane ramiączka vs nieodpinane ramiączka
+            # Fiszbiny - na fiszbinach vs bez fiszbin
+            [9, 2],  # na fiszbinach vs biustonosz bez fiszbin
+            # Typy miseczek (wykluczające się)
+            [7, 27, 22, 30],  # gładkie, miękkie, wyściełane, usztywniane miseczki
+            # Stan - niski vs wyższy
+            [28, 25],  # niski stan vs wyższy stan
+        ]
+
+        # Utwórz mapę ID -> atrybut dla szybkiego wyszukiwania
+        attr_map = {attr['id']: attr for attr in matched_attributes}
+
+        # Dla każdej grupy wykluczających się atrybutów, zostaw tylko ten z najwyższym podobieństwem
+        for group in conflicting_groups:
+            # Znajdź atrybuty z tej grupy, które są w matched_attributes
+            group_attrs = [attr_map[attr_id]
+                           for attr_id in group if attr_id in attr_map]
+
+            if len(group_attrs) > 1:
+                # Posortuj według podobieństwa (malejąco)
+                group_attrs.sort(key=lambda x: x['similarity'], reverse=True)
+
+                # Zostaw tylko pierwszy (z najwyższym podobieństwem)
+                best_attr = group_attrs[0]
+                removed_attrs = group_attrs[1:]
+
+                logger.info(
+                    f"Usuwam wykluczające się atrybuty z grupy {group}:")
+                print(
+                    f"[DEBUG] Usuwam wykluczające się atrybuty z grupy {group}:")
+                logger.info(
+                    f"  Zostawiam: {best_attr['name']} (ID: {best_attr['id']}, similarity: {best_attr['similarity']:.3f})")
+                print(
+                    f"[DEBUG]   Zostawiam: {best_attr['name']} (ID: {best_attr['id']}, similarity: {best_attr['similarity']:.3f})")
+
+                for removed_attr in removed_attrs:
+                    logger.info(
+                        f"  Usuwam: {removed_attr['name']} (ID: {removed_attr['id']}, similarity: {removed_attr['similarity']:.3f})")
+                    print(
+                        f"[DEBUG]   Usuwam: {removed_attr['name']} (ID: {removed_attr['id']}, similarity: {removed_attr['similarity']:.3f})")
+                    # Usuń z matched_attributes
+                    matched_attributes = [
+                        attr for attr in matched_attributes if attr['id'] != removed_attr['id']]
+
+        return matched_attributes
+
+    def _extract_attributes_simple_match(self, description: str, available_attributes: List[Dict], similarity_threshold: float = 0.05, min_attributes: int = 3, max_attributes: int = 15) -> List[int]:
+        """
+        Proste dopasowanie tekstowe jako ostateczny fallback.
+        """
+        description_lower = description.lower()
+        matched_ids = []
+
+        for attr in available_attributes:
+            attr_name_lower = attr['name'].lower()
+            # Sprawdź czy nazwa atrybutu występuje w opisie
+            if attr_name_lower in description_lower:
+                matched_ids.append(attr['id'])
+
+        if matched_ids:
+            logger.info(
+                f"Znaleziono {len(matched_ids)} atrybutów przez proste dopasowanie: {matched_ids}")
+            print(
+                f"[DEBUG] Znaleziono {len(matched_ids)} atrybutów przez proste dopasowanie: {matched_ids}")
+
+        return matched_ids
 
     def process_product_data(self, product_data: Dict) -> Dict:
         """

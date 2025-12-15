@@ -981,12 +981,8 @@ class BrowserAutomation:
             new_name = ai_processor.enhance_product_name(
                 current_name, use_structured=True)
 
-            if not new_name or new_name == current_name:
-                logger.warning(
-                    "Nazwa nie została ulepszona lub jest identyczna - używam oryginalnej nazwy")
-                print(
-                    "[DEBUG] Nazwa nie została ulepszona lub jest identyczna - używam oryginalnej nazwy")
-                new_name = current_name.strip()
+            if not new_name:
+                raise ValueError("Ulepszona nazwa produktu jest pusta")
 
             logger.info(f"Nowa nazwa produktu: {new_name}")
             print(f"[DEBUG] Nowa nazwa produktu: {new_name}")
@@ -1583,6 +1579,111 @@ class BrowserAutomation:
             import traceback
             traceback.print_exc()
             raise
+
+    def get_available_attributes(self) -> List[Dict]:
+        """
+        Pobiera listę dostępnych atrybutów z formularza.
+
+        Returns:
+            Lista słowników z atrybutami [{'id': int, 'name': str}, ...]
+        """
+        try:
+            logger.info("Pobieranie dostępnych atrybutów z formularza...")
+            print("[DEBUG] Pobieranie dostępnych atrybutów z formularza...")
+
+            # Znajdź select z atrybutami
+            attributes_select = self.wait.until(
+                EC.presence_of_element_located((By.ID, "mpd_attributes"))
+            )
+
+            # Pobierz wszystkie opcje
+            options = attributes_select.find_elements(By.TAG_NAME, "option")
+
+            attributes = []
+            for option in options:
+                attr_id = int(option.get_attribute("value"))
+                attr_name = option.text.strip()
+                attributes.append({'id': attr_id, 'name': attr_name})
+
+            logger.info(f"Znaleziono {len(attributes)} dostępnych atrybutów")
+            print(f"[DEBUG] Znaleziono {len(attributes)} dostępnych atrybutów")
+            return attributes
+
+        except Exception as e:
+            logger.error(f"Błąd podczas pobierania atrybutów: {e}")
+            print(f"[DEBUG] Błąd podczas pobierania atrybutów: {e}")
+            return []
+
+    def select_attributes(self, attribute_ids: List[int]):
+        """
+        Zaznacza atrybuty w formularzu.
+
+        Args:
+            attribute_ids: Lista ID atrybutów do zaznaczenia
+        """
+        try:
+            if not attribute_ids:
+                logger.info("Brak atrybutów do zaznaczenia")
+                print("[DEBUG] Brak atrybutów do zaznaczenia")
+                return
+
+            logger.info(f"Zaznaczanie {len(attribute_ids)} atrybutów...")
+            print(
+                f"[DEBUG] Zaznaczanie {len(attribute_ids)} atrybutów: {attribute_ids}")
+
+            # Znajdź select z atrybutami
+            attributes_select = self.wait.until(
+                EC.presence_of_element_located((By.ID, "mpd_attributes"))
+            )
+
+            # Zaznacz atrybuty przez JavaScript (najbardziej niezawodne dla multiple select)
+            for attr_id in attribute_ids:
+                try:
+                    # Znajdź opcję po value
+                    option = attributes_select.find_element(
+                        By.CSS_SELECTOR, f'option[value="{attr_id}"]'
+                    )
+
+                    # Zaznacz opcję przez JavaScript
+                    self.driver.execute_script(
+                        "arguments[0].selected = true;",
+                        option
+                    )
+
+                    # Wywołaj zdarzenie change
+                    self.driver.execute_script(
+                        """
+                        var select = arguments[0];
+                        var option = arguments[1];
+                        option.selected = true;
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                        """,
+                        attributes_select,
+                        option
+                    )
+
+                    logger.info(f"Zaznaczono atrybut ID: {attr_id}")
+                    print(f"[DEBUG] Zaznaczono atrybut ID: {attr_id}")
+
+                except NoSuchElementException:
+                    logger.warning(f"Nie znaleziono atrybutu o ID: {attr_id}")
+                    print(f"[DEBUG] Nie znaleziono atrybutu o ID: {attr_id}")
+                    continue
+
+            time.sleep(0.5)
+
+            # Sprawdź ile atrybutów zostało zaznaczonych
+            selected_options = attributes_select.find_elements(
+                By.CSS_SELECTOR, "option:checked"
+            )
+            logger.info(f"Zaznaczono {len(selected_options)} atrybutów")
+            print(f"[DEBUG] Zaznaczono {len(selected_options)} atrybutów")
+
+        except Exception as e:
+            logger.error(f"Błąd podczas zaznaczania atrybutów: {e}")
+            print(f"[DEBUG] Błąd podczas zaznaczania atrybutów: {e}")
+            import traceback
+            traceback.print_exc()
 
     def close_browser(self):
         """Zamknięcie przeglądarki"""

@@ -206,8 +206,11 @@ class Command(BaseCommand):
                         self.stdout.write(self.style.SUCCESS(
                             "[OK] Zaktualizowano nazwę produktu"))
                     except Exception as e_name:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas edycji nazwy: {e_name}"))
+                        self.stdout.write(self.style.ERROR(
+                            f"[ERROR] Błąd podczas edycji nazwy: {e_name}"))
+                        self.stdout.write(
+                            "[ERROR] Kończę proces - nie można ulepszyć nazwy produktu")
+                        raise
 
                     try:
                         enhanced_description = browser.update_product_description()
@@ -224,6 +227,38 @@ class Command(BaseCommand):
                             except Exception as e_short_desc:
                                 self.stdout.write(self.style.WARNING(
                                     f"[WARNING] Błąd podczas edycji krótkiego opisu: {e_short_desc}"))
+
+                        # Wyciągnij i zaznacz atrybuty z opisu
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] Wyciąganie atrybutów z opisu produktu...")
+                            from web_agent.automation.ai_processor import AIProcessor
+                            ai_processor = AIProcessor()
+
+                            # Pobierz dostępne atrybuty z formularza
+                            available_attributes = browser.get_available_attributes()
+
+                            if available_attributes and enhanced_description:
+                                # Wyciągnij atrybuty z opisu używając AI
+                                attribute_ids = ai_processor.extract_attributes_from_description(
+                                    enhanced_description,
+                                    available_attributes
+                                )
+
+                                if attribute_ids:
+                                    # Zaznacz atrybuty w formularzu
+                                    browser.select_attributes(attribute_ids)
+                                    self.stdout.write(self.style.SUCCESS(
+                                        f"[OK] Zaznaczono {len(attribute_ids)} atrybutów z opisu"))
+                                else:
+                                    self.stdout.write(
+                                        "[INFO] Nie znaleziono atrybutów w opisie produktu")
+                            else:
+                                self.stdout.write(
+                                    "[INFO] Brak dostępnych atrybutów lub opisu do analizy")
+                        except Exception as e_attrs:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas wyciągania atrybutów: {e_attrs}"))
                     except Exception as e_desc:
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas edycji opisu: {e_desc}"))
