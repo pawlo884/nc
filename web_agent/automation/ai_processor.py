@@ -1821,32 +1821,70 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
             attr_name_to_id = {attr['name'].lower(): attr['id']
                                for attr in available_attributes}
 
+            # Przygotuj listę (id, name_lower) dla fuzzy matchingu
+            available_for_fuzzy = [(attr['id'], attr['name'].lower())
+                                   for attr in available_attributes]
+
+            try:
+                from rapidfuzz import fuzz  # type: ignore
+                use_fuzzy = True
+            except ImportError:
+                use_fuzzy = False
+
             for extracted_name in extracted_attr_names:
                 extracted_lower = extracted_name.lower()
-                # Dokładne dopasowanie
+                # 1) Dokładne dopasowanie
                 if extracted_lower in attr_name_to_id:
-                    matched_attr_ids.append(attr_name_to_id[extracted_lower])
+                    attr_id = attr_name_to_id[extracted_lower]
+                    matched_attr_ids.append(attr_id)
                     logger.info(
-                        f"Dopasowano: '{extracted_name}' -> ID: {attr_name_to_id[extracted_lower]}")
+                        f"Dopasowano: '{extracted_name}' -> ID: {attr_id}")
                     print(
-                        f"[DEBUG] Dopasowano: '{extracted_name}' -> ID: {attr_name_to_id[extracted_lower]}")
-                else:
-                    # Próba częściowego dopasowania
-                    matched = False
-                    for attr_name, attr_id in attr_name_to_id.items():
-                        if extracted_lower in attr_name or attr_name in extracted_lower:
-                            matched_attr_ids.append(attr_id)
-                            logger.info(
-                                f"Dopasowano częściowo: '{extracted_name}' -> '{attr_name}' (ID: {attr_id})")
-                            print(
-                                f"[DEBUG] Dopasowano częściowo: '{extracted_name}' -> '{attr_name}' (ID: {attr_id})")
-                            matched = True
-                            break
-                    if not matched:
-                        logger.warning(
-                            f"Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
+                        f"[DEBUG] Dopasowano: '{extracted_name}' -> ID: {attr_id}")
+                    continue
+
+                # 2) Proste dopasowanie częściowe (contains)
+                partial_match_id = None
+                for attr_name, attr_id in attr_name_to_id.items():
+                    if extracted_lower in attr_name or attr_name in extracted_lower:
+                        partial_match_id = attr_id
+                        logger.info(
+                            f"Dopasowano częściowo (substring): '{extracted_name}' -> '{attr_name}' (ID: {attr_id})")
                         print(
-                            f"[DEBUG] Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
+                            f"[DEBUG] Dopasowano częściowo (substring): '{extracted_name}' -> '{attr_name}' (ID: {attr_id})")
+                        break
+
+                if partial_match_id is not None:
+                    matched_attr_ids.append(partial_match_id)
+                    continue
+
+                # 3) Fuzzy matching dla literówek (np. 'uszywiane miseczki' -> 'usztywniane miseczki')
+                if use_fuzzy:
+                    best_id = None
+                    best_score = 0.0
+                    for attr_id, attr_name_lower in available_for_fuzzy:
+                        score = fuzz.ratio(extracted_lower,
+                                           attr_name_lower) / 100.0
+                        if score > best_score:
+                            best_score = score
+                            best_id = attr_id
+
+                    # Ustal próg dla literówek – np. >= 0.75
+                    if best_id is not None and best_score >= 0.75:
+                        matched_attr_ids.append(best_id)
+                        best_name = next(
+                            a['name'] for a in available_attributes if a['id'] == best_id)
+                        logger.info(
+                            f"Dopasowano fuzzy: '{extracted_name}' -> '{best_name}' (ID: {best_id}, score: {best_score:.3f})")
+                        print(
+                            f"[DEBUG] Dopasowano fuzzy: '{extracted_name}' -> '{best_name}' (ID: {best_id}, score: {best_score:.3f})")
+                        continue
+
+                # 4) Nic nie znaleziono
+                logger.warning(
+                    f"Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
+                print(
+                    f"[DEBUG] Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
 
             # Usuń duplikaty zachowując kolejność
             seen = set()
