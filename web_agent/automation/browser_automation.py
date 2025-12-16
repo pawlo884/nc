@@ -30,6 +30,7 @@ class BrowserAutomation:
             password: Hasło użytkownika
             headless: Czy uruchomić przeglądarkę w trybie headless
         """
+        self._original_product_name = None  # Przechowuje oryginalną nazwę przed edycją
         # Usuń /admin/ z końca URL jeśli jest
         base_url = base_url.rstrip('/').replace('/admin', '')
         self.base_url = base_url.rstrip('/')
@@ -961,10 +962,13 @@ class BrowserAutomation:
                 EC.presence_of_element_located((By.ID, "mpd_name"))
             )
 
-            # Pobierz obecną nazwę
+            # Pobierz obecną nazwę (przed edycją - zapisz dla późniejszego użycia)
             current_name = name_field.get_attribute("value") or ""
             logger.info(f"Obecna nazwa produktu: {current_name}")
             print(f"[DEBUG] Obecna nazwa produktu: {current_name}")
+
+            # Zapisz oryginalną nazwę jako atrybut instancji dla późniejszego użycia
+            self._original_product_name = current_name
 
             if not current_name or not current_name.strip():
                 logger.warning("Brak nazwy produktu do przetworzenia")
@@ -1033,6 +1037,297 @@ class BrowserAutomation:
             logger.error(f"Błąd podczas edycji nazwy produktu: {e}")
             print(f"[DEBUG] Błąd podczas edycji nazwy produktu: {e}")
             raise
+
+    def update_producer_color(self, original_name: str, brand_id: int = None, brand_name: str = None):
+        """
+        Wyodrębnia kolor producenta z oryginalnej nazwy produktu i wypełnia pole producer_color_name.
+        Najpierw sprawdza bazę kolorów dla danej marki i próbuje dopasować, jeśli nie znajdzie - ekstrachuje z nazwy.
+
+        Args:
+            original_name: Oryginalna nazwa produktu przed edycją (np. "Kostium dwuczęściowy Kostium kąpielowy Model Ada M-803 (1) Lilia - Marko")
+            brand_id: ID marki (opcjonalne)
+            brand_name: Nazwa marki (opcjonalne)
+        """
+        try:
+            logger.info("Wyodrębnianie koloru producenta...")
+            print("[DEBUG] Wyodrębnianie koloru producenta...")
+
+            color_name = None
+
+            # 1. NAJPIERW sprawdź bazę kolorów dla danej marki
+            if brand_id and brand_name:
+                from web_agent.models import ProducerColor
+                existing_colors = ProducerColor.objects.filter(
+                    brand_id=brand_id)
+
+                if existing_colors.exists():
+                    logger.info(
+                        f"Sprawdzam {existing_colors.count()} kolorów w bazie dla marki {brand_name}...")
+                    print(
+                        f"[DEBUG] Sprawdzam {existing_colors.count()} kolorów w bazie dla marki {brand_name}...")
+
+                    # Spróbuj dopasować kolory z bazy do nazwy produktu (DOKŁADNE DOPASOWANIE)
+                    # Sortuj kolory po długości (najdłuższe pierwsze) - żeby "red ferrari" było sprawdzone przed "red"
+                    sorted_colors = sorted(
+                        existing_colors, key=lambda x: len(x.color_name), reverse=True)
+                    original_name_lower = original_name.lower()
+
+                    import re
+                    for color_obj in sorted_colors:
+                        color_lower = color_obj.color_name.lower()
+                        # Dokładne dopasowanie - kolor musi być osobnym słowem (nie częścią innego słowa)
+                        # Używamy word boundaries (\b) w regex
+                        pattern = r'\b' + re.escape(color_lower) + r'\b'
+                        if re.search(pattern, original_name_lower):
+                            color_name = color_obj.color_name
+                            # Zwiększ licznik użyć
+                            color_obj.usage_count += 1
+                            color_obj.save(
+                                update_fields=['usage_count', 'updated_at'])
+                            logger.info(
+                                f"Znaleziono kolor w bazie (dokładne dopasowanie): {color_name} (użycie #{color_obj.usage_count})")
+                            print(
+                                f"[INFO] Znaleziono kolor w bazie (dokładne dopasowanie): {color_name} (użycie #{color_obj.usage_count})")
+                            break
+
+            # 2. Jeśli nie znaleziono w bazie, wyodrębnij z nazwy
+            if not color_name:
+                logger.info(
+                    "Nie znaleziono koloru w bazie, ekstrachuję z nazwy produktu...")
+                print(
+                    "[DEBUG] Nie znaleziono koloru w bazie, ekstrachuję z nazwy produktu...")
+                color_name = self._extract_color_from_name(original_name)
+
+                if not color_name:
+                    logger.warning(
+                        "Nie udało się wyodrębnić koloru z nazwy produktu")
+                    print("[DEBUG] Nie udało się wyodrębnić koloru z nazwy produktu")
+                    return
+
+                logger.info(
+                    f"Wyodrębniony kolor producenta z nazwy: {color_name}")
+                print(
+                    f"[DEBUG] Wyodrębniony kolor producenta z nazwy: {color_name}")
+
+                # Zapisz nowy kolor do bazy jeśli mamy brand_id i brand_name
+                if brand_id and brand_name:
+                    from web_agent.models import ProducerColor
+                    color_obj, created = ProducerColor.objects.get_or_create(
+                        brand_id=brand_id,
+                        color_name=color_name,
+                        defaults={'brand_name': brand_name}
+                    )
+                    if created:
+                        logger.info(
+                            f"Dodano nowy kolor do bazy: {color_name} dla marki {brand_name}")
+                        print(
+                            f"[INFO] Dodano nowy kolor do bazy: {color_name} dla marki {brand_name}")
+                    else:
+                        # Zwiększ licznik użyć
+                        color_obj.usage_count += 1
+                        color_obj.save(
+                            update_fields=['usage_count', 'updated_at'])
+                        logger.info(
+                            f"Kolor już istnieje w bazie (użycie #{color_obj.usage_count})")
+                        print(
+                            f"[DEBUG] Kolor już istnieje w bazie (użycie #{color_obj.usage_count})")
+
+            # Wypełnij pole producer_color_name
+            try:
+                producer_color_field = self.wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "producer_color_name"))
+                )
+
+                # Wyczyść pole i wpisz kolor
+                self.driver.execute_script(
+                    "arguments[0].value = '';", producer_color_field)
+                time.sleep(0.2)
+
+                self.driver.execute_script(
+                    "arguments[0].value = arguments[1];",
+                    producer_color_field,
+                    color_name
+                )
+                time.sleep(0.3)
+
+                # Wywołaj zdarzenia
+                self.driver.execute_script(
+                    """
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                    """,
+                    producer_color_field
+                )
+                time.sleep(0.3)
+
+                logger.info(
+                    f"Pole producer_color_name zostało wypełnione: {color_name}")
+                print(
+                    f"[DEBUG] Pole producer_color_name zostało wypełnione: {color_name}")
+
+            except Exception as e:
+                logger.warning(
+                    f"Nie udało się wypełnić pola producer_color_name: {e}")
+                print(
+                    f"[DEBUG] Nie udało się wypełnić pola producer_color_name: {e}")
+
+        except Exception as e:
+            logger.warning(
+                f"Błąd podczas wyodrębniania koloru producenta: {e}")
+            print(f"[DEBUG] Błąd podczas wyodrębniania koloru producenta: {e}")
+
+    def _extract_color_from_name(self, name: str) -> str:
+        """
+        Wyodrębnia kolor producenta z nazwy produktu.
+        Kolor zwykle znajduje się przed nazwą marki (np. "Lilia - Marko" -> "Lilia")
+
+        Args:
+            name: Pełna nazwa produktu przed edycją
+
+        Returns:
+            Nazwa koloru producenta lub pusty string
+        """
+        if not name:
+            return ""
+
+        name = name.strip()
+
+        # Wzorce do wyodrębniania koloru:
+        # 1. "Kolor - Marka" (np. "Lilia - Marko")
+        # 2. "(Kolor)" (np. "(1) Lilia")
+        # 3. Ostatnie słowo przed "- Marka"
+
+        import re
+
+        # Wzorzec 1: "Kolor - Marka" na końcu
+        match = re.search(
+            r'([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)*)\s*-\s*[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+$', name)
+        if match:
+            color = match.group(1).strip()
+            if len(color) > 1 and len(color) < 50:  # Rozsądna długość koloru
+                return color
+
+        # Wzorzec 2: "(liczba) Kolor" (np. "(1) Lilia")
+        match = re.search(
+            r'\([^)]+\)\s+([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)*)\s*-\s*[A-ZĄĆĘŁŃÓŚŹŻ]', name)
+        if match:
+            color = match.group(1).strip()
+            if len(color) > 1 and len(color) < 50:
+                return color
+
+        # Wzorzec 3: Ostatnie słowo przed ostatnim "-" (jeśli jest)
+        parts = name.split(' - ')
+        if len(parts) >= 2:
+            # Weź ostatnią część przed ostatnim "-"
+            before_last_dash = parts[-2].strip()
+            # Weź ostatnie słowo/część
+            words = before_last_dash.split()
+            if words:
+                last_word = words[-1]
+                # Sprawdź czy to wygląda na kolor (zaczyna się wielką literą, nie jest liczbą)
+                if last_word and last_word[0].isupper() and not last_word.replace('(', '').replace(')', '').isdigit():
+                    if len(last_word) > 1 and len(last_word) < 50:
+                        return last_word
+
+        return ""
+
+    def update_producer_code(self, original_name: str):
+        """
+        Wyodrębnia kod producenta z oryginalnej nazwy produktu i wypełnia pole producer_code.
+        Pattern: M-XXX (np. M-803)
+
+        Args:
+            original_name: Oryginalna nazwa produktu przed edycją (np. "Kostium dwuczęściowy Kostium kąpielowy Model Ada M-803 (1) Lilia - Marko")
+        """
+        try:
+            logger.info("Wyodrębnianie kodu producenta z nazwy produktu...")
+            print("[DEBUG] Wyodrębnianie kodu producenta z nazwy produktu...")
+
+            # Wyodrębnij kod producenta (pattern: M-XXX)
+            producer_code = self._extract_producer_code_from_name(
+                original_name)
+
+            if not producer_code:
+                logger.warning(
+                    "Nie udało się wyodrębnić kodu producenta z nazwy produktu")
+                print(
+                    "[DEBUG] Nie udało się wyodrębnić kodu producenta z nazwy produktu")
+                return
+
+            logger.info(f"Wyodrębniony kod producenta: {producer_code}")
+            print(f"[DEBUG] Wyodrębniony kod producenta: {producer_code}")
+
+            # Wypełnij pole producer_code
+            try:
+                producer_code_field = self.wait.until(
+                    EC.presence_of_element_located((By.ID, "producer_code"))
+                )
+
+                # Wyczyść pole i wpisz kod
+                self.driver.execute_script(
+                    "arguments[0].value = '';", producer_code_field)
+                time.sleep(0.2)
+
+                self.driver.execute_script(
+                    "arguments[0].value = arguments[1];",
+                    producer_code_field,
+                    producer_code
+                )
+                time.sleep(0.3)
+
+                # Wywołaj zdarzenia
+                self.driver.execute_script(
+                    """
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                    """,
+                    producer_code_field
+                )
+                time.sleep(0.3)
+
+                logger.info(
+                    f"Pole producer_code zostało wypełnione: {producer_code}")
+                print(
+                    f"[DEBUG] Pole producer_code zostało wypełnione: {producer_code}")
+
+            except Exception as e:
+                logger.warning(
+                    f"Nie udało się wypełnić pola producer_code: {e}")
+                print(
+                    f"[DEBUG] Nie udało się wypełnić pola producer_code: {e}")
+
+        except Exception as e:
+            logger.warning(f"Błąd podczas wyodrębniania kodu producenta: {e}")
+            print(f"[DEBUG] Błąd podczas wyodrębniania kodu producenta: {e}")
+
+    def _extract_producer_code_from_name(self, name: str) -> str:
+        """
+        Wyodrębnia kod producenta z nazwy produktu.
+        Pattern: M-XXX (np. M-803, M-123, M-45)
+
+        Args:
+            name: Pełna nazwa produktu przed edycją
+
+        Returns:
+            Kod producenta (np. "M-803") lub pusty string
+        """
+        if not name:
+            return ""
+
+        import re
+
+        # Wzorzec: M-XXX gdzie XXX to cyfry
+        # Może być też M-XXX-YYY (np. M-803-1)
+        pattern = r'\bM-\d+(?:-\d+)?\b'
+        match = re.search(pattern, name, re.IGNORECASE)
+
+        if match:
+            code = match.group(0)
+            # Znormalizuj do wielkich liter
+            return code.upper()
+
+        return ""
 
     def _process_product_name(self, name: str) -> str:
         """
@@ -1164,9 +1459,19 @@ class BrowserAutomation:
                 ai_processor = AIProcessor()
 
             logger.info("Ulepszanie opisu przez AI...")
-            print("[DEBUG] Ulepszanie opisu przez AI...")
+            print("[INFO] ========================================")
+            print("[INFO] ULEPSZANIE OPISU PRZEZ AI")
+            print("[INFO] ========================================")
+            print(
+                f"[INFO] Długość oryginalnego opisu: {len(current_description)} znaków")
+            print("[INFO] Wysyłam żądanie do API...")
+            print("[INFO] To może zająć do 30 sekund - proszę czekać...")
             enhanced_description = ai_processor.enhance_product_description(
                 current_description)
+            print("[INFO] ========================================")
+            print(
+                f"[INFO] Opis został ulepszony! Nowa długość: {len(enhanced_description)} znaków")
+            print("[INFO] ========================================")
 
             if not enhanced_description or enhanced_description == current_description:
                 logger.warning(
@@ -1407,18 +1712,98 @@ class BrowserAutomation:
             logger.info("Tworzenie produktu w MPD...")
             print("[DEBUG] Tworzenie produktu w MPD...")
 
-            # Znajdź przycisk "Utwórz nowy produkt w MPD"
-            create_mpd_button = self.wait.until(
-                EC.element_to_be_clickable((By.ID, "create-mpd-product-btn"))
-            )
+            # Poczekaj chwilę, aby upewnić się, że formularz jest gotowy
+            time.sleep(1)
+
+            # Sprawdź, czy sekcja right-column jest zwinięta i rozwiń ją
+            try:
+                right_column = self.driver.find_element(
+                    By.CSS_SELECTOR, ".right-column")
+                if "collapsed" in right_column.get_attribute("class"):
+                    toggle_button = self.driver.find_element(
+                        By.CSS_SELECTOR, ".toggle-button")
+                    toggle_button.click()
+                    time.sleep(0.5)
+                    logger.info("Rozwinięto sekcję right-column")
+                    print("[DEBUG] Rozwinięto sekcję right-column")
+            except:
+                pass  # Jeśli nie znajdziemy sekcji, kontynuuj
+
+            # Spróbuj znaleźć przycisk na różne sposoby
+            create_mpd_button = None
+
+            # Metoda 1: Przez ID (użyj presence_of_element_located zamiast element_to_be_clickable)
+            try:
+                create_mpd_button = self.wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "create-mpd-product-btn"))
+                )
+                logger.info("Znaleziono przycisk przez ID (presence)")
+                print("[DEBUG] Znaleziono przycisk przez ID (presence)")
+            except:
+                # Metoda 2: Przez XPath z ID
+                try:
+                    create_mpd_button = self.wait.until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, "//button[@id='create-mpd-product-btn']"))
+                    )
+                    logger.info("Znaleziono przycisk przez XPath z ID")
+                    print("[DEBUG] Znaleziono przycisk przez XPath z ID")
+                except:
+                    # Metoda 3: Przez tekst przycisku
+                    try:
+                        create_mpd_button = self.wait.until(
+                            EC.presence_of_element_located(
+                                (By.XPATH, "//button[contains(text(), 'Utwórz nowy produkt w MPD')]"))
+                        )
+                        logger.info("Znaleziono przycisk przez tekst")
+                        print("[DEBUG] Znaleziono przycisk przez tekst")
+                    except:
+                        # Metoda 4: Przez częściowy tekst
+                        try:
+                            create_mpd_button = self.wait.until(
+                                EC.presence_of_element_located(
+                                    (By.XPATH, "//button[contains(text(), 'Utwórz')]"))
+                            )
+                            logger.info(
+                                "Znaleziono przycisk przez częściowy tekst")
+                            print(
+                                "[DEBUG] Znaleziono przycisk przez częściowy tekst")
+                        except:
+                            raise Exception(
+                                "Nie znaleziono przycisku 'Utwórz nowy produkt w MPD'")
+
+            if not create_mpd_button:
+                raise Exception("Przycisk nie został znaleziony")
 
             # Przewiń do przycisku
             self.driver.execute_script(
-                "arguments[0].scrollIntoView(true);", create_mpd_button)
+                "arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", create_mpd_button)
             time.sleep(0.5)
 
-            # Kliknij przycisk
-            create_mpd_button.click()
+            # Spróbuj kliknąć przycisk - najpierw standardowo, potem przez JavaScript
+            try:
+                # Sprawdź czy przycisk jest widoczny i klikalny
+                if create_mpd_button.is_displayed() and create_mpd_button.is_enabled():
+                    create_mpd_button.click()
+                    logger.info("Kliknięto przycisk standardowo")
+                    print("[DEBUG] Kliknięto przycisk standardowo")
+                else:
+                    # Jeśli nie jest klikalny, użyj JavaScript
+                    self.driver.execute_script(
+                        "arguments[0].click();", create_mpd_button)
+                    logger.info("Kliknięto przycisk przez JavaScript")
+                    print("[DEBUG] Kliknięto przycisk przez JavaScript")
+            except Exception as e_click:
+                # Fallback: użyj JavaScript do kliknięcia
+                logger.warning(
+                    f"Błąd podczas standardowego kliknięcia: {e_click}, używam JavaScript")
+                print(
+                    f"[DEBUG] Błąd podczas standardowego kliknięcia: {e_click}, używam JavaScript")
+                self.driver.execute_script(
+                    "arguments[0].click();", create_mpd_button)
+                logger.info("Kliknięto przycisk przez JavaScript (fallback)")
+                print("[DEBUG] Kliknięto przycisk przez JavaScript (fallback)")
             logger.info("Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
             print("[DEBUG] Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
 
@@ -1510,18 +1895,98 @@ class BrowserAutomation:
             logger.info("Tworzenie produktu w MPD...")
             print("[DEBUG] Tworzenie produktu w MPD...")
 
-            # Znajdź przycisk "Utwórz nowy produkt w MPD"
-            create_mpd_button = self.wait.until(
-                EC.element_to_be_clickable((By.ID, "create-mpd-product-btn"))
-            )
+            # Poczekaj chwilę, aby upewnić się, że formularz jest gotowy
+            time.sleep(1)
+
+            # Sprawdź, czy sekcja right-column jest zwinięta i rozwiń ją
+            try:
+                right_column = self.driver.find_element(
+                    By.CSS_SELECTOR, ".right-column")
+                if "collapsed" in right_column.get_attribute("class"):
+                    toggle_button = self.driver.find_element(
+                        By.CSS_SELECTOR, ".toggle-button")
+                    toggle_button.click()
+                    time.sleep(0.5)
+                    logger.info("Rozwinięto sekcję right-column")
+                    print("[DEBUG] Rozwinięto sekcję right-column")
+            except:
+                pass  # Jeśli nie znajdziemy sekcji, kontynuuj
+
+            # Spróbuj znaleźć przycisk na różne sposoby
+            create_mpd_button = None
+
+            # Metoda 1: Przez ID (użyj presence_of_element_located zamiast element_to_be_clickable)
+            try:
+                create_mpd_button = self.wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "create-mpd-product-btn"))
+                )
+                logger.info("Znaleziono przycisk przez ID (presence)")
+                print("[DEBUG] Znaleziono przycisk przez ID (presence)")
+            except:
+                # Metoda 2: Przez XPath z ID
+                try:
+                    create_mpd_button = self.wait.until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, "//button[@id='create-mpd-product-btn']"))
+                    )
+                    logger.info("Znaleziono przycisk przez XPath z ID")
+                    print("[DEBUG] Znaleziono przycisk przez XPath z ID")
+                except:
+                    # Metoda 3: Przez tekst przycisku
+                    try:
+                        create_mpd_button = self.wait.until(
+                            EC.presence_of_element_located(
+                                (By.XPATH, "//button[contains(text(), 'Utwórz nowy produkt w MPD')]"))
+                        )
+                        logger.info("Znaleziono przycisk przez tekst")
+                        print("[DEBUG] Znaleziono przycisk przez tekst")
+                    except:
+                        # Metoda 4: Przez częściowy tekst
+                        try:
+                            create_mpd_button = self.wait.until(
+                                EC.presence_of_element_located(
+                                    (By.XPATH, "//button[contains(text(), 'Utwórz')]"))
+                            )
+                            logger.info(
+                                "Znaleziono przycisk przez częściowy tekst")
+                            print(
+                                "[DEBUG] Znaleziono przycisk przez częściowy tekst")
+                        except:
+                            raise Exception(
+                                "Nie znaleziono przycisku 'Utwórz nowy produkt w MPD'")
+
+            if not create_mpd_button:
+                raise Exception("Przycisk nie został znaleziony")
 
             # Przewiń do przycisku
             self.driver.execute_script(
-                "arguments[0].scrollIntoView(true);", create_mpd_button)
+                "arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", create_mpd_button)
             time.sleep(0.5)
 
-            # Kliknij przycisk
-            create_mpd_button.click()
+            # Spróbuj kliknąć przycisk - najpierw standardowo, potem przez JavaScript
+            try:
+                # Sprawdź czy przycisk jest widoczny i klikalny
+                if create_mpd_button.is_displayed() and create_mpd_button.is_enabled():
+                    create_mpd_button.click()
+                    logger.info("Kliknięto przycisk standardowo")
+                    print("[DEBUG] Kliknięto przycisk standardowo")
+                else:
+                    # Jeśli nie jest klikalny, użyj JavaScript
+                    self.driver.execute_script(
+                        "arguments[0].click();", create_mpd_button)
+                    logger.info("Kliknięto przycisk przez JavaScript")
+                    print("[DEBUG] Kliknięto przycisk przez JavaScript")
+            except Exception as e_click:
+                # Fallback: użyj JavaScript do kliknięcia
+                logger.warning(
+                    f"Błąd podczas standardowego kliknięcia: {e_click}, używam JavaScript")
+                print(
+                    f"[DEBUG] Błąd podczas standardowego kliknięcia: {e_click}, używam JavaScript")
+                self.driver.execute_script(
+                    "arguments[0].click();", create_mpd_button)
+                logger.info("Kliknięto przycisk przez JavaScript (fallback)")
+                print("[DEBUG] Kliknięto przycisk przez JavaScript (fallback)")
             logger.info("Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
             print("[DEBUG] Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
 
@@ -1613,6 +2078,495 @@ class BrowserAutomation:
             logger.error(f"Błąd podczas pobierania atrybutów: {e}")
             print(f"[DEBUG] Błąd podczas pobierania atrybutów: {e}")
             return []
+
+    def select_size_category(self, category_name: str = None):
+        """
+        Automatycznie wybiera grupę rozmiarową na podstawie kategorii produktu.
+        W aktualnym workflow dla przekazanej kategorii zawsze wybieramy "bielizna".
+
+        Args:
+            category_name: Nazwa kategorii produktu (np. "Kostiumy dwuczęściowe")
+        """
+        try:
+            from selenium.webdriver.support.ui import Select
+
+            logger.info("Wybór grupy rozmiarowej...")
+            print("[DEBUG] Wybór grupy rozmiarowej...")
+
+            # Jeśli kategoria została przekazana z komendy, zawsze wybieramy "bielizna"
+            if category_name:
+                size_category = "bielizna"
+                logger.info(
+                    f"Kategoria '{category_name}' -> wybieram grupę rozmiarową: {size_category}")
+                print(
+                    f"[DEBUG] Kategoria '{category_name}' -> wybieram grupę rozmiarową: {size_category}")
+
+                # Znajdź select z grupą rozmiarową
+                size_select = self.wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "mpd_size_category"))
+                )
+
+                # Wybierz opcję "bielizna"
+                select = Select(size_select)
+                try:
+                    select.select_by_visible_text(size_category)
+                    time.sleep(0.5)
+                    logger.info(f"Wybrano grupę rozmiarową: {size_category}")
+                    print(f"[DEBUG] Wybrano grupę rozmiarową: {size_category}")
+                except Exception as e:
+                    logger.warning(
+                        f"Nie udało się wybrać grupy rozmiarowej '{size_category}': {e}")
+                    print(
+                        f"[DEBUG] Nie udało się wybrać grupy rozmiarowej '{size_category}': {e}")
+            else:
+                logger.info(
+                    f"Brak automatycznego wyboru grupy rozmiarowej dla kategorii: {category_name}")
+                print(
+                    f"[DEBUG] Brak automatycznego wyboru grupy rozmiarowej dla kategorii: {category_name}")
+
+        except Exception as e:
+            logger.warning(f"Błąd podczas wyboru grupy rozmiarowej: {e}")
+            print(f"[DEBUG] Błąd podczas wyboru grupy rozmiarowej: {e}")
+
+    def select_product_path(self, path_value: str = "5"):
+        """
+        Zaznacza ścieżkę produktu w select mpd_paths.
+        Dla kostiumów dwuczęściowych zaznacza opcję "Dwuczęściowe" (value="5").
+
+        Args:
+            path_value: Wartość opcji do zaznaczenia (domyślnie "5" dla Dwuczęściowe)
+        """
+        try:
+            from selenium.webdriver.support.ui import Select
+
+            logger.info("Wybór ścieżki produktu...")
+            print("[DEBUG] Wybór ścieżki produktu...")
+
+            # Znajdź select z ścieżkami produktu
+            path_select = self.wait.until(
+                EC.presence_of_element_located((By.ID, "mpd_paths"))
+            )
+
+            # Wybierz opcję "Dwuczęściowe" (value="5")
+            select = Select(path_select)
+            try:
+                # Zaznacz opcję po wartości
+                select.select_by_value(path_value)
+                time.sleep(0.5)
+
+                # Sprawdź czy opcja została zaznaczona
+                selected_options = select.all_selected_options
+                if selected_options:
+                    selected_text = selected_options[0].text
+                    logger.info(
+                        f"Wybrano ścieżkę produktu: {selected_text} (value={path_value})")
+                    print(
+                        f"[DEBUG] Wybrano ścieżkę produktu: {selected_text} (value={path_value})")
+                else:
+                    logger.warning(
+                        f"Nie udało się zaznaczyć ścieżki produktu (value={path_value})")
+                    print(
+                        f"[DEBUG] Nie udało się zaznaczyć ścieżki produktu (value={path_value})")
+            except Exception as e:
+                logger.warning(
+                    f"Nie udało się wybrać ścieżki produktu '{path_value}': {e}")
+                print(
+                    f"[DEBUG] Nie udało się wybrać ścieżki produktu '{path_value}': {e}")
+
+        except Exception as e:
+            logger.warning(f"Błąd podczas wyboru ścieżki produktu: {e}")
+            print(f"[DEBUG] Błąd podczas wyboru ścieżki produktu: {e}")
+
+    def select_unit(self, unit_value: str = "0"):
+        """
+        Wybiera jednostkę produktu w select unit_id.
+        Domyślnie wybiera "szt." (value="0").
+
+        Args:
+            unit_value: Wartość opcji do wyboru (domyślnie "0" dla szt.)
+        """
+        try:
+            from selenium.webdriver.support.ui import Select
+
+            logger.info("Wybór jednostki produktu...")
+            print("[DEBUG] Wybór jednostki produktu...")
+
+            # Znajdź select z jednostkami
+            unit_select = self.wait.until(
+                EC.presence_of_element_located((By.ID, "unit_id"))
+            )
+
+            # Wybierz opcję "szt." (value="0")
+            select = Select(unit_select)
+            try:
+                # Wybierz opcję po wartości
+                select.select_by_value(unit_value)
+                time.sleep(0.5)
+
+                # Sprawdź czy opcja została wybrana
+                selected_option = select.first_selected_option
+                if selected_option and selected_option.get_attribute("value") == unit_value:
+                    selected_text = selected_option.text
+                    logger.info(
+                        f"Wybrano jednostkę produktu: {selected_text} (value={unit_value})")
+                    print(
+                        f"[DEBUG] Wybrano jednostkę produktu: {selected_text} (value={unit_value})")
+                else:
+                    logger.warning(
+                        f"Nie udało się wybrać jednostki produktu (value={unit_value})")
+                    print(
+                        f"[DEBUG] Nie udało się wybrać jednostki produktu (value={unit_value})")
+            except Exception as e:
+                logger.warning(
+                    f"Nie udało się wybrać jednostki produktu '{unit_value}': {e}")
+                print(
+                    f"[DEBUG] Nie udało się wybrać jednostki produktu '{unit_value}': {e}")
+
+        except Exception as e:
+            logger.warning(f"Błąd podczas wyboru jednostki produktu: {e}")
+            print(f"[DEBUG] Błąd podczas wyboru jednostki produktu: {e}")
+
+    def fill_fabric_materials(self):
+        """
+        Wyodrębnia materiały z sekcji "Szczegóły produktu" (size_table_html) 
+        i wypełnia pola składu (materiały) w formularzu.
+        """
+        try:
+            import re
+
+            logger.info("Wyodrębnianie materiałów z szczegółów produktu...")
+            print("[DEBUG] Wyodrębnianie materiałów z szczegółów produktu...")
+
+            # Spróbuj rozwinąć sekcję "Szczegóły produktu" jeśli jest zwinięta
+            try:
+                details_heading = self.driver.find_element(
+                    By.ID, "details-heading"
+                )
+                # Sprawdź czy sekcja jest zwinięta (sprawdź czy jest klasa "collapsed" lub podobna)
+                details_section = self.driver.find_element(
+                    By.CSS_SELECTOR, "fieldset[aria-labelledby='details-heading']"
+                )
+                # Jeśli sekcja jest ukryta, spróbuj ją rozwinąć
+                if not details_section.is_displayed():
+                    details_heading.click()
+                    time.sleep(0.5)
+            except:
+                pass  # Jeśli nie znajdziemy sekcji, kontynuuj
+
+            # Pobierz zawartość z size_table (główne źródło danych)
+            size_table_html = ""
+            try:
+                # Spróbuj najpierw size_table (główne źródło)
+                size_table_field = self.wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "id_details-0-size_table"))
+                )
+                size_table_html = size_table_field.get_attribute("value") or ""
+                if size_table_html:
+                    logger.info("Pobrano dane z pola size_table")
+                    print("[DEBUG] Pobrano dane z pola size_table")
+            except:
+                try:
+                    # Spróbuj przez XPath dla size_table
+                    size_table_field = self.driver.find_element(
+                        By.XPATH, "//textarea[@name='details-0-size_table']"
+                    )
+                    size_table_html = size_table_field.get_attribute(
+                        "value") or ""
+                    if size_table_html:
+                        logger.info("Pobrano dane z pola size_table (XPath)")
+                        print("[DEBUG] Pobrano dane z pola size_table (XPath)")
+                except:
+                    # Fallback do size_table_html
+                    try:
+                        size_table_html_field = self.wait.until(
+                            EC.presence_of_element_located(
+                                (By.ID, "id_details-0-size_table_html"))
+                        )
+                        size_table_html = size_table_html_field.get_attribute(
+                            "value") or ""
+                        if size_table_html:
+                            logger.info("Pobrano dane z pola size_table_html")
+                            print("[DEBUG] Pobrano dane z pola size_table_html")
+                    except:
+                        try:
+                            # Spróbuj przez XPath dla size_table_html
+                            size_table_html_field = self.driver.find_element(
+                                By.XPATH, "//textarea[@name='details-0-size_table_html']"
+                            )
+                            size_table_html = size_table_html_field.get_attribute(
+                                "value") or ""
+                            if size_table_html:
+                                logger.info(
+                                    "Pobrano dane z pola size_table_html (XPath)")
+                                print(
+                                    "[DEBUG] Pobrano dane z pola size_table_html (XPath)")
+                        except:
+                            # Fallback do size_table_txt
+                            try:
+                                size_table_txt_field = self.wait.until(
+                                    EC.presence_of_element_located(
+                                        (By.ID, "id_details-0-size_table_txt"))
+                                )
+                                size_table_html = size_table_txt_field.get_attribute(
+                                    "value") or ""
+                                if size_table_html:
+                                    logger.info(
+                                        "Pobrano dane z pola size_table_txt")
+                                    print(
+                                        "[DEBUG] Pobrano dane z pola size_table_txt")
+                            except:
+                                try:
+                                    # Spróbuj przez XPath dla size_table_txt
+                                    size_table_txt_field = self.driver.find_element(
+                                        By.XPATH, "//textarea[@name='details-0-size_table_txt']"
+                                    )
+                                    size_table_html = size_table_txt_field.get_attribute(
+                                        "value") or ""
+                                    if size_table_html:
+                                        logger.info(
+                                            "Pobrano dane z pola size_table_txt (XPath)")
+                                        print(
+                                            "[DEBUG] Pobrano dane z pola size_table_txt (XPath)")
+                                except:
+                                    # Fallback: pobierz dane z bazy danych
+                                    logger.info(
+                                        "Pola nie znalezione w formularzu, próbuję pobrać z bazy danych...")
+                                    print(
+                                        "[DEBUG] Pola nie znalezione w formularzu, próbuję pobrać z bazy danych...")
+
+                                    # Wyodrębnij ID produktu z URL
+                                    current_url = self.driver.current_url
+                                    product_id_match = re.search(
+                                        r'/product/(\d+)/', current_url)
+
+                                    if product_id_match:
+                                        product_id = int(
+                                            product_id_match.group(1))
+                                        logger.info(
+                                            f"Znaleziono ID produktu w URL: {product_id}")
+                                        print(
+                                            f"[DEBUG] Znaleziono ID produktu w URL: {product_id}")
+
+                                        # Pobierz szczegóły produktu z bazy danych
+                                        try:
+                                            from django.db import connections
+                                            from matterhorn1.models import Product
+
+                                            with connections['matterhorn1'].cursor() as cursor:
+                                                cursor.execute("""
+                                                    SELECT pd.size_table, pd.size_table_html, pd.size_table_txt
+                                                    FROM productdetails pd
+                                                    INNER JOIN product p ON pd.product_id = p.id
+                                                    WHERE p.id = %s
+                                                """, [product_id])
+
+                                                row = cursor.fetchone()
+                                                if row:
+                                                    # Priorytet: size_table > size_table_html > size_table_txt
+                                                    size_table_html = row[0] or row[1] or row[2] or ""
+                                                    if size_table_html:
+                                                        logger.info(
+                                                            "Pobrano size_table z bazy danych")
+                                                        print(
+                                                            "[DEBUG] Pobrano size_table z bazy danych")
+                                                    else:
+                                                        logger.warning(
+                                                            "Brak szczegółów produktu w bazie danych")
+                                                        print(
+                                                            "[DEBUG] Brak szczegółów produktu w bazie danych")
+                                                        return
+                                                else:
+                                                    logger.warning(
+                                                        "Brak szczegółów produktu w bazie danych")
+                                                    print(
+                                                        "[DEBUG] Brak szczegółów produktu w bazie danych")
+                                                    return
+                                        except Exception as e_db:
+                                            logger.warning(
+                                                f"Błąd podczas pobierania z bazy danych: {e_db}")
+                                            print(
+                                                f"[DEBUG] Błąd podczas pobierania z bazy danych: {e_db}")
+                                            return
+                                    else:
+                                        logger.warning(
+                                            "Nie udało się wyodrębnić ID produktu z URL")
+                                        print(
+                                            "[DEBUG] Nie udało się wyodrębnić ID produktu z URL")
+                                        return
+
+            if not size_table_html:
+                logger.warning("Pole size_table_html jest puste")
+                print("[DEBUG] Pole size_table_html jest puste")
+                return
+
+            # Wyodrębnij materiały i procenty z HTML
+            materials = self._extract_materials_from_html(size_table_html)
+
+            if not materials:
+                logger.warning("Nie udało się wyodrębnić materiałów z HTML")
+                print("[DEBUG] Nie udało się wyodrębnić materiałów z HTML")
+                return
+
+            logger.info(
+                f"Wyodrębniono {len(materials)} materiałów: {materials}")
+            print(
+                f"[DEBUG] Wyodrębniono {len(materials)} materiałów: {materials}")
+
+            # Mapowanie nazw materiałów na wartości w select
+            material_mapping = {
+                "elastan": "1",
+                "poliamid": "2",
+                # Można dodać więcej materiałów w przyszłości
+            }
+
+            # Znajdź sekcję z materiałami
+            fabric_list = self.wait.until(
+                EC.presence_of_element_located((By.ID, "fabric-list"))
+            )
+
+            # Pobierz istniejące wiersze materiałów
+            existing_rows = fabric_list.find_elements(
+                By.CSS_SELECTOR, ".fabric-row")
+
+            # Dodaj wiersze jeśli potrzeba
+            for i, (material_name, percentage) in enumerate(materials):
+                # Normalizuj nazwę materiału (lowercase)
+                material_lower = material_name.lower().strip()
+
+                # Znajdź wartość w select
+                material_value = None
+                for key, value in material_mapping.items():
+                    if key in material_lower:
+                        material_value = value
+                        break
+
+                if not material_value:
+                    logger.warning(
+                        f"Nie znaleziono mapowania dla materiału: {material_name}")
+                    print(
+                        f"[DEBUG] Nie znaleziono mapowania dla materiału: {material_name}")
+                    continue
+
+                # Użyj istniejącego wiersza lub dodaj nowy
+                if i < len(existing_rows):
+                    fabric_row = existing_rows[i]
+                else:
+                    # Kliknij "Dodaj materiał"
+                    add_button = self.driver.find_element(
+                        By.XPATH, "//button[contains(@onclick, 'addFabricRow')]"
+                    )
+                    add_button.click()
+                    time.sleep(0.5)
+
+                    # Pobierz nowo dodany wiersz
+                    existing_rows = fabric_list.find_elements(
+                        By.CSS_SELECTOR, ".fabric-row")
+                    fabric_row = existing_rows[i]
+
+                # Znajdź select i input w wierszu
+                fabric_select = fabric_row.find_element(
+                    By.CSS_SELECTOR, "select[name='fabric_component[]']")
+                fabric_percentage = fabric_row.find_element(
+                    By.CSS_SELECTOR, "input[name='fabric_percentage[]']")
+
+                # Wybierz materiał
+                from selenium.webdriver.support.ui import Select
+                select = Select(fabric_select)
+                select.select_by_value(material_value)
+                time.sleep(0.3)
+
+                # Wypełnij procent
+                self.driver.execute_script(
+                    "arguments[0].value = arguments[1];",
+                    fabric_percentage,
+                    str(percentage)
+                )
+                time.sleep(0.3)
+
+                # Wywołaj zdarzenia
+                self.driver.execute_script(
+                    """
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                    """,
+                    fabric_percentage
+                )
+                time.sleep(0.2)
+
+                logger.info(
+                    f"Wypełniono materiał: {material_name} ({percentage}%)")
+                print(
+                    f"[DEBUG] Wypełniono materiał: {material_name} ({percentage}%)")
+
+            logger.info(f"Wypełniono {len(materials)} materiałów")
+            print(f"[DEBUG] Wypełniono {len(materials)} materiałów")
+
+            # Poczekaj chwilę, aby upewnić się, że formularz jest gotowy
+            time.sleep(1)
+
+        except Exception as e:
+            logger.warning(f"Błąd podczas wypełniania materiałów: {e}")
+            print(f"[DEBUG] Błąd podczas wypełniania materiałów: {e}")
+
+    def _extract_materials_from_html(self, html_content: str) -> list:
+        """
+        Wyodrębnia materiały i procenty z HTML.
+
+        Przykład:
+        Input: "<strong>Elastan</strong> 20 % <br><strong>poliamid</strong> 80 % <br>"
+        Output: [("Elastan", 20), ("poliamid", 80)]
+
+        Args:
+            html_content: Zawartość HTML z materiałami
+
+        Returns:
+            Lista tupli (nazwa_materiału, procent)
+        """
+        if not html_content:
+            return []
+
+        import re
+
+        materials = []
+
+        # Wzorzec 1: <strong>Materiał</strong> XX % (najczęstszy format)
+        pattern1 = r'<strong>([^<]+)</strong>\s*(\d+)\s*%'
+        matches1 = re.findall(pattern1, html_content, re.IGNORECASE)
+
+        for material_name, percentage_str in matches1:
+            try:
+                percentage = int(percentage_str)
+                materials.append((material_name.strip(), percentage))
+            except ValueError:
+                continue
+
+        # Jeśli nie znaleziono, spróbuj wzorca bez tagów strong
+        if not materials:
+            # Wzorzec 2: Materiał XX % (bez HTML tagów)
+            # Najpierw usuń tagi HTML
+            text_content = re.sub(r'<[^>]+>', ' ', html_content)
+            pattern2 = r'([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:[a-ząćęłńóśźż]+)*)\s+(\d+)\s*%'
+            matches2 = re.findall(pattern2, text_content)
+
+            # Słowa do pominięcia (nie są materiałami)
+            skip_words = {
+                'rozmiar', 'obwód', 'cm', 'table', 'thead', 'tbody', 'tr', 'td', 'th',
+                'div', 'class', 'prod', 'data', 'table', 'striped', 'bordered', 'hover',
+                'responsive', 'thead', 'tbody', 'strong', 'br', 'align', 'right'
+            }
+
+            for material_name, percentage_str in matches2:
+                try:
+                    material_lower = material_name.lower().strip()
+                    if material_lower not in skip_words and len(material_name) > 2:
+                        percentage = int(percentage_str)
+                        materials.append((material_name.strip(), percentage))
+                except ValueError:
+                    continue
+
+        return materials
 
     def select_attributes(self, attribute_ids: List[int]):
         """

@@ -67,39 +67,39 @@ class ProductDescriptionStructure(BaseModel):
     """
     introduction: str = Field(
         ...,
-        description="Chwytliwe otwarcie (1-2 zdania) przyciągające uwagę klienta",
-        min_length=50,
+        description="Krótkie wprowadzenie (jedno zdanie) opisujące produkt",
+        min_length=30,
         max_length=200
     )
-    key_features: List[str] = Field(
+    top_features: List[str] = Field(
         ...,
-        description="Lista 3-5 kluczowych cech i korzyści produktu",
-        min_length=3,
-        max_length=5
+        description="Lista cech góry (biustonosz) - każda cecha jako osobny string",
+        min_length=1,
+        max_length=10
     )
-    technical_details: str = Field(
+    bottom_features: List[str] = Field(
         ...,
-        description="Szczegóły techniczne: materiał, krój, dopasowanie, konstrukcja",
-        min_length=100,
+        description="Lista cech dołu (figi) - każda cecha jako osobny string",
+        min_length=1,
+        max_length=10
+    )
+    finishing: str = Field(
+        ...,
+        description="Opis wykończenia i zdobień",
+        min_length=50,
         max_length=300
     )
-    target_audience: str = Field(
+    packaging: str = Field(
         ...,
-        description="Dla kogo jest produkt (typ sylwetki, styl życia)",
-        min_length=50,
-        max_length=150
+        description="Opis pakowania produktu",
+        min_length=30,
+        max_length=200
     )
-    occasions: str = Field(
+    size_tip: str = Field(
         ...,
-        description="Okazje do noszenia (plaża, basen, wakacje, sesje zdjęciowe)",
-        min_length=50,
-        max_length=150
-    )
-    call_to_action: str = Field(
-        ...,
-        description="Zachęta do zakupu (1 zdanie)",
-        min_length=20,
-        max_length=100
+        description="Wskazówka dotycząca rozmiaru (np. dopasowany krój, polecany rozmiar)",
+        min_length=30,
+        max_length=200
     )
 
     def to_formatted_text(self) -> str:
@@ -109,20 +109,28 @@ class ProductDescriptionStructure(BaseModel):
         lines = [
             self.introduction,
             "",
-            "Kluczowe cechy:",
-            *[f"• {feature}" for feature in self.key_features],
+            "Góra (biustonosz)",
             "",
-            self.technical_details,
+            *[f"{feature}" for feature in self.top_features],
             "",
-            f"Dla kogo: {self.target_audience}",
+            "Dół (figi)",
             "",
-            f"Okazje: {self.occasions}",
+            *[f"{feature}" for feature in self.bottom_features],
             "",
-            self.call_to_action
+            "Wykończenie",
+            "",
+            self.finishing,
+            "",
+            "Pakowanie",
+            "",
+            self.packaging,
+            "",
+            "Wskazówka rozmiarowa",
+            self.size_tip
         ]
         return "\n".join(lines)
 
-    @field_validator('introduction', 'technical_details', 'target_audience', 'occasions', 'call_to_action')
+    @field_validator('introduction', 'finishing', 'packaging', 'size_tip')
     @classmethod
     def validate_text_fields(cls, v: str) -> str:
         """Walidacja i normalizacja pól tekstowych"""
@@ -130,9 +138,9 @@ class ProductDescriptionStructure(BaseModel):
             raise ValueError("Pole nie może być puste")
         return v.strip()
 
-    @field_validator('key_features')
+    @field_validator('top_features', 'bottom_features')
     @classmethod
-    def validate_key_features(cls, v: List[str]) -> List[str]:
+    def validate_features(cls, v: List[str]) -> List[str]:
         """Walidacja listy cech"""
         if not v:
             raise ValueError("Lista cech nie może być pusta")
@@ -239,10 +247,9 @@ class AIProcessor:
         """
         limits = {
             'introduction': 200,
-            'technical_details': 300,
-            'target_audience': 150,
-            'occasions': 150,
-            'call_to_action': 100
+            'finishing': 300,
+            'packaging': 200,
+            'size_tip': 200
         }
 
         truncated_data = data.copy()
@@ -260,12 +267,13 @@ class AIProcessor:
                     logger.debug(
                         f"Skrócono pole '{field}' z {len(data[field])} do {len(truncated_data[field])} znaków")
 
-        # Skróć również key_features jeśli są zbyt długie
-        if 'key_features' in truncated_data and isinstance(truncated_data['key_features'], list):
-            truncated_data['key_features'] = [
-                feature[:200] + '...' if len(feature) > 200 else feature
-                for feature in truncated_data['key_features']
-            ]
+        # Skróć również top_features i bottom_features jeśli są zbyt długie
+        for feature_list_name in ['top_features', 'bottom_features']:
+            if feature_list_name in truncated_data and isinstance(truncated_data[feature_list_name], list):
+                truncated_data[feature_list_name] = [
+                    feature[:300] + '...' if len(feature) > 300 else feature
+                    for feature in truncated_data[feature_list_name]
+                ]
 
         return truncated_data
 
@@ -275,88 +283,152 @@ class AIProcessor:
         """
         import json
 
-        system_prompt = """Jesteś ekspertem od copywritingu e-commerce specjalizującym się w modzie plażowej i strojach kąpielowych.
+        system_prompt = """Jesteś ekspertem od copywritingu e-commerce specjalizującym się w bieliźnie i kostiumach kąpielowych.
 
 TWOJE ZADANIE:
-Przekształć podany opis produktu w strukturęzowany, atrakcyjny tekst dla sklepu online.
+Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. Podziel opis na sekcje: „Góra”, „Dół”, „Wykończenie”, „Pakowanie” oraz „Wskazówka rozmiarowa”. Dodaj konkretne wskazówki dla klienta, aby łatwiej wybrał rozmiar i używał produktu.
 
 WYTYCZNE:
 
 1. STYL I TON:
-- Przyjazny, inspirujący, lekko lifestyle'owy
-- Zwracaj się do klienta w sposób naturalny
-- Buduj emocjonalny związek z produktem
+- Elegancki, kobiecy, zmysłowy
+- Profesjonalny, ale przyjazny i zachęcający
+- Skup się na korzyściach dla klientki
+- Używaj języka, który buduje emocjonalny związek z produktem
+- Podkreślaj wyjątkowość i jakość
 
 2. STRUKTURA (JSON) - WAŻNE: PRZESTRZEGAJ DOKŁADNIE LIMITÓW ZNAKÓW:
-- introduction: Chwytliwe otwarcie (1-2 zdania, MAKSYMALNIE 200 znaków - nie przekraczaj!)
-- key_features: Lista 3-5 kluczowych cech i korzyści (każda jako osobny string, max 200 znaków każda)
-- technical_details: Szczegóły techniczne - materiał, krój, dopasowanie, konstrukcja (100-300 znaków, MAKSYMALNIE 300 znaków!)
-- target_audience: Dla kogo (typ sylwetki, styl życia) (50-150 znaków, MAKSYMALNIE 150 znaków - bardzo ważne!)
-- occasions: Okazje do noszenia (plaża, basen, wakacje) (50-150 znaków, MAKSYMALNIE 150 znaków!)
-- call_to_action: Zachęta do zakupu (1 zdanie, 20-100 znaków, MAKSYMALNIE 100 znaków!)
+- introduction: Krótkie, przyciągające wprowadzenie (jedno zdanie) opisujące produkt w elegancki sposób - MAKSYMALNIE 200 znaków!
+- top_features: Lista cech góry (biustonosz) - WYMAGANE MINIMUM 1 cecha! Każda cecha jako osobny string w formacie "cecha – elegancki opis korzyści" (np. "usztywniane miseczki z dolnymi fiszbinami – zapewniają stabilne podtrzymanie i pięknie modelują biust"). Max 10 cech, każda max 300 znaków. Jeśli produkt nie ma góry, użyj ["brak góry"].
+- bottom_features: Lista cech dołu (figi) - WYMAGANE MINIMUM 1 cecha! Każda cecha jako osobny string w formacie "cecha – elegancki opis korzyści" (np. "niski stan – subtelnie podkreśla kobiece kształty"). Max 10 cech, każda max 300 znaków. Jeśli produkt nie ma dołu, użyj ["brak dołu"].
+- finishing: Elegancki opis wykończenia i zdobień, podkreślający luksusowy charakter (50-300 znaków, MAKSYMALNIE 300 znaków!)
+- packaging: Opis pakowania produktu z naciskiem na praktyczność i wygodę (30-200 znaków, MAKSYMALNIE 200 znaków!)
+- size_tip: Konkretne wskazówki rozmiarowe dla klienta, aby łatwiej wybrał rozmiar (30-200 znaków, MAKSYMALNIE 200 znaków!)
 
-UWAGA: Jeśli przekroczysz limity znaków, odpowiedź zostanie odrzucona. Bądź zwięzły i precyzyjny!
+UWAGA: Jeśli przekroczysz limity znaków, odpowiedź zostanie odrzucona. Bądź zwięzły, ale elegancki!
+UWAGA: top_features i bottom_features MUSZĄ zawierać przynajmniej 1 element - nie mogą być pustymi listami!
 
-3. CO UWZGLĘDNIĆ:
-- Rodzaj stroju (bikini, kostium, majtki, góra)
-- Krój i fason
-- Materiał i jego właściwości (szybkoschnący, elastyczny, UV)
-- Dla kogo (typ sylwetki, styl życia)
-- Okazje do noszenia (plaża, basen, wakacje)
-- Unikalne cechy (fiszbiny, wyściółka, wiązania)
+3. FORMAT CECH (top_features i bottom_features):
+- Każda cecha powinna być w formacie: "nazwa cechy – elegancki opis korzyści" (np. "ramiączka odpinane i regulowane – zapewniają wygodę i możliwość noszenia na różne sposoby, idealne na opaleniznę")
+- Używaj myślnika (–) do oddzielenia nazwy od opisu
+- Opisuj korzyści, nie tylko cechy techniczne
+- Używaj zmysłowego, kobiecego języka
+- Bądź konkretny: wymień fiszbiny, wiązania, zapięcia, materiały, rozmiary push-up itp.
 
-4. SEO:
-- Naturalnie wpleć słowa kluczowe
-- Unikaj keyword stuffing
+4. CO UWZGLĘDNIĆ W TOP_FEATURES (góra/biustonosz):
+- Typ miseczek (usztywniane, push-up, wyjmowane) i ich korzyści
+- Fiszbiny (dolne, kształt) i jak modelują sylwetkę
+- Dekolt (kształt, głębokość) i jego efekt wizualny
+- Zapięcie (z tyłu, z przodu, regulowane) i wygoda
+- Ramiączka (odpinane, regulowane, szerokość) i możliwości stylizacji
+- Rozmiary push-up (jeśli dostępne) i efekt optyczny
+- Inne cechy konstrukcyjne z naciskiem na korzyści
 
-5. CZEGO UNIKAĆ:
-- Przesadnych obietnic
-- Sztampowych frazesów
+5. CO UWZGLĘDNIĆ W BOTTOM_FEATURES (dół/figi):
+- Stan (niski, wysoki) i efekt wizualny
+- Podszewka (obecność, materiał) i komfort
+- Wiązania (po bokach, z tyłu, regulowane) i możliwość dopasowania
+- Krój i dopasowanie oraz jak podkreśla sylwetkę
+- Inne cechy konstrukcyjne z naciskiem na korzyści
+
+6. CO UWZGLĘDNIĆ W FINISHING:
+- Zdobienia (glamour, hafty, aplikacje) i ich elegancja
+- Detale dekoracyjne i luksusowy charakter
+- Charakter wykończenia (luksusowy, elegancki, zmysłowy)
+- Zastosowanie (wakacje, sesje zdjęciowe, plażowe chwile)
+
+7. CO UWZGLĘDNIĆ W PACKAGING:
+- Rodzaj opakowania (woreczek foliowy, pudełko) i jego praktyczność
+- Wygoda na wyjazd i przechowywanie
+- Dbałość o szczegóły
+
+8. CO UWZGLĘDNIĆ W SIZE_TIP:
+- Konkretne wskazówki dotyczące rozmiaru (zamówić większy/mniejszy)
+- Informacje o kroju (dopasowany, luźny) i jak to wpływa na wybór
+- Praktyczne porady dotyczące dopasowania
+- Pomoc w wyborze odpowiedniego rozmiaru
+
+9. JĘZYK I STYL:
+- Używaj eleganckich, kobiecych określeń
+- Podkreślaj zmysłowość i kobiecość
+- Opisuj korzyści, nie tylko cechy
+- Buduj emocjonalny związek z produktem
+- Używaj pozytywnych, zachęcających sformułowań
+
+10. CZEGO UNIKAĆ:
 - Zbyt technicznego języka
+- Sztampowych frazesów
+- Zbyt agresywnych zachęt do zakupu
 - Powtórzeń
+- Zbyt długich opisów
 
 ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
-        user_prompt = f"Przekształć ten opis produktu w strukturęzowany format JSON:\n\n{original_description}"
+        user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: Wyodrębnij WSZYSTKIE cechy góry (biustonosz) do top_features i WSZYSTKIE cechy dołu (figi) do bottom_features. Każda lista MUSI zawierać przynajmniej 1 element. Jeśli nie ma informacji o górze/dole, użyj odpowiednio [\"brak góry\"] lub [\"brak dołu\"]. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
 
         # Próba użycia structured output (jeśli dostępne)
         try:
             if self.api_type == 'openai':
                 model_name = "gpt-4o-mini"
                 if os.getenv('OPENAI_API_KEY_NOVITA') == self.api_key:
-                    model_name = "KIMI-K2-THINKING"
+                    model_name = "gpt-5.2"
 
                 # Spróbuj użyć response_format dla structured output
                 try:
-                    response = self.client.chat.completions.create(
-                        model=model_name,
-                        messages=[
+                    logger.info(
+                        "Wysyłam żądanie do OpenAI API (timeout: 30s)...")
+                    print("[INFO] Wysyłam żądanie do OpenAI API (timeout: 30s)...")
+                    print("[INFO] Czekam na odpowiedź...")
+                    # Dla modelu gpt-5.2 używamy max_completion_tokens zamiast max_tokens
+                    api_params = {
+                        "model": model_name,
+                        "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt}
                         ],
-                        response_format={"type": "json_object"},
-                        temperature=0.7,
-                        max_tokens=1500,
-                        timeout=120
-                    )
+                        "response_format": {"type": "json_object"},
+                        "temperature": 0.7,
+                        "timeout": 30
+                    }
+                    if model_name == "gpt-5.2":
+                        api_params["max_completion_tokens"] = 1000
+                    else:
+                        api_params["max_tokens"] = 1000
+                    response = self.client.chat.completions.create(
+                        **api_params)
+                    logger.info("Otrzymano odpowiedź z OpenAI API")
+                    print("[INFO] Otrzymano odpowiedź z OpenAI API")
                 except Exception:
                     # Fallback - zwykłe wywołanie bez response_format
-                    response = self.client.chat.completions.create(
-                        model=model_name,
-                        messages=[
+                    logger.info("Fallback: wywołanie bez response_format...")
+                    print("[INFO] Fallback: wywołanie bez response_format...")
+                    print("[INFO] Czekam na odpowiedź...")
+                    # Dla modelu gpt-5.2 używamy max_completion_tokens zamiast max_tokens
+                    api_params = {
+                        "model": model_name,
+                        "messages": [
                             {"role": "system", "content": system_prompt +
                                 "\n\nODPOWIEDŹ MUSI BYĆ TYLKO JSON, BEZ ŻADNYCH DODATKOWYCH KOMENTARZY."},
                             {"role": "user", "content": user_prompt}
                         ],
-                        temperature=0.7,
-                        max_tokens=1500,
-                        timeout=120
-                    )
+                        "temperature": 0.7,
+                        "timeout": 30
+                    }
+                    if model_name == "gpt-5.2":
+                        api_params["max_completion_tokens"] = 1000
+                    else:
+                        api_params["max_tokens"] = 1000
+                    response = self.client.chat.completions.create(
+                        **api_params)
+                    logger.info("Otrzymano odpowiedź z OpenAI API (fallback)")
+                    print("[INFO] Otrzymano odpowiedź z OpenAI API (fallback)")
 
                 content = response.choices[0].message.content
                 if not content:
                     raise ValueError("Pusta odpowiedź z API")
 
+                logger.info("Przetwarzam odpowiedź z API...")
+                print("[INFO] Przetwarzam odpowiedź z API...")
                 content = content.strip()
 
                 # Wyciągnij JSON z odpowiedzi (może być otoczony markdown)
@@ -367,44 +439,80 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                     content = content.split("```")[1].split("```")[0].strip()
 
                 # Parsuj JSON
+                logger.info("Parsuję JSON z odpowiedzi...")
+                print("[INFO] Parsuję JSON z odpowiedzi...")
                 data = json.loads(content)
+                logger.info("JSON sparsowany pomyślnie")
+                print("[INFO] JSON sparsowany pomyślnie")
 
                 # Skróć pola do limitów przed walidacją
+                logger.info("Skracam pola do limitów...")
+                print("[INFO] Skracam pola do limitów...")
                 data = self._truncate_fields_to_limits(data)
 
                 # Waliduj przez Pydantic
+                logger.info("Waliduję dane przez Pydantic...")
+                print("[INFO] Waliduję dane przez Pydantic...")
                 description_structure = ProductDescriptionStructure(**data)
+                logger.info("Walidacja zakończona pomyślnie")
+                print("[INFO] Walidacja zakończona pomyślnie")
 
                 # Konwertuj na tekst
+                logger.info("Konwertuję strukturę na tekst...")
+                print("[INFO] Konwertuję strukturę na tekst...")
                 formatted_text = description_structure.to_formatted_text()
 
                 logger.info(
                     f"Opis ulepszony przez AI ze strukturą (długość: {len(formatted_text)})")
+                print(
+                    f"[INFO] Opis ulepszony przez AI (długość: {len(formatted_text)} znaków)")
                 return formatted_text
 
             elif self.api_type == 'huggingface':
-                # HuggingFace - użyj tego samego podejścia
-                max_retries = 5
-                retry_delay = 5
+                # Użyj OpenAI API z modelem gpt-5.2 zamiast HuggingFace
+                # Pobierz klucz OpenAI (preferuj OPENAI_API_KEY, potem OPENAI_API_KEY_NOVITA)
+                openai_key = os.getenv('OPENAI_API_KEY') or os.getenv(
+                    'OPENAI_API_KEY_NOVITA')
+                if not openai_key:
+                    raise ValueError(
+                        "Brak klucza OpenAI API dla modelu gpt-5.2")
+
+                from openai import OpenAI
+                openai_client = OpenAI(api_key=openai_key)
+
+                max_retries = 2  # Zmniejszone z 5 do 2
+                retry_delay = 3  # Zmniejszone z 5 do 3
 
                 for attempt in range(max_retries):
                     try:
-                        response = self.client.chat.completions.create(
-                            model="moonshotai/Kimi-K2-Thinking",
+                        logger.info(
+                            f"Próba {attempt + 1}/{max_retries} - wysyłam żądanie do OpenAI API (model: gpt-5.2, timeout: 30s)...")
+                        print(
+                            f"[INFO] Próba {attempt + 1}/{max_retries} - wysyłam żądanie do OpenAI API (model: gpt-5.2, timeout: 30s)...")
+                        print("[INFO] Czekam na odpowiedź...")
+                        response = openai_client.chat.completions.create(
+                            model="gpt-5.2",
                             messages=[
                                 {"role": "system", "content": system_prompt +
                                     "\n\nODPOWIEDŹ MUSI BYĆ TYLKO JSON, BEZ ŻADNYCH DODATKOWYCH KOMENTARZY."},
                                 {"role": "user", "content": user_prompt}
                             ],
                             temperature=0.7,
-                            max_tokens=1500,
-                            timeout=120
+                            # Zmienione z max_tokens na max_completion_tokens dla gpt-5.2
+                            max_completion_tokens=1000,
+                            timeout=30  # Zmniejszone z 120 do 30 sekund
                         )
+                        logger.info(
+                            f"Otrzymano odpowiedź z OpenAI API (model: gpt-5.2, próba {attempt + 1})")
+                        print(
+                            f"[INFO] Otrzymano odpowiedź z OpenAI API (model: gpt-5.2, próba {attempt + 1})")
 
                         content = response.choices[0].message.content
                         if not content:
                             raise ValueError("Pusta odpowiedź z API")
 
+                        logger.info("Przetwarzam odpowiedź z OpenAI API...")
+                        print("[INFO] Przetwarzam odpowiedź z OpenAI API...")
                         content = content.strip()
 
                         # Wyciągnij JSON
@@ -416,18 +524,31 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                                 "```")[1].split("```")[0].strip()
 
                         # Parsuj JSON
+                        logger.info("Parsuję JSON z odpowiedzi...")
+                        print("[INFO] Parsuję JSON z odpowiedzi...")
                         data = json.loads(content)
+                        logger.info("JSON sparsowany pomyślnie")
+                        print("[INFO] JSON sparsowany pomyślnie")
 
                         # Skróć pola do limitów przed walidacją
+                        logger.info("Skracam pola do limitów...")
+                        print("[INFO] Skracam pola do limitów...")
                         data = self._truncate_fields_to_limits(data)
 
                         # Waliduj przez Pydantic
+                        logger.info("Waliduję dane przez Pydantic...")
+                        print("[INFO] Waliduję dane przez Pydantic...")
                         description_structure = ProductDescriptionStructure(
                             **data)
+                        logger.info("Walidacja zakończona pomyślnie")
+                        print("[INFO] Walidacja zakończona pomyślnie")
+
                         formatted_text = description_structure.to_formatted_text()
 
                         logger.info(
                             f"Opis ulepszony przez AI ze strukturą (długość: {len(formatted_text)})")
+                        print(
+                            f"[INFO] Opis ulepszony przez AI (długość: {len(formatted_text)} znaków)")
                         return formatted_text
 
                     except json.JSONDecodeError as e:
@@ -472,10 +593,10 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
         """
         try:
             if self.api_type == 'openai':
-                # Sprawdź czy używamy klucza Novita (może obsługiwać model KIMI-K2-THINKING)
+                # Sprawdź czy używamy klucza Novita (może obsługiwać model gpt-5.2)
                 model_name = "gpt-4o-mini"  # Domyślny model
                 if os.getenv('OPENAI_API_KEY_NOVITA') == self.api_key:
-                    model_name = "KIMI-K2-THINKING"  # Spróbuj użyć modelu KIMI
+                    model_name = "gpt-5.2"  # Spróbuj użyć modelu gpt-5.2
 
                 response = self.client.chat.completions.create(
                     model=model_name,
@@ -534,41 +655,43 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                     enhanced = original_description
 
             elif self.api_type == 'huggingface':
-                # Użyj HuggingFace Router API z modelem KIMI-K2-THINKING
+                # Użyj OpenAI API z modelem gpt-5.2 zamiast HuggingFace
+                # Pobierz klucz OpenAI (preferuj OPENAI_API_KEY, potem OPENAI_API_KEY_NOVITA)
+                openai_key = os.getenv('OPENAI_API_KEY') or os.getenv(
+                    'OPENAI_API_KEY_NOVITA')
+                if not openai_key:
+                    raise ValueError(
+                        "Brak klucza OpenAI API dla modelu gpt-5.2")
+
+                from openai import OpenAI
+                openai_client = OpenAI(api_key=openai_key)
+
                 # Spróbuj kilka razy z retry w przypadku błędów 504/timeout
-                max_retries = 5  # Zwiększona liczba prób
-                # Zwiększony początkowy delay (5, 10, 20, 40, 60 sekund)
-                retry_delay = 5
+                max_retries = 2  # Zmniejszone z 5 do 2
+                # Zmniejszony początkowy delay (3, 6 sekund)
+                retry_delay = 3  # Zmniejszone z 5 do 3
                 enhanced = None
 
-                # Lista modeli do próby
-                # Bez :novita HuggingFace Router automatycznie wybiera najlepszy dostępny model
-                models_to_try = [
-                    # Główny model (automatyczny wybór)
-                    "moonshotai/Kimi-K2-Thinking",
-                ]
+                # Model do użycia
+                model = "gpt-5.2"
 
                 success = False
                 for attempt in range(max_retries):
                     if success:
                         break
 
-                    for model in models_to_try:
-                        if success:
-                            break
+                    try:
+                        logger.info(
+                            f"Próba {attempt + 1}/{max_retries} z modelem {model} (OpenAI API)")
+                        print(
+                            f"[INFO] Próba {attempt + 1}/{max_retries} z modelem {model} (OpenAI API)")
 
-                        try:
-                            logger.info(
-                                f"Próba {attempt + 1}/{max_retries} z modelem {model}")
-                            print(
-                                f"[DEBUG] Próba {attempt + 1}/{max_retries} z modelem {model}")
-
-                            response = self.client.chat.completions.create(
-                                model=model,
-                                messages=[
-                                    {
-                                        "role": "system",
-                                        "content": """Jesteś ekspertem od copywritingu e-commerce specjalizującym się w modzie plażowej i strojach kąpielowych.
+                        response = openai_client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": """Jesteś ekspertem od copywritingu e-commerce specjalizującym się w modzie plażowej i strojach kąpielowych.
 
                             TWOJE ZADANIE:
                             Przekształć podany opis produktu w atrakcyjny, sprzedażowy tekst dla sklepu online.
@@ -604,81 +727,79 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                             - Sztampowych frazesów
                             - Zbyt technicznego języka
                             - Powtórzeń"""
-                                    },
-                                    {
-                                        "role": "user",
-                                        "content": f"Ulepsz ten opis produktu:\n\n{original_description}"
-                                    }
-                                ],
-                                temperature=0.7,
-                                max_tokens=1000,
-                                timeout=120  # Zwiększony timeout do 120 sekund
-                            )
+                                },
+                                {
+                                    "role": "user",
+                                    "content": f"Ulepsz ten opis produktu:\n\n{original_description}"
+                                }
+                            ],
+                            temperature=0.7,
+                            # Zmienione z max_tokens na max_completion_tokens dla gpt-5.2
+                            max_completion_tokens=800,
+                            timeout=30  # Zmniejszone z 120 do 30 sekund
+                        )
+                        logger.info(
+                            f"Otrzymano odpowiedź z OpenAI API (model: gpt-5.2, próba {attempt + 1})")
+                        print(
+                            f"[INFO] Otrzymano odpowiedź z OpenAI API (model: gpt-5.2, próba {attempt + 1})")
 
-                            if response.choices[0].message.content:
-                                enhanced = response.choices[0].message.content.strip(
-                                )
+                        if response.choices[0].message.content:
+                            enhanced = response.choices[0].message.content.strip(
+                            )
+                        else:
+                            enhanced = original_description
+
+                        # Sukces - wyjdź z pętli
+                        logger.info(f"Sukces z modelem {model}")
+                        print(f"[INFO] Sukces z modelem {model}")
+                        success = True
+                        break
+
+                    except Exception as e:
+                        error_msg = str(e)
+                        logger.warning(
+                            f"Błąd z modelem {model}: {error_msg[:100]}")
+                        print(
+                            f"[DEBUG] Błąd z modelem {model}: {error_msg[:100]}")
+
+                        # Jeśli to timeout/504, spróbuj retry
+                        is_timeout = (
+                            "504" in error_msg or "Gateway Timeout" in error_msg or
+                            "timeout" in error_msg.lower() or "InternalServerError" in error_msg or
+                            "Request timed out" in error_msg
+                        )
+
+                        if is_timeout:
+                            # Przejdź do retry
+                            if attempt < max_retries - 1:
+                                logger.warning(
+                                    f"Błąd timeout OpenAI API (próba {attempt + 1}/{max_retries}), "
+                                    f"czekam {retry_delay}s i ponawiam...")
+                                print(
+                                    f"[INFO] Błąd timeout OpenAI API (próba {attempt + 1}/{max_retries}), "
+                                    f"czekam {retry_delay}s i ponawiam...")
+                                time.sleep(retry_delay)
+                                # Exponential backoff, max 10s (zmniejszone z 60)
+                                retry_delay = min(retry_delay * 2, 10)
+                                continue  # Przejdź do następnej próby
                             else:
+                                # Ostatnia próba - zwróć oryginalny opis
+                                logger.error(
+                                    f"Błąd timeout OpenAI API po {max_retries} próbach")
+                                print(
+                                    f"[INFO] Błąd timeout OpenAI API po {max_retries} próbach")
                                 enhanced = original_description
-
-                            # Sukces - wyjdź z obu pętli
-                            logger.info(f"Sukces z modelem {model}")
-                            print(f"[DEBUG] Sukces z modelem {model}")
-                            success = True
-                            break
-
-                        except Exception as e:
-                            error_msg = str(e)
-                            logger.warning(
-                                f"Błąd z modelem {model}: {error_msg[:100]}")
+                                success = True  # Zakończ pętle
+                                break
+                        else:
+                            # Inny błąd - zwróć oryginalny opis
+                            logger.error(
+                                f"Błąd OpenAI API: {e}")
                             print(
-                                f"[DEBUG] Błąd z modelem {model}: {error_msg[:100]}")
-
-                            # Jeśli to timeout/504, spróbuj następnego modelu lub retry
-                            is_timeout = (
-                                "504" in error_msg or "Gateway Timeout" in error_msg or
-                                "timeout" in error_msg.lower() or "InternalServerError" in error_msg or
-                                "Request timed out" in error_msg
-                            )
-
-                            if is_timeout:
-                                # Spróbuj następnego modelu w tej samej próbie
-                                if model != models_to_try[-1]:
-                                    continue  # Spróbuj następnego modelu
-                                # Jeśli to ostatni model, przejdź do retry
-                                if attempt < max_retries - 1:
-                                    logger.warning(
-                                        f"Błąd 504/timeout HuggingFace (próba {attempt + 1}/{max_retries}), "
-                                        f"czekam {retry_delay}s i ponawiam...")
-                                    print(
-                                        f"[DEBUG] Błąd 504/timeout HuggingFace (próba {attempt + 1}/{max_retries}), "
-                                        f"czekam {retry_delay}s i ponawiam...")
-                                    time.sleep(retry_delay)
-                                    # Exponential backoff, max 60s
-                                    retry_delay = min(retry_delay * 2, 60)
-                                    break  # Wyjdź z pętli modeli, przejdź do następnej próby
-                                else:
-                                    # Ostatnia próba - zwróć oryginalny opis
-                                    logger.error(
-                                        f"Błąd 504/timeout HuggingFace po {max_retries} próbach z wszystkimi modelami")
-                                    print(
-                                        f"[DEBUG] Błąd 504/timeout HuggingFace po {max_retries} próbach z wszystkimi modelami")
-                                    enhanced = original_description
-                                    success = True  # Zakończ pętle
-                                    break
-                            else:
-                                # Inny błąd - spróbuj następnego modelu
-                                if model != models_to_try[-1]:
-                                    continue  # Spróbuj następnego modelu
-                                else:
-                                    # Ostatni model, inny błąd - zwróć oryginalny opis
-                                    logger.error(
-                                        f"Błąd HuggingFace API z wszystkimi modelami: {e}")
-                                    print(
-                                        "[DEBUG] Błąd HuggingFace API z wszystkimi modelami")
-                                    enhanced = original_description
-                                    success = True  # Zakończ pętle
-                                    break
+                                f"[INFO] Błąd OpenAI API: {error_msg[:100]}")
+                            enhanced = original_description
+                            success = True  # Zakończ pętle
+                            break
 
                 # Jeśli HuggingFace nie zadziałało, spróbuj OpenAI jako fallback
                 if not enhanced or enhanced == original_description:
@@ -694,7 +815,7 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                             # Określ model OpenAI
                             model_name = "gpt-4o-mini"
                             if os.getenv('OPENAI_API_KEY_NOVITA') == openai_key:
-                                model_name = "KIMI-K2-THINKING"
+                                model_name = "gpt-5.2"
 
                             response = openai_client.chat.completions.create(
                                 model=model_name,
@@ -744,9 +865,13 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                                     }
                                 ],
                                 temperature=0.7,
-                                max_tokens=1000,
-                                timeout=120
+                                max_tokens=800,  # Zmniejszone dla szybszej odpowiedzi
+                                timeout=30  # Zmniejszone z 120 do 30 sekund
                             )
+                            logger.info(
+                                "Otrzymano odpowiedź z OpenAI (fallback)")
+                            print(
+                                "[DEBUG] Otrzymano odpowiedź z OpenAI (fallback)")
 
                             if response.choices[0].message.content:
                                 enhanced = response.choices[0].message.content.strip(
@@ -781,7 +906,7 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
                         model_name = "gpt-4o-mini"
                         if os.getenv('OPENAI_API_KEY_NOVITA') == openai_key:
-                            model_name = "KIMI-K2-THINKING"
+                            model_name = "gpt-5.2"
 
                         response = openai_client.chat.completions.create(
                             model=model_name,
@@ -930,7 +1055,7 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
             if self.api_type == 'openai':
                 model_name = "gpt-4o-mini"
                 if os.getenv('OPENAI_API_KEY_NOVITA') == self.api_key:
-                    model_name = "KIMI-K2-THINKING"
+                    model_name = "gpt-5.2"
 
                 logger.info(
                     f"Używam API: {self.api_type}, model: {model_name}")
@@ -946,7 +1071,8 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                         ],
                         response_format={"type": "json_object"},
                         temperature=0.7,
-                        max_tokens=300,
+                        # Zmienione z max_tokens na max_completion_tokens dla gpt-5.2
+                        max_completion_tokens=300,
                         timeout=60
                     )
                 except Exception as e:
@@ -1013,25 +1139,36 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                 return final_name
 
             elif self.api_type == 'huggingface':
+                # Użyj OpenAI API z modelem gpt-5.2 zamiast HuggingFace
+                openai_key = os.getenv('OPENAI_API_KEY') or os.getenv(
+                    'OPENAI_API_KEY_NOVITA')
+                if not openai_key:
+                    raise ValueError(
+                        "Brak klucza OpenAI API dla modelu gpt-5.2")
+
+                from openai import OpenAI
+                openai_client = OpenAI(api_key=openai_key)
+
                 max_retries = 5
                 retry_delay = 5
 
                 logger.info(
-                    f"Używam API: {self.api_type}, model: moonshotai/Kimi-K2-Thinking")
+                    f"Używam OpenAI API, model: gpt-5.2")
                 print(
-                    f"[DEBUG] Używam API: {self.api_type}, model: moonshotai/Kimi-K2-Thinking")
+                    f"[INFO] Używam OpenAI API, model: gpt-5.2")
 
                 for attempt in range(max_retries):
                     try:
-                        response = self.client.chat.completions.create(
-                            model="moonshotai/Kimi-K2-Thinking",
+                        response = openai_client.chat.completions.create(
+                            model="gpt-5.2",
                             messages=[
                                 {"role": "system", "content": system_prompt +
                                     "\n\nODPOWIEDŹ MUSI BYĆ TYLKO JSON, BEZ ŻADNYCH DODATKOWYCH KOMENTARZY."},
                                 {"role": "user", "content": user_prompt}
                             ],
                             temperature=0.7,
-                            max_tokens=300,
+                            # Zmienione z max_tokens na max_completion_tokens dla gpt-5.2
+                            max_completion_tokens=300,
                             timeout=60
                         )
 
@@ -1249,7 +1386,7 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
             if self.api_type == 'openai':
                 model_name = "gpt-4o-mini"
                 if os.getenv('OPENAI_API_KEY_NOVITA') == self.api_key:
-                    model_name = "KIMI-K2-THINKING"
+                    model_name = "gpt-5.2"
 
                 response = self.client.chat.completions.create(
                     model=model_name,
@@ -1275,81 +1412,86 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                     short_desc = description[:max_length] if description else ""
 
             elif self.api_type == 'huggingface':
+                # Użyj OpenAI API z modelem gpt-5.2 zamiast HuggingFace
+                openai_key = os.getenv('OPENAI_API_KEY') or os.getenv(
+                    'OPENAI_API_KEY_NOVITA')
+                if not openai_key:
+                    raise ValueError(
+                        "Brak klucza OpenAI API dla modelu gpt-5.2")
+
+                from openai import OpenAI
+                openai_client = OpenAI(api_key=openai_key)
+
                 # Użyj tego samego modelu co dla długiego opisu z retry logic
                 max_retries = 5
                 retry_delay = 5
                 short_desc = None
 
-                # Bez :novita HuggingFace Router automatycznie wybiera najlepszy dostępny model
-                models_to_try = [
-                    # Główny model (automatyczny wybór)
-                    "moonshotai/Kimi-K2-Thinking",
-                ]
+                # Model do użycia
+                model = "gpt-5.2"
 
                 success = False
                 for attempt in range(max_retries):
                     if success:
                         break
 
-                    for model in models_to_try:
-                        if success:
-                            break
+                    try:
+                        response = openai_client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": f"Jesteś ekspertem od tworzenia krótkich opisów produktów. "
+                                    f"Twórz zwięzłe, atrakcyjne opisy produktów tekstylnych o maksymalnej długości {max_length} znaków. "
+                                    f"Odpowiadaj tylko krótkim opisem, bez dodatkowych komentarzy."
+                                },
+                                {
+                                    "role": "user",
+                                    "content": f"Utwórz krótki opis produktu na podstawie tego opisu:\n\n{description}"
+                                }
+                            ],
+                            temperature=0.7,
+                            # Zmienione z max_tokens na max_completion_tokens dla gpt-5.2
+                            max_completion_tokens=200,
+                            timeout=30  # Zmniejszone z 120 do 30 sekund
+                        )
+                        logger.info(
+                            "Otrzymano odpowiedź dla krótkiego opisu z OpenAI API (model: gpt-5.2)")
+                        print(
+                            "[INFO] Otrzymano odpowiedź dla krótkiego opisu z OpenAI API (model: gpt-5.2)")
 
-                        try:
-                            response = self.client.chat.completions.create(
-                                model=model,
-                                messages=[
-                                    {
-                                        "role": "system",
-                                        "content": f"Jesteś ekspertem od tworzenia krótkich opisów produktów. "
-                                        f"Twórz zwięzłe, atrakcyjne opisy produktów tekstylnych o maksymalnej długości {max_length} znaków. "
-                                        f"Odpowiadaj tylko krótkim opisem, bez dodatkowych komentarzy."
-                                    },
-                                    {
-                                        "role": "user",
-                                        "content": f"Utwórz krótki opis produktu na podstawie tego opisu:\n\n{description}"
-                                    }
-                                ],
-                                temperature=0.7,
-                                max_tokens=200,
-                                timeout=120
+                        if response.choices[0].message.content:
+                            short_desc = response.choices[0].message.content.strip(
                             )
+                        else:
+                            short_desc = description[:max_length] if description else ""
 
-                            if response.choices[0].message.content:
-                                short_desc = response.choices[0].message.content.strip(
-                                )
+                        success = True
+                        break
+
+                    except Exception as e:
+                        error_msg = str(e)
+                        is_timeout = (
+                            "504" in error_msg or "Gateway Timeout" in error_msg or
+                            "timeout" in error_msg.lower() or "InternalServerError" in error_msg or
+                            "Request timed out" in error_msg
+                        )
+
+                        if is_timeout:
+                            if attempt < max_retries - 1:
+                                time.sleep(retry_delay)
+                                # Max 10s zamiast 60s
+                                retry_delay = min(retry_delay * 2, 10)
+                                continue
                             else:
                                 short_desc = description[:max_length] if description else ""
-
+                                success = True
+                                break
+                        else:
+                            # Inny błąd - zwróć oryginalny opis
+                            short_desc = description[:max_length] if description else ""
                             success = True
                             break
-
-                        except Exception as e:
-                            error_msg = str(e)
-                            is_timeout = (
-                                "504" in error_msg or "Gateway Timeout" in error_msg or
-                                "timeout" in error_msg.lower() or "InternalServerError" in error_msg or
-                                "Request timed out" in error_msg
-                            )
-
-                            if is_timeout:
-                                if model != models_to_try[-1]:
-                                    continue
-                                if attempt < max_retries - 1:
-                                    time.sleep(retry_delay)
-                                    retry_delay = min(retry_delay * 2, 60)
-                                    break
-                                else:
-                                    short_desc = description[:max_length] if description else ""
-                                    success = True
-                                    break
-                            else:
-                                if model != models_to_try[-1]:
-                                    continue
-                                else:
-                                    short_desc = description[:max_length] if description else ""
-                                    success = True
-                                    break
 
                 # Jeśli HuggingFace nie zadziałało, spróbuj OpenAI jako fallback
                 if not short_desc or short_desc == description[:max_length] if description else "":
@@ -1366,7 +1508,7 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
                             model_name = "gpt-4o-mini"
                             if os.getenv('OPENAI_API_KEY_NOVITA') == openai_key:
-                                model_name = "KIMI-K2-THINKING"
+                                model_name = "gpt-5.2"
 
                             response = openai_client.chat.completions.create(
                                 model=model_name,
@@ -1384,8 +1526,12 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                                 ],
                                 temperature=0.7,
                                 max_tokens=200,
-                                timeout=120
+                                timeout=30  # Zmniejszone z 120 do 30 sekund
                             )
+                            logger.info(
+                                "Otrzymano odpowiedź dla krótkiego opisu")
+                            print(
+                                "[DEBUG] Otrzymano odpowiedź dla krótkiego opisu")
 
                             if response.choices[0].message.content:
                                 short_desc = response.choices[0].message.content.strip(
@@ -1430,7 +1576,7 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
                         model_name = "gpt-4o-mini"
                         if os.getenv('OPENAI_API_KEY_NOVITA') == openai_key:
-                            model_name = "KIMI-K2-THINKING"
+                            model_name = "gpt-5.2"
 
                         response = openai_client.chat.completions.create(
                             model=model_name,
@@ -1801,15 +1947,40 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
             if not content:
                 raise ValueError("Pusta odpowiedź z OpenAI API")
 
-            # Parsuj JSON
-            result = json.loads(content)
+            # Upewnij się, że content jest prawidłowo zdekodowany jako UTF-8
+            if isinstance(content, bytes):
+                content = content.decode('utf-8')
+            elif not isinstance(content, str):
+                content = str(content)
+
+            # Normalizuj Unicode przed parsowaniem (NFKC - kompatybilność + kompozycja)
+            # To pomaga naprawić problemy z kodowaniem polskich znaków
+            import unicodedata
+            content_normalized = unicodedata.normalize('NFKC', content)
+
+            # Parsuj JSON (Python 3 zawsze używa UTF-8)
+            try:
+                result = json.loads(content_normalized)
+            except json.JSONDecodeError as e:
+                # Jeśli parsowanie się nie powiodło, spróbuj bez normalizacji
+                logger.warning(
+                    f"Błąd parsowania JSON po normalizacji, próba bez normalizacji: {e}")
+                result = json.loads(content)
 
             if 'attributes' not in result or not isinstance(result['attributes'], list):
                 raise ValueError(
                     "Nieprawidłowy format odpowiedzi z OpenAI API")
 
-            extracted_attr_names = [attr.strip()
-                                    for attr in result['attributes']]
+            # Normalizuj i wyczyść nazwy atrybutów z problemami kodowania
+            extracted_attr_names = []
+            for attr in result['attributes']:
+                if isinstance(attr, bytes):
+                    attr = attr.decode('utf-8')
+                attr_str = str(attr).strip()
+                # Normalizuj Unicode (NFKC - kompatybilność + kompozycja)
+                # To naprawia problemy z kodowaniem polskich znaków (np. "wiązane" -> "wiązane")
+                attr_normalized = unicodedata.normalize('NFKC', attr_str)
+                extracted_attr_names.append(attr_normalized)
 
             logger.info(
                 f"LLM wyodrębnił następujące atrybuty: {extracted_attr_names}")

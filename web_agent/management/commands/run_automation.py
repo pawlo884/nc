@@ -6,6 +6,8 @@ from web_agent.automation.browser_automation import BrowserAutomation
 from web_agent.models import AutomationRun, BrandConfig
 from matterhorn1.models import Brand, Category
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 import os
 
 
@@ -205,6 +207,36 @@ class Command(BaseCommand):
                         browser.update_product_name()
                         self.stdout.write(self.style.SUCCESS(
                             "[OK] Zaktualizowano nazwę produktu"))
+
+                        # Wyodrębnij i wypełnij kolor producenta (użyj zapisanej oryginalnej nazwy)
+                        if hasattr(browser, '_original_product_name') and browser._original_product_name:
+                            try:
+                                self.stdout.write(
+                                    "\n[INFO] Wyodrębnianie koloru producenta...")
+                                browser.update_producer_color(
+                                    browser._original_product_name,
+                                    brand_id=brand_id,
+                                    brand_name=brand.name if brand else None
+                                )
+                                self.stdout.write(self.style.SUCCESS(
+                                    "[OK] Wypełniono kolor producenta"))
+                            except Exception as e_color:
+                                self.stdout.write(self.style.WARNING(
+                                    f"[WARNING] Błąd podczas wyodrębniania koloru: {e_color}"))
+
+                        # Wyodrębnij i wypełnij kod producenta (użyj zapisanej oryginalnej nazwy)
+                        if hasattr(browser, '_original_product_name') and browser._original_product_name:
+                            try:
+                                self.stdout.write(
+                                    "\n[INFO] Wyodrębnianie kodu producenta...")
+                                browser.update_producer_code(
+                                    browser._original_product_name
+                                )
+                                self.stdout.write(self.style.SUCCESS(
+                                    "[OK] Wypełniono kod producenta"))
+                            except Exception as e_code:
+                                self.stdout.write(self.style.WARNING(
+                                    f"[WARNING] Błąd podczas wyodrębniania kodu: {e_code}"))
                     except Exception as e_name:
                         self.stdout.write(self.style.ERROR(
                             f"[ERROR] Błąd podczas edycji nazwy: {e_name}"))
@@ -262,6 +294,55 @@ class Command(BaseCommand):
                     except Exception as e_desc:
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas edycji opisu: {e_desc}"))
+
+                    # Wypełnij materiały (skład) z szczegółów produktu - PRZED przejściem do MPD
+                    # Pola szczegółów są w formularzu produktu matterhorn1, nie w MPD
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] Wyodrębnianie i wypełnianie materiałów...")
+                        browser.fill_fabric_materials()
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Wypełniono materiały"))
+                    except Exception as e_fabric:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas wypełniania materiałów: {e_fabric}"))
+
+                    # Wybierz grupę rozmiarową na podstawie kategorii
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] Wybieranie grupy rozmiarowej...")
+                        category_name_for_size = automation_filters.get(
+                            'category_name') if automation_filters else category_name
+                        browser.select_size_category(category_name_for_size)
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Wybrano grupę rozmiarową"))
+                    except Exception as e_size:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas wyboru grupy rozmiarowej: {e_size}"))
+
+                    # Zaznacz ścieżkę produktu (Dwuczęściowe)
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] Wybieranie ścieżki produktu...")
+                        # value="5" dla Dwuczęściowe
+                        browser.select_product_path(path_value="5")
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Wybrano ścieżkę produktu"))
+                    except Exception as e_path:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas wyboru ścieżki produktu: {e_path}"))
+
+                    # Wybierz jednostkę produktu (szt.)
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] Wybieranie jednostki produktu...")
+                        # value="0" dla szt.
+                        browser.select_unit(unit_value="0")
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Wybrano jednostkę produktu"))
+                    except Exception as e_unit:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas wyboru jednostki produktu: {e_unit}"))
 
                     # Utwórz produkt w MPD (przycisk "Utwórz nowy produkt w MPD")
                     # Jeśli przycisk istnieje, produkt nie jest zmapowany - klikamy go

@@ -1,5 +1,4 @@
 from django.db import models
-from django.utils import timezone
 
 
 class AutomationRun(models.Model):
@@ -146,3 +145,55 @@ class BrandConfig(models.Model):
 
     def __str__(self):
         return f"{self.brand_name} (ID: {self.brand_id})"
+
+
+class ProducerColor(models.Model):
+    """Baza kolorów producenta dla marki - przechowuje fantazyjne nazwy kolorów"""
+
+    id = models.BigAutoField(primary_key=True)
+    brand_id = models.IntegerField(
+        db_index=True, verbose_name='ID marki')
+    brand_name = models.CharField(
+        max_length=200, verbose_name='Nazwa marki')
+    color_name = models.CharField(
+        max_length=200, verbose_name='Nazwa koloru producenta')
+    normalized_color = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        verbose_name='Znormalizowana nazwa koloru',
+        help_text='Znormalizowana wersja nazwy koloru do porównań'
+    )
+    usage_count = models.IntegerField(
+        default=0, verbose_name='Liczba użyć')
+    created_at = models.DateTimeField(
+        auto_now_add=True, verbose_name='Utworzono')
+    updated_at = models.DateTimeField(
+        auto_now=True, verbose_name='Zaktualizowano')
+
+    class Meta:
+        db_table = 'producer_color'
+        verbose_name = 'Kolor producenta'
+        verbose_name_plural = 'Kolory producenta'
+        ordering = ['brand_name', 'color_name']
+        unique_together = [['brand_id', 'color_name']]
+        indexes = [
+            models.Index(fields=['brand_id', 'color_name']),
+            models.Index(fields=['brand_name']),
+        ]
+
+    def __str__(self):
+        return f"{self.brand_name} - {self.color_name}"
+
+    def save(self, *args, **kwargs):
+        """Automatycznie normalizuje nazwę koloru przy zapisie"""
+        if not self.normalized_color and self.color_name:
+            self.normalized_color = self._normalize_color_name(self.color_name)
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _normalize_color_name(color_name: str) -> str:
+        """Normalizuje nazwę koloru do porównań (lowercase, bez spacji)"""
+        if not color_name:
+            return ""
+        return color_name.lower().strip().replace(' ', '').replace('-', '')
