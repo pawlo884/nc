@@ -1833,6 +1833,18 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
             for extracted_name in extracted_attr_names:
                 extracted_lower = extracted_name.lower()
+
+                # 0) Reguły specjalne dla znanych synonimów
+                # "wiązane po/na bokach" traktujemy jak atrybut "regulowane"
+                if "wiąz" in extracted_lower and "bok" in extracted_lower and "regulowane" in attr_name_to_id:
+                    reg_id = attr_name_to_id["regulowane"]
+                    matched_attr_ids.append(reg_id)
+                    logger.info(
+                        f"Dopasowano regułą specjalną: '{extracted_name}' -> 'regulowane' (ID: {reg_id})")
+                    print(
+                        f"[DEBUG] Dopasowano regułą specjalną: '{extracted_name}' -> 'regulowane' (ID: {reg_id})")
+                    continue
+
                 # 1) Dokładne dopasowanie
                 if extracted_lower in attr_name_to_id:
                     attr_id = attr_name_to_id[extracted_lower]
@@ -1860,6 +1872,7 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
                 # 3) Fuzzy matching dla literówek (np. 'uszywiane miseczki' -> 'usztywniane miseczki')
                 if use_fuzzy:
+                    from rapidfuzz import fuzz  # type: ignore
                     best_id = None
                     best_score = 0.0
                     for attr_id, attr_name_lower in available_for_fuzzy:
