@@ -1851,7 +1851,7 @@ class BrowserAutomation:
         """
         DEPRECATED: Użyj fill_mpd_short_description() zamiast tej metody.
         Wrapper dla kompatybilności wstecznej.
-        
+
         Args:
             full_description: Pełny opis produktu (ignorowany - metoda pobierze go automatycznie)
             ai_processor: Instancja AIProcessor do tworzenia krótkiego opisu. Jeśli None, tworzy nową.
@@ -2064,9 +2064,10 @@ class BrowserAutomation:
         1. Wypełnia pole mpd_name (SCENARIUSZ CREATE, KROK 1)
         2. Wypełnia pole mpd_description (SCENARIUSZ CREATE, KROK 2)
         3. Wypełnia pole mpd_short_description (SCENARIUSZ CREATE, KROK 3)
-        4. Ustawia markę (mpd_brand)
-        5. Ustawia kolor producenta (producer_color_name)
-        6. Klika przycisk "Utwórz nowy produkt w MPD"
+        4. Wypełnia atrybuty w mpd_attributes (SCENARIUSZ CREATE, KROK 4)
+        5. Ustawia markę (mpd_brand)
+        6. Ustawia kolor producenta (producer_color_name)
+        7. Klika przycisk "Utwórz nowy produkt w MPD"
 
         Args:
             ai_processor: Instancja AIProcessor do ulepszania nazwy. Jeśli None, tworzy nową.
@@ -2106,6 +2107,15 @@ class BrowserAutomation:
                     "Nie udało się wypełnić pola mpd_short_description, kontynuuję dalej...")
                 print(
                     "[DEBUG] Nie udało się wypełnić pola mpd_short_description, kontynuuję dalej...")
+
+            # SCENARIUSZ CREATE, KROK 4: Wypełnij atrybuty w mpd_attributes
+            filled_attributes = self.fill_mpd_attributes(
+                ai_processor=ai_processor)
+            if not filled_attributes:
+                logger.warning(
+                    "Nie udało się wypełnić atrybutów w mpd_attributes, kontynuuję dalej...")
+                print(
+                    "[DEBUG] Nie udało się wypełnić atrybutów w mpd_attributes, kontynuuję dalej...")
 
             # PRZED kliknięciem przycisku ustaw markę i kolor producenta w sekcji MPD
             try:
@@ -2430,6 +2440,139 @@ class BrowserAutomation:
             import traceback
             traceback.print_exc()
             raise
+
+    def fill_mpd_attributes(self, ai_processor=None):
+        """
+        SCENARIUSZ CREATE, KROK 4: Wypełnia atrybuty w polu mpd_attributes w sekcji MPD.
+
+        Pobiera opis z pola mpd_description (które powinno być już wypełnione przez KROK 2),
+        wyciąga atrybuty z opisu przez AI i zaznacza je w polu mpd_attributes.
+
+        Args:
+            ai_processor: Instancja AIProcessor do wyciągania atrybutów. Jeśli None, tworzy nową.
+
+        Returns:
+            List[int]: Lista ID zaznaczonych atrybutów lub None w przypadku błędu
+        """
+        try:
+            logger.info("=" * 50)
+            logger.info(
+                "SCENARIUSZ CREATE, KROK 4: Wypełnianie atrybutów w mpd_attributes")
+            logger.info("=" * 50)
+            print("[DEBUG] " + "=" * 50)
+            print(
+                "[DEBUG] SCENARIUSZ CREATE, KROK 4: Wypełnianie atrybutów w mpd_attributes")
+            print("[DEBUG] " + "=" * 50)
+
+            # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
+            self._ensure_right_column_expanded()
+            time.sleep(0.5)
+
+            # KROK 4.1: Pobierz pełny opis z pola mpd_description (powinno być wypełnione przez KROK 2)
+            full_description = None
+            try:
+                mpd_desc_field = self.driver.find_element(
+                    By.ID, "mpd_description")
+                full_description = mpd_desc_field.get_attribute("value") or ""
+                logger.info(
+                    f"Pobrano pełny opis z pola mpd_description (długość: {len(full_description)})")
+                print(
+                    f"[DEBUG] Pobrano pełny opis z pola mpd_description (długość: {len(full_description)})")
+            except Exception as e:
+                logger.warning(
+                    f"Nie udało się pobrać opisu z pola mpd_description: {e}")
+                print(
+                    f"[DEBUG] Nie udało się pobrać opisu z pola mpd_description: {e}")
+
+            # KROK 4.2: Jeśli pole mpd_description jest puste, pobierz opis z formularza Django
+            if not full_description or not full_description.strip():
+                try:
+                    django_desc_field = self.wait.until(
+                        EC.presence_of_element_located(
+                            (By.ID, "id_description"))
+                    )
+                    full_description = django_desc_field.get_attribute(
+                        "value") or ""
+                    logger.info(
+                        f"Pobrano pełny opis z formularza Django (długość: {len(full_description)})")
+                    print(
+                        f"[DEBUG] Pobrano pełny opis z formularza Django (długość: {len(full_description)})")
+                except Exception as e:
+                    logger.warning(
+                        f"Nie udało się pobrać opisu z formularza Django: {e}")
+                    print(
+                        f"[DEBUG] Nie udało się pobrać opisu z formularza Django: {e}")
+
+            if not full_description or not full_description.strip():
+                logger.warning("Brak opisu do wyciągnięcia atrybutów")
+                print("[DEBUG] Brak opisu do wyciągnięcia atrybutów")
+                return None
+
+            # KROK 4.3: Pobierz dostępne atrybuty z formularza
+            available_attributes = self.get_available_attributes()
+            if not available_attributes:
+                logger.warning("Brak dostępnych atrybutów w formularzu")
+                print("[DEBUG] Brak dostępnych atrybutów w formularzu")
+                return None
+
+            # KROK 4.4: Wyciągnij atrybuty z opisu przez AI
+            if ai_processor is None:
+                from web_agent.automation.ai_processor import AIProcessor
+                ai_processor = AIProcessor()
+
+            logger.info("Wyciąganie atrybutów z opisu przez AI...")
+            print("[DEBUG] Wyciąganie atrybutów z opisu przez AI...")
+            attribute_ids = ai_processor.extract_attributes_from_description(
+                full_description,
+                available_attributes
+            )
+
+            if not attribute_ids:
+                logger.warning("Nie znaleziono atrybutów w opisie produktu")
+                print("[DEBUG] Nie znaleziono atrybutów w opisie produktu")
+                return None
+
+            logger.info(
+                f"Wyodrębniono {len(attribute_ids)} atrybutów: {attribute_ids}")
+            print(
+                f"[DEBUG] Wyodrębniono {len(attribute_ids)} atrybutów: {attribute_ids}")
+
+            # KROK 4.5: Zaznacz atrybuty w formularzu
+            self.select_attributes(attribute_ids)
+
+            # KROK 4.6: Weryfikacja - sprawdź ile atrybutów zostało zaznaczonych
+            try:
+                attributes_select = self.driver.find_element(
+                    By.ID, "mpd_attributes")
+                selected_options = attributes_select.find_elements(
+                    By.CSS_SELECTOR, "option:checked"
+                )
+                if len(selected_options) > 0:
+                    logger.info(
+                        f"✓ Zaznaczono {len(selected_options)} atrybutów w mpd_attributes")
+                    print(
+                        f"[DEBUG] ✓ Zaznaczono {len(selected_options)} atrybutów w mpd_attributes")
+                    return attribute_ids
+                else:
+                    logger.warning("Nie zaznaczono żadnych atrybutów")
+                    print("[DEBUG] Nie zaznaczono żadnych atrybutów")
+                    return None
+            except Exception as e_verify:
+                logger.warning(
+                    f"Nie udało się zweryfikować zaznaczonych atrybutów: {e_verify}")
+                print(
+                    f"[DEBUG] Nie udało się zweryfikować zaznaczonych atrybutów: {e_verify}")
+                # Zwróć listę ID mimo braku weryfikacji
+                return attribute_ids
+
+        except Exception as e:
+            logger.error(
+                f"Błąd podczas wypełniania atrybutów w mpd_attributes: {e}")
+            print(
+                f"[DEBUG] Błąd podczas wypełniania atrybutów w mpd_attributes: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def get_available_attributes(self) -> List[Dict]:
         """
