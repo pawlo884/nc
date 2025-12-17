@@ -213,42 +213,12 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(
                         "[OK] Otworzono pierwszy produkt z listy"))
 
-                    # Edytuj pola produktu (nazwa, opis, krótki opis)
-                    self.stdout.write("\n[INFO] Edycja pól produktu...")
+                    # KROK 1: Edycja nazwy produktu
+                    self.stdout.write("\n[INFO] KROK 1: Edycja nazwy produktu...")
                     try:
                         browser.update_product_name()
                         self.stdout.write(self.style.SUCCESS(
                             "[OK] Zaktualizowano nazwę produktu"))
-
-                        # Wyodrębnij i wypełnij kolor producenta (użyj zapisanej oryginalnej nazwy)
-                        if hasattr(browser, '_original_product_name') and browser._original_product_name:
-                            try:
-                                self.stdout.write(
-                                    "\n[INFO] Wyodrębnianie koloru producenta...")
-                                browser.update_producer_color(
-                                    browser._original_product_name,
-                                    brand_id=brand_id,
-                                    brand_name=brand.name if brand else None
-                                )
-                                self.stdout.write(self.style.SUCCESS(
-                                    "[OK] Wypełniono kolor producenta"))
-                            except Exception as e_color:
-                                self.stdout.write(self.style.WARNING(
-                                    f"[WARNING] Błąd podczas wyodrębniania koloru: {e_color}"))
-
-                        # Wyodrębnij i wypełnij kod producenta (użyj zapisanej oryginalnej nazwy)
-                        if hasattr(browser, '_original_product_name') and browser._original_product_name:
-                            try:
-                                self.stdout.write(
-                                    "\n[INFO] Wyodrębnianie kodu producenta...")
-                                browser.update_producer_code(
-                                    browser._original_product_name
-                                )
-                                self.stdout.write(self.style.SUCCESS(
-                                    "[OK] Wypełniono kod producenta"))
-                            except Exception as e_code:
-                                self.stdout.write(self.style.WARNING(
-                                    f"[WARNING] Błąd podczas wyodrębniania kodu: {e_code}"))
                     except Exception as e_name:
                         self.stdout.write(self.style.ERROR(
                             f"[ERROR] Błąd podczas edycji nazwy: {e_name}"))
@@ -256,56 +226,105 @@ class Command(BaseCommand):
                             "[ERROR] Kończę proces - nie można ulepszyć nazwy produktu")
                         raise
 
+                    # KROK 2: Edycja opisu produktu
                     try:
+                        self.stdout.write("\n[INFO] KROK 2: Edycja opisu produktu...")
                         enhanced_description = browser.update_product_description()
                         self.stdout.write(self.style.SUCCESS(
                             "[OK] Zaktualizowano opis produktu"))
-
-                        # Edytuj krótki opis jeśli długi opis został wygenerowany
-                        if enhanced_description:
-                            try:
-                                browser.update_product_short_description(
-                                    enhanced_description)
-                                self.stdout.write(self.style.SUCCESS(
-                                    "[OK] Zaktualizowano krótki opis produktu"))
-                            except Exception as e_short_desc:
-                                self.stdout.write(self.style.WARNING(
-                                    f"[WARNING] Błąd podczas edycji krótkiego opisu: {e_short_desc}"))
-
-                        # Wyciągnij i zaznacz atrybuty z opisu
-                        try:
-                            self.stdout.write(
-                                "\n[INFO] Wyciąganie atrybutów z opisu produktu...")
-                            from web_agent.automation.ai_processor import AIProcessor
-                            ai_processor = AIProcessor()
-
-                            # Pobierz dostępne atrybuty z formularza
-                            available_attributes = browser.get_available_attributes()
-
-                            if available_attributes and enhanced_description:
-                                # Wyciągnij atrybuty z opisu używając AI
-                                attribute_ids = ai_processor.extract_attributes_from_description(
-                                    enhanced_description,
-                                    available_attributes
-                                )
-
-                                if attribute_ids:
-                                    # Zaznacz atrybuty w formularzu
-                                    browser.select_attributes(attribute_ids)
-                                    self.stdout.write(self.style.SUCCESS(
-                                        f"[OK] Zaznaczono {len(attribute_ids)} atrybutów z opisu"))
-                                else:
-                                    self.stdout.write(
-                                        "[INFO] Nie znaleziono atrybutów w opisie produktu")
-                            else:
-                                self.stdout.write(
-                                    "[INFO] Brak dostępnych atrybutów lub opisu do analizy")
-                        except Exception as e_attrs:
-                            self.stdout.write(self.style.WARNING(
-                                f"[WARNING] Błąd podczas wyciągania atrybutów: {e_attrs}"))
                     except Exception as e_desc:
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas edycji opisu: {e_desc}"))
+                        enhanced_description = None
+
+                    # KROK 3: Edycja krótkiego opisu
+                    if enhanced_description:
+                        try:
+                            self.stdout.write("\n[INFO] KROK 3: Edycja krótkiego opisu produktu...")
+                            browser.update_product_short_description(
+                                enhanced_description)
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Zaktualizowano krótki opis produktu"))
+                        except Exception as e_short_desc:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas edycji krótkiego opisu: {e_short_desc}"))
+
+                    # KROK 4: Wyciągnij i zaznacz atrybuty z opisu
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] KROK 4: Wyciąganie atrybutów z opisu produktu...")
+                        from web_agent.automation.ai_processor import AIProcessor
+                        ai_processor = AIProcessor()
+
+                        # Pobierz dostępne atrybuty z formularza
+                        available_attributes = browser.get_available_attributes()
+
+                        if available_attributes and enhanced_description:
+                            # Wyciągnij atrybuty z opisu używając AI
+                            attribute_ids = ai_processor.extract_attributes_from_description(
+                                enhanced_description,
+                                available_attributes
+                            )
+
+                            if attribute_ids:
+                                # Zaznacz atrybuty w formularzu
+                                browser.select_attributes(attribute_ids)
+                                self.stdout.write(self.style.SUCCESS(
+                                    f"[OK] Zaznaczono {len(attribute_ids)} atrybutów z opisu"))
+                            else:
+                                self.stdout.write(
+                                    "[INFO] Nie znaleziono atrybutów w opisie produktu")
+                        else:
+                            self.stdout.write(
+                                "[INFO] Brak dostępnych atrybutów lub opisu do analizy")
+                    except Exception as e_attrs:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas wyciągania atrybutów: {e_attrs}"))
+
+                    # KROK 5: Zaznacz markę w dropdown
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] KROK 5: Zaznaczanie marki w dropdown...")
+                        brand_result = browser.fill_mpd_brand()
+                        if brand_result:
+                            self.stdout.write(self.style.SUCCESS(
+                                f"[OK] Zaznaczono markę: {brand_result}"))
+                        else:
+                            self.stdout.write(self.style.WARNING(
+                                "[WARNING] Nie udało się zaznaczyć marki w dropdown"))
+                    except Exception as e_brand:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas zaznaczania marki: {e_brand}"))
+
+                    # Wyodrębnij i wypełnij kolor producenta (użyj zapisanej oryginalnej nazwy)
+                    if hasattr(browser, '_original_product_name') and browser._original_product_name:
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] Wyodrębnianie koloru producenta...")
+                            browser.update_producer_color(
+                                browser._original_product_name,
+                                brand_id=brand_id,
+                                brand_name=brand.name if brand else None
+                            )
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Wypełniono kolor producenta"))
+                        except Exception as e_color:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas wyodrębniania koloru: {e_color}"))
+
+                    # Wyodrębnij i wypełnij kod producenta (użyj zapisanej oryginalnej nazwy)
+                    if hasattr(browser, '_original_product_name') and browser._original_product_name:
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] Wyodrębnianie kodu producenta...")
+                            browser.update_producer_code(
+                                browser._original_product_name
+                            )
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Wypełniono kod producenta"))
+                        except Exception as e_code:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas wyodrębniania kodu: {e_code}"))
 
                     # Wypełnij materiały (skład) z szczegółów produktu - PRZED przejściem do MPD
                     # Pola szczegółów są w formularzu produktu matterhorn1, nie w MPD
