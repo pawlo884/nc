@@ -5,7 +5,16 @@ import logging
 from typing import Dict, Optional, List
 import os
 import time
+import sys
 from pydantic import BaseModel, Field, field_validator
+
+# Ustaw kodowanie stdout na UTF-8 dla poprawnego wyświetlania polskich znaków
+if sys.stdout.encoding is None or sys.stdout.encoding.lower() != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except (AttributeError, ValueError):
+        # Python < 3.7 lub stdout nie można przekonfigurować
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -2067,8 +2076,14 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                 # 4) Nic nie znaleziono
                 logger.warning(
                     f"Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
-                print(
-                    f"[DEBUG] Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
+                # Użyj bezpiecznego wypisywania dla polskich znaków
+                try:
+                    print(
+                        f"[DEBUG] Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
+                except UnicodeEncodeError:
+                    # Fallback: użyj logger zamiast print jeśli wystąpi błąd kodowania
+                    logger.debug(
+                        f"[DEBUG] Nie znaleziono dopasowania dla atrybutu: '{extracted_name}'")
 
             # Usuń duplikaty zachowując kolejność
             seen = set()
