@@ -2056,18 +2056,213 @@ class BrowserAutomation:
             traceback.print_exc()
             return None
 
+    def fill_mpd_brand(self):
+        """
+        SCENARIUSZ CREATE, KROK 5: Wypełnia markę w polu mpd_brand w sekcji MPD.
+
+        Pobiera markę z formularza produktu Django (id_brand), normalizuje ją
+        (usuwa część w nawiasach) i ustawia w polu mpd_brand przez JavaScript.
+
+        Returns:
+            str: Nazwa ustawionej marki lub None w przypadku błędu
+        """
+        try:
+            logger.info("=" * 50)
+            logger.info(
+                "SCENARIUSZ CREATE, KROK 5: Wypełnianie marki w mpd_brand")
+            logger.info("=" * 50)
+            print("[DEBUG] " + "=" * 50)
+            print("[DEBUG] SCENARIUSZ CREATE, KROK 5: Wypełnianie marki w mpd_brand")
+            print("[DEBUG] " + "=" * 50)
+
+            # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
+            self._ensure_right_column_expanded()
+            time.sleep(0.5)
+
+            # KROK 5.1: Pobierz markę z formularza produktu (Django admin używa id="id_brand")
+            brand_name = None
+            try:
+                from selenium.webdriver.support.ui import Select
+
+                brand_select = self.driver.find_element(By.ID, "id_brand")
+                select = Select(brand_select)
+                selected_option = select.first_selected_option
+                if selected_option and selected_option.get_attribute("value"):
+                    brand_name_full = selected_option.text.strip()
+                    # Usuń część w nawiasach (np. "Marko (174)" -> "Marko")
+                    if '(' in brand_name_full:
+                        brand_name = brand_name_full.split('(')[0].strip()
+                    else:
+                        brand_name = brand_name_full
+                    logger.info(
+                        f"Pobrano markę z formularza Django: {brand_name_full} -> {brand_name}")
+                    print(
+                        f"[DEBUG] Pobrano markę z formularza Django: {brand_name_full} -> {brand_name}")
+                else:
+                    logger.warning(
+                        "Brak zaznaczonej marki w formularzu Django")
+                    print("[DEBUG] Brak zaznaczonej marki w formularzu Django")
+            except Exception as e:
+                logger.warning(
+                    f"Nie udało się pobrać marki z formularza Django: {e}")
+                print(
+                    f"[DEBUG] Nie udało się pobrać marki z formularza Django: {e}")
+                return None
+
+            if not brand_name:
+                logger.warning("Brak nazwy marki do ustawienia")
+                print("[DEBUG] Brak nazwy marki do ustawienia")
+                return None
+
+            # KROK 5.2: Znajdź pole mpd_brand w sekcji MPD
+            try:
+                mpd_brand_select = self.wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "mpd_brand"))
+                )
+            except Exception as e:
+                logger.error(f"Nie udało się znaleźć pola mpd_brand: {e}")
+                print(f"[DEBUG] Nie udało się znaleźć pola mpd_brand: {e}")
+                return None
+
+            # KROK 5.3: Znajdź wartość opcji dla marki w selectcie mpd_brand
+            from selenium.webdriver.support.ui import Select
+            mpd_select = Select(mpd_brand_select)
+
+            matched_value = None
+            for opt in mpd_select.options:
+                text = opt.text or ""
+                if text.strip().lower() == brand_name.lower():
+                    matched_value = opt.get_attribute("value")
+                    break
+                # Fallback: porównaj bez części w nawiasach
+                base = text.split('(')[0].strip().lower()
+                if base == brand_name.lower():
+                    matched_value = opt.get_attribute("value")
+                    break
+
+            if not matched_value:
+                logger.warning(
+                    f"Nie znaleziono opcji dla marki '{brand_name}' w selectcie mpd_brand")
+                print(
+                    f"[DEBUG] Nie znaleziono opcji dla marki '{brand_name}' w selectcie mpd_brand")
+                return None
+
+            # KROK 5.4: Wybierz markę w dropdown mpd_brand przez Select
+            logger.info(
+                f"Próbuję wybrać markę '{brand_name}' (value: '{matched_value}')...")
+            print(
+                f"[DEBUG] Próbuję wybrać markę '{brand_name}' (value: '{matched_value}')...")
+
+            try:
+                # Metoda 1: select_by_value
+                mpd_select.select_by_value(matched_value)
+                time.sleep(0.5)  # Daj czas na przetworzenie
+                logger.info(
+                    f"Wybrano markę przez Select.select_by_value: {brand_name} (value: {matched_value})")
+                print(
+                    f"[DEBUG] Wybrano markę przez Select.select_by_value: {brand_name} (value: {matched_value})")
+            except Exception as e_select_value:
+                logger.warning(
+                    f"Nie udało się wybrać przez select_by_value: {e_select_value}, próbuję select_by_visible_text")
+                print(
+                    f"[DEBUG] Nie udało się wybrać przez select_by_value: {e_select_value}, próbuję select_by_visible_text")
+                try:
+                    # Metoda 2: select_by_visible_text (fallback)
+                    mpd_select.select_by_visible_text(brand_name)
+                    time.sleep(0.5)
+                    logger.info(
+                        f"Wybrano markę przez Select.select_by_visible_text: {brand_name}")
+                    print(
+                        f"[DEBUG] Wybrano markę przez Select.select_by_visible_text: {brand_name}")
+                except Exception as e_select_text:
+                    logger.warning(
+                        f"Nie udało się wybrać przez select_by_visible_text: {e_select_text}, próbuję przez JavaScript")
+                    print(
+                        f"[DEBUG] Nie udało się wybrać przez select_by_visible_text: {e_select_text}, próbuję przez JavaScript")
+                    # Metoda 3: JavaScript (fallback)
+                    self.driver.execute_script(
+                        """
+                        var select = arguments[0];
+                        var value = arguments[1];
+                        select.value = value;
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                        select.dispatchEvent(new Event('input', { bubbles: true }));
+                        """,
+                        mpd_brand_select,
+                        matched_value
+                    )
+                    time.sleep(0.5)
+                    logger.info(
+                        f"Ustawiono markę przez JavaScript: {brand_name} (value: {matched_value})")
+                    print(
+                        f"[DEBUG] Ustawiono markę przez JavaScript: {brand_name} (value: {matched_value})")
+
+            # KROK 5.5: Weryfikacja - sprawdź czy wartość została ustawiona
+            # Sprawdź przez Select.all_selected_options
+            try:
+                selected_options = mpd_select.all_selected_options
+                if selected_options and len(selected_options) > 0:
+                    selected_text = selected_options[0].text.strip()
+                    selected_value = selected_options[0].get_attribute("value")
+                    if selected_value == matched_value:
+                        logger.info(
+                            f"✓ Marka została wybrana w mpd_brand: {selected_text} (value: {matched_value})")
+                        print(
+                            f"[DEBUG] ✓ Marka została wybrana w mpd_brand: {selected_text} (value: {matched_value})")
+                        return brand_name
+                    else:
+                        logger.warning(
+                            f"⚠ Wybrana wartość nie pasuje. Oczekiwano: '{matched_value}', otrzymano: '{selected_value}'")
+                        print(
+                            f"[DEBUG] ⚠ Wybrana wartość nie pasuje. Oczekiwano: '{matched_value}', otrzymano: '{selected_value}'")
+                        return None
+                else:
+                    logger.warning(
+                        "Brak zaznaczonej opcji w selectcie mpd_brand")
+                    print("[DEBUG] Brak zaznaczonej opcji w selectcie mpd_brand")
+                    return None
+            except Exception as e_verify:
+                logger.warning(
+                    f"Nie udało się zweryfikować wyboru marki: {e_verify}")
+                print(
+                    f"[DEBUG] Nie udało się zweryfikować wyboru marki: {e_verify}")
+                # Fallback: sprawdź przez get_attribute
+                actual_value = mpd_brand_select.get_attribute("value")
+                if actual_value == matched_value:
+                    logger.info(
+                        f"✓ Marka została ustawiona w mpd_brand (weryfikacja przez get_attribute): {brand_name}")
+                    print(
+                        f"[DEBUG] ✓ Marka została ustawiona w mpd_brand (weryfikacja przez get_attribute): {brand_name}")
+                    return brand_name
+                else:
+                    logger.warning(
+                        f"⚠ Marka nie została poprawnie ustawiona. Oczekiwano: '{matched_value}', otrzymano: '{actual_value}'")
+                    print(
+                        f"[DEBUG] ⚠ Marka nie została poprawnie ustawiona. Oczekiwano: '{matched_value}', otrzymano: '{actual_value}'")
+                    return None
+
+        except Exception as e:
+            logger.error(f"Błąd podczas wypełniania marki w mpd_brand: {e}")
+            print(f"[DEBUG] Błąd podczas wypełniania marki w mpd_brand: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     def create_mpd_product(self, ai_processor=None):
         """
-        Tworzy produkt w MPD (klika przycisk "Utwórz nowy produkt w MPD").
+        Wykonuje SCENARIUSZ CREATE - wypełnia pola produktu w MPD.
 
-        Wykonuje kroki w następującej kolejności:
+        Wykonuje TYLKO kroki 1-5 w następującej kolejności:
         1. Wypełnia pole mpd_name (SCENARIUSZ CREATE, KROK 1)
         2. Wypełnia pole mpd_description (SCENARIUSZ CREATE, KROK 2)
         3. Wypełnia pole mpd_short_description (SCENARIUSZ CREATE, KROK 3)
         4. Wypełnia atrybuty w mpd_attributes (SCENARIUSZ CREATE, KROK 4)
-        5. Ustawia markę (mpd_brand)
-        6. Ustawia kolor producenta (producer_color_name)
-        7. Klika przycisk "Utwórz nowy produkt w MPD"
+        5. Wypełnia markę w mpd_brand (SCENARIUSZ CREATE, KROK 5)
+
+        UWAGA: Metoda kończy się po wykonaniu kroków 1-5.
+        Dodatkowe operacje (ustawienie koloru producenta, kliknięcie przycisku)
+        są zakomentowane poniżej i nie są wykonywane.
 
         Args:
             ai_processor: Instancja AIProcessor do ulepszania nazwy. Jeśli None, tworzy nową.
@@ -2079,10 +2274,19 @@ class BrowserAutomation:
             # Poczekaj chwilę, aby upewnić się, że formularz jest gotowy
             time.sleep(1)
 
-            # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
+            # ============================================================
+            # PRZYGOTOWANIE: Upewnij się, że sekcja right-column jest rozwinięta
+            # ============================================================
             self._ensure_right_column_expanded()
 
-            # SCENARIUSZ CREATE, KROK 1: Wypełnij pole mpd_name
+            # ============================================================
+            # SCENARIUSZ CREATE - KROKI 1-5 (WYKONYWANE PO KOLEI)
+            # ============================================================
+
+            # KROK 1: Wypełnij pole mpd_name
+            logger.info("=" * 60)
+            logger.info("KROK 1: Wypełnianie pola mpd_name")
+            logger.info("=" * 60)
             filled_name = self.fill_mpd_name(ai_processor=ai_processor)
             if not filled_name:
                 logger.warning(
@@ -2090,7 +2294,10 @@ class BrowserAutomation:
                 print(
                     "[DEBUG] Nie udało się wypełnić pola mpd_name, kontynuuję dalej...")
 
-            # SCENARIUSZ CREATE, KROK 2: Wypełnij pole mpd_description
+            # KROK 2: Wypełnij pole mpd_description
+            logger.info("=" * 60)
+            logger.info("KROK 2: Wypełnianie pola mpd_description")
+            logger.info("=" * 60)
             filled_description = self.fill_mpd_description(
                 ai_processor=ai_processor)
             if not filled_description:
@@ -2099,7 +2306,10 @@ class BrowserAutomation:
                 print(
                     "[DEBUG] Nie udało się wypełnić pola mpd_description, kontynuuję dalej...")
 
-            # SCENARIUSZ CREATE, KROK 3: Wypełnij pole mpd_short_description
+            # KROK 3: Wypełnij pole mpd_short_description
+            logger.info("=" * 60)
+            logger.info("KROK 3: Wypełnianie pola mpd_short_description")
+            logger.info("=" * 60)
             filled_short_description = self.fill_mpd_short_description(
                 ai_processor=ai_processor)
             if not filled_short_description:
@@ -2108,7 +2318,10 @@ class BrowserAutomation:
                 print(
                     "[DEBUG] Nie udało się wypełnić pola mpd_short_description, kontynuuję dalej...")
 
-            # SCENARIUSZ CREATE, KROK 4: Wypełnij atrybuty w mpd_attributes
+            # KROK 4: Wypełnij atrybuty w mpd_attributes
+            logger.info("=" * 60)
+            logger.info("KROK 4: Wypełnianie atrybutów w mpd_attributes")
+            logger.info("=" * 60)
             filled_attributes = self.fill_mpd_attributes(
                 ai_processor=ai_processor)
             if not filled_attributes:
@@ -2117,211 +2330,179 @@ class BrowserAutomation:
                 print(
                     "[DEBUG] Nie udało się wypełnić atrybutów w mpd_attributes, kontynuuję dalej...")
 
-            # PRZED kliknięciem przycisku ustaw markę i kolor producenta w sekcji MPD
-            try:
-                from selenium.webdriver.support.ui import Select
-
-                # 1. Pobierz markę z formularza produktu (Django admin używa id="id_brand")
-                brand_name = None
-                try:
-                    brand_select = self.driver.find_element(By.ID, "id_brand")
-                    select = Select(brand_select)
-                    selected_option = select.first_selected_option
-                    if selected_option and selected_option.get_attribute("value"):
-                        brand_name_full = selected_option.text.strip()
-                        # Usuń część w nawiasach (np. "Marko (174)" -> "Marko")
-                        if '(' in brand_name_full:
-                            brand_name = brand_name_full.split('(')[0].strip()
-                        else:
-                            brand_name = brand_name_full
-                        logger.info(
-                            f"Pobrano markę z formularza: {brand_name}")
-                        print(
-                            f"[DEBUG] Pobrano markę z formularza: {brand_name}")
-                except Exception as e:
-                    logger.warning(f"Nie udało się pobrać marki: {e}")
-                    print(f"[DEBUG] Nie udało się pobrać marki: {e}")
-
-                # 2. Ustaw markę w selectcie mpd_brand przez JavaScript
-                if brand_name:
-                    try:
-                        mpd_brand_select = self.wait.until(
-                            EC.presence_of_element_located(
-                                (By.ID, "mpd_brand"))
-                        )
-                        mpd_select = Select(mpd_brand_select)
-
-                        # Znajdź wartość opcji dla marki
-                        matched_value = None
-                        for opt in mpd_select.options:
-                            text = opt.text or ""
-                            if text.strip().lower() == brand_name.lower():
-                                matched_value = opt.get_attribute("value")
-                                break
-                            # Fallback: porównaj bez części w nawiasach
-                            base = text.split('(')[0].strip().lower()
-                            if base == brand_name.lower():
-                                matched_value = opt.get_attribute("value")
-                                break
-
-                        if matched_value:
-                            # Ustaw przez JavaScript, aby React widział zmianę
-                            self.driver.execute_script(
-                                """
-                                var select = arguments[0];
-                                var value = arguments[1];
-                                select.value = value;
-                                select.dispatchEvent(new Event('change', { bubbles: true }));
-                                select.dispatchEvent(new Event('input', { bubbles: true }));
-                                """,
-                                mpd_brand_select,
-                                matched_value
-                            )
-                            logger.info(
-                                f"Ustawiono markę w MPD: {brand_name} (value: {matched_value})")
-                            print(
-                                f"[DEBUG] Ustawiono markę w MPD: {brand_name} (value: {matched_value})")
-                            time.sleep(0.3)
-                    except Exception as e:
-                        logger.warning(
-                            f"Nie udało się ustawić marki w MPD: {e}")
-                        print(
-                            f"[DEBUG] Nie udało się ustawić marki w MPD: {e}")
-
-                # 3. Sprawdź i ustaw kolor producenta w sekcji MPD (jeśli jest puste)
-                try:
-                    producer_color_field = self.driver.find_element(
-                        By.ID, "producer_color_name")
-                    producer_color_val = producer_color_field.get_attribute(
-                        "value") or ""
-
-                    # Jeśli pole jest puste, użyj zapamiętanego koloru z update_producer_color
-                    if not producer_color_val:
-                        if hasattr(self, "_last_extracted_producer_color") and self._last_extracted_producer_color:
-                            producer_color_val = self._last_extracted_producer_color
-                            logger.info(
-                                f"Używam zapamiętanego koloru: {producer_color_val}")
-                            print(
-                                f"[DEBUG] Używam zapamiętanego koloru: {producer_color_val}")
-                        else:
-                            logger.warning(
-                                "Pole producer_color_name jest puste i brak zapamiętanego koloru")
-                            print(
-                                "[DEBUG] Pole producer_color_name jest puste i brak zapamiętanego koloru")
-
-                    # ZAWSZE ustaw kolor przez JavaScript, aby React widział wartość (nawet jeśli już jest wypełniony)
-                    if producer_color_val:
-                        # Ustaw przez JavaScript, aby upewnić się że React widzi wartość
-                        self.driver.execute_script(
-                            """
-                            var field = arguments[0];
-                            var value = arguments[1];
-                            field.value = value;
-                            field.dispatchEvent(new Event('input', { bubbles: true }));
-                            field.dispatchEvent(new Event('change', { bubbles: true }));
-                            field.dispatchEvent(new Event('blur', { bubbles: true }));
-                            """,
-                            producer_color_field,
-                            producer_color_val
-                        )
-                        logger.info(
-                            f"Ustawiono kolor producenta w MPD przez JavaScript: {producer_color_val}")
-                        print(
-                            f"[DEBUG] Ustawiono kolor producenta w MPD przez JavaScript: {producer_color_val}")
-                        time.sleep(0.5)  # Daj więcej czasu na przetworzenie
-                except Exception as e:
-                    logger.warning(
-                        f"Nie udało się sprawdzić/ustawić koloru producenta: {e}")
-                    print(
-                        f"[DEBUG] Nie udało się sprawdzić/ustawić koloru producenta: {e}")
-            except Exception as e:
-                logger.warning(
-                    f"Błąd podczas przygotowania pól marki/koloru w MPD: {e}")
-                print(
-                    f"[DEBUG] Błąd podczas przygotowania pól marki/koloru w MPD: {e}")
-
-            # Spróbuj znaleźć przycisk na różne sposoby
-            create_mpd_button = None
-
-            # Metoda 1: Przez ID (użyj presence_of_element_located zamiast element_to_be_clickable)
-            try:
-                create_mpd_button = self.wait.until(
-                    EC.presence_of_element_located(
-                        (By.ID, "create-mpd-product-btn"))
-                )
-                logger.info("Znaleziono przycisk przez ID (presence)")
-                print("[DEBUG] Znaleziono przycisk przez ID (presence)")
-            except:
-                # Metoda 2: Przez XPath z ID
-                try:
-                    create_mpd_button = self.wait.until(
-                        EC.presence_of_element_located(
-                            (By.XPATH, "//button[@id='create-mpd-product-btn']"))
-                    )
-                    logger.info("Znaleziono przycisk przez XPath z ID")
-                    print("[DEBUG] Znaleziono przycisk przez XPath z ID")
-                except:
-                    # Metoda 3: Przez tekst przycisku
-                    try:
-                        create_mpd_button = self.wait.until(
-                            EC.presence_of_element_located(
-                                (By.XPATH, "//button[contains(text(), 'Utwórz nowy produkt w MPD')]"))
-                        )
-                        logger.info("Znaleziono przycisk przez tekst")
-                        print("[DEBUG] Znaleziono przycisk przez tekst")
-                    except:
-                        # Metoda 4: Przez częściowy tekst
-                        try:
-                            create_mpd_button = self.wait.until(
-                                EC.presence_of_element_located(
-                                    (By.XPATH, "//button[contains(text(), 'Utwórz')]"))
-                            )
-                            logger.info(
-                                "Znaleziono przycisk przez częściowy tekst")
-                            print(
-                                "[DEBUG] Znaleziono przycisk przez częściowy tekst")
-                        except:
-                            raise Exception(
-                                "Nie znaleziono przycisku 'Utwórz nowy produkt w MPD'")
-
-            if not create_mpd_button:
-                raise Exception("Przycisk nie został znaleziony")
-
-            # Przewiń do przycisku
-            self.driver.execute_script(
-                "arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", create_mpd_button)
+            # Krótka pauza przed przejściem do KROKU 5, aby UI się zaktualizował
             time.sleep(0.5)
 
-            # Spróbuj kliknąć przycisk - najpierw standardowo, potem przez JavaScript
-            try:
-                # Sprawdź czy przycisk jest widoczny i klikalny
-                if create_mpd_button.is_displayed() and create_mpd_button.is_enabled():
-                    create_mpd_button.click()
-                    logger.info("Kliknięto przycisk standardowo")
-                    print("[DEBUG] Kliknięto przycisk standardowo")
-                else:
-                    # Jeśli nie jest klikalny, użyj JavaScript
-                    self.driver.execute_script(
-                        "arguments[0].click();", create_mpd_button)
-                    logger.info("Kliknięto przycisk przez JavaScript")
-                    print("[DEBUG] Kliknięto przycisk przez JavaScript")
-            except Exception as e_click:
-                # Fallback: użyj JavaScript do kliknięcia
-                logger.warning(
-                    f"Błąd podczas standardowego kliknięcia: {e_click}, używam JavaScript")
+            # KROK 5: Wypełnij markę w mpd_brand
+            logger.info("=" * 60)
+            logger.info("KROK 5: Wypełnianie marki w mpd_brand")
+            logger.info("=" * 60)
+            filled_brand = self.fill_mpd_brand()
+            if not filled_brand:
+                logger.error(
+                    "❌ BŁĄD: Nie udało się wypełnić marki w mpd_brand - PRZERWANIE WYKONANIA")
                 print(
-                    f"[DEBUG] Błąd podczas standardowego kliknięcia: {e_click}, używam JavaScript")
-                self.driver.execute_script(
-                    "arguments[0].click();", create_mpd_button)
-                logger.info("Kliknięto przycisk przez JavaScript (fallback)")
-                print("[DEBUG] Kliknięto przycisk przez JavaScript (fallback)")
-            logger.info("Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
-            print("[DEBUG] Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
+                    "[DEBUG] ❌ BŁĄD: Nie udało się wypełnić marki w mpd_brand - PRZERWANIE WYKONANIA")
+                # NIE kontynuuj dalej - marka MUSI być wybrana przed kontynuacją
+                return
+            else:
+                logger.info(
+                    f"✅ KROK 5 ZAKOŃCZONY: Marka '{filled_brand}' została pomyślnie wybrana w mpd_brand")
+                print(
+                    f"[DEBUG] ✅ KROK 5 ZAKOŃCZONY: Marka '{filled_brand}' została pomyślnie wybrana w mpd_brand")
+                # Dodatkowe opóźnienie aby upewnić się że React zarejestrował zmianę
+                time.sleep(0.5)
 
-            # Poczekaj na utworzenie produktu
-            time.sleep(3)
-            logger.info("Produkt został utworzony w MPD")
-            print("[DEBUG] Produkt został utworzony w MPD")
+            # ============================================================
+            # KONIEC KROKÓW 1-5 - WSZYSTKIE KROKI ZAKOŃCZONE
+            # Metoda kończy się tutaj - kod poniżej jest zakomentowany
+            # ============================================================
+            logger.info("=" * 60)
+            logger.info("✅ WSZYSTKIE KROKI 1-5 ZAKOŃCZONE POMYŚLNIE")
+            logger.info("=" * 60)
+            print("[DEBUG] " + "=" * 60)
+            print("[DEBUG] ✅ WSZYSTKIE KROKI 1-5 ZAKOŃCZONE POMYŚLNIE")
+            print("[DEBUG] " + "=" * 60)
+            return  # Metoda kończy się tutaj - kod poniżej jest zakomentowany i nie wykonywany
+
+            # ============================================================
+            # PONIŻEJ ZAKOMENTOWANY KOD DODATKOWY (NIE WYKONYWANY)
+            # ============================================================
+            # Ten kod będzie używany w przyszłości, gdy będziemy dodawać kolejne kroki.
+            # Obecnie wykonują się TYLKO kroki 1-5 powyżej.
+            # ============================================================
+
+            # ZAKOMENTOWANE - KROK 6 (przyszłość): Ustaw kolor producenta w sekcji MPD
+            # UWAGA: To nie jest część kroków 1-5, wykonuje się po ich zakończeniu
+            # try:
+            #     producer_color_field = self.driver.find_element(
+            #         By.ID, "producer_color_name")
+            #     producer_color_val = producer_color_field.get_attribute(
+            #         "value") or ""
+            #
+            #     # Jeśli pole jest puste, użyj zapamiętanego koloru z update_producer_color
+            #     if not producer_color_val:
+            #         if hasattr(self, "_last_extracted_producer_color") and self._last_extracted_producer_color:
+            #             producer_color_val = self._last_extracted_producer_color
+            #             logger.info(
+            #                 f"Używam zapamiętanego koloru: {producer_color_val}")
+            #             print(
+            #                 f"[DEBUG] Używam zapamiętanego koloru: {producer_color_val}")
+            #         else:
+            #             logger.warning(
+            #                 "Pole producer_color_name jest puste i brak zapamiętanego koloru")
+            #             print(
+            #                 "[DEBUG] Pole producer_color_name jest puste i brak zapamiętanego koloru")
+            #
+            #     # ZAWSZE ustaw kolor przez JavaScript, aby React widział wartość (nawet jeśli już jest wypełniony)
+            #     if producer_color_val:
+            #         # Ustaw przez JavaScript, aby upewnić się że React widzi wartość
+            #         self.driver.execute_script(
+            #             """
+            #             var field = arguments[0];
+            #             var value = arguments[1];
+            #             field.value = value;
+            #             field.dispatchEvent(new Event('input', { bubbles: true }));
+            #             field.dispatchEvent(new Event('change', { bubbles: true }));
+            #             field.dispatchEvent(new Event('blur', { bubbles: true }));
+            #             """,
+            #             producer_color_field,
+            #             producer_color_val
+            #         )
+            #         logger.info(
+            #             f"Ustawiono kolor producenta w MPD przez JavaScript: {producer_color_val}")
+            #         print(
+            #             f"[DEBUG] Ustawiono kolor producenta w MPD przez JavaScript: {producer_color_val}")
+            #         time.sleep(0.5)  # Daj więcej czasu na przetworzenie
+            # except Exception as e:
+            #     logger.warning(
+            #         f"Nie udało się sprawdzić/ustawić koloru producenta: {e}")
+            #     print(
+            #         f"[DEBUG] Nie udało się sprawdzić/ustawić koloru producenta: {e}")
+
+            # ZAKOMENTOWANE - KROK 7 (przyszłość): Kliknięcie przycisku "Utwórz nowy produkt w MPD"
+            # UWAGA: To nie jest część kroków 1-5, wykonuje się po ich zakończeniu i ustawieniu koloru producenta
+            # create_mpd_button = None
+
+            # # Metoda 1: Przez ID (użyj presence_of_element_located zamiast element_to_be_clickable)
+            # try:
+            #     create_mpd_button = self.wait.until(
+            #         EC.presence_of_element_located(
+            #             (By.ID, "create-mpd-product-btn"))
+            #     )
+            #     logger.info("Znaleziono przycisk przez ID (presence)")
+            #     print("[DEBUG] Znaleziono przycisk przez ID (presence)")
+            # except:
+            #     # Metoda 2: Przez XPath z ID
+            #     try:
+            #         create_mpd_button = self.wait.until(
+            #             EC.presence_of_element_located(
+            #                 (By.XPATH, "//button[@id='create-mpd-product-btn']"))
+            #         )
+            #         logger.info("Znaleziono przycisk przez XPath z ID")
+            #         print("[DEBUG] Znaleziono przycisk przez XPath z ID")
+            #     except:
+            #         # Metoda 3: Przez tekst przycisku
+            #         try:
+            #             create_mpd_button = self.wait.until(
+            #                 EC.presence_of_element_located(
+            #                     (By.XPATH, "//button[contains(text(), 'Utwórz nowy produkt w MPD')]"))
+            #             )
+            #             logger.info("Znaleziono przycisk przez tekst")
+            #             print("[DEBUG] Znaleziono przycisk przez tekst")
+            #         except:
+            #             # Metoda 4: Przez częściowy tekst
+            #             try:
+            #                 create_mpd_button = self.wait.until(
+            #                     EC.presence_of_element_located(
+            #                         (By.XPATH, "//button[contains(text(), 'Utwórz')]"))
+            #                 )
+            #                 logger.info(
+            #                     "Znaleziono przycisk przez częściowy tekst")
+            #                 print(
+            #                     "[DEBUG] Znaleziono przycisk przez częściowy tekst")
+            #             except:
+            #                 raise Exception(
+            #                     "Nie znaleziono przycisku 'Utwórz nowy produkt w MPD'")
+            #
+            # if not create_mpd_button:
+            #     raise Exception("Przycisk nie został znaleziony")
+            #
+            # # Przewiń do przycisku
+            # self.driver.execute_script(
+            #     "arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", create_mpd_button)
+            # time.sleep(0.5)
+            #
+            # # Spróbuj kliknąć przycisk - najpierw standardowo, potem przez JavaScript
+            # try:
+            #     # Sprawdź czy przycisk jest widoczny i klikalny
+            #     if create_mpd_button.is_displayed() and create_mpd_button.is_enabled():
+            #         create_mpd_button.click()
+            #         logger.info("Kliknięto przycisk standardowo")
+            #         print("[DEBUG] Kliknięto przycisk standardowo")
+            #     else:
+            #         # Jeśli nie jest klikalny, użyj JavaScript
+            #         self.driver.execute_script(
+            #             "arguments[0].click();", create_mpd_button)
+            #         logger.info("Kliknięto przycisk przez JavaScript")
+            #         print("[DEBUG] Kliknięto przycisk przez JavaScript")
+            # except Exception as e_click:
+            #     # Fallback: użyj JavaScript do kliknięcia
+            #     logger.warning(
+            #         f"Błąd podczas standardowego kliknięcia: {e_click}, używam JavaScript")
+            #     print(
+            #         f"[DEBUG] Błąd podczas standardowego kliknięcia: {e_click}, używam JavaScript")
+            #     self.driver.execute_script(
+            #         "arguments[0].click();", create_mpd_button)
+            #     logger.info("Kliknięto przycisk przez JavaScript (fallback)")
+            #     print("[DEBUG] Kliknięto przycisk przez JavaScript (fallback)")
+            # logger.info("Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
+            # print("[DEBUG] Kliknięto przycisk 'Utwórz nowy produkt w MPD'")
+            #
+            # # Poczekaj na utworzenie produktu
+            # time.sleep(3)
+            # logger.info("Produkt został utworzony w MPD")
+            # print("[DEBUG] Produkt został utworzony w MPD")
 
         except Exception as e:
             logger.error(f"Błąd podczas tworzenia produktu w MPD: {e}")
