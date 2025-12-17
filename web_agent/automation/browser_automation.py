@@ -2437,6 +2437,58 @@ class BrowserAutomation:
             traceback.print_exc()
             return None
 
+    def fill_series_name_placeholder(self):
+        """
+        KROK 8: Ustawia placeholder w polu series_name (nie wypełnia faktycznej wartości).
+        
+        Pole series_name pozostaje puste lub z placeholderem - nie wypełniamy go faktycznie.
+        
+        Returns:
+            bool: True jeśli operacja się powiodła, False w przypadku błędu
+        """
+        try:
+            logger.info("=" * 50)
+            logger.info("KROK 8: Ustawianie placeholder w polu series_name")
+            logger.info("=" * 50)
+            print("[DEBUG] " + "=" * 50)
+            print("[DEBUG] KROK 8: Ustawianie placeholder w polu series_name")
+            print("[DEBUG] " + "=" * 50)
+            
+            # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
+            self._ensure_right_column_expanded()
+            time.sleep(0.5)
+            
+            # KROK 8.1: Znajdź pole series_name
+            try:
+                series_field = self.wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "series_name"))
+                )
+            except Exception as e:
+                logger.warning(f"Nie udało się znaleźć pola series_name: {e}")
+                print(f"[DEBUG] Nie udało się znaleźć pola series_name: {e}")
+                return False
+            
+            # KROK 8.2: Wyczyść pole i ustaw placeholder (pole pozostaje puste)
+            try:
+                series_field.clear()
+                # Pole pozostaje puste - to jest placeholder
+                logger.info("✓ Pole series_name zostało wyczyszczone (placeholder)")
+                print("[DEBUG] ✓ Pole series_name zostało wyczyszczone (placeholder)")
+                time.sleep(0.3)
+                return True
+            except Exception as e:
+                logger.warning(f"Nie udało się wyczyścić pola series_name: {e}")
+                print(f"[DEBUG] Nie udało się wyczyścić pola series_name: {e}")
+                return False
+        
+        except Exception as e:
+            logger.error(f"Błąd podczas ustawiania placeholder w polu series_name: {e}")
+            print(f"[DEBUG] Błąd podczas ustawiania placeholder w polu series_name: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
     def create_mpd_product(self, ai_processor=None):
         """
         Wykonuje SCENARIUSZ CREATE - wypełnia pola produktu w MPD.

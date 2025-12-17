@@ -324,11 +324,11 @@ class Command(BaseCommand):
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas wyboru głównego koloru: {e_color_main}"))
 
-                    # Wyodrębnij i wypełnij kolor producenta (użyj zapisanej oryginalnej nazwy)
+                    # KROK 8: Wyodrębnij i wypełnij kolor producenta (użyj zapisanej oryginalnej nazwy)
                     if hasattr(browser, '_original_product_name') and browser._original_product_name:
                         try:
                             self.stdout.write(
-                                "\n[INFO] Wyodrębnianie koloru producenta...")
+                                "\n[INFO] KROK 8: Wyodrębnianie koloru producenta...")
                             browser.update_producer_color(
                                 browser._original_product_name,
                                 brand_id=brand_id,
@@ -340,11 +340,11 @@ class Command(BaseCommand):
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Błąd podczas wyodrębniania koloru: {e_color}"))
 
-                    # Wyodrębnij i wypełnij kod producenta (użyj zapisanej oryginalnej nazwy)
+                    # KROK 9: Wyodrębnij i wypełnij kod producenta (użyj zapisanej oryginalnej nazwy)
                     if hasattr(browser, '_original_product_name') and browser._original_product_name:
                         try:
                             self.stdout.write(
-                                "\n[INFO] Wyodrębnianie kodu producenta...")
+                                "\n[INFO] KROK 9: Wyodrębnianie kodu producenta...")
                             browser.update_producer_code(
                                 browser._original_product_name
                             )
@@ -353,6 +353,33 @@ class Command(BaseCommand):
                         except Exception as e_code:
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Błąd podczas wyodrębniania kodu: {e_code}"))
+
+                    # KROK 10: Ustaw placeholder w polu series_name (nie wypełniamy faktycznej wartości)
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] KROK 10: Ustawianie placeholder w polu series_name...")
+                        series_result = browser.fill_series_name_placeholder()
+                        if series_result:
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Ustawiono placeholder w polu series_name"))
+                        else:
+                            self.stdout.write(self.style.WARNING(
+                                "[WARNING] Nie udało się ustawić placeholder w polu series_name"))
+                    except Exception as e_series:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas ustawiania placeholder w polu series_name: {e_series}"))
+
+                    # KROK 11: Zaznacz ścieżkę produktu (Dwuczęściowe)
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] KROK 11: Wybieranie ścieżki produktu...")
+                        # value="5" dla Dwuczęściowe
+                        browser.select_product_path(path_value="5")
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Wybrano ścieżkę produktu"))
+                    except Exception as e_path:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas wyboru ścieżki produktu: {e_path}"))
 
                     # Wypełnij materiały (skład) z szczegółów produktu - PRZED przejściem do MPD
                     # Pola szczegółów są w formularzu produktu matterhorn1, nie w MPD
@@ -365,18 +392,6 @@ class Command(BaseCommand):
                     except Exception as e_fabric:
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas wypełniania materiałów: {e_fabric}"))
-
-                    # Zaznacz ścieżkę produktu (Dwuczęściowe)
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] Wybieranie ścieżki produktu...")
-                        # value="5" dla Dwuczęściowe
-                        browser.select_product_path(path_value="5")
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Wybrano ścieżkę produktu"))
-                    except Exception as e_path:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas wyboru ścieżki produktu: {e_path}"))
 
                     # Wybierz jednostkę produktu (szt.)
                     try:
