@@ -1426,37 +1426,75 @@ class BrowserAutomation:
 
         return result
 
-    def update_product_description(self, ai_processor=None):
+    def fill_mpd_description(self, ai_processor=None):
         """
-        Edycja opisu produktu w polu mpd_description.
-        Ulepsza opis przez AI i zapisuje go.
+        SCENARIUSZ 1, KROK 2: Wypełnia pole mpd_description w sekcji MPD.
+
+        Pobiera opis produktu z głównego formularza Django (id_description) lub
+        z pola mpd_description (jeśli już istnieje), ulepsza go przez AI
+        i ustawia w polu mpd_description.
 
         Args:
             ai_processor: Instancja AIProcessor do ulepszania opisu. Jeśli None, tworzy nową.
+
+        Returns:
+            str: Ulepszony opis produktu lub None w przypadku błędu
         """
         try:
-            logger.info("Rozpoczynam edycję opisu produktu...")
-            print("[DEBUG] Rozpoczynam edycję opisu produktu...")
+            logger.info("=" * 50)
+            logger.info("SCENARIUSZ 1, KROK 2: Wypełnianie pola mpd_description")
+            logger.info("=" * 50)
+            print("[DEBUG] " + "=" * 50)
+            print("[DEBUG] SCENARIUSZ 1, KROK 2: Wypełnianie pola mpd_description")
+            print("[DEBUG] " + "=" * 50)
 
-            # Czekaj na załadowanie pola mpd_description
-            desc_field = self.wait.until(
-                EC.presence_of_element_located((By.ID, "mpd_description"))
-            )
+            # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
+            self._ensure_right_column_expanded()
+            time.sleep(0.5)
 
-            # Pobierz obecny opis
-            current_description = desc_field.get_attribute(
-                "value") or desc_field.text or ""
+            # KROK 2.1: Znajdź pole mpd_description w sekcji MPD
+            try:
+                mpd_desc_field = self.wait.until(
+                    EC.presence_of_element_located((By.ID, "mpd_description"))
+                )
+            except Exception as e:
+                logger.error(f"Nie udało się znaleźć pola mpd_description: {e}")
+                print(f"[DEBUG] Nie udało się znaleźć pola mpd_description: {e}")
+                return None
+
+            # KROK 2.2: Pobierz obecny opis z pola mpd_description
+            current_description = mpd_desc_field.get_attribute(
+                "value") or mpd_desc_field.text or ""
+
+            # KROK 2.3: Jeśli pole mpd_description jest puste, pobierz opis z formularza Django (id_description)
+            if not current_description or not current_description.strip():
+                try:
+                    django_desc_field = self.wait.until(
+                        EC.presence_of_element_located((By.ID, "id_description"))
+                    )
+                    current_description = django_desc_field.get_attribute(
+                        "value") or django_desc_field.text or ""
+                    logger.info(
+                        f"Pobrano opis z formularza Django (długość: {len(current_description)})")
+                    print(
+                        f"[DEBUG] Pobrano opis z formularza Django (długość: {len(current_description)})")
+                except Exception as e:
+                    logger.warning(
+                        f"Nie udało się pobrać opisu z formularza Django: {e}")
+                    print(
+                        f"[DEBUG] Nie udało się pobrać opisu z formularza Django: {e}")
+
+            if not current_description or not current_description.strip():
+                logger.warning("Brak opisu do ulepszenia")
+                print("[DEBUG] Brak opisu do ulepszenia")
+                return None
+
             logger.info(
                 f"Obecny opis produktu (długość: {len(current_description)})")
             print(
                 f"[DEBUG] Obecny opis produktu (długość: {len(current_description)})")
 
-            if not current_description or not current_description.strip():
-                logger.warning("Brak opisu do ulepszenia")
-                print("[DEBUG] Brak opisu do ulepszenia")
-                return
-
-            # Ulepsz opis przez AI
+            # KROK 2.4: Ulepsz opis przez AI
             if ai_processor is None:
                 from web_agent.automation.ai_processor import AIProcessor
                 ai_processor = AIProcessor()
@@ -1481,31 +1519,32 @@ class BrowserAutomation:
                     "Opis nie został ulepszony lub jest identyczny - użyję oryginalnego opisu")
                 print(
                     "[DEBUG] Opis nie został ulepszony lub jest identyczny - użyję oryginalnego opisu")
-                enhanced_description = current_description  # Użyj oryginalnego opisu
+                enhanced_description = current_description
 
             logger.info(
-                f"Nowy opis produktu (długość: {len(enhanced_description)})")
+                f"Ulepszona opis produktu (długość: {len(enhanced_description)})")
             print(
-                f"[DEBUG] Nowy opis produktu (długość: {len(enhanced_description)})")
+                f"[DEBUG] Ulepszona opis produktu (długość: {len(enhanced_description)})")
 
-            # Wyczyść pole i ustaw nowy opis przez JavaScript (najbardziej niezawodne)
-            # Najpierw kliknij w pole aby upewnić się, że jest aktywne
-            self.driver.execute_script("arguments[0].focus();", desc_field)
+            # KROK 2.5: Ustaw wartość w polu mpd_description przez JavaScript
+            # Najpierw focus na pole
+            self.driver.execute_script("arguments[0].focus();", mpd_desc_field)
             time.sleep(0.2)
 
             # Wyczyść pole przez JavaScript
-            self.driver.execute_script("arguments[0].value = '';", desc_field)
+            self.driver.execute_script(
+                "arguments[0].value = '';", mpd_desc_field)
             time.sleep(0.2)
 
             # Ustaw wartość przez JavaScript
             self.driver.execute_script(
                 "arguments[0].value = arguments[1];",
-                desc_field,
+                mpd_desc_field,
                 enhanced_description
             )
             time.sleep(0.3)
 
-            # Wywołaj zdarzenia aby upewnić się, że zmiana została zarejestrowana
+            # Wywołaj zdarzenia, aby React zarejestrował zmianę
             self.driver.execute_script(
                 """
                 var field = arguments[0];
@@ -1513,76 +1552,96 @@ class BrowserAutomation:
                 field.dispatchEvent(new Event('change', { bubbles: true }));
                 field.dispatchEvent(new Event('blur', { bubbles: true }));
                 """,
-                desc_field
+                mpd_desc_field
             )
             time.sleep(0.5)
 
-            # Sprawdź czy wartość została faktycznie ustawiona
+            # KROK 2.6: Weryfikacja - sprawdź czy wartość została ustawiona
             actual_value = self.driver.execute_script(
-                "return arguments[0].value;", desc_field)
+                "return arguments[0].value;", mpd_desc_field)
+
             if not actual_value or len(actual_value) < len(enhanced_description) * 0.8:
                 logger.warning(
-                    f"Wartość nie została poprawnie ustawiona. Oczekiwano: {len(enhanced_description)} znaków, otrzymano: {len(actual_value) if actual_value else 0} znaków")
+                    f"⚠ Wartość mpd_description nie została poprawnie ustawiona. "
+                    f"Oczekiwano: {len(enhanced_description)} znaków, otrzymano: {len(actual_value) if actual_value else 0} znaków")
                 print(
-                    f"[DEBUG] Wartość nie została poprawnie ustawiona. Oczekiwano: {len(enhanced_description)} znaków, otrzymano: {len(actual_value) if actual_value else 0} znaków")
+                    f"[DEBUG] ⚠ Wartość mpd_description nie została poprawnie ustawiona. "
+                    f"Oczekiwano: {len(enhanced_description)} znaków, otrzymano: {len(actual_value) if actual_value else 0} znaków")
                 print(f"[DEBUG] Próbuję alternatywną metodę - send_keys")
 
-                # Spróbuj przez send_keys jako fallback
-                desc_field.clear()
-                time.sleep(0.2)
-                desc_field.send_keys(enhanced_description)
-                time.sleep(0.5)
-
-                # Sprawdź ponownie
-                actual_value = self.driver.execute_script(
-                    "return arguments[0].value;", desc_field)
-                if not actual_value or len(actual_value) < len(enhanced_description) * 0.8:
+                # Fallback: spróbuj przez send_keys
+                try:
+                    mpd_desc_field.clear()
+                    time.sleep(0.2)
+                    mpd_desc_field.send_keys(enhanced_description)
+                    time.sleep(0.5)
+                    # Ponownie wywołaj zdarzenia
+                    self.driver.execute_script(
+                        """
+                        arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                        arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                        """,
+                        mpd_desc_field
+                    )
+                    # Sprawdź ponownie
+                    actual_value = self.driver.execute_script(
+                        "return arguments[0].value;", mpd_desc_field)
+                    if not actual_value or len(actual_value) < len(enhanced_description) * 0.8:
+                        logger.error(
+                            f"Nie udało się ustawić wartości w polu mpd_description")
+                        print(
+                            f"[DEBUG] Nie udało się ustawić wartości w polu mpd_description")
+                        return None
+                    else:
+                        logger.info(
+                            f"✓ Pole mpd_description wypełnione przez send_keys (długość: {len(actual_value)})")
+                        print(
+                            f"[DEBUG] ✓ Pole mpd_description wypełnione przez send_keys (długość: {len(actual_value)})")
+                except Exception as e_fallback:
                     logger.error(
-                        f"Nie udało się ustawić wartości w polu opisu")
-                    print(f"[DEBUG] Nie udało się ustawić wartości w polu opisu")
-                    return
+                        f"Nie udało się wypełnić mpd_description przez send_keys: {e_fallback}")
+                    print(
+                        f"[DEBUG] Nie udało się wypełnić mpd_description przez send_keys: {e_fallback}")
+                    return None
             else:
                 logger.info(
-                    f"Wartość poprawnie ustawiona w polu (długość: {len(actual_value)})")
+                    f"✓ Pole mpd_description zostało wypełnione (długość: {len(actual_value)})")
                 print(
-                    f"[DEBUG] Wartość poprawnie ustawiona w polu (długość: {len(actual_value)})")
+                    f"[DEBUG] ✓ Pole mpd_description zostało wypełnione (długość: {len(actual_value)})")
 
-            # Dodatkowe sprawdzenie - upewnij się, że wartość jest w DOM przed zapisem
+            # Dodatkowe sprawdzenie - upewnij się, że wartość jest w DOM
             final_check = self.driver.execute_script(
                 "return document.getElementById('mpd_description').value;")
             if not final_check or len(final_check) < len(enhanced_description) * 0.8:
-                logger.error(
-                    f"Wartość nie jest w DOM przed zapisem. Długość: {len(final_check) if final_check else 0}")
+                logger.warning(
+                    f"⚠ Wartość nie jest w DOM. Długość: {len(final_check) if final_check else 0}")
                 print(
-                    f"[DEBUG] Wartość nie jest w DOM przed zapisem. Długość: {len(final_check) if final_check else 0}")
-                return
+                    f"[DEBUG] ⚠ Wartość nie jest w DOM. Długość: {len(final_check) if final_check else 0}")
+            else:
+                logger.info("✓ Wartość potwierdzona w DOM")
+                print("[DEBUG] ✓ Wartość potwierdzona w DOM")
 
             time.sleep(0.5)  # Daj więcej czasu na przetworzenie
-
-            # Pole zostało wypełnione - nie zapisujemy, użytkownik zapisze ręcznie
-            logger.info(
-                "Pole opisu zostało wypełnione ulepszonym opisem. Użytkownik może teraz ręcznie zapisać zmiany.")
-            print(
-                "[DEBUG] Pole opisu zostało wypełnione ulepszonym opisem. Użytkownik może teraz ręcznie zapisać zmiany.")
 
             # Zwróć ulepszony opis, aby można było użyć go do krótkiego opisu
             return enhanced_description
 
         except Exception as e:
-            logger.error(f"Błąd podczas edycji opisu produktu: {e}")
-            print(f"[DEBUG] Błąd podczas edycji opisu produktu: {e}")
+            logger.error(f"Błąd podczas wypełniania pola mpd_description: {e}")
+            print(f"[DEBUG] Błąd podczas wypełniania pola mpd_description: {e}")
             import traceback
             traceback.print_exc()
-            # Zwróć oryginalny opis jako fallback, aby można było wygenerować krótki opis
-            try:
-                desc_field = self.wait.until(
-                    EC.presence_of_element_located((By.ID, "mpd_description"))
-                )
-                original_desc = desc_field.get_attribute(
-                    "value") or desc_field.text or ""
-                return original_desc if original_desc else None
-            except:
-                return None
+            # Zwróć None w przypadku błędu
+            return None
+
+    def update_product_description(self, ai_processor=None):
+        """
+        DEPRECATED: Użyj fill_mpd_description() zamiast tej metody.
+        Wrapper dla kompatybilności wstecznej.
+        """
+        logger.warning(
+            "update_product_description() jest deprecated. Użyj fill_mpd_description()")
+        return self.fill_mpd_description(ai_processor=ai_processor)
 
     def update_product_short_description(self, full_description: str, ai_processor=None):
         """
@@ -1878,9 +1937,10 @@ class BrowserAutomation:
 
         Wykonuje kroki w następującej kolejności:
         1. Wypełnia pole mpd_name (SCENARIUSZ 1, KROK 1)
-        2. Ustawia markę (mpd_brand)
-        3. Ustawia kolor producenta (producer_color_name)
-        4. Klika przycisk "Utwórz nowy produkt w MPD"
+        2. Wypełnia pole mpd_description (SCENARIUSZ 1, KROK 2)
+        3. Ustawia markę (mpd_brand)
+        4. Ustawia kolor producenta (producer_color_name)
+        5. Klika przycisk "Utwórz nowy produkt w MPD"
 
         Args:
             ai_processor: Instancja AIProcessor do ulepszania nazwy. Jeśli None, tworzy nową.
@@ -1902,6 +1962,14 @@ class BrowserAutomation:
                     "Nie udało się wypełnić pola mpd_name, kontynuuję dalej...")
                 print(
                     "[DEBUG] Nie udało się wypełnić pola mpd_name, kontynuuję dalej...")
+
+            # SCENARIUSZ 1, KROK 2: Wypełnij pole mpd_description
+            filled_description = self.fill_mpd_description(ai_processor=ai_processor)
+            if not filled_description:
+                logger.warning(
+                    "Nie udało się wypełnić pola mpd_description, kontynuuję dalej...")
+                print(
+                    "[DEBUG] Nie udało się wypełnić pola mpd_description, kontynuuję dalej...")
 
             # PRZED kliknięciem przycisku ustaw markę i kolor producenta w sekcji MPD
             try:
