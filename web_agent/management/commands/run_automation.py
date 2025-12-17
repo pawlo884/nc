@@ -95,6 +95,7 @@ class Command(BaseCommand):
 
         # Utwórz AutomationRun
         # Użyj domyślnych filtrów z konfiguracji marki, jeśli nie podano w parametrach
+        # Globalne domyślne wartości: active=True, is_mapped=False
         filters = {}
         if active_filter is not None:
             filters['active'] = active_filter
@@ -102,6 +103,11 @@ class Command(BaseCommand):
             filters['active'] = brand_config.default_active_filter
             self.stdout.write(
                 f"[INFO] Użyto domyślnego filtra active z konfiguracji: {brand_config.default_active_filter}")
+        else:
+            # Globalny domyślny filtr active=True
+            filters['active'] = True
+            self.stdout.write(
+                "[INFO] Użyto globalnego domyślnego filtra active: True")
 
         if is_mapped_filter is not None:
             filters['is_mapped'] = is_mapped_filter
@@ -109,6 +115,11 @@ class Command(BaseCommand):
             filters['is_mapped'] = brand_config.default_is_mapped_filter
             self.stdout.write(
                 f"[INFO] Użyto domyślnego filtra is_mapped z konfiguracji: {brand_config.default_is_mapped_filter}")
+        else:
+            # Globalny domyślny filtr is_mapped=False
+            filters['is_mapped'] = False
+            self.stdout.write(
+                "[INFO] Użyto globalnego domyślnego filtra is_mapped: False")
 
         # AutomationRun automatycznie trafi do bazy web_agent dzięki WebAgentRouter
         automation_run = AutomationRun.objects.create(
@@ -167,14 +178,15 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"[INFO] Filtr kategorii (bez ID): {category_name}")
 
-            if active_filter is not None:
-                automation_filters['active'] = active_filter
-                self.stdout.write(f"[INFO] Filtr active: {active_filter}")
+            # Dodaj filtry active i is_mapped z utworzonych filtrów (zawierają już domyślne wartości)
+            if 'active' in filters:
+                automation_filters['active'] = filters['active']
+                self.stdout.write(f"[INFO] Filtr active: {filters['active']}")
 
-            if is_mapped_filter is not None:
-                automation_filters['is_mapped'] = is_mapped_filter
+            if 'is_mapped' in filters:
+                automation_filters['is_mapped'] = filters['is_mapped']
                 self.stdout.write(
-                    f"[INFO] Filtr is_mapped: {is_mapped_filter}")
+                    f"[INFO] Filtr is_mapped: {filters['is_mapped']}")
 
             # Przejdź do listy produktów (z filtrami lub bez)
             self.stdout.write(f"\n[INFO] Przechodzenie do listy produktów...")
