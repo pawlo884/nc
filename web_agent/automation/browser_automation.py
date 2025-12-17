@@ -1428,7 +1428,7 @@ class BrowserAutomation:
 
     def fill_mpd_description(self, ai_processor=None):
         """
-        SCENARIUSZ 1, KROK 2: Wypełnia pole mpd_description w sekcji MPD.
+        SCENARIUSZ CREATE, KROK 2: Wypełnia pole mpd_description w sekcji MPD.
 
         Pobiera opis produktu z głównego formularza Django (id_description) lub
         z pola mpd_description (jeśli już istnieje), ulepsza go przez AI
@@ -1442,10 +1442,11 @@ class BrowserAutomation:
         """
         try:
             logger.info("=" * 50)
-            logger.info("SCENARIUSZ 1, KROK 2: Wypełnianie pola mpd_description")
+            logger.info(
+                "SCENARIUSZ CREATE, KROK 2: Wypełnianie pola mpd_description")
             logger.info("=" * 50)
             print("[DEBUG] " + "=" * 50)
-            print("[DEBUG] SCENARIUSZ 1, KROK 2: Wypełnianie pola mpd_description")
+            print("[DEBUG] SCENARIUSZ CREATE, KROK 2: Wypełnianie pola mpd_description")
             print("[DEBUG] " + "=" * 50)
 
             # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
@@ -1458,8 +1459,10 @@ class BrowserAutomation:
                     EC.presence_of_element_located((By.ID, "mpd_description"))
                 )
             except Exception as e:
-                logger.error(f"Nie udało się znaleźć pola mpd_description: {e}")
-                print(f"[DEBUG] Nie udało się znaleźć pola mpd_description: {e}")
+                logger.error(
+                    f"Nie udało się znaleźć pola mpd_description: {e}")
+                print(
+                    f"[DEBUG] Nie udało się znaleźć pola mpd_description: {e}")
                 return None
 
             # KROK 2.2: Pobierz obecny opis z pola mpd_description
@@ -1470,7 +1473,8 @@ class BrowserAutomation:
             if not current_description or not current_description.strip():
                 try:
                     django_desc_field = self.wait.until(
-                        EC.presence_of_element_located((By.ID, "id_description"))
+                        EC.presence_of_element_located(
+                            (By.ID, "id_description"))
                     )
                     current_description = django_desc_field.get_attribute(
                         "value") or django_desc_field.text or ""
@@ -1628,7 +1632,8 @@ class BrowserAutomation:
 
         except Exception as e:
             logger.error(f"Błąd podczas wypełniania pola mpd_description: {e}")
-            print(f"[DEBUG] Błąd podczas wypełniania pola mpd_description: {e}")
+            print(
+                f"[DEBUG] Błąd podczas wypełniania pola mpd_description: {e}")
             import traceback
             traceback.print_exc()
             # Zwróć None w przypadku błędu
@@ -1789,7 +1794,7 @@ class BrowserAutomation:
 
     def fill_mpd_name(self, ai_processor=None):
         """
-        SCENARIUSZ 1, KROK 1: Wypełnia pole mpd_name w sekcji MPD.
+        SCENARIUSZ CREATE, KROK 1: Wypełnia pole mpd_name w sekcji MPD.
 
         Pobiera nazwę produktu z głównego formularza Django (id_name),
         ulepsza ją przez AI (jeśli potrzeba) i ustawia w polu mpd_name.
@@ -1802,10 +1807,10 @@ class BrowserAutomation:
         """
         try:
             logger.info("=" * 50)
-            logger.info("SCENARIUSZ 1, KROK 1: Wypełnianie pola mpd_name")
+            logger.info("SCENARIUSZ CREATE, KROK 1: Wypełnianie pola mpd_name")
             logger.info("=" * 50)
             print("[DEBUG] " + "=" * 50)
-            print("[DEBUG] SCENARIUSZ 1, KROK 1: Wypełnianie pola mpd_name")
+            print("[DEBUG] SCENARIUSZ CREATE, KROK 1: Wypełnianie pola mpd_name")
             print("[DEBUG] " + "=" * 50)
 
             # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
@@ -1936,8 +1941,8 @@ class BrowserAutomation:
         Tworzy produkt w MPD (klika przycisk "Utwórz nowy produkt w MPD").
 
         Wykonuje kroki w następującej kolejności:
-        1. Wypełnia pole mpd_name (SCENARIUSZ 1, KROK 1)
-        2. Wypełnia pole mpd_description (SCENARIUSZ 1, KROK 2)
+        1. Wypełnia pole mpd_name (SCENARIUSZ CREATE, KROK 1)
+        2. Wypełnia pole mpd_description (SCENARIUSZ CREATE, KROK 2)
         3. Ustawia markę (mpd_brand)
         4. Ustawia kolor producenta (producer_color_name)
         5. Klika przycisk "Utwórz nowy produkt w MPD"
@@ -1955,7 +1960,7 @@ class BrowserAutomation:
             # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
             self._ensure_right_column_expanded()
 
-            # SCENARIUSZ 1, KROK 1: Wypełnij pole mpd_name
+            # SCENARIUSZ CREATE, KROK 1: Wypełnij pole mpd_name
             filled_name = self.fill_mpd_name(ai_processor=ai_processor)
             if not filled_name:
                 logger.warning(
@@ -1963,8 +1968,9 @@ class BrowserAutomation:
                 print(
                     "[DEBUG] Nie udało się wypełnić pola mpd_name, kontynuuję dalej...")
 
-            # SCENARIUSZ 1, KROK 2: Wypełnij pole mpd_description
-            filled_description = self.fill_mpd_description(ai_processor=ai_processor)
+            # SCENARIUSZ CREATE, KROK 2: Wypełnij pole mpd_description
+            filled_description = self.fill_mpd_description(
+                ai_processor=ai_processor)
             if not filled_description:
                 logger.warning(
                     "Nie udało się wypełnić pola mpd_description, kontynuuję dalej...")
