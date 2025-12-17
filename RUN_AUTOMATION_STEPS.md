@@ -165,21 +165,25 @@
     - Dla "Kostiumy Dwuczęciowe" wybiera `value="5"` (Dwuczęściowe)
     - Wypełnia pole "Ścieżka produktu" w formularzu
 
-### 8.13. WYPEŁNIANIE MATERIAŁÓW (SKŁADU)
+### 8.13. KROK 12: WYBÓR JEDNOSTKI PRODUKTU
 
-31. **Wyodrębnij i wypełnij materiały** (`browser.fill_fabric_materials()`)
-    - Wyodrębnia informacje o składzie z szczegółów produktu
-    - Wypełnia pole "Materiały" lub "Skład" w formularzu
-
-### 8.14. WYBÓR JEDNOSTKI PRODUKTU
-
-33. **Wybierz jednostkę produktu** (`browser.select_unit()`)
+31. **Wybierz jednostkę produktu** (`browser.select_unit()`)
     - Wybiera `value="0"` (szt.)
     - Wypełnia pole "Jednostka" w formularzu
 
-### 8.15. TWORZENIE PRODUKTU W MPD
+### 8.14. KROK 13: WYPEŁNIANIE MATERIAŁÓW (SKŁADU)
 
-34. **Utwórz produkt w MPD** (`browser.create_mpd_product()`)
+32. **Wyodrębnij i wypełnij materiały** (`browser.fill_fabric_materials()`)
+    - Wyodrębnia informacje o składzie z szczegółów produktu
+    - Wypełnia pole "Materiały" lub "Skład" w formularzu
+
+### 8.15. KROK 14: KLIKNIĘCIE PRZYCISKU "UTWÓRZ NOWY PRODUKT W MPD"
+
+33. **Kliknij przycisk "Utwórz nowy produkt w MPD"**
+    - Znajduje przycisk po ID `create-mpd-product-btn`
+    - Klika przycisk, aby utworzyć produkt w MPD
+    - Czeka 2 sekundy na przetworzenie
+    - Jeśli przycisk nie istnieje (produkt już zmapowany), pomija ten krok
     - Szuka przycisku "Utwórz nowy produkt w MPD"
     - Jeśli przycisk istnieje (produkt nie jest zmapowany):
       - Klika przycisk

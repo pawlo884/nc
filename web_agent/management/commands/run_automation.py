@@ -8,7 +8,9 @@ from matterhorn1.models import Brand, Category
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 import os
+import time
 
 
 class Command(BaseCommand):
@@ -381,22 +383,10 @@ class Command(BaseCommand):
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas wyboru ścieżki produktu: {e_path}"))
 
-                    # Wypełnij materiały (skład) z szczegółów produktu - PRZED przejściem do MPD
-                    # Pola szczegółów są w formularzu produktu matterhorn1, nie w MPD
+                    # KROK 12: Wybierz jednostkę produktu (szt.)
                     try:
                         self.stdout.write(
-                            "\n[INFO] Wyodrębnianie i wypełnianie materiałów...")
-                        browser.fill_fabric_materials()
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Wypełniono materiały"))
-                    except Exception as e_fabric:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas wypełniania materiałów: {e_fabric}"))
-
-                    # Wybierz jednostkę produktu (szt.)
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] Wybieranie jednostki produktu...")
+                            "\n[INFO] KROK 12: Wybieranie jednostki produktu...")
                         # value="0" dla szt.
                         browser.select_unit(unit_value="0")
                         self.stdout.write(self.style.SUCCESS(
@@ -405,21 +395,54 @@ class Command(BaseCommand):
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas wyboru jednostki produktu: {e_unit}"))
 
-                    # Utwórz produkt w MPD (przycisk "Utwórz nowy produkt w MPD")
-                    # Jeśli przycisk istnieje, produkt nie jest zmapowany - klikamy go
-                    # Jeśli przycisk nie istnieje, produkt jest już zmapowany - nie robimy nic
+                    # KROK 13: Wypełnij materiały (skład) z szczegółów produktu - PRZED przejściem do MPD
+                    # Pola szczegółów są w formularzu produktu matterhorn1, nie w MPD
                     try:
                         self.stdout.write(
-                            "\n[INFO] Tworzę produkt w MPD...")
-                        browser.create_mpd_product()
+                            "\n[INFO] KROK 13: Wyodrębnianie i wypełnianie materiałów...")
+                        browser.fill_fabric_materials()
                         self.stdout.write(self.style.SUCCESS(
-                            "[OK] Produkt został utworzony w MPD"))
+                            "[OK] Wypełniono materiały"))
+                    except Exception as e_fabric:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas wypełniania materiałów: {e_fabric}"))
+
+                    # KROK 14: Kliknij przycisk "Utwórz nowy produkt w MPD"
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] KROK 14: Klikanie przycisku 'Utwórz nowy produkt w MPD'...")
+                        
+                        # Znajdź przycisk po ID
+                        create_button = browser.wait.until(
+                            EC.element_to_be_clickable((By.ID, "create-mpd-product-btn"))
+                        )
+                        create_button.click()
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Kliknięto przycisk 'Utwórz nowy produkt w MPD'"))
+                        time.sleep(2)  # Czekaj na przetworzenie
                     except NoSuchElementException:
                         self.stdout.write(
                             "[INFO] Produkt jest już zmapowany - przycisk 'Utwórz nowy produkt w MPD' nie istnieje")
-                    except Exception as e_save:
+                    except Exception as e_button:
                         self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas tworzenia produktu w MPD: {e_save}"))
+                            f"[WARNING] Błąd podczas klikania przycisku: {e_button}"))
+
+                    # ZAKOMENTOWANE: Utwórz produkt w MPD (przycisk "Utwórz nowy produkt w MPD")
+                    # Wszystkie pola są już wypełnione w krokach 1-13, więc nie ma potrzeby ponownie wypełniać
+                    # Jeśli przycisk istnieje, produkt nie jest zmapowany - klikamy go
+                    # Jeśli przycisk nie istnieje, produkt jest już zmapowany - nie robimy nic
+                    # try:
+                    #     self.stdout.write(
+                    #         "\n[INFO] Tworzę produkt w MPD...")
+                    #     browser.create_mpd_product()
+                    #     self.stdout.write(self.style.SUCCESS(
+                    #         "[OK] Produkt został utworzony w MPD"))
+                    # except NoSuchElementException:
+                    #     self.stdout.write(
+                    #         "[INFO] Produkt jest już zmapowany - przycisk 'Utwórz nowy produkt w MPD' nie istnieje")
+                    # except Exception as e_save:
+                    #     self.stdout.write(self.style.WARNING(
+                    #         f"[WARNING] Błąd podczas tworzenia produktu w MPD: {e_save}"))
 
                 except Exception as e:
                     self.stdout.write(self.style.WARNING(
