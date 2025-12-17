@@ -1644,35 +1644,97 @@ class BrowserAutomation:
         DEPRECATED: Użyj fill_mpd_description() zamiast tej metody.
         Wrapper dla kompatybilności wstecznej.
         """
-        logger.warning(
-            "update_product_description() jest deprecated. Użyj fill_mpd_description()")
+        try:
+            logger.warning(
+                "update_product_description() jest deprecated. Uzyj fill_mpd_description()")
+            print(
+                "[WARNING] update_product_description() jest deprecated. Uzyj fill_mpd_description()")
+        except UnicodeEncodeError:
+            logger.warning(
+                "update_product_description() is deprecated. Use fill_mpd_description()")
         return self.fill_mpd_description(ai_processor=ai_processor)
 
-    def update_product_short_description(self, full_description: str, ai_processor=None):
+    def fill_mpd_short_description(self, ai_processor=None):
         """
-        Edycja krótkiego opisu produktu w polu mpd_short_description.
-        Tworzy skróconą wersję pełnego opisu przez AI.
+        SCENARIUSZ CREATE, KROK 3: Wypełnia pole mpd_short_description w sekcji MPD.
+
+        Pobiera pełny opis z pola mpd_description (które powinno być już wypełnione przez KROK 2),
+        tworzy krótki opis przez AI i ustawia w polu mpd_short_description.
 
         Args:
-            full_description: Pełny opis produktu do skrócenia
             ai_processor: Instancja AIProcessor do tworzenia krótkiego opisu. Jeśli None, tworzy nową.
+
+        Returns:
+            str: Utworzony krótki opis produktu lub None w przypadku błędu
         """
         try:
-            logger.info("Rozpoczynam edycję krótkiego opisu produktu...")
-            print("[DEBUG] Rozpoczynam edycję krótkiego opisu produktu...")
+            logger.info("=" * 50)
+            logger.info(
+                "SCENARIUSZ CREATE, KROK 3: Wypełnianie pola mpd_short_description")
+            logger.info("=" * 50)
+            print("[DEBUG] " + "=" * 50)
+            print(
+                "[DEBUG] SCENARIUSZ CREATE, KROK 3: Wypełnianie pola mpd_short_description")
+            print("[DEBUG] " + "=" * 50)
 
-            # Czekaj na załadowanie pola mpd_short_description
-            short_desc_field = self.wait.until(
-                EC.presence_of_element_located(
-                    (By.ID, "mpd_short_description"))
-            )
+            # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
+            self._ensure_right_column_expanded()
+            time.sleep(0.5)
+
+            # KROK 3.1: Znajdź pole mpd_short_description w sekcji MPD
+            try:
+                mpd_short_desc_field = self.wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "mpd_short_description"))
+                )
+            except Exception as e:
+                logger.error(
+                    f"Nie udało się znaleźć pola mpd_short_description: {e}")
+                print(
+                    f"[DEBUG] Nie udało się znaleźć pola mpd_short_description: {e}")
+                return None
+
+            # KROK 3.2: Pobierz pełny opis z pola mpd_description (powinno być wypełnione przez KROK 2)
+            full_description = None
+            try:
+                mpd_desc_field = self.driver.find_element(
+                    By.ID, "mpd_description")
+                full_description = mpd_desc_field.get_attribute("value") or ""
+                logger.info(
+                    f"Pobrano pełny opis z pola mpd_description (długość: {len(full_description)})")
+                print(
+                    f"[DEBUG] Pobrano pełny opis z pola mpd_description (długość: {len(full_description)})")
+            except Exception as e:
+                logger.warning(
+                    f"Nie udało się pobrać opisu z pola mpd_description: {e}")
+                print(
+                    f"[DEBUG] Nie udało się pobrać opisu z pola mpd_description: {e}")
+
+            # KROK 3.3: Jeśli pole mpd_description jest puste, pobierz opis z formularza Django
+            if not full_description or not full_description.strip():
+                try:
+                    django_desc_field = self.wait.until(
+                        EC.presence_of_element_located(
+                            (By.ID, "id_description"))
+                    )
+                    full_description = django_desc_field.get_attribute(
+                        "value") or ""
+                    logger.info(
+                        f"Pobrano pełny opis z formularza Django (długość: {len(full_description)})")
+                    print(
+                        f"[DEBUG] Pobrano pełny opis z formularza Django (długość: {len(full_description)})")
+                except Exception as e:
+                    logger.warning(
+                        f"Nie udało się pobrać opisu z formularza Django: {e}")
+                    print(
+                        f"[DEBUG] Nie udało się pobrać opisu z formularza Django: {e}")
 
             if not full_description or not full_description.strip():
                 logger.warning("Brak pełnego opisu do skrócenia")
                 print("[DEBUG] Brak pełnego opisu do skrócenia")
-                return
+                return None
 
-            # Utwórz krótki opis przez AI
+            # KROK 3.4: Utwórz krótki opis przez AI
             if ai_processor is None:
                 from web_agent.automation.ai_processor import AIProcessor
                 ai_processor = AIProcessor()
@@ -1685,66 +1747,124 @@ class BrowserAutomation:
             if not short_description:
                 logger.warning("Nie udało się utworzyć krótkiego opisu")
                 print("[DEBUG] Nie udało się utworzyć krótkiego opisu")
-                return
+                return None
 
             logger.info(
-                f"Krótki opis produktu (długość: {len(short_description)})")
+                f"Utworzony krótki opis produktu (długość: {len(short_description)})")
             print(
-                f"[DEBUG] Krótki opis produktu (długość: {len(short_description)})")
+                f"[DEBUG] Utworzony krótki opis produktu (długość: {len(short_description)})")
 
-            # Wyczyść pole i ustaw krótki opis przez JavaScript
+            # KROK 3.5: Ustaw wartość w polu mpd_short_description przez JavaScript
+            # Najpierw focus na pole
             self.driver.execute_script(
-                "arguments[0].focus();", short_desc_field)
+                "arguments[0].focus();", mpd_short_desc_field)
             time.sleep(0.2)
 
+            # Wyczyść pole przez JavaScript
             self.driver.execute_script(
-                "arguments[0].value = '';", short_desc_field)
+                "arguments[0].value = '';", mpd_short_desc_field)
             time.sleep(0.2)
 
+            # Ustaw wartość przez JavaScript
             self.driver.execute_script(
                 "arguments[0].value = arguments[1];",
-                short_desc_field,
+                mpd_short_desc_field,
                 short_description
             )
             time.sleep(0.3)
 
-            # Wywołaj zdarzenia
+            # Wywołaj zdarzenia, aby React zarejestrował zmianę
             self.driver.execute_script(
                 """
-                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                var field = arguments[0];
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+                field.dispatchEvent(new Event('blur', { bubbles: true }));
                 """,
-                short_desc_field
+                mpd_short_desc_field
             )
             time.sleep(0.5)
 
-            # Sprawdź czy wartość została ustawiona
+            # KROK 3.6: Weryfikacja - sprawdź czy wartość została ustawiona
             actual_value = self.driver.execute_script(
-                "return arguments[0].value;", short_desc_field)
+                "return arguments[0].value;", mpd_short_desc_field)
+
             if actual_value == short_description:
                 logger.info(
-                    f"Pole krótkiego opisu zostało wypełnione: {short_description[:50]}...")
+                    f"✓ Pole mpd_short_description zostało wypełnione (długość: {len(actual_value)})")
                 print(
-                    f"[DEBUG] Pole krótkiego opisu zostało wypełnione (długość: {len(actual_value)})")
+                    f"[DEBUG] ✓ Pole mpd_short_description zostało wypełnione (długość: {len(actual_value)})")
+                return short_description
             else:
                 logger.warning(
-                    f"Wartość krótkiego opisu nie została poprawnie ustawiona. Oczekiwano: {len(short_description)}, otrzymano: {len(actual_value) if actual_value else 0}")
+                    f"⚠ Wartość mpd_short_description nie została poprawnie ustawiona. "
+                    f"Oczekiwano: {len(short_description)} znaków, otrzymano: {len(actual_value) if actual_value else 0} znaków")
                 print(
-                    f"[DEBUG] Wartość krótkiego opisu nie została poprawnie ustawiona")
-                # Spróbuj przez send_keys jako fallback
-                short_desc_field.clear()
-                time.sleep(0.2)
-                short_desc_field.send_keys(short_description)
-                time.sleep(0.3)
-
-            logger.info(
-                "Pole krótkiego opisu zostało wypełnione. Nie zapisuję - zostanie zapisane przy tworzeniu produktu w MPD.")
-            print("[DEBUG] Pole krótkiego opisu zostało wypełnione. Nie zapisuję - zostanie zapisane przy tworzeniu produktu w MPD.")
+                    f"[DEBUG] ⚠ Wartość mpd_short_description nie została poprawnie ustawiona. "
+                    f"Oczekiwano: {len(short_description)} znaków, otrzymano: {len(actual_value) if actual_value else 0} znaków")
+                # Fallback: spróbuj przez send_keys
+                try:
+                    mpd_short_desc_field.clear()
+                    time.sleep(0.2)
+                    mpd_short_desc_field.send_keys(short_description)
+                    time.sleep(0.3)
+                    # Ponownie wywołaj zdarzenia
+                    self.driver.execute_script(
+                        """
+                        arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                        arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                        """,
+                        mpd_short_desc_field
+                    )
+                    # Sprawdź ponownie
+                    actual_value = self.driver.execute_script(
+                        "return arguments[0].value;", mpd_short_desc_field)
+                    if actual_value == short_description:
+                        logger.info(
+                            f"✓ Pole mpd_short_description wypełnione przez send_keys (długość: {len(actual_value)})")
+                        print(
+                            f"[DEBUG] ✓ Pole mpd_short_description wypełnione przez send_keys (długość: {len(actual_value)})")
+                        return short_description
+                    else:
+                        logger.error(
+                            f"Nie udało się ustawić wartości w polu mpd_short_description")
+                        print(
+                            f"[DEBUG] Nie udało się ustawić wartości w polu mpd_short_description")
+                        return None
+                except Exception as e_fallback:
+                    logger.error(
+                        f"Nie udało się wypełnić mpd_short_description przez send_keys: {e_fallback}")
+                    print(
+                        f"[DEBUG] Nie udało się wypełnić mpd_short_description przez send_keys: {e_fallback}")
+                    return None
 
         except Exception as e:
-            logger.error(f"Błąd podczas edycji krótkiego opisu produktu: {e}")
-            print(f"[DEBUG] Błąd podczas edycji krótkiego opisu produktu: {e}")
-            raise
+            logger.error(
+                f"Błąd podczas wypełniania pola mpd_short_description: {e}")
+            print(
+                f"[DEBUG] Błąd podczas wypełniania pola mpd_short_description: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def update_product_short_description(self, full_description: str, ai_processor=None):
+        """
+        DEPRECATED: Użyj fill_mpd_short_description() zamiast tej metody.
+        Wrapper dla kompatybilności wstecznej.
+        
+        Args:
+            full_description: Pełny opis produktu (ignorowany - metoda pobierze go automatycznie)
+            ai_processor: Instancja AIProcessor do tworzenia krótkiego opisu. Jeśli None, tworzy nową.
+        """
+        try:
+            logger.warning(
+                "update_product_short_description() jest deprecated. Uzyj fill_mpd_short_description()")
+            print(
+                "[WARNING] update_product_short_description() jest deprecated. Uzyj fill_mpd_short_description()")
+        except UnicodeEncodeError:
+            logger.warning(
+                "update_product_short_description() is deprecated. Use fill_mpd_short_description()")
+        return self.fill_mpd_short_description(ai_processor=ai_processor)
 
     def check_if_product_is_mapped(self) -> bool:
         """
@@ -1943,9 +2063,10 @@ class BrowserAutomation:
         Wykonuje kroki w następującej kolejności:
         1. Wypełnia pole mpd_name (SCENARIUSZ CREATE, KROK 1)
         2. Wypełnia pole mpd_description (SCENARIUSZ CREATE, KROK 2)
-        3. Ustawia markę (mpd_brand)
-        4. Ustawia kolor producenta (producer_color_name)
-        5. Klika przycisk "Utwórz nowy produkt w MPD"
+        3. Wypełnia pole mpd_short_description (SCENARIUSZ CREATE, KROK 3)
+        4. Ustawia markę (mpd_brand)
+        5. Ustawia kolor producenta (producer_color_name)
+        6. Klika przycisk "Utwórz nowy produkt w MPD"
 
         Args:
             ai_processor: Instancja AIProcessor do ulepszania nazwy. Jeśli None, tworzy nową.
@@ -1976,6 +2097,15 @@ class BrowserAutomation:
                     "Nie udało się wypełnić pola mpd_description, kontynuuję dalej...")
                 print(
                     "[DEBUG] Nie udało się wypełnić pola mpd_description, kontynuuję dalej...")
+
+            # SCENARIUSZ CREATE, KROK 3: Wypełnij pole mpd_short_description
+            filled_short_description = self.fill_mpd_short_description(
+                ai_processor=ai_processor)
+            if not filled_short_description:
+                logger.warning(
+                    "Nie udało się wypełnić pola mpd_short_description, kontynuuję dalej...")
+                print(
+                    "[DEBUG] Nie udało się wypełnić pola mpd_short_description, kontynuuję dalej...")
 
             # PRZED kliknięciem przycisku ustaw markę i kolor producenta w sekcji MPD
             try:
