@@ -11,6 +11,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 import os
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -206,226 +209,315 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(
                     "\n[OK] Przeglądarka otwarta - wszystkie produkty!"))
 
-            # Otwórz pierwszy produkt z listy (domyślnie 1)
+            # Przetwarzaj produkty z listy (max_products)
             if max_products and max_products > 0:
                 self.stdout.write(
-                    f"\n[INFO] Otwieranie pierwszego produktu z listy (max: {max_products})...")
-                try:
-                    browser.open_first_product_from_list()
-                    self.stdout.write(self.style.SUCCESS(
-                        "[OK] Otworzono pierwszy produkt z listy"))
-
-                    # KROK 1: Edycja nazwy produktu
-                    self.stdout.write("\n[INFO] KROK 1: Edycja nazwy produktu...")
-                    try:
-                        browser.update_product_name()
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Zaktualizowano nazwę produktu"))
-                    except Exception as e_name:
-                        self.stdout.write(self.style.ERROR(
-                            f"[ERROR] Błąd podczas edycji nazwy: {e_name}"))
+                    f"\n[INFO] Przetwarzanie produktów z listy (max: {max_products})...")
+                
+                # Zapisz URL listy produktów z filtrami przed wejściem w pierwszy produkt
+                filtered_list_url = browser.driver.current_url
+                # Zapisz również w obiekcie browser, aby metody mogły z niego korzystać
+                browser._saved_filtered_list_url = filtered_list_url
+                self.stdout.write(
+                    f"[DEBUG] Zapisano URL listy produktów z filtrami: {filtered_list_url}")
+                logger.info(f"Zapisano URL listy produktów z filtrami: {filtered_list_url}")
+                
+                for product_index in range(max_products):
+                    self.stdout.write(
+                        f"\n{'='*60}")
+                    self.stdout.write(
+                        f"[INFO] PRODUKT {product_index + 1}/{max_products}")
+                    self.stdout.write(
+                        f"{'='*60}")
+                    
+                    # Jeśli to nie pierwszy produkt, wróć do zapisanej listy z filtrami
+                    if product_index > 0:
                         self.stdout.write(
-                            "[ERROR] Kończę proces - nie można ulepszyć nazwy produktu")
-                        raise
-
-                    # KROK 2: Edycja opisu produktu
+                            f"\n[INFO] Wracanie do przefiltrowanej listy produktów przed produktem {product_index + 1}...")
+                        browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                        time.sleep(2)
+                    
+                    # Otwórz produkt o danym indeksie
                     try:
-                        self.stdout.write("\n[INFO] KROK 2: Edycja opisu produktu...")
-                        enhanced_description = browser.update_product_description()
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Zaktualizowano opis produktu"))
-                    except Exception as e_desc:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas edycji opisu: {e_desc}"))
-                        enhanced_description = None
-
-                    # KROK 3: Edycja krótkiego opisu
-                    if enhanced_description:
-                        try:
-                            self.stdout.write("\n[INFO] KROK 3: Edycja krótkiego opisu produktu...")
-                            browser.update_product_short_description(
-                                enhanced_description)
-                            self.stdout.write(self.style.SUCCESS(
-                                "[OK] Zaktualizowano krótki opis produktu"))
-                        except Exception as e_short_desc:
+                        success = browser.open_product_from_list_by_index(product_index)
+                        if not success:
                             self.stdout.write(self.style.WARNING(
-                                f"[WARNING] Błąd podczas edycji krótkiego opisu: {e_short_desc}"))
-
-                    # KROK 4: Wyciągnij i zaznacz atrybuty z opisu
+                                f"[WARNING] Nie udało się otworzyć produktu o indeksie {product_index}"))
+                            continue
+                        self.stdout.write(self.style.SUCCESS(
+                            f"[OK] Otworzono produkt {product_index + 1} z listy"))
+                    except Exception as e:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas otwierania produktu {product_index + 1}: {e}"))
+                        continue
+                    
                     try:
-                        self.stdout.write(
-                            "\n[INFO] KROK 4: Wyciąganie atrybutów z opisu produktu...")
-                        from web_agent.automation.ai_processor import AIProcessor
-                        ai_processor = AIProcessor()
+                        # Pobierz oryginalną nazwę produktu (potrzebna dla ASSIGN i CREATE)
+                        try:
+                            from selenium.webdriver.common.by import By
+                            name_field = browser.driver.find_element(By.ID, "id_name")
+                            original_name = name_field.get_attribute("value")
+                            if original_name:
+                                browser._original_product_name = original_name
+                                logger.info(f"Pobrano oryginalną nazwę produktu: {original_name}")
+                                print(f"[DEBUG] Pobrano oryginalną nazwę produktu: {original_name}")
+                        except Exception as e:
+                            logger.warning(f"Nie udało się pobrać oryginalnej nazwy produktu: {e}")
+                            print(f"[DEBUG] Nie udało się pobrać oryginalnej nazwy produktu: {e}")
 
-                        # Pobierz dostępne atrybuty z formularza
-                        available_attributes = browser.get_available_attributes()
+                        # SCENARIUSZ ASSIGN: Sprawdź najpierw sugerowane produkty
+                        self.stdout.write("\n[INFO] Sprawdzanie scenariusza ASSIGN (sugerowane produkty)...")
+                        assign_result = browser.handle_assign_scenario(
+                            brand_id=brand_id,
+                            brand_name=brand.name if brand else None
+                        )
+                        
+                        if assign_result:
+                            # Scenariusz ASSIGN się powiódł (znaleziono produkt z pokryciem 100% i przypisano)
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Scenariusz ASSIGN zakończony - produkt został przypisany do istniejącego produktu w MPD"))
+                            self.stdout.write(
+                                f"\n[OK] Produkt {product_index + 1}/{max_products} przetworzony pomyślnie (ASSIGN)")
+                            # Scenariusz ASSIGN zakończony - metoda handle_assign_scenario już wróciła do listy
+                            # Przejdź do następnego produktu (jeśli to nie ostatni)
+                            continue
+                        else:
+                            # Brak sugerowanych produktów z pokryciem 100% - przejdź do scenariusza CREATE
+                            self.stdout.write(
+                                "[INFO] Brak sugerowanych produktów z pokryciem 100% - przechodzę do scenariusza CREATE")
+                    
+                        # SCENARIUSZ CREATE: Wypełnij wszystkie pola i utwórz nowy produkt
+                        # KROK 1: Edycja nazwy produktu
+                        self.stdout.write("\n[INFO] KROK 1: Edycja nazwy produktu...")
+                        try:
+                            browser.update_product_name()
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Zaktualizowano nazwę produktu"))
+                        except Exception as e_name:
+                            self.stdout.write(self.style.ERROR(
+                                f"[ERROR] Błąd podczas edycji nazwy: {e_name}"))
+                            self.stdout.write(
+                                "[ERROR] Kończę proces - nie można ulepszyć nazwy produktu")
+                            raise
 
-                        if available_attributes and enhanced_description:
-                            # Wyciągnij atrybuty z opisu używając AI
-                            attribute_ids = ai_processor.extract_attributes_from_description(
-                                enhanced_description,
-                                available_attributes
-                            )
+                        # KROK 2: Edycja opisu produktu
+                        try:
+                            self.stdout.write("\n[INFO] KROK 2: Edycja opisu produktu...")
+                            enhanced_description = browser.update_product_description()
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Zaktualizowano opis produktu"))
+                        except Exception as e_desc:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas edycji opisu: {e_desc}"))
+                            enhanced_description = None
 
-                            if attribute_ids:
-                                # Zaznacz atrybuty w formularzu
-                                browser.select_attributes(attribute_ids)
+                        # KROK 3: Edycja krótkiego opisu
+                        if enhanced_description:
+                            try:
+                                self.stdout.write("\n[INFO] KROK 3: Edycja krótkiego opisu produktu...")
+                                browser.update_product_short_description(
+                                    enhanced_description)
                                 self.stdout.write(self.style.SUCCESS(
-                                    f"[OK] Zaznaczono {len(attribute_ids)} atrybutów z opisu"))
+                                    "[OK] Zaktualizowano krótki opis produktu"))
+                            except Exception as e_short_desc:
+                                self.stdout.write(self.style.WARNING(
+                                    f"[WARNING] Błąd podczas edycji krótkiego opisu: {e_short_desc}"))
+
+                        # KROK 4: Wyciągnij i zaznacz atrybuty z opisu
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] KROK 4: Wyciąganie atrybutów z opisu produktu...")
+                            from web_agent.automation.ai_processor import AIProcessor
+                            ai_processor = AIProcessor()
+
+                            # Pobierz dostępne atrybuty z formularza
+                            available_attributes = browser.get_available_attributes()
+
+                            if available_attributes and enhanced_description:
+                                # Wyciągnij atrybuty z opisu używając AI
+                                attribute_ids = ai_processor.extract_attributes_from_description(
+                                    enhanced_description,
+                                    available_attributes
+                                )
+
+                                if attribute_ids:
+                                    # Zaznacz atrybuty w formularzu
+                                    browser.select_attributes(attribute_ids)
+                                    self.stdout.write(self.style.SUCCESS(
+                                        f"[OK] Zaznaczono {len(attribute_ids)} atrybutów z opisu"))
+                                else:
+                                    self.stdout.write(
+                                        "[INFO] Nie znaleziono atrybutów w opisie produktu")
                             else:
                                 self.stdout.write(
-                                    "[INFO] Nie znaleziono atrybutów w opisie produktu")
-                        else:
-                            self.stdout.write(
-                                "[INFO] Brak dostępnych atrybutów lub opisu do analizy")
-                    except Exception as e_attrs:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas wyciągania atrybutów: {e_attrs}"))
-
-                    # KROK 5: Zaznacz markę w dropdown
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] KROK 5: Zaznaczanie marki w dropdown...")
-                        brand_result = browser.fill_mpd_brand()
-                        if brand_result:
-                            self.stdout.write(self.style.SUCCESS(
-                                f"[OK] Zaznaczono markę: {brand_result}"))
-                        else:
+                                    "[INFO] Brak dostępnych atrybutów lub opisu do analizy")
+                        except Exception as e_attrs:
                             self.stdout.write(self.style.WARNING(
-                                "[WARNING] Nie udało się zaznaczyć marki w dropdown"))
-                    except Exception as e_brand:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas zaznaczania marki: {e_brand}"))
+                                f"[WARNING] Błąd podczas wyciągania atrybutów: {e_attrs}"))
 
-                    # KROK 6: Wybierz grupę rozmiarową na podstawie kategorii
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] KROK 6: Wybieranie grupy rozmiarowej...")
-                        category_name_for_size = automation_filters.get(
-                            'category_name') if automation_filters else category_name
-                        browser.select_size_category(category_name_for_size)
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Wybrano grupę rozmiarową"))
-                    except Exception as e_size:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas wyboru grupy rozmiarowej: {e_size}"))
-
-                    # KROK 7: Wybierz główny kolor (main_color_id) na podstawie wartości z pola id_color
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] KROK 7: Wybieranie głównego koloru (main_color_id)...")
-                        color_result = browser.fill_main_color_from_product_color()
-                        if color_result:
-                            self.stdout.write(self.style.SUCCESS(
-                                f"[OK] Wybrano główny kolor: {color_result}"))
-                        else:
-                            self.stdout.write(self.style.WARNING(
-                                "[WARNING] Nie udało się wybrać głównego koloru"))
-                    except Exception as e_color_main:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas wyboru głównego koloru: {e_color_main}"))
-
-                    # KROK 8: Wyodrębnij i wypełnij kolor producenta (użyj zapisanej oryginalnej nazwy)
-                    if hasattr(browser, '_original_product_name') and browser._original_product_name:
+                        # KROK 5: Zaznacz markę w dropdown
                         try:
                             self.stdout.write(
-                                "\n[INFO] KROK 8: Wyodrębnianie koloru producenta...")
-                            browser.update_producer_color(
-                                browser._original_product_name,
-                                brand_id=brand_id,
-                                brand_name=brand.name if brand else None
-                            )
-                            self.stdout.write(self.style.SUCCESS(
-                                "[OK] Wypełniono kolor producenta"))
-                        except Exception as e_color:
+                                "\n[INFO] KROK 5: Zaznaczanie marki w dropdown...")
+                            brand_result = browser.fill_mpd_brand()
+                            if brand_result:
+                                self.stdout.write(self.style.SUCCESS(
+                                    f"[OK] Zaznaczono markę: {brand_result}"))
+                            else:
+                                self.stdout.write(self.style.WARNING(
+                                    "[WARNING] Nie udało się zaznaczyć marki w dropdown"))
+                        except Exception as e_brand:
                             self.stdout.write(self.style.WARNING(
-                                f"[WARNING] Błąd podczas wyodrębniania koloru: {e_color}"))
+                                f"[WARNING] Błąd podczas zaznaczania marki: {e_brand}"))
 
-                    # KROK 9: Wyodrębnij i wypełnij kod producenta (użyj zapisanej oryginalnej nazwy)
-                    if hasattr(browser, '_original_product_name') and browser._original_product_name:
+                        # KROK 6: Wybierz grupę rozmiarową na podstawie kategorii
                         try:
                             self.stdout.write(
-                                "\n[INFO] KROK 9: Wyodrębnianie kodu producenta...")
-                            browser.update_producer_code(
-                                browser._original_product_name
+                                "\n[INFO] KROK 6: Wybieranie grupy rozmiarowej...")
+                            category_name_for_size = automation_filters.get(
+                                'category_name') if automation_filters else category_name
+                            browser.select_size_category(category_name_for_size)
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Wybrano grupę rozmiarową"))
+                        except Exception as e_size:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas wyboru grupy rozmiarowej: {e_size}"))
+
+                        # KROK 7: Wybierz główny kolor (main_color_id) na podstawie wartości z pola id_color
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] KROK 7: Wybieranie głównego koloru (main_color_id)...")
+                            color_result = browser.fill_main_color_from_product_color()
+                            if color_result:
+                                self.stdout.write(self.style.SUCCESS(
+                                    f"[OK] Wybrano główny kolor: {color_result}"))
+                            else:
+                                self.stdout.write(self.style.WARNING(
+                                    "[WARNING] Nie udało się wybrać głównego koloru"))
+                        except Exception as e_color_main:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas wyboru głównego koloru: {e_color_main}"))
+
+                        # KROK 8: Wyodrębnij i wypełnij kolor producenta (użyj zapisanej oryginalnej nazwy)
+                        if hasattr(browser, '_original_product_name') and browser._original_product_name:
+                            try:
+                                self.stdout.write(
+                                    "\n[INFO] KROK 8: Wyodrębnianie koloru producenta...")
+                                browser.update_producer_color(
+                                    browser._original_product_name,
+                                    brand_id=brand_id,
+                                    brand_name=brand.name if brand else None
+                                )
+                                self.stdout.write(self.style.SUCCESS(
+                                    "[OK] Wypełniono kolor producenta"))
+                            except Exception as e_color:
+                                self.stdout.write(self.style.WARNING(
+                                    f"[WARNING] Błąd podczas wyodrębniania koloru: {e_color}"))
+
+                        # KROK 9: Wyodrębnij i wypełnij kod producenta (użyj zapisanej oryginalnej nazwy)
+                        if hasattr(browser, '_original_product_name') and browser._original_product_name:
+                            try:
+                                self.stdout.write(
+                                    "\n[INFO] KROK 9: Wyodrębnianie kodu producenta...")
+                                browser.update_producer_code(
+                                    browser._original_product_name
+                                )
+                                self.stdout.write(self.style.SUCCESS(
+                                    "[OK] Wypełniono kod producenta"))
+                            except Exception as e_code:
+                                self.stdout.write(self.style.WARNING(
+                                    f"[WARNING] Błąd podczas wyodrębniania kodu: {e_code}"))
+
+                        # KROK 10: Ustaw placeholder w polu series_name (nie wypełniamy faktycznej wartości)
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] KROK 10: Ustawianie placeholder w polu series_name...")
+                            series_result = browser.fill_series_name_placeholder()
+                            if series_result:
+                                self.stdout.write(self.style.SUCCESS(
+                                    "[OK] Ustawiono placeholder w polu series_name"))
+                            else:
+                                self.stdout.write(self.style.WARNING(
+                                    "[WARNING] Nie udało się ustawić placeholder w polu series_name"))
+                        except Exception as e_series:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas ustawiania placeholder w polu series_name: {e_series}"))
+
+                        # KROK 11: Zaznacz ścieżkę produktu (Dwuczęściowe)
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] KROK 11: Wybieranie ścieżki produktu...")
+                            # value="5" dla Dwuczęściowe
+                            browser.select_product_path(path_value="5")
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Wybrano ścieżkę produktu"))
+                        except Exception as e_path:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas wyboru ścieżki produktu: {e_path}"))
+
+                        # KROK 12: Wybierz jednostkę produktu (szt.)
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] KROK 12: Wybieranie jednostki produktu...")
+                            # value="0" dla szt.
+                            browser.select_unit(unit_value="0")
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Wybrano jednostkę produktu"))
+                        except Exception as e_unit:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas wyboru jednostki produktu: {e_unit}"))
+
+                        # KROK 13: Wypełnij materiały (skład) z szczegółów produktu - PRZED przejściem do MPD
+                        # Pola szczegółów są w formularzu produktu matterhorn1, nie w MPD
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] KROK 13: Wyodrębnianie i wypełnianie materiałów...")
+                            browser.fill_fabric_materials()
+                            self.stdout.write(self.style.SUCCESS(
+                                "[OK] Wypełniono materiały"))
+                        except Exception as e_fabric:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas wypełniania materiałów: {e_fabric}"))
+
+                        # KROK 14: Kliknij przycisk "Utwórz nowy produkt w MPD"
+                        try:
+                            self.stdout.write(
+                                "\n[INFO] KROK 14: Klikanie przycisku 'Utwórz nowy produkt w MPD'...")
+                            
+                            # Znajdź przycisk po ID
+                            create_button = browser.wait.until(
+                                EC.element_to_be_clickable((By.ID, "create-mpd-product-btn"))
                             )
+                            create_button.click()
                             self.stdout.write(self.style.SUCCESS(
-                                "[OK] Wypełniono kod producenta"))
-                        except Exception as e_code:
+                                "[OK] Kliknięto przycisk 'Utwórz nowy produkt w MPD'"))
+                            time.sleep(3)  # Czekaj na przetworzenie i ewentualne przekierowanie
+                            
+                            # Po utworzeniu produktu, sprawdź czy jesteśmy na stronie produktu czy już na liście
+                            # Jeśli jesteśmy na stronie produktu, wróć do listy
+                            try:
+                                current_url = browser.driver.current_url
+                                self.stdout.write(
+                                    f"[DEBUG] URL po utworzeniu produktu: {current_url}")
+                                if '/change/' in current_url:
+                                    self.stdout.write(
+                                        "[INFO] Po utworzeniu produktu - wracam do listy produktów")
+                                    browser.navigate_back_to_product_list()
+                                    time.sleep(2)
+                                else:
+                                    self.stdout.write(
+                                        "[INFO] Po utworzeniu produktu - już jesteśmy na liście produktów")
+                            except Exception as e_nav:
+                                self.stdout.write(self.style.WARNING(
+                                    f"[WARNING] Błąd podczas nawigacji po utworzeniu produktu: {e_nav}"))
+                                import traceback
+                                traceback.print_exc()
+                        except NoSuchElementException:
+                            self.stdout.write(
+                                "[INFO] Produkt jest już zmapowany - przycisk 'Utwórz nowy produkt w MPD' nie istnieje")
+                        except Exception as e_button:
                             self.stdout.write(self.style.WARNING(
-                                f"[WARNING] Błąd podczas wyodrębniania kodu: {e_code}"))
-
-                    # KROK 10: Ustaw placeholder w polu series_name (nie wypełniamy faktycznej wartości)
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] KROK 10: Ustawianie placeholder w polu series_name...")
-                        series_result = browser.fill_series_name_placeholder()
-                        if series_result:
-                            self.stdout.write(self.style.SUCCESS(
-                                "[OK] Ustawiono placeholder w polu series_name"))
-                        else:
-                            self.stdout.write(self.style.WARNING(
-                                "[WARNING] Nie udało się ustawić placeholder w polu series_name"))
-                    except Exception as e_series:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas ustawiania placeholder w polu series_name: {e_series}"))
-
-                    # KROK 11: Zaznacz ścieżkę produktu (Dwuczęściowe)
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] KROK 11: Wybieranie ścieżki produktu...")
-                        # value="5" dla Dwuczęściowe
-                        browser.select_product_path(path_value="5")
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Wybrano ścieżkę produktu"))
-                    except Exception as e_path:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas wyboru ścieżki produktu: {e_path}"))
-
-                    # KROK 12: Wybierz jednostkę produktu (szt.)
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] KROK 12: Wybieranie jednostki produktu...")
-                        # value="0" dla szt.
-                        browser.select_unit(unit_value="0")
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Wybrano jednostkę produktu"))
-                    except Exception as e_unit:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas wyboru jednostki produktu: {e_unit}"))
-
-                    # KROK 13: Wypełnij materiały (skład) z szczegółów produktu - PRZED przejściem do MPD
-                    # Pola szczegółów są w formularzu produktu matterhorn1, nie w MPD
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] KROK 13: Wyodrębnianie i wypełnianie materiałów...")
-                        browser.fill_fabric_materials()
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Wypełniono materiały"))
-                    except Exception as e_fabric:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas wypełniania materiałów: {e_fabric}"))
-
-                    # KROK 14: Kliknij przycisk "Utwórz nowy produkt w MPD"
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] KROK 14: Klikanie przycisku 'Utwórz nowy produkt w MPD'...")
-                        
-                        # Znajdź przycisk po ID
-                        create_button = browser.wait.until(
-                            EC.element_to_be_clickable((By.ID, "create-mpd-product-btn"))
-                        )
-                        create_button.click()
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Kliknięto przycisk 'Utwórz nowy produkt w MPD'"))
-                        time.sleep(2)  # Czekaj na przetworzenie
-                    except NoSuchElementException:
-                        self.stdout.write(
-                            "[INFO] Produkt jest już zmapowany - przycisk 'Utwórz nowy produkt w MPD' nie istnieje")
-                    except Exception as e_button:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas klikania przycisku: {e_button}"))
+                                f"[WARNING] Błąd podczas klikania przycisku: {e_button}"))
 
                     # ZAKOMENTOWANE: Utwórz produkt w MPD (przycisk "Utwórz nowy produkt w MPD")
                     # Wszystkie pola są już wypełnione w krokach 1-13, więc nie ma potrzeby ponownie wypełniać
@@ -443,13 +535,64 @@ class Command(BaseCommand):
                     # except Exception as e_save:
                     #     self.stdout.write(self.style.WARNING(
                     #         f"[WARNING] Błąd podczas tworzenia produktu w MPD: {e_save}"))
-
-                except Exception as e:
-                    self.stdout.write(self.style.WARNING(
-                        f"[WARNING] Nie udało się otworzyć produktu: {e}"))
+                    
+                        self.stdout.write(
+                            f"\n[OK] Produkt {product_index + 1}/{max_products} przetworzony pomyślnie (CREATE)")
+                        # Metoda już wróciła do listy po kliknięciu "Utwórz nowy produkt w MPD"
+                        # Sprawdź czy faktycznie jesteśmy na liście przed przejściem do następnego produktu
+                        try:
+                            current_url_after = browser.driver.current_url
+                            self.stdout.write(
+                                f"[DEBUG] URL po CREATE: {current_url_after}")
+                            if '/change/' in current_url_after:
+                                self.stdout.write(
+                                    "[WARNING] Nadal jesteśmy na stronie produktu - wracam do przefiltrowanej listy...")
+                                browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                                time.sleep(2)
+                            elif '/matterhorn1/product/' in current_url_after:
+                                self.stdout.write(
+                                    "[OK] Jesteśmy na liście produktów - gotowi do następnego produktu")
+                            else:
+                                self.stdout.write(
+                                    "[WARNING] Nie jesteśmy ani na liście, ani na stronie produktu - wracam do przefiltrowanej listy...")
+                                browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                                time.sleep(2)
+                        except Exception as e_check:
+                            self.stdout.write(self.style.WARNING(
+                                f"[WARNING] Błąd podczas sprawdzania URL po CREATE: {e_check}"))
+                            # Spróbuj wrócić do zapisanej listy mimo błędu
+                            try:
+                                browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                                time.sleep(2)
+                            except:
+                                pass
+                    
+                    except Exception as e:
+                        import traceback
+                        self.stdout.write(self.style.ERROR(
+                            f"[ERROR] Błąd podczas przetwarzania produktu {product_index + 1}: {e}"))
+                        traceback.print_exc()
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas przetwarzania produktu {product_index + 1}: {e}"))
+                        # W przypadku błędu również wróć do zapisanej listy (jeśli to nie ostatni produkt)
+                        if product_index < max_products - 1:
+                            try:
+                                browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                                time.sleep(2)
+                            except:
+                                pass
+                        continue
+                
+                # Po przetworzeniu wszystkich produktów
+                self.stdout.write(
+                    f"\n{'='*60}")
+                self.stdout.write(
+                    f"[OK] Przetworzono {max_products} produktów")
+                self.stdout.write(
+                    f"{'='*60}")
 
             self.stdout.write(
-                "[INFO] Przeglądarka pozostanie otwarta. Możesz teraz ręcznie przetwarzać produkty.")
+                "\n[INFO] Przeglądarka pozostanie otwarta. Możesz teraz ręcznie przetwarzać produkty.")
             self.stdout.write(f"\n   AutomationRun ID: {automation_run.id}")
             # Pobierz port z base_url lub użyj domyślnego 8080
             port = '8080'

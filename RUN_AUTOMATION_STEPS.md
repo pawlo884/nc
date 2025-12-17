@@ -80,32 +80,45 @@
     - Klika na pierwszy link produktu w tabeli
     - Czeka na załadowanie strony edycji produktu
 
-### 8.2. KROK 1: EDYCJA NAZWY PRODUKTU
+### 8.2. SCENARIUSZ ASSIGN (PIERWSZY - SPRAWDZANY JAKO PIERWSZY)
 
-18. **Zaktualizuj nazwę produktu** (`browser.update_product_name()`)
+18. **SCENARIUSZ ASSIGN** (`browser.handle_assign_scenario()`) - **WYWOŁYWANY JAKO PIERWSZY**
+    - Sprawdza czy istnieje sekcja "Sugerowane podobne produkty w MPD"
+    - Dla każdego wiersza w tabeli sprawdza kolumnę "Pokrycie"
+    - **Jeśli pokrycie = 100%**:
+      - **ASSIGN KROK 1**: Wypełnia główny kolor (select.main-color-select) - tak jak CREATE KROK 7
+      - **ASSIGN KROK 2**: Wypełnia kolor producenta (input.producer-color-input) - tak jak CREATE KROK 8
+      - **ASSIGN KROK 3**: Wypełnia kod producenta (input.producer-code-input) - tak jak CREATE KROK 9
+      - **ASSIGN KROK 4**: Klika przycisk "Przypisz" (button.assign-mapping-btn)
+      - **Zakończ przetwarzanie** - produkt został przypisany
+    - **Jeśli pokrycie < 100%** lub brak sugerowanych produktów → przejdź do scenariusza CREATE
+
+### 8.3. SCENARIUSZ CREATE: KROK 1: EDYCJA NAZWY PRODUKTU
+
+20. **Zaktualizuj nazwę produktu** (`browser.update_product_name()`)
     - Pobiera oryginalną nazwę produktu
     - Zapisuje ją w `browser._original_product_name`
     - Używa AI do ulepszenia nazwy (jeśli dostępne)
     - Wypełnia pole nazwy w formularzu
 
-### 8.3. KROK 2: EDYCJA OPISU PRODUKTU
+### 8.4. SCENARIUSZ CREATE: KROK 2: EDYCJA OPISU PRODUKTU
 
-19. **Zaktualizuj opis produktu** (`browser.update_product_description()`)
+21. **Zaktualizuj opis produktu** (`browser.update_product_description()`)
     - Pobiera oryginalny opis z formularza
     - Używa AI do ulepszenia opisu (jeśli dostępne)
     - Wypełnia pole "Opis" w formularzu
     - Zwraca ulepszony opis dla dalszego użycia
 
-### 8.4. KROK 3: EDYCJA KRÓTKIEGO OPISU
+### 8.5. SCENARIUSZ CREATE: KROK 3: EDYCJA KRÓTKIEGO OPISU
 
-20. **Zaktualizuj krótki opis** (`browser.update_product_short_description()`)
+22. **Zaktualizuj krótki opis** (`browser.update_product_short_description()`)
     - Używa ulepszonego opisu z poprzedniego kroku
     - Generuje krótki opis (skrócona wersja)
     - Wypełnia pole "Krótki opis" w formularzu
 
-### 8.5. KROK 4: WYCIĄGANIE I ZAZNACZANIE ATRYBUTÓW
+### 8.6. SCENARIUSZ CREATE: KROK 4: WYCIĄGANIE I ZAZNACZANIE ATRYBUTÓW
 
-21. **Pobierz dostępne atrybuty** z formularza (`browser.get_available_attributes()`)
+23. **Pobierz dostępne atrybuty** z formularza (`browser.get_available_attributes()`)
 22. **Wyciągnij atrybuty z opisu** używając AI (`ai_processor.extract_attributes_from_description()`)
     - Analizuje ulepszony opis produktu
     - Znajduje atrybuty pasujące do dostępnych w formularzu
@@ -113,7 +126,7 @@
 23. **Zaznacz atrybuty w formularzu** (`browser.select_attributes()`)
     - Zaznacza checkboxy dla znalezionych atrybutów
 
-### 8.6. KROK 5: ZAZNACZENIE MARKI W DROPDOWN
+### 8.7. SCENARIUSZ CREATE: KROK 5: ZAZNACZENIE MARKI W DROPDOWN
 
 24. **Zaznacz markę w dropdown** (`browser.fill_mpd_brand()`)
     - Pobiera markę z formularza Django (pole `id_brand`)
@@ -122,13 +135,13 @@
     - Zaznacza markę w dropdownie (próbuje `select_by_value`, `select_by_visible_text` lub JavaScript)
     - Weryfikuje czy marka została poprawnie zaznaczona
 
-### 8.7. KROK 6: WYBÓR GRUPY ROZMIAROWEJ
+### 8.8. SCENARIUSZ CREATE: KROK 6: WYBÓR GRUPY ROZMIAROWEJ
 
 25. **Wybierz grupę rozmiarową** (`browser.select_size_category()`)
     - Na podstawie nazwy kategorii wybiera odpowiednią grupę rozmiarową
     - Wypełnia pole "Grupa rozmiarowa" w formularzu
 
-### 8.8. KROK 7: WYBÓR GŁÓWNEGO KOLORU (main_color_id)
+### 8.9. SCENARIUSZ CREATE: KROK 7: WYBÓR GŁÓWNEGO KOLORU (main_color_id)
 
 26. **Wybierz główny kolor** (`browser.fill_main_color_from_product_color()`)
     - Pobiera wartość koloru z pola `<input type="text" name="color" id="id_color">`
@@ -137,7 +150,7 @@
     - Zaznacza kolor w dropdownie (próbuje `select_by_value`, `select_by_visible_text` lub JavaScript)
     - Weryfikuje czy kolor został poprawnie zaznaczony
 
-### 8.9. KROK 8: WYODRĘBNIANIE I WYPEŁNIANIE KOLORU PRODUCENTA
+### 8.10. SCENARIUSZ CREATE: KROK 8: WYODRĘBNIANIE I WYPEŁNIANIE KOLORU PRODUCENTA
 
 27. **Wyodrębnij kolor producenta** (`browser.update_producer_color()`)
     - Używa zapisanej oryginalnej nazwy produktu
@@ -145,33 +158,33 @@
     - Mapuje kolor zgodnie z konfiguracją marki (jeśli istnieje)
     - Wypełnia pole "Kolor producenta" w formularzu
 
-### 8.10. KROK 9: WYODRĘBNIANIE I WYPEŁNIANIE KODU PRODUCENTA
+### 8.11. SCENARIUSZ CREATE: KROK 9: WYODRĘBNIANIE I WYPEŁNIANIE KODU PRODUCENTA
 
 28. **Wyodrębnij kod producenta** (`browser.update_producer_code()`)
     - Używa zapisanej oryginalnej nazwy produktu
     - Wyodrębnia kod producenta z nazwy (np. "MK-1234")
     - Wypełnia pole "Kod producenta" w formularzu
 
-### 8.11. KROK 10: USTAWIENIE PLACEHOLDER W POLU SERII (series_name)
+### 8.12. SCENARIUSZ CREATE: KROK 10: USTAWIENIE PLACEHOLDER W POLU SERII (series_name)
 
 29. **Ustaw placeholder w polu series_name** (`browser.fill_series_name_placeholder()`)
     - Znajduje pole `<input type="text" id="series_name">`
     - Czyści pole (zostawia puste jako placeholder)
     - **UWAGA**: Nie wypełniamy faktycznej wartości - pole pozostaje puste
 
-### 8.12. KROK 11: WYBÓR ŚCIEŻKI PRODUKTU
+### 8.13. SCENARIUSZ CREATE: KROK 11: WYBÓR ŚCIEŻKI PRODUKTU
 
 30. **Wybierz ścieżkę produktu** (`browser.select_product_path()`)
     - Dla "Kostiumy Dwuczęciowe" wybiera `value="5"` (Dwuczęściowe)
     - Wypełnia pole "Ścieżka produktu" w formularzu
 
-### 8.13. KROK 12: WYBÓR JEDNOSTKI PRODUKTU
+### 8.14. SCENARIUSZ CREATE: KROK 12: WYBÓR JEDNOSTKI PRODUKTU
 
 31. **Wybierz jednostkę produktu** (`browser.select_unit()`)
     - Wybiera `value="0"` (szt.)
     - Wypełnia pole "Jednostka" w formularzu
 
-### 8.14. KROK 13: WYPEŁNIANIE MATERIAŁÓW (SKŁADU)
+### 8.15. SCENARIUSZ CREATE: KROK 13: WYPEŁNIANIE MATERIAŁÓW (SKŁADU)
 
 32. **Wyodrębnij i wypełnij materiały** (`browser.fill_fabric_materials()`)
     - Wyodrębnia informacje o składzie z szczegółów produktu
@@ -193,14 +206,14 @@
 
 ## 9. ZAKOŃCZENIE
 
-36. **Zostaw przeglądarkę otwartą**
+37. **Zostaw przeglądarkę otwartą**
     - Przeglądarka pozostaje otwarta dla ręcznego przetwarzania
     - Wyświetla informacje o `AutomationRun ID`
     - Wyświetla link do wyników w admin panelu
 
 ## 10. OBSŁUGA BŁĘDÓW
 
-37. **W przypadku błędów**:
+38. **W przypadku błędów**:
     - Aktualizuje `AutomationRun.status = 'failed'`
     - Zapisuje `error_message` z opisem błędu
     - Zamyka przeglądarkę (jeśli była otwarta)
