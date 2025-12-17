@@ -621,6 +621,220 @@ class BrowserAutomation:
             print(f"[DEBUG] Błąd podczas otwierania pierwszego produktu: {e}")
             raise
 
+    def open_product_from_list_by_index(self, index: int = 0):
+        """
+        Otwiera produkt z listy o danym indeksie.
+        
+        Args:
+            index: Indeks produktu w liście (0 = pierwszy, 1 = drugi, itd.)
+        """
+        try:
+            logger.info(f"Szukanie produktu o indeksie {index} w liście...")
+            print(f"[DEBUG] Szukanie produktu o indeksie {index} w liście...")
+
+            # Znajdź wszystkie wiersze w tabeli
+            rows = self.driver.find_elements(
+                By.CSS_SELECTOR, "table#result_list tbody tr")
+
+            if not rows:
+                logger.warning("Brak produktów w liście")
+                print("[DEBUG] Brak produktów w liście")
+                return False
+
+            if index >= len(rows):
+                logger.warning(f"Indeks {index} poza zakresem (dostępne: {len(rows)} produktów)")
+                print(f"[DEBUG] Indeks {index} poza zakresem (dostępne: {len(rows)} produktów)")
+                return False
+
+            logger.info(f"Znaleziono {len(rows)} produktów w liście, otwieram produkt o indeksie {index}")
+            print(f"[DEBUG] Znaleziono {len(rows)} produktów w liście, otwieram produkt o indeksie {index}")
+            
+            target_row = rows[index]
+
+            # Znajdź link do produktu w wierszu
+            try:
+                links = target_row.find_elements(By.TAG_NAME, "a")
+                print(f"[DEBUG] Znaleziono {len(links)} linków w wierszu {index}")
+
+                if links:
+                    # Znajdź link który prowadzi do strony produktu (zawiera /change/)
+                    product_link = None
+                    for link in links:
+                        href = link.get_attribute('href') or ''
+                        if '/change/' in href or '/product/' in href:
+                            product_link = link
+                            break
+
+                    if not product_link:
+                        product_link = links[0]
+
+                    logger.info(f"Znaleziono link do produktu: {product_link.get_attribute('href')}")
+                    print(f"[DEBUG] Klikam w link: {product_link.get_attribute('href')[:80]}")
+                    self.driver.execute_script(
+                        "arguments[0].scrollIntoView(true);", product_link)
+                    time.sleep(0.5)
+                    product_link.click()
+                    logger.info(f"Kliknięto w produkt o indeksie {index}")
+                    print(f"[DEBUG] Kliknięto w produkt o indeksie {index}")
+                    time.sleep(3)  # Czekaj na załadowanie strony produktu
+                    return True
+                else:
+                    logger.warning(f"Brak linka w wierszu {index}, klikam w cały wiersz...")
+                    self.driver.execute_script(
+                        "arguments[0].scrollIntoView(true);", target_row)
+                    time.sleep(0.5)
+                    target_row.click()
+                    logger.info(f"Kliknięto w wiersz produktu o indeksie {index}")
+                    print(f"[DEBUG] Kliknięto w wiersz produktu o indeksie {index}")
+                    time.sleep(3)
+                    return True
+            except Exception as e2:
+                logger.warning(f"Błąd podczas klikania w link produktu: {e2}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Błąd podczas otwierania produktu o indeksie {index}: {e}")
+            print(f"[DEBUG] Błąd podczas otwierania produktu o indeksie {index}: {e}")
+            return False
+
+    def navigate_back_to_product_list(self, preserve_filters=True, filtered_list_url=None):
+        """
+        Wraca do listy produktów (klika przycisk "Wróć do listy" lub przechodzi do URL listy).
+        
+        Args:
+            preserve_filters: Jeśli True, zachowuje parametry URL z filtrami
+            filtered_list_url: Opcjonalny URL listy z filtrami (jeśli podano, użyj tego zamiast parsowania)
+        """
+        try:
+            logger.info("Wracanie do listy produktów...")
+            print("[DEBUG] Wracanie do listy produktów...")
+
+            # Jeśli mamy zapisany URL listy z filtrami, użyj go
+            if filtered_list_url:
+                logger.info(f"Używam zapisanego URL listy z filtrami: {filtered_list_url}")
+                print(f"[DEBUG] Używam zapisanego URL listy z filtrami: {filtered_list_url}")
+                self.driver.get(filtered_list_url)
+                time.sleep(2)
+                logger.info("Przeszłem do zapisanej listy produktów z filtrami")
+                print("[DEBUG] Przeszłem do zapisanej listy produktów z filtrami")
+                return True
+
+            current_url = self.driver.current_url
+            
+            # Jeśli już jesteśmy na liście produktów (nie na stronie produktu), odśwież stronę
+            if '/change/' not in current_url and '/matterhorn1/product/' in current_url:
+                # Jesteśmy już na liście - odśwież stronę, aby zachować filtry
+                self.driver.refresh()
+                time.sleep(2)
+                logger.info("Odświeżono listę produktów (już byliśmy na liście)")
+                print("[DEBUG] Odświeżono listę produktów (już byliśmy na liście)")
+                return True
+
+            # Spróbuj znaleźć przycisk "Wróć do listy" lub link
+            try:
+                back_link = self.driver.find_element(By.PARTIAL_LINK_TEXT, "Wróć")
+                back_link.click()
+                time.sleep(2)
+                logger.info("Kliknięto przycisk 'Wróć do listy'")
+                print("[DEBUG] Kliknięto przycisk 'Wróć do listy'")
+                return True
+            except:
+                # Jeśli nie ma przycisku, przejdź bezpośrednio do URL listy
+                # URL produktu: /admin/matterhorn1/product/12345/change/?_changelist_filter=...
+                # URL listy: /admin/matterhorn1/product/?_changelist_filter=...
+                import re
+                
+                # Wzorzec do usunięcia ID produktu z URL
+                # Przykład: http://localhost:8080/admin/matterhorn1/product/12345/change/?params
+                # Wynik: http://localhost:8080/admin/matterhorn1/product/?params
+                from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+                
+                parsed_url = urlparse(current_url)
+                path_parts = parsed_url.path.split('/')
+                
+                # Znajdź indeks 'product' w ścieżce
+                try:
+                    product_idx = path_parts.index('product')
+                    # Sprawdź czy następny element to ID produktu (liczba)
+                    if product_idx + 1 < len(path_parts) and path_parts[product_idx + 1].isdigit():
+                        # Usuń ID produktu i wszystko po nim w ścieżce
+                        new_path_parts = path_parts[:product_idx + 1]  # ['', 'admin', 'matterhorn1', 'product']
+                        new_path = '/'.join(new_path_parts) + '/'
+                        
+                        # Zachowaj parametry URL (filtry) jeśli są
+                        if preserve_filters and parsed_url.query:
+                            new_url = urlunparse((
+                                parsed_url.scheme,
+                                parsed_url.netloc,
+                                new_path,
+                                parsed_url.params,
+                                parsed_url.query,  # Zachowaj parametry
+                                parsed_url.fragment
+                            ))
+                        else:
+                            new_url = urlunparse((
+                                parsed_url.scheme,
+                                parsed_url.netloc,
+                                new_path,
+                                parsed_url.params,
+                                '',
+                                parsed_url.fragment
+                            ))
+                        
+                        self.driver.get(new_url)
+                        time.sleep(2)
+                        logger.info(f"Przeszłem do listy produktów: {new_url}")
+                        print(f"[DEBUG] Przeszłem do listy produktów: {new_url}")
+                        return True
+                except (ValueError, IndexError):
+                    # Nie znaleziono 'product' w ścieżce lub problem z parsowaniem
+                    pass
+                
+                # Fallback - sprawdź czy już jesteśmy na liście
+                if '/matterhorn1/product/' in current_url and '/change/' not in current_url:
+                    # Sprawdź czy URL zawiera ID produktu
+                    if re.search(r'/product/\d+/', current_url):
+                        # Usuń ID produktu z URL
+                        new_url = re.sub(r'(/product/)\d+(/)', r'\1\2', current_url)
+                        if preserve_filters and '?' in current_url:
+                            # Zachowaj parametry
+                            pass  # new_url już ma parametry
+                        else:
+                            # Usuń parametry jeśli nie chcemy ich zachować
+                            new_url = new_url.split('?')[0]
+                        self.driver.get(new_url)
+                        time.sleep(2)
+                        logger.info(f"Przeszłem do listy produktów (fallback): {new_url}")
+                        print(f"[DEBUG] Przeszłem do listy produktów (fallback): {new_url}")
+                        return True
+                    else:
+                        # Już jesteśmy na liście - odśwież stronę
+                        self.driver.refresh()
+                        time.sleep(2)
+                        logger.info("Odświeżono listę produktów (już byliśmy na liście)")
+                        print("[DEBUG] Odświeżono listę produktów (już byliśmy na liście)")
+                        return True
+                else:
+                    # Fallback - przejdź do podstawowej listy z zachowaniem hosta
+                    parsed_url = urlparse(current_url)
+                    list_url = urlunparse((
+                        parsed_url.scheme,
+                        parsed_url.netloc,
+                        '/admin/matterhorn1/product/',
+                        '',
+                        '',
+                        ''
+                    ))
+                    self.driver.get(list_url)
+                    time.sleep(2)
+                    logger.info(f"Przeszłem do podstawowej listy produktów: {list_url}")
+                    print(f"[DEBUG] Przeszłem do podstawowej listy produktów: {list_url}")
+                    return True
+        except Exception as e:
+            logger.warning(f"Błąd podczas wracania do listy produktów: {e}")
+            print(f"[DEBUG] Błąd podczas wracania do listy produktów: {e}")
+            return False
+
     def get_product_ids_from_list(self) -> List[int]:
         """
         Pobranie ID produktów z listy.
@@ -1054,17 +1268,73 @@ class BrowserAutomation:
 
             color_name = None
 
-            # 1. NAJPIERW sprawdź bazę kolorów dla danej marki
-            if brand_id and brand_name:
+            # 1. NAJPIERW wyodrębnij kolor z nazwy (regex-based, NIE Pydantic)
+            #    Obsługuje kolory złożone: jeśli kolor zawiera "/" (np. "Coral/Blue"), oznacza to DWA KOLORY
+            logger.info("Wyodrębnianie koloru producenta z nazwy produktu...")
+            print("[DEBUG] Wyodrębnianie koloru producenta z nazwy produktu...")
+            print("[DEBUG] UWAGA: Jeśli kolor zawiera '/' (np. 'Coral/Blue'), oznacza to DWA KOLORY")
+            color_name = self._extract_color_from_name(original_name)
+
+            if not color_name:
+                logger.warning(
+                    "Nie udało się wyodrębnić koloru z nazwy produktu")
+                print("[DEBUG] Nie udało się wyodrębnić koloru z nazwy produktu")
+                return
+
+            logger.info(
+                f"Wyodrębniony kolor producenta z nazwy: {color_name}")
+            print(
+                f"[DEBUG] Wyodrębniony kolor producenta z nazwy: {color_name}")
+
+            # 2. Sprawdź czy wyodrębniony kolor istnieje w bazie dla danej marki
+            if color_name and brand_id and brand_name:
+                from web_agent.models import ProducerColor
+                try:
+                    # Sprawdź czy dokładnie taki kolor istnieje w bazie
+                    color_obj = ProducerColor.objects.get(
+                        brand_id=brand_id,
+                        color_name=color_name
+                    )
+                    # Zwiększ licznik użycia
+                    color_obj.usage_count += 1
+                    color_obj.save(update_fields=['usage_count', 'updated_at'])
+                    logger.info(
+                        f"Znaleziono kolor w bazie (dokładne dopasowanie): {color_name} (użycie #{color_obj.usage_count})")
+                    print(
+                        f"[INFO] Znaleziono kolor w bazie (dokładne dopasowanie): {color_name} (użycie #{color_obj.usage_count})")
+                except ProducerColor.DoesNotExist:
+                    # Jeśli nie istnieje, zapisz nowy kolor do bazy
+                    color_obj, created = ProducerColor.objects.get_or_create(
+                        brand_id=brand_id,
+                        color_name=color_name,
+                        defaults={'brand_name': brand_name}
+                    )
+                    if created:
+                        logger.info(
+                            f"Dodano nowy kolor do bazy: {color_name} dla marki {brand_name}")
+                        print(
+                            f"[INFO] Dodano nowy kolor do bazy: {color_name} dla marki {brand_name}")
+                    else:
+                        # Zwiększ licznik użyć
+                        color_obj.usage_count += 1
+                        color_obj.save(
+                            update_fields=['usage_count', 'updated_at'])
+                        logger.info(
+                            f"Kolor już istnieje w bazie (użycie #{color_obj.usage_count})")
+                        print(
+                            f"[DEBUG] Kolor już istnieje w bazie (użycie #{color_obj.usage_count})")
+            
+            # 3. Fallback: Jeśli nie udało się wyodrębnić z nazwy, sprawdź bazę (dla pojedynczych kolorów)
+            if not color_name and brand_id and brand_name:
                 from web_agent.models import ProducerColor
                 existing_colors = ProducerColor.objects.filter(
                     brand_id=brand_id)
 
                 if existing_colors.exists():
                     logger.info(
-                        f"Sprawdzam {existing_colors.count()} kolorów w bazie dla marki {brand_name}...")
+                        f"Sprawdzam {existing_colors.count()} kolorów w bazie dla marki {brand_name} (fallback)...")
                     print(
-                        f"[DEBUG] Sprawdzam {existing_colors.count()} kolorów w bazie dla marki {brand_name}...")
+                        f"[DEBUG] Sprawdzam {existing_colors.count()} kolorów w bazie dla marki {brand_name} (fallback)...")
 
                     # Spróbuj dopasować kolory z bazy do nazwy produktu (DOKŁADNE DOPASOWANIE)
                     # Sortuj kolory po długości (najdłuższe pierwsze) - żeby "red ferrari" było sprawdzone przed "red"
@@ -1085,52 +1355,10 @@ class BrowserAutomation:
                             color_obj.save(
                                 update_fields=['usage_count', 'updated_at'])
                             logger.info(
-                                f"Znaleziono kolor w bazie (dokładne dopasowanie): {color_name} (użycie #{color_obj.usage_count})")
+                                f"Znaleziono kolor w bazie (fallback): {color_name} (użycie #{color_obj.usage_count})")
                             print(
-                                f"[INFO] Znaleziono kolor w bazie (dokładne dopasowanie): {color_name} (użycie #{color_obj.usage_count})")
+                                f"[INFO] Znaleziono kolor w bazie (fallback): {color_name} (użycie #{color_obj.usage_count})")
                             break
-
-            # 2. Jeśli nie znaleziono w bazie, wyodrębnij z nazwy
-            if not color_name:
-                logger.info(
-                    "Nie znaleziono koloru w bazie, ekstrachuję z nazwy produktu...")
-                print(
-                    "[DEBUG] Nie znaleziono koloru w bazie, ekstrachuję z nazwy produktu...")
-                color_name = self._extract_color_from_name(original_name)
-
-                if not color_name:
-                    logger.warning(
-                        "Nie udało się wyodrębnić koloru z nazwy produktu")
-                    print("[DEBUG] Nie udało się wyodrębnić koloru z nazwy produktu")
-                    return
-
-                logger.info(
-                    f"Wyodrębniony kolor producenta z nazwy: {color_name}")
-                print(
-                    f"[DEBUG] Wyodrębniony kolor producenta z nazwy: {color_name}")
-
-                # Zapisz nowy kolor do bazy jeśli mamy brand_id i brand_name
-                if brand_id and brand_name:
-                    from web_agent.models import ProducerColor
-                    color_obj, created = ProducerColor.objects.get_or_create(
-                        brand_id=brand_id,
-                        color_name=color_name,
-                        defaults={'brand_name': brand_name}
-                    )
-                    if created:
-                        logger.info(
-                            f"Dodano nowy kolor do bazy: {color_name} dla marki {brand_name}")
-                        print(
-                            f"[INFO] Dodano nowy kolor do bazy: {color_name} dla marki {brand_name}")
-                    else:
-                        # Zwiększ licznik użyć
-                        color_obj.usage_count += 1
-                        color_obj.save(
-                            update_fields=['usage_count', 'updated_at'])
-                        logger.info(
-                            f"Kolor już istnieje w bazie (użycie #{color_obj.usage_count})")
-                        print(
-                            f"[DEBUG] Kolor już istnieje w bazie (użycie #{color_obj.usage_count})")
 
             # Wypełnij pole producer_color_name
             try:
@@ -1184,6 +1412,7 @@ class BrowserAutomation:
         """
         Wyodrębnia kolor producenta z nazwy produktu.
         Kolor zwykle znajduje się przed nazwą marki (np. "Lilia - Marko" -> "Lilia")
+        Obsługuje kolory złożone z "/" (np. "Seledyn/Black", "Coral/Blue")
 
         Args:
             name: Pełna nazwa produktu przed edycją
@@ -1195,44 +1424,63 @@ class BrowserAutomation:
             return ""
 
         name = name.strip()
+        logger.debug(f"_extract_color_from_name: Analizuję nazwę: {name}")
+        print(f"[DEBUG] _extract_color_from_name: Analizuję nazwę: {name}")
 
-        # Wzorce do wyodrębniania koloru:
-        # 1. "Kolor - Marka" (np. "Lilia - Marko")
-        # 2. "(Kolor)" (np. "(1) Lilia")
-        # 3. Ostatnie słowo przed "- Marka"
+        # Wzorce do wyodrębniania koloru (regex-based, NIE Pydantic):
+        # 1. "Kolor - Marka" (np. "Lilia - Marko", "Seledyn/Black - Marko")
+        #    UWAGA: Jeśli kolor zawiera "/" (np. "Coral/Blue"), oznacza to DWA KOLORY
+        # 2. "(liczba) Kolor" (np. "(1) Lilia", "(2) Seledyn/Black", "(4) Coral/Blue")
+        #    UWAGA: Jeśli kolor zawiera "/" (np. "Coral/Blue"), oznacza to DWA KOLORY
+        # 3. Ostatnie słowo/część przed "- Marka"
+        #    UWAGA: Jeśli kolor zawiera "/" (np. "Black/Pink"), oznacza to DWA KOLORY
 
         import re
 
-        # Wzorzec 1: "Kolor - Marka" na końcu
+        # Wzorzec 1: "Kolor - Marka" na końcu (obsługuje kolory z "/")
+        # Dopasowuje: "Seledyn/Black", "Lilia", "Black/White", "Coral/Blue" itp.
         match = re.search(
-            r'([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)*)\s*-\s*[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+$', name)
+            r'([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:\/[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)*(?:\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:\/[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)*)*)\s*-\s*[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+$', name)
         if match:
             color = match.group(1).strip()
+            logger.debug(f"_extract_color_from_name: Wzorzec 1 znalazł: {color}")
+            print(f"[DEBUG] _extract_color_from_name: Wzorzec 1 znalazł: {color}")
             if len(color) > 1 and len(color) < 50:  # Rozsądna długość koloru
                 return color
 
-        # Wzorzec 2: "(liczba) Kolor" (np. "(1) Lilia")
+        # Wzorzec 2: "(liczba) Kolor" (np. "(1) Lilia", "(2) Seledyn/Black", "(4) Coral/Blue")
+        # To jest najczęstszy wzorzec dla produktów z numerami wariantów
         match = re.search(
-            r'\([^)]+\)\s+([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)*)\s*-\s*[A-ZĄĆĘŁŃÓŚŹŻ]', name)
+            r'\([^)]+\)\s+([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:\/[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)*(?:\s+[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:\/[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)*)*)\s*-\s*[A-ZĄĆĘŁŃÓŚŹŻ]', name)
         if match:
             color = match.group(1).strip()
+            logger.debug(f"_extract_color_from_name: Wzorzec 2 znalazł: {color}")
+            print(f"[DEBUG] _extract_color_from_name: Wzorzec 2 znalazł: {color}")
             if len(color) > 1 and len(color) < 50:
                 return color
 
-        # Wzorzec 3: Ostatnie słowo przed ostatnim "-" (jeśli jest)
+        # Wzorzec 3: Ostatnie słowo/część przed ostatnim "-" (jeśli jest)
+        # Obsługuje kolory z "/" (np. "Seledyn/Black", "Coral/Blue")
         parts = name.split(' - ')
         if len(parts) >= 2:
             # Weź ostatnią część przed ostatnim "-"
             before_last_dash = parts[-2].strip()
-            # Weź ostatnie słowo/część
+            # Weź ostatnie słowo/część (może zawierać "/")
             words = before_last_dash.split()
             if words:
                 last_word = words[-1]
+                logger.debug(f"_extract_color_from_name: Wzorzec 3 - ostatnie słowo: {last_word}")
+                print(f"[DEBUG] _extract_color_from_name: Wzorzec 3 - ostatnie słowo: {last_word}")
                 # Sprawdź czy to wygląda na kolor (zaczyna się wielką literą, nie jest liczbą)
-                if last_word and last_word[0].isupper() and not last_word.replace('(', '').replace(')', '').isdigit():
+                # Może zawierać "/" (np. "Seledyn/Black", "Coral/Blue")
+                if last_word and last_word[0].isupper() and not last_word.replace('(', '').replace(')', '').replace('/', '').isdigit():
                     if len(last_word) > 1 and len(last_word) < 50:
+                        logger.debug(f"_extract_color_from_name: Wzorzec 3 zwraca: {last_word}")
+                        print(f"[DEBUG] _extract_color_from_name: Wzorzec 3 zwraca: {last_word}")
                         return last_word
 
+        logger.debug(f"_extract_color_from_name: Nie znaleziono koloru")
+        print(f"[DEBUG] _extract_color_from_name: Nie znaleziono koloru")
         return ""
 
     def update_producer_code(self, original_name: str):
@@ -3588,6 +3836,391 @@ class BrowserAutomation:
             print(f"[DEBUG] Błąd podczas zaznaczania atrybutów: {e}")
             import traceback
             traceback.print_exc()
+
+    def handle_assign_scenario(self, brand_id=None, brand_name=None):
+        """
+        SCENARIUSZ ASSIGN: Obsługuje przypisanie produktu do istniejącego produktu w MPD.
+        
+        Sprawdza czy istnieje sekcja "Sugerowane podobne produkty w MPD" i dla każdego
+        wiersza z pokryciem 100% wypełnia pola i klika przycisk "Przypisz".
+        
+        Args:
+            brand_id: ID marki (opcjonalne, dla mapowania kolorów)
+            brand_name: Nazwa marki (opcjonalne, dla mapowania kolorów)
+            
+        Returns:
+            bool: True jeśli znaleziono i obsłużono sugerowane produkty, False jeśli nie
+        """
+        try:
+            logger.info("=" * 50)
+            logger.info("SCENARIUSZ ASSIGN: Sprawdzanie sugerowanych produktów")
+            logger.info("=" * 50)
+            print("[DEBUG] " + "=" * 50)
+            print("[DEBUG] SCENARIUSZ ASSIGN: Sprawdzanie sugerowanych produktów")
+            print("[DEBUG] " + "=" * 50)
+            
+            # Sprawdź czy istnieje sekcja "Sugerowane podobne produkty w MPD"
+            try:
+                # Szukaj nagłówka "Sugerowane podobne produkty w MPD"
+                suggested_section = self.driver.find_element(
+                    By.XPATH, "//h3[contains(text(), 'Sugerowane podobne produkty w MPD')]"
+                )
+                logger.info("Znaleziono sekcję sugerowanych produktów")
+                print("[DEBUG] Znaleziono sekcję sugerowanych produktów")
+            except NoSuchElementException:
+                logger.info("Brak sekcji sugerowanych produktów - produkt nie ma sugerowanych mapowań")
+                print("[DEBUG] Brak sekcji sugerowanych produktów - produkt nie ma sugerowanych mapowań")
+                return False
+            
+            # Znajdź tabelę z sugerowanymi produktami
+            try:
+                # Tabela jest w tym samym div co nagłówek
+                parent_div = suggested_section.find_element(By.XPATH, "./ancestor::div[contains(@class, 'form-row')]")
+                table = parent_div.find_element(By.XPATH, ".//table")
+                logger.info("Znaleziono tabelę sugerowanych produktów")
+                print("[DEBUG] Znaleziono tabelę sugerowanych produktów")
+            except NoSuchElementException:
+                logger.warning("Nie znaleziono tabeli sugerowanych produktów")
+                print("[DEBUG] Nie znaleziono tabeli sugerowanych produktów")
+                return False
+            
+            # Znajdź wszystkie wiersze w tbody (pomijając nagłówek)
+            rows = table.find_elements(By.XPATH, ".//tbody/tr")
+            logger.info(f"Znaleziono {len(rows)} wierszy w tabeli sugerowanych produktów")
+            print(f"[DEBUG] Znaleziono {len(rows)} wierszy w tabeli sugerowanych produktów")
+            
+            if not rows:
+                logger.info("Brak wierszy w tabeli sugerowanych produktów")
+                print("[DEBUG] Brak wierszy w tabeli sugerowanych produktów")
+                return False
+            
+            # Przetwarzaj każdy wiersz
+            for idx, row in enumerate(rows, 1):
+                try:
+                    logger.info(f"Przetwarzanie wiersza {idx}/{len(rows)}")
+                    print(f"[DEBUG] Przetwarzanie wiersza {idx}/{len(rows)}")
+                    
+                    # Znajdź kolumnę "Pokrycie" (4. kolumna, indeks 3)
+                    coverage_cells = row.find_elements(By.XPATH, ".//td")
+                    if len(coverage_cells) < 4:
+                        logger.warning(f"Wiersz {idx} nie ma wystarczającej liczby kolumn")
+                        print(f"[DEBUG] Wiersz {idx} nie ma wystarczającej liczby kolumn")
+                        continue
+                    
+                    # Kolumna "Pokrycie" to 4. kolumna (indeks 3)
+                    coverage_cell = coverage_cells[3]
+                    coverage_text = coverage_cell.text.strip()
+                    
+                    logger.info(f"Wiersz {idx}: Pokrycie = {coverage_text}")
+                    print(f"[DEBUG] Wiersz {idx}: Pokrycie = {coverage_text}")
+                    
+                    # Sprawdź czy pokrycie = 100%
+                    coverage_value = None
+                    try:
+                        # Usuń znak % i zamień przecinek na kropkę
+                        coverage_clean = coverage_text.replace('%', '').replace(',', '.')
+                        coverage_value = float(coverage_clean)
+                    except ValueError:
+                        logger.warning(f"Nie można sparsować pokrycia: {coverage_text}")
+                        print(f"[DEBUG] Nie można sparsować pokrycia: {coverage_text}")
+                        continue
+                    
+                    # Jeśli pokrycie nie jest 100%, pomiń ten wiersz
+                    if coverage_value < 100.0:
+                        logger.info(f"Wiersz {idx}: Pokrycie {coverage_value}% < 100%, pomijam")
+                        print(f"[DEBUG] Wiersz {idx}: Pokrycie {coverage_value}% < 100%, pomijam")
+                        continue
+                    
+                    logger.info(f"Wiersz {idx}: Pokrycie = 100%, wypełniam pola i przypisuję")
+                    print(f"[DEBUG] Wiersz {idx}: Pokrycie = 100%, wypełniam pola i przypisuję")
+                    
+                    # KROK ASSIGN 1: Wypełnij główny kolor (tak jak w kroku 7)
+                    try:
+                        # Znajdź select głównego koloru w tym wierszu
+                        main_color_select = row.find_element(By.CSS_SELECTOR, "select.main-color-select")
+                        
+                        # Przewiń do elementu, aby był widoczny
+                        self.driver.execute_script(
+                            "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});",
+                            main_color_select
+                        )
+                        time.sleep(0.5)
+                        
+                        from selenium.webdriver.support.ui import Select
+                        color_select = Select(main_color_select)
+                        
+                        # Pobierz kolor z pola id_color (tak jak w kroku 7)
+                        color_input = self.driver.find_element(By.ID, "id_color")
+                        color_name = color_input.get_attribute("value")
+                        if color_name:
+                            color_name = color_name.strip()
+                            logger.info(f"Pobrano kolor z pola id_color: {color_name}")
+                            print(f"[DEBUG] Pobrano kolor z pola id_color: {color_name}")
+                            
+                            # Znajdź wartość opcji dla koloru
+                            matched_value = None
+                            for opt in color_select.options:
+                                text = opt.text or ""
+                                opt_value = opt.get_attribute("value")
+                                if not opt_value:
+                                    continue
+                                if text.strip().lower() == color_name.lower():
+                                    matched_value = opt_value
+                                    break
+                            
+                            if matched_value:
+                                color_select.select_by_value(matched_value)
+                                logger.info(f"Wybrano główny kolor: {color_name} (value: {matched_value})")
+                                print(f"[DEBUG] Wybrano główny kolor: {color_name} (value: {matched_value})")
+                                time.sleep(0.3)
+                    except Exception as e_color:
+                        logger.warning(f"Błąd podczas wypełniania głównego koloru w wierszu {idx}: {e_color}")
+                        print(f"[DEBUG] Błąd podczas wypełniania głównego koloru w wierszu {idx}: {e_color}")
+                    
+                    # KROK ASSIGN 2: Wypełnij kolor producenta (tak jak w kroku 8)
+                    try:
+                        logger.info(f"KROK ASSIGN 2: Wypełnianie koloru producenta w wierszu {idx}")
+                        print(f"[DEBUG] KROK ASSIGN 2: Wypełnianie koloru producenta w wierszu {idx}")
+                        
+                        # Znajdź input koloru producenta w tym wierszu
+                        producer_color_input = row.find_element(By.CSS_SELECTOR, "input.producer-color-input")
+                        
+                        # Przewiń do elementu, aby był widoczny
+                        self.driver.execute_script(
+                            "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});",
+                            producer_color_input
+                        )
+                        time.sleep(0.5)
+                        
+                        # Użyj tej samej logiki co w kroku 8 (update_producer_color)
+                        color_name = None
+                        if hasattr(self, '_original_product_name') and self._original_product_name:
+                            logger.info(f"Używam oryginalnej nazwy produktu: {self._original_product_name}")
+                            print(f"[DEBUG] Używam oryginalnej nazwy produktu: {self._original_product_name}")
+                            original_name = self._original_product_name
+                            
+                            # 1. NAJPIERW wyodrębnij kolor z nazwy (regex-based, NIE Pydantic)
+                            #    Obsługuje kolory złożone: jeśli kolor zawiera "/" (np. "Coral/Blue"), oznacza to DWA KOLORY
+                            logger.info("Wyodrębnianie koloru producenta z nazwy produktu (ASSIGN)...")
+                            print("[DEBUG] Wyodrębnianie koloru producenta z nazwy produktu (ASSIGN)...")
+                            print("[DEBUG] UWAGA: Jeśli kolor zawiera '/' (np. 'Coral/Blue'), oznacza to DWA KOLORY")
+                            color_name = self._extract_color_from_name(original_name)
+                            
+                            # 2. Sprawdź czy wyodrębniony kolor istnieje w bazie dla danej marki
+                            if color_name and brand_id and brand_name:
+                                from web_agent.models import ProducerColor
+                                try:
+                                    # Sprawdź czy dokładnie taki kolor istnieje w bazie
+                                    color_obj = ProducerColor.objects.get(
+                                        brand_id=brand_id,
+                                        color_name=color_name
+                                    )
+                                    # Zwiększ licznik użycia
+                                    color_obj.usage_count += 1
+                                    color_obj.save(update_fields=['usage_count', 'updated_at'])
+                                    logger.info(f"Znaleziono kolor w bazie (dokładne dopasowanie): {color_name} (użycie #{color_obj.usage_count})")
+                                    print(f"[DEBUG] Znaleziono kolor w bazie (dokładne dopasowanie): {color_name} (użycie #{color_obj.usage_count})")
+                                except ProducerColor.DoesNotExist:
+                                    # Jeśli nie istnieje, zapisz nowy kolor do bazy
+                                    color_obj, created = ProducerColor.objects.get_or_create(
+                                        brand_id=brand_id,
+                                        color_name=color_name,
+                                        defaults={'brand_name': brand_name}
+                                    )
+                                    if created:
+                                        logger.info(f"Dodano nowy kolor do bazy: {color_name} dla marki {brand_name}")
+                                        print(f"[DEBUG] Dodano nowy kolor do bazy: {color_name} dla marki {brand_name}")
+                            
+                            # 3. Fallback: Jeśli nie udało się wyodrębnić z nazwy, sprawdź bazę (dla pojedynczych kolorów)
+                            if not color_name and brand_id and brand_name:
+                                from web_agent.models import ProducerColor
+                                existing_colors = ProducerColor.objects.filter(brand_id=brand_id)
+                                
+                                if existing_colors.exists():
+                                    import re
+                                    sorted_colors = sorted(existing_colors, key=lambda x: len(x.color_name), reverse=True)
+                                    original_name_lower = original_name.lower()
+                                    
+                                    for color_obj in sorted_colors:
+                                        color_lower = color_obj.color_name.lower()
+                                        pattern = r'\b' + re.escape(color_lower) + r'\b'
+                                        if re.search(pattern, original_name_lower):
+                                            color_name = color_obj.color_name
+                                            color_obj.usage_count += 1
+                                            color_obj.save(update_fields=['usage_count', 'updated_at'])
+                                            logger.info(f"Znaleziono kolor w bazie (fallback): {color_name}")
+                                            print(f"[DEBUG] Znaleziono kolor w bazie (fallback): {color_name}")
+                                            break
+                            
+                            # 3. Mapowanie kolorów z BrandConfig
+                            if color_name and brand_id:
+                                try:
+                                    from web_agent.models import BrandConfig
+                                    brand_config = BrandConfig.objects.get(brand_id=brand_id)
+                                    if brand_config and brand_config.color_mapping:
+                                        color_mapping = brand_config.color_mapping
+                                        color_name_lower = color_name.lower().strip()
+                                        for original, mapped in color_mapping.items():
+                                            if original.lower().strip() == color_name_lower:
+                                                color_name = mapped
+                                                logger.info(f"Zmapowano kolor: '{color_name}' -> '{mapped}'")
+                                                break
+                                except Exception:
+                                    pass
+                            
+                            # 4. Wypełnij pole
+                            if color_name:
+                                # Wyczyść przez JavaScript
+                                self.driver.execute_script(
+                                    "arguments[0].value = '';",
+                                    producer_color_input
+                                )
+                                time.sleep(0.2)
+                                
+                                # Wypełnij pole
+                                try:
+                                    producer_color_input.send_keys(color_name)
+                                except Exception as e_send:
+                                    # Jeśli send_keys nie działa, użyj JavaScript
+                                    logger.warning(f"send_keys nie działa, używam JavaScript: {e_send}")
+                                    print(f"[DEBUG] send_keys nie działa, używam JavaScript: {e_send}")
+                                    self.driver.execute_script(
+                                        "arguments[0].value = arguments[1];",
+                                        producer_color_input,
+                                        color_name
+                                    )
+                                
+                                time.sleep(0.2)
+                                
+                                # Wywołaj zdarzenia
+                                self.driver.execute_script(
+                                    """
+                                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                                    """,
+                                    producer_color_input
+                                )
+                                time.sleep(0.3)
+                                
+                                logger.info(f"Wypełniono kolor producenta: {color_name}")
+                                print(f"[DEBUG] Wypełniono kolor producenta: {color_name}")
+                    except Exception as e_prod_color:
+                        logger.warning(f"Błąd podczas wypełniania koloru producenta w wierszu {idx}: {e_prod_color}")
+                        print(f"[DEBUG] Błąd podczas wypełniania koloru producenta w wierszu {idx}: {e_prod_color}")
+                    
+                    # KROK ASSIGN 3: Wypełnij kod producenta (tak jak w kroku 9)
+                    try:
+                        logger.info(f"KROK ASSIGN 3: Wypełnianie kodu producenta w wierszu {idx}")
+                        print(f"[DEBUG] KROK ASSIGN 3: Wypełnianie kodu producenta w wierszu {idx}")
+                        
+                        # Znajdź input kodu producenta w tym wierszu
+                        producer_code_input = row.find_element(By.CSS_SELECTOR, "input.producer-code-input")
+                        
+                        # Przewiń do elementu, aby był widoczny
+                        self.driver.execute_script(
+                            "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});",
+                            producer_code_input
+                        )
+                        time.sleep(0.5)
+                        
+                        # Użyj tej samej logiki co w kroku 9 (_extract_producer_code_from_name)
+                        if hasattr(self, '_original_product_name') and self._original_product_name:
+                            logger.info(f"Używam oryginalnej nazwy produktu do wyodrębnienia kodu: {self._original_product_name}")
+                            print(f"[DEBUG] Używam oryginalnej nazwy produktu do wyodrębnienia kodu: {self._original_product_name}")
+                            producer_code = self._extract_producer_code_from_name(self._original_product_name)
+                            if producer_code:
+                                # Wyczyść i wypełnij przez JavaScript (bardziej niezawodne)
+                                self.driver.execute_script(
+                                    "arguments[0].value = '';",
+                                    producer_code_input
+                                )
+                                time.sleep(0.2)
+                                producer_code_input.send_keys(producer_code)
+                                time.sleep(0.3)
+                                logger.info(f"Wypełniono kod producenta: {producer_code}")
+                                print(f"[DEBUG] Wypełniono kod producenta: {producer_code}")
+                    except Exception as e_code:
+                        logger.warning(f"Błąd podczas wypełniania kodu producenta w wierszu {idx}: {e_code}")
+                        print(f"[DEBUG] Błąd podczas wypełniania kodu producenta w wierszu {idx}: {e_code}")
+                    
+                    # KROK ASSIGN 4: Kliknij przycisk "Przypisz"
+                    try:
+                        logger.info(f"KROK ASSIGN 4: Kliknięcie przycisku 'Przypisz' w wierszu {idx}")
+                        print(f"[DEBUG] KROK ASSIGN 4: Kliknięcie przycisku 'Przypisz' w wierszu {idx}")
+                        
+                        assign_button = row.find_element(By.CSS_SELECTOR, "button.assign-mapping-btn")
+                        mpd_product_id = assign_button.get_attribute("data-mpd-id")
+                        logger.info(f"Klikam przycisk 'Przypisz' dla produktu MPD ID: {mpd_product_id}")
+                        print(f"[DEBUG] Klikam przycisk 'Przypisz' dla produktu MPD ID: {mpd_product_id}")
+                        
+                        # Przewiń do przycisku, aby był widoczny
+                        self.driver.execute_script(
+                            "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});",
+                            assign_button
+                        )
+                        time.sleep(0.5)
+                        
+                        # Spróbuj kliknąć normalnie
+                        try:
+                            assign_button.click()
+                        except Exception as e_click:
+                            # Jeśli zwykłe kliknięcie nie działa, użyj JavaScript
+                            logger.warning(f"Zwykłe kliknięcie nie działa, używam JavaScript: {e_click}")
+                            print(f"[DEBUG] Zwykłe kliknięcie nie działa, używam JavaScript: {e_click}")
+                            self.driver.execute_script("arguments[0].click();", assign_button)
+                        
+                        time.sleep(3)  # Czekaj na przetworzenie i ewentualne przekierowanie
+                        
+                        logger.info(f"✓ Przypisano produkt do MPD ID: {mpd_product_id}")
+                        print(f"[DEBUG] ✓ Przypisano produkt do MPD ID: {mpd_product_id}")
+                        
+                        # Po przypisaniu, sprawdź czy jesteśmy na stronie produktu czy już na liście
+                        # Jeśli jesteśmy na stronie produktu, wróć do listy
+                        # Uwaga: filtered_list_url będzie przekazany przez run_automation.py
+                        try:
+                            current_url = self.driver.current_url
+                            logger.info(f"URL po przypisaniu: {current_url}")
+                            print(f"[DEBUG] URL po przypisaniu: {current_url}")
+                            if '/change/' in current_url:
+                                logger.info("Po przypisaniu - wracam do listy produktów")
+                                print("[DEBUG] Po przypisaniu - wracam do listy produktów")
+                                # Użyj zapisanego URL jeśli jest dostępny (przekazany przez parametr)
+                                # Jeśli nie, użyj domyślnej metody
+                                if hasattr(self, '_saved_filtered_list_url') and self._saved_filtered_list_url:
+                                    self.navigate_back_to_product_list(filtered_list_url=self._saved_filtered_list_url)
+                                else:
+                                    self.navigate_back_to_product_list()
+                                time.sleep(2)
+                            else:
+                                logger.info("Po przypisaniu - już jesteśmy na liście produktów")
+                                print("[DEBUG] Po przypisaniu - już jesteśmy na liście produktów")
+                        except Exception as e_nav:
+                            logger.warning(f"Błąd podczas nawigacji po przypisaniu: {e_nav}")
+                            print(f"[DEBUG] Błąd podczas nawigacji po przypisaniu: {e_nav}")
+                        
+                        # Po przypisaniu, przerwij pętlę (tylko pierwszy produkt z 100% pokryciem)
+                        return True
+                        
+                    except Exception as e_button:
+                        logger.warning(f"Błąd podczas klikania przycisku 'Przypisz' w wierszu {idx}: {e_button}")
+                        print(f"[DEBUG] Błąd podczas klikania przycisku 'Przypisz' w wierszu {idx}: {e_button}")
+                
+                except Exception as e_row:
+                    logger.warning(f"Błąd podczas przetwarzania wiersza {idx}: {e_row}")
+                    print(f"[DEBUG] Błąd podczas przetwarzania wiersza {idx}: {e_row}")
+                    continue
+            
+            logger.info("Nie znaleziono wiersza z pokryciem 100%")
+            print("[DEBUG] Nie znaleziono wiersza z pokryciem 100%")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Błąd podczas obsługi scenariusza ASSIGN: {e}")
+            print(f"[DEBUG] Błąd podczas obsługi scenariusza ASSIGN: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
 
     def close_browser(self):
         """Zamknięcie przeglądarki"""
