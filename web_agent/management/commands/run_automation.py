@@ -309,6 +309,21 @@ class Command(BaseCommand):
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas wyboru grupy rozmiarowej: {e_size}"))
 
+                    # KROK 7: Wybierz główny kolor (main_color_id) na podstawie wartości z pola id_color
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] KROK 7: Wybieranie głównego koloru (main_color_id)...")
+                        color_result = browser.fill_main_color_from_product_color()
+                        if color_result:
+                            self.stdout.write(self.style.SUCCESS(
+                                f"[OK] Wybrano główny kolor: {color_result}"))
+                        else:
+                            self.stdout.write(self.style.WARNING(
+                                "[WARNING] Nie udało się wybrać głównego koloru"))
+                    except Exception as e_color_main:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas wyboru głównego koloru: {e_color_main}"))
+
                     # Wyodrębnij i wypełnij kolor producenta (użyj zapisanej oryginalnej nazwy)
                     if hasattr(browser, '_original_product_name') and browser._original_product_name:
                         try:

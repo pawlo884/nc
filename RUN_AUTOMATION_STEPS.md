@@ -128,42 +128,51 @@
     - Na podstawie nazwy kategorii wybiera odpowiednią grupę rozmiarową
     - Wypełnia pole "Grupa rozmiarowa" w formularzu
 
-### 8.8. WYODRĘBNIANIE I WYPEŁNIANIE KOLORU PRODUCENTA
+### 8.8. KROK 7: WYBÓR GŁÓWNEGO KOLORU (main_color_id)
 
-26. **Wyodrębnij kolor producenta** (`browser.update_producer_color()`)
+26. **Wybierz główny kolor** (`browser.fill_main_color_from_product_color()`)
+    - Pobiera wartość koloru z pola `<input type="text" name="color" id="id_color">`
+    - Normalizuje nazwę koloru (porównuje case-insensitive)
+    - Znajduje odpowiednią opcję w dropdownie `main_color_id` na podstawie nazwy
+    - Zaznacza kolor w dropdownie (próbuje `select_by_value`, `select_by_visible_text` lub JavaScript)
+    - Weryfikuje czy kolor został poprawnie zaznaczony
+
+### 8.9. WYODRĘBNIANIE I WYPEŁNIANIE KOLORU PRODUCENTA
+
+27. **Wyodrębnij kolor producenta** (`browser.update_producer_color()`)
     - Używa zapisanej oryginalnej nazwy produktu
     - Wyodrębnia kolor z nazwy (np. "czarny", "biały")
     - Mapuje kolor zgodnie z konfiguracją marki (jeśli istnieje)
     - Wypełnia pole "Kolor producenta" w formularzu
 
-### 8.9. WYODRĘBNIANIE I WYPEŁNIANIE KODU PRODUCENTA
+### 8.10. WYODRĘBNIANIE I WYPEŁNIANIE KODU PRODUCENTA
 
-27. **Wyodrębnij kod producenta** (`browser.update_producer_code()`)
+28. **Wyodrębnij kod producenta** (`browser.update_producer_code()`)
     - Używa zapisanej oryginalnej nazwy produktu
     - Wyodrębnia kod producenta z nazwy (np. "MK-1234")
     - Wypełnia pole "Kod producenta" w formularzu
 
-### 8.10. WYPEŁNIANIE MATERIAŁÓW (SKŁADU)
+### 8.11. WYPEŁNIANIE MATERIAŁÓW (SKŁADU)
 
-28. **Wyodrębnij i wypełnij materiały** (`browser.fill_fabric_materials()`)
+29. **Wyodrębnij i wypełnij materiały** (`browser.fill_fabric_materials()`)
     - Wyodrębnia informacje o składzie z szczegółów produktu
     - Wypełnia pole "Materiały" lub "Skład" w formularzu
 
-### 8.11. WYBÓR ŚCIEŻKI PRODUKTU
+### 8.12. WYBÓR ŚCIEŻKI PRODUKTU
 
-29. **Wybierz ścieżkę produktu** (`browser.select_product_path()`)
+30. **Wybierz ścieżkę produktu** (`browser.select_product_path()`)
     - Dla "Kostiumy Dwuczęciowe" wybiera `value="5"` (Dwuczęściowe)
     - Wypełnia pole "Ścieżka produktu" w formularzu
 
-### 8.12. WYBÓR JEDNOSTKI PRODUKTU
+### 8.13. WYBÓR JEDNOSTKI PRODUKTU
 
-30. **Wybierz jednostkę produktu** (`browser.select_unit()`)
+31. **Wybierz jednostkę produktu** (`browser.select_unit()`)
     - Wybiera `value="0"` (szt.)
     - Wypełnia pole "Jednostka" w formularzu
 
-### 8.13. TWORZENIE PRODUKTU W MPD
+### 8.14. TWORZENIE PRODUKTU W MPD
 
-31. **Utwórz produkt w MPD** (`browser.create_mpd_product()`)
+32. **Utwórz produkt w MPD** (`browser.create_mpd_product()`)
     - Szuka przycisku "Utwórz nowy produkt w MPD"
     - Jeśli przycisk istnieje (produkt nie jest zmapowany):
       - Klika przycisk
@@ -173,14 +182,14 @@
 
 ## 9. ZAKOŃCZENIE
 
-32. **Zostaw przeglądarkę otwartą**
+33. **Zostaw przeglądarkę otwartą**
     - Przeglądarka pozostaje otwarta dla ręcznego przetwarzania
     - Wyświetla informacje o `AutomationRun ID`
     - Wyświetla link do wyników w admin panelu
 
 ## 10. OBSŁUGA BŁĘDÓW
 
-33. **W przypadku błędów**:
+34. **W przypadku błędów**:
     - Aktualizuje `AutomationRun.status = 'failed'`
     - Zapisuje `error_message` z opisem błędu
     - Zamyka przeglądarkę (jeśli była otwarta)

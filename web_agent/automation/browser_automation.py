@@ -2249,6 +2249,194 @@ class BrowserAutomation:
             traceback.print_exc()
             return None
 
+    def fill_main_color_from_product_color(self):
+        """
+        KROK 7: Wypełnia główny kolor (main_color_id) na podstawie wartości z pola id_color.
+        
+        Pobiera wartość koloru z pola <input type="text" name="color" id="id_color">
+        i znajduje odpowiednią opcję w dropdownie main_color_id, a następnie ją zaznacza.
+        
+        Returns:
+            str: Nazwa ustawionego koloru lub None w przypadku błędu
+        """
+        try:
+            logger.info("=" * 50)
+            logger.info("KROK 7: Wypełnianie głównego koloru (main_color_id)")
+            logger.info("=" * 50)
+            print("[DEBUG] " + "=" * 50)
+            print("[DEBUG] KROK 7: Wypełnianie głównego koloru (main_color_id)")
+            print("[DEBUG] " + "=" * 50)
+            
+            # KROK 0: Upewnij się, że sekcja right-column jest rozwinięta
+            self._ensure_right_column_expanded()
+            time.sleep(0.5)
+            
+            # KROK 7.1: Pobierz wartość koloru z pola id_color
+            color_name = None
+            try:
+                color_input = self.driver.find_element(By.ID, "id_color")
+                color_name = color_input.get_attribute("value")
+                if color_name:
+                    color_name = color_name.strip()
+                    logger.info(f"Pobrano kolor z pola id_color: {color_name}")
+                    print(f"[DEBUG] Pobrano kolor z pola id_color: {color_name}")
+                else:
+                    logger.warning("Brak wartości koloru w polu id_color")
+                    print("[DEBUG] Brak wartości koloru w polu id_color")
+            except Exception as e:
+                logger.warning(f"Nie udało się pobrać koloru z pola id_color: {e}")
+                print(f"[DEBUG] Nie udało się pobrać koloru z pola id_color: {e}")
+                return None
+            
+            if not color_name:
+                logger.warning("Brak nazwy koloru do ustawienia")
+                print("[DEBUG] Brak nazwy koloru do ustawienia")
+                return None
+            
+            # KROK 7.2: Znajdź pole main_color_id w sekcji MPD
+            try:
+                main_color_select = self.wait.until(
+                    EC.presence_of_element_located(
+                        (By.ID, "main_color_id"))
+                )
+            except Exception as e:
+                logger.error(f"Nie udało się znaleźć pola main_color_id: {e}")
+                print(f"[DEBUG] Nie udało się znaleźć pola main_color_id: {e}")
+                return None
+            
+            # KROK 7.3: Znajdź wartość opcji dla koloru w selectcie main_color_id
+            from selenium.webdriver.support.ui import Select
+            color_select = Select(main_color_select)
+            
+            matched_value = None
+            matched_text = None
+            for opt in color_select.options:
+                text = opt.text or ""
+                opt_value = opt.get_attribute("value")
+                
+                # Pomiń opcję pustą
+                if not opt_value:
+                    continue
+                
+                # Porównaj nazwę koloru (case-insensitive)
+                if text.strip().lower() == color_name.lower():
+                    matched_value = opt_value
+                    matched_text = text.strip()
+                    break
+                # Fallback: porównaj bez części w nawiasach
+                base = text.split('(')[0].strip().lower()
+                if base == color_name.lower():
+                    matched_value = opt_value
+                    matched_text = text.strip()
+                    break
+            
+            if not matched_value:
+                logger.warning(
+                    f"Nie znaleziono opcji dla koloru '{color_name}' w selectcie main_color_id")
+                print(
+                    f"[DEBUG] Nie znaleziono opcji dla koloru '{color_name}' w selectcie main_color_id")
+                return None
+            
+            # KROK 7.4: Wybierz kolor w dropdown main_color_id przez Select
+            logger.info(
+                f"Próbuję wybrać kolor '{color_name}' (value: '{matched_value}', text: '{matched_text}')...")
+            print(
+                f"[DEBUG] Próbuję wybrać kolor '{color_name}' (value: '{matched_value}', text: '{matched_text}')...")
+            
+            try:
+                # Metoda 1: select_by_value
+                color_select.select_by_value(matched_value)
+                time.sleep(0.5)  # Daj czas na przetworzenie
+                logger.info(
+                    f"Wybrano kolor przez Select.select_by_value: {matched_text} (value: {matched_value})")
+                print(
+                    f"[DEBUG] Wybrano kolor przez Select.select_by_value: {matched_text} (value: {matched_value})")
+            except Exception as e_select_value:
+                logger.warning(
+                    f"Nie udało się wybrać przez select_by_value: {e_select_value}, próbuję select_by_visible_text")
+                print(
+                    f"[DEBUG] Nie udało się wybrać przez select_by_value: {e_select_value}, próbuję select_by_visible_text")
+                try:
+                    # Metoda 2: select_by_visible_text (fallback)
+                    color_select.select_by_visible_text(matched_text)
+                    time.sleep(0.5)
+                    logger.info(
+                        f"Wybrano kolor przez Select.select_by_visible_text: {matched_text}")
+                    print(
+                        f"[DEBUG] Wybrano kolor przez Select.select_by_visible_text: {matched_text}")
+                except Exception as e_select_text:
+                    logger.warning(
+                        f"Nie udało się wybrać przez select_by_visible_text: {e_select_text}, próbuję przez JavaScript")
+                    print(
+                        f"[DEBUG] Nie udało się wybrać przez select_by_visible_text: {e_select_text}, próbuję przez JavaScript")
+                    # Metoda 3: JavaScript (fallback)
+                    self.driver.execute_script(
+                        """
+                        var select = arguments[0];
+                        var value = arguments[1];
+                        select.value = value;
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                        select.dispatchEvent(new Event('input', { bubbles: true }));
+                        """,
+                        main_color_select,
+                        matched_value
+                    )
+                    time.sleep(0.5)
+                    logger.info(
+                        f"Ustawiono kolor przez JavaScript: {matched_text} (value: {matched_value})")
+                    print(
+                        f"[DEBUG] Ustawiono kolor przez JavaScript: {matched_text} (value: {matched_value})")
+            
+            # KROK 7.5: Weryfikacja - sprawdź czy wartość została ustawiona
+            try:
+                selected_options = color_select.all_selected_options
+                if selected_options and len(selected_options) > 0:
+                    selected_text = selected_options[0].text.strip()
+                    selected_value = selected_options[0].get_attribute("value")
+                    if selected_value == matched_value:
+                        logger.info(
+                            f"✓ Kolor został wybrany w main_color_id: {selected_text} (value: {matched_value})")
+                        print(
+                            f"[DEBUG] ✓ Kolor został wybrany w main_color_id: {selected_text} (value: {matched_value})")
+                        return matched_text
+                    else:
+                        logger.warning(
+                            f"⚠ Wybrana wartość nie pasuje. Oczekiwano: '{matched_value}', otrzymano: '{selected_value}'")
+                        print(
+                            f"[DEBUG] ⚠ Wybrana wartość nie pasuje. Oczekiwano: '{matched_value}', otrzymano: '{selected_value}'")
+                        return None
+                else:
+                    logger.warning(
+                        "Brak zaznaczonej opcji w selectcie main_color_id")
+                    print("[DEBUG] Brak zaznaczonej opcji w selectcie main_color_id")
+                    return None
+            except Exception as e_verify:
+                logger.warning(
+                    f"Nie udało się zweryfikować wyboru koloru: {e_verify}")
+                print(
+                    f"[DEBUG] Nie udało się zweryfikować wyboru koloru: {e_verify}")
+                # Fallback: sprawdź przez get_attribute
+                actual_value = main_color_select.get_attribute("value")
+                if actual_value == matched_value:
+                    logger.info(
+                        f"✓ Kolor został ustawiony w main_color_id (weryfikacja przez get_attribute): {matched_text}")
+                    print(
+                        f"[DEBUG] ✓ Kolor został ustawiony w main_color_id (weryfikacja przez get_attribute): {matched_text}")
+                    return matched_text
+                else:
+                    logger.warning(
+                        f"⚠ Kolor nie został poprawnie ustawiony. Oczekiwano: '{matched_value}', otrzymano: '{actual_value}'")
+                    print(
+                        f"[DEBUG] ⚠ Kolor nie został poprawnie ustawiony. Oczekiwano: '{matched_value}', otrzymano: '{actual_value}'")
+                    return None
+        
+        except Exception as e:
+            logger.error(f"Błąd podczas wypełniania głównego koloru w main_color_id: {e}")
+            print(f"[DEBUG] Błąd podczas wypełniania głównego koloru w main_color_id: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     def create_mpd_product(self, ai_processor=None):
         """
         Wykonuje SCENARIUSZ CREATE - wypełnia pola produktu w MPD.
