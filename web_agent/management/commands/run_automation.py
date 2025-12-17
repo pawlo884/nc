@@ -296,6 +296,19 @@ class Command(BaseCommand):
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas zaznaczania marki: {e_brand}"))
 
+                    # KROK 6: Wybierz grupę rozmiarową na podstawie kategorii
+                    try:
+                        self.stdout.write(
+                            "\n[INFO] KROK 6: Wybieranie grupy rozmiarowej...")
+                        category_name_for_size = automation_filters.get(
+                            'category_name') if automation_filters else category_name
+                        browser.select_size_category(category_name_for_size)
+                        self.stdout.write(self.style.SUCCESS(
+                            "[OK] Wybrano grupę rozmiarową"))
+                    except Exception as e_size:
+                        self.stdout.write(self.style.WARNING(
+                            f"[WARNING] Błąd podczas wyboru grupy rozmiarowej: {e_size}"))
+
                     # Wyodrębnij i wypełnij kolor producenta (użyj zapisanej oryginalnej nazwy)
                     if hasattr(browser, '_original_product_name') and browser._original_product_name:
                         try:
@@ -337,19 +350,6 @@ class Command(BaseCommand):
                     except Exception as e_fabric:
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas wypełniania materiałów: {e_fabric}"))
-
-                    # Wybierz grupę rozmiarową na podstawie kategorii
-                    try:
-                        self.stdout.write(
-                            "\n[INFO] Wybieranie grupy rozmiarowej...")
-                        category_name_for_size = automation_filters.get(
-                            'category_name') if automation_filters else category_name
-                        browser.select_size_category(category_name_for_size)
-                        self.stdout.write(self.style.SUCCESS(
-                            "[OK] Wybrano grupę rozmiarową"))
-                    except Exception as e_size:
-                        self.stdout.write(self.style.WARNING(
-                            f"[WARNING] Błąd podczas wyboru grupy rozmiarowej: {e_size}"))
 
                     # Zaznacz ścieżkę produktu (Dwuczęściowe)
                     try:

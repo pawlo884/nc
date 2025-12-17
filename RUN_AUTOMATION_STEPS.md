@@ -122,32 +122,32 @@
     - Zaznacza markę w dropdownie (próbuje `select_by_value`, `select_by_visible_text` lub JavaScript)
     - Weryfikuje czy marka została poprawnie zaznaczona
 
-### 8.7. WYODRĘBNIANIE I WYPEŁNIANIE KOLORU PRODUCENTA
+### 8.7. KROK 6: WYBÓR GRUPY ROZMIAROWEJ
 
-25. **Wyodrębnij kolor producenta** (`browser.update_producer_color()`)
+25. **Wybierz grupę rozmiarową** (`browser.select_size_category()`)
+    - Na podstawie nazwy kategorii wybiera odpowiednią grupę rozmiarową
+    - Wypełnia pole "Grupa rozmiarowa" w formularzu
+
+### 8.8. WYODRĘBNIANIE I WYPEŁNIANIE KOLORU PRODUCENTA
+
+26. **Wyodrębnij kolor producenta** (`browser.update_producer_color()`)
     - Używa zapisanej oryginalnej nazwy produktu
     - Wyodrębnia kolor z nazwy (np. "czarny", "biały")
     - Mapuje kolor zgodnie z konfiguracją marki (jeśli istnieje)
     - Wypełnia pole "Kolor producenta" w formularzu
 
-### 8.8. WYODRĘBNIANIE I WYPEŁNIANIE KODU PRODUCENTA
+### 8.9. WYODRĘBNIANIE I WYPEŁNIANIE KODU PRODUCENTA
 
-26. **Wyodrębnij kod producenta** (`browser.update_producer_code()`)
+27. **Wyodrębnij kod producenta** (`browser.update_producer_code()`)
     - Używa zapisanej oryginalnej nazwy produktu
     - Wyodrębnia kod producenta z nazwy (np. "MK-1234")
     - Wypełnia pole "Kod producenta" w formularzu
 
-### 8.9. WYPEŁNIANIE MATERIAŁÓW (SKŁADU)
+### 8.10. WYPEŁNIANIE MATERIAŁÓW (SKŁADU)
 
-27. **Wyodrębnij i wypełnij materiały** (`browser.fill_fabric_materials()`)
+28. **Wyodrębnij i wypełnij materiały** (`browser.fill_fabric_materials()`)
     - Wyodrębnia informacje o składzie z szczegółów produktu
     - Wypełnia pole "Materiały" lub "Skład" w formularzu
-
-### 8.10. WYBÓR GRUPY ROZMIAROWEJ
-
-28. **Wybierz grupę rozmiarową** (`browser.select_size_category()`)
-    - Na podstawie nazwy kategorii wybiera odpowiednią grupę rozmiarową
-    - Wypełnia pole "Grupa rozmiarowa" w formularzu
 
 ### 8.11. WYBÓR ŚCIEŻKI PRODUKTU
 
