@@ -1,5 +1,14 @@
 # Zero-Downtime Deployment - Orkiestracja
 
+> ⚠️ **HISTORYCZNE / NIEUŻYWANE (w części)**
+>
+> Skrypty `deploy-zero-downtime.*` opisane w tej dokumentacji zostały wycofane z repo.
+> Produkcja działa **wyłącznie w trybie blue‑green**.
+>
+> **Aktualnie używaj:**
+> - `docs/BLUE_GREEN_DEPLOYMENT.md`
+> - `./scripts/deploy/deploy-blue-green.sh deploy|status|rollback`
+
 ## 🎯 Problem
 Podczas standardowego budowania obrazu Docker:
 - ❌ Stary obraz jest zastępowany
@@ -63,24 +72,12 @@ Nasz system orkiestracji zapewnia:
 
 ## 🚀 Użycie
 
-### Deploy z zero-downtime
+### Deploy (blue-green)
 
-#### Windows PowerShell:
-```powershell
-# Development
-.\deploy-zero-downtime.ps1 -Environment dev
-
-# Production
-.\deploy-zero-downtime.ps1 -Environment prod
-```
-
-#### Linux/Mac:
 ```bash
-# Development
-./deploy-zero-downtime.sh dev
-
-# Production
-./deploy-zero-downtime.sh prod
+export ENVIRONMENT=prod
+./scripts/deploy/deploy-blue-green.sh deploy
+./scripts/deploy/deploy-blue-green.sh status
 ```
 
 ### Rollback do poprzedniej wersji
@@ -380,6 +377,6 @@ Zero-downtime deployment daje Ci:
 
 Wypróbuj teraz:
 ```powershell
-.\deploy-zero-downtime.ps1 -Environment dev
+./scripts/deploy/deploy-blue-green.sh status
 ```
 

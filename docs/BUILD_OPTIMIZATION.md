@@ -169,7 +169,7 @@ echo $DOCKER_BUILDKIT      # Linux/Mac
 
 Chcesz aby stary obraz działał podczas budowania nowego?
 
-**Zobacz:** [ZERO_DOWNTIME_DEPLOYMENT.md](ZERO_DOWNTIME_DEPLOYMENT.md)
+**Zobacz:** [BLUE_GREEN_DEPLOYMENT.md](BLUE_GREEN_DEPLOYMENT.md) (prod działa tylko blue‑green)
 
 Nasz system orkiestracji zapewnia:
 - ✅ Stary obraz działa podczas budowania nowego
@@ -178,8 +178,8 @@ Nasz system orkiestracji zapewnia:
 - ✅ Backup obrazów i łatwy powrót do poprzednich wersji
 
 ```powershell
-# Uruchom zero-downtime deployment
-.\deploy-zero-downtime.ps1 -Environment dev
+# Blue-green deploy (prod)
+./scripts/deploy/deploy-blue-green.sh deploy
 ```
 
 ## 📚 Więcej informacji

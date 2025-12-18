@@ -1,11 +1,23 @@
 # 🤖 Automatyczny Deployment z GitHub Actions
 
+> ⚠️ **HISTORYCZNE / NIEUŻYWANE (częściowo)**
+>
+> Ten dokument powstał dla starszego podejścia „zero‑downtime” i plików/skryptów, które w repo zostały już wycofane.
+> Aktualnie produkcja działa **wyłącznie w trybie blue‑green**.
+>
+> **Aktualny proces (obowiązujący):**
+> - Workflow: `.github/workflows/deploy-vps.yml`
+> - Skrypt: `./scripts/deploy/deploy-blue-green.sh deploy`
+> - Sekrety: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
+>
+> Reszta dokumentu poniżej jest **archiwalna** i może zawierać nieaktualne nazwy plików i komendy.
+
 ## 🎯 Jak to działa?
 
 Po każdym `git push` na branch `main`:
 1. ✅ GitHub Actions automatycznie się uruchamia
 2. 📤 Kopiuje pliki na serwer produkcyjny
-3. 🚀 Uruchamia `deploy-zero-downtime.sh` (stary obraz działa podczas budowania!)
+3. 🚀 Uruchamia blue‑green deploy (`./scripts/deploy/deploy-blue-green.sh deploy`)
 4. 🏥 Sprawdza health check
 5. ✅ Deployment zakończony (downtime tylko 2-5s!)
 6. 🔙 W razie błędu - automatyczny rollback
@@ -14,7 +26,7 @@ Po każdym `git push` na branch `main`:
 
 ### Krok 1: Dodaj plik workflow
 ```bash
-# Plik już jest: .github/workflows/production-deploy.yml
+# Plik już jest: .github/workflows/deploy-vps.yml
 # Jest gotowy do użycia!
 ```
 
@@ -24,11 +36,9 @@ Idź do: **GitHub → Twoje Repo → Settings → Secrets and variables → Acti
 Dodaj te secrets:
 
 ```
-SSH_PRIVATE_KEY     = Twój klucz SSH do serwera
-SSH_USER            = root (lub inny user)
-SSH_HOST            = 123.45.67.89 (IP serwera)
-DEPLOY_PATH         = /home/user/nc_project
-APP_URL             = https://twoja-domena.pl
+VPS_SSH_KEY     = Twój klucz SSH do serwera
+VPS_USER        = użytkownik na serwerze
+VPS_HOST        = IP / domena serwera
 ```
 
 ### Krok 3: Wygeneruj klucz SSH (jeśli nie masz)
@@ -41,7 +51,7 @@ ssh-copy-id -i ~/.ssh/github_deploy.pub user@twoj-serwer.pl
 
 # Skopiuj PRYWATNY klucz do GitHub Secrets:
 cat ~/.ssh/github_deploy
-# Całą zawartość wklej jako SSH_PRIVATE_KEY w GitHub
+# Całą zawartość wklej jako VPS_SSH_KEY w GitHub
 ```
 
 ## 🚀 Użycie
@@ -209,7 +219,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy
-        run: ssh ... bash deploy-zero-downtime.sh prod
+        run: ssh ... ./scripts/deploy/deploy-blue-green.sh deploy
 ```
 
 ### 2. Multi-environment
@@ -291,8 +301,8 @@ docker stats
 
 Przed pierwszym użyciem sprawdź:
 
-- [ ] Workflow file istnieje: `.github/workflows/production-deploy.yml`
-- [ ] GitHub Secrets są dodane (SSH_PRIVATE_KEY, SSH_USER, SSH_HOST, DEPLOY_PATH, APP_URL)
+- [ ] Workflow file istnieje: `.github/workflows/deploy-vps.yml`
+- [ ] GitHub Secrets są dodane (VPS_SSH_KEY, VPS_USER, VPS_HOST)
 - [ ] SSH klucz działa: `ssh user@serwer`
 - [ ] Folder deployment istnieje na serwerze
 - [ ] Docker jest zainstalowany na serwerze
