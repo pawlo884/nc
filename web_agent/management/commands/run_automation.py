@@ -62,8 +62,9 @@ class Command(BaseCommand):
         brand_config = None
         if brand_name:
             try:
-                brand = Brand.objects.using(
-                    'matterhorn1').get(name__iexact=brand_name)
+                # Nie wymuszaj aliasu bazy - routing (Matterhorn1Router) wybierze poprawnie
+                # 'zzz_matterhorn1' w dev lub 'matterhorn1' w prod.
+                brand = Brand.objects.get(name__iexact=brand_name)
                 brand_id = int(brand.brand_id)
                 self.stdout.write(
                     f"[OK] Znaleziono marke: {brand.name} (ID: {brand_id})")
@@ -85,7 +86,9 @@ class Command(BaseCommand):
         category = None
         if category_name:
             try:
-                category = Category.objects.using('matterhorn1').filter(
+                # Nie wymuszaj aliasu bazy - routing (Matterhorn1Router) wybierze poprawnie
+                # 'zzz_matterhorn1' w dev lub 'matterhorn1' w prod.
+                category = Category.objects.filter(
                     name__icontains=category_name).first()
                 if category:
                     category_id = int(category.category_id)
@@ -213,15 +216,16 @@ class Command(BaseCommand):
             if max_products and max_products > 0:
                 self.stdout.write(
                     f"\n[INFO] Przetwarzanie produktów z listy (max: {max_products})...")
-                
+
                 # Zapisz URL listy produktów z filtrami przed wejściem w pierwszy produkt
                 filtered_list_url = browser.driver.current_url
                 # Zapisz również w obiekcie browser, aby metody mogły z niego korzystać
                 browser._saved_filtered_list_url = filtered_list_url
                 self.stdout.write(
                     f"[DEBUG] Zapisano URL listy produktów z filtrami: {filtered_list_url}")
-                logger.info(f"Zapisano URL listy produktów z filtrami: {filtered_list_url}")
-                
+                logger.info(
+                    f"Zapisano URL listy produktów z filtrami: {filtered_list_url}")
+
                 for product_index in range(max_products):
                     self.stdout.write(
                         f"\n{'='*60}")
@@ -229,17 +233,19 @@ class Command(BaseCommand):
                         f"[INFO] PRODUKT {product_index + 1}/{max_products}")
                     self.stdout.write(
                         f"{'='*60}")
-                    
+
                     # Jeśli to nie pierwszy produkt, wróć do zapisanej listy z filtrami
                     if product_index > 0:
                         self.stdout.write(
                             f"\n[INFO] Wracanie do przefiltrowanej listy produktów przed produktem {product_index + 1}...")
-                        browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                        browser.navigate_back_to_product_list(
+                            filtered_list_url=filtered_list_url)
                         time.sleep(2)
-                    
+
                     # Otwórz produkt o danym indeksie
                     try:
-                        success = browser.open_product_from_list_by_index(product_index)
+                        success = browser.open_product_from_list_by_index(
+                            product_index)
                         if not success:
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Nie udało się otworzyć produktu o indeksie {product_index}"))
@@ -250,28 +256,34 @@ class Command(BaseCommand):
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas otwierania produktu {product_index + 1}: {e}"))
                         continue
-                    
+
                     try:
                         # Pobierz oryginalną nazwę produktu (potrzebna dla ASSIGN i CREATE)
                         try:
                             from selenium.webdriver.common.by import By
-                            name_field = browser.driver.find_element(By.ID, "id_name")
+                            name_field = browser.driver.find_element(
+                                By.ID, "id_name")
                             original_name = name_field.get_attribute("value")
                             if original_name:
                                 browser._original_product_name = original_name
-                                logger.info(f"Pobrano oryginalną nazwę produktu: {original_name}")
-                                print(f"[DEBUG] Pobrano oryginalną nazwę produktu: {original_name}")
+                                logger.info(
+                                    f"Pobrano oryginalną nazwę produktu: {original_name}")
+                                print(
+                                    f"[DEBUG] Pobrano oryginalną nazwę produktu: {original_name}")
                         except Exception as e:
-                            logger.warning(f"Nie udało się pobrać oryginalnej nazwy produktu: {e}")
-                            print(f"[DEBUG] Nie udało się pobrać oryginalnej nazwy produktu: {e}")
+                            logger.warning(
+                                f"Nie udało się pobrać oryginalnej nazwy produktu: {e}")
+                            print(
+                                f"[DEBUG] Nie udało się pobrać oryginalnej nazwy produktu: {e}")
 
                         # SCENARIUSZ ASSIGN: Sprawdź najpierw sugerowane produkty
-                        self.stdout.write("\n[INFO] Sprawdzanie scenariusza ASSIGN (sugerowane produkty)...")
+                        self.stdout.write(
+                            "\n[INFO] Sprawdzanie scenariusza ASSIGN (sugerowane produkty)...")
                         assign_result = browser.handle_assign_scenario(
                             brand_id=brand_id,
                             brand_name=brand.name if brand else None
                         )
-                        
+
                         if assign_result:
                             # Scenariusz ASSIGN się powiódł (znaleziono produkt z pokryciem 100% i przypisano)
                             self.stdout.write(self.style.SUCCESS(
@@ -285,10 +297,11 @@ class Command(BaseCommand):
                             # Brak sugerowanych produktów z pokryciem 100% - przejdź do scenariusza CREATE
                             self.stdout.write(
                                 "[INFO] Brak sugerowanych produktów z pokryciem 100% - przechodzę do scenariusza CREATE")
-                    
+
                         # SCENARIUSZ CREATE: Wypełnij wszystkie pola i utwórz nowy produkt
                         # KROK 1: Edycja nazwy produktu
-                        self.stdout.write("\n[INFO] KROK 1: Edycja nazwy produktu...")
+                        self.stdout.write(
+                            "\n[INFO] KROK 1: Edycja nazwy produktu...")
                         try:
                             browser.update_product_name()
                             self.stdout.write(self.style.SUCCESS(
@@ -302,7 +315,8 @@ class Command(BaseCommand):
 
                         # KROK 2: Edycja opisu produktu
                         try:
-                            self.stdout.write("\n[INFO] KROK 2: Edycja opisu produktu...")
+                            self.stdout.write(
+                                "\n[INFO] KROK 2: Edycja opisu produktu...")
                             enhanced_description = browser.update_product_description()
                             self.stdout.write(self.style.SUCCESS(
                                 "[OK] Zaktualizowano opis produktu"))
@@ -314,7 +328,8 @@ class Command(BaseCommand):
                         # KROK 3: Edycja krótkiego opisu
                         if enhanced_description:
                             try:
-                                self.stdout.write("\n[INFO] KROK 3: Edycja krótkiego opisu produktu...")
+                                self.stdout.write(
+                                    "\n[INFO] KROK 3: Edycja krótkiego opisu produktu...")
                                 browser.update_product_short_description(
                                     enhanced_description)
                                 self.stdout.write(self.style.SUCCESS(
@@ -376,7 +391,8 @@ class Command(BaseCommand):
                                 "\n[INFO] KROK 6: Wybieranie grupy rozmiarowej...")
                             category_name_for_size = automation_filters.get(
                                 'category_name') if automation_filters else category_name
-                            browser.select_size_category(category_name_for_size)
+                            browser.select_size_category(
+                                category_name_for_size)
                             self.stdout.write(self.style.SUCCESS(
                                 "[OK] Wybrano grupę rozmiarową"))
                         except Exception as e_size:
@@ -483,16 +499,18 @@ class Command(BaseCommand):
                         try:
                             self.stdout.write(
                                 "\n[INFO] KROK 14: Klikanie przycisku 'Utwórz nowy produkt w MPD'...")
-                            
+
                             # Znajdź przycisk po ID
                             create_button = browser.wait.until(
-                                EC.element_to_be_clickable((By.ID, "create-mpd-product-btn"))
+                                EC.element_to_be_clickable(
+                                    (By.ID, "create-mpd-product-btn"))
                             )
                             create_button.click()
                             self.stdout.write(self.style.SUCCESS(
                                 "[OK] Kliknięto przycisk 'Utwórz nowy produkt w MPD'"))
-                            time.sleep(3)  # Czekaj na przetworzenie i ewentualne przekierowanie
-                            
+                            # Czekaj na przetworzenie i ewentualne przekierowanie
+                            time.sleep(3)
+
                             # Po utworzeniu produktu, sprawdź czy jesteśmy na stronie produktu czy już na liście
                             # Jeśli jesteśmy na stronie produktu, wróć do listy
                             try:
@@ -535,7 +553,7 @@ class Command(BaseCommand):
                     # except Exception as e_save:
                     #     self.stdout.write(self.style.WARNING(
                     #         f"[WARNING] Błąd podczas tworzenia produktu w MPD: {e_save}"))
-                    
+
                         self.stdout.write(
                             f"\n[OK] Produkt {product_index + 1}/{max_products} przetworzony pomyślnie (CREATE)")
                         # Metoda już wróciła do listy po kliknięciu "Utwórz nowy produkt w MPD"
@@ -547,7 +565,8 @@ class Command(BaseCommand):
                             if '/change/' in current_url_after:
                                 self.stdout.write(
                                     "[WARNING] Nadal jesteśmy na stronie produktu - wracam do przefiltrowanej listy...")
-                                browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                                browser.navigate_back_to_product_list(
+                                    filtered_list_url=filtered_list_url)
                                 time.sleep(2)
                             elif '/matterhorn1/product/' in current_url_after:
                                 self.stdout.write(
@@ -555,18 +574,20 @@ class Command(BaseCommand):
                             else:
                                 self.stdout.write(
                                     "[WARNING] Nie jesteśmy ani na liście, ani na stronie produktu - wracam do przefiltrowanej listy...")
-                                browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                                browser.navigate_back_to_product_list(
+                                    filtered_list_url=filtered_list_url)
                                 time.sleep(2)
                         except Exception as e_check:
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Błąd podczas sprawdzania URL po CREATE: {e_check}"))
                             # Spróbuj wrócić do zapisanej listy mimo błędu
                             try:
-                                browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                                browser.navigate_back_to_product_list(
+                                    filtered_list_url=filtered_list_url)
                                 time.sleep(2)
                             except:
                                 pass
-                    
+
                     except Exception as e:
                         import traceback
                         self.stdout.write(self.style.ERROR(
@@ -577,12 +598,13 @@ class Command(BaseCommand):
                         # W przypadku błędu również wróć do zapisanej listy (jeśli to nie ostatni produkt)
                         if product_index < max_products - 1:
                             try:
-                                browser.navigate_back_to_product_list(filtered_list_url=filtered_list_url)
+                                browser.navigate_back_to_product_list(
+                                    filtered_list_url=filtered_list_url)
                                 time.sleep(2)
                             except:
                                 pass
                         continue
-                
+
                 # Po przetworzeniu wszystkich produktów
                 self.stdout.write(
                     f"\n{'='*60}")
