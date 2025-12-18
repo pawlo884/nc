@@ -263,11 +263,13 @@ class Command(BaseCommand):
                                 "[WARNING] Brak kolejnych produktów na liście do przetworzenia"))
                             break
 
-                        target_index = current_list_product_ids.index(next_product_id)
+                        target_index = current_list_product_ids.index(
+                            next_product_id)
                         self.stdout.write(
                             f"[INFO] Wybrany produkt z listy: ID={next_product_id} (index={target_index})")
 
-                        success = browser.open_product_from_list_by_index(target_index)
+                        success = browser.open_product_from_list_by_index(
+                            target_index)
                         if not success:
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Nie udało się otworzyć produktu o indeksie {product_index}"))
