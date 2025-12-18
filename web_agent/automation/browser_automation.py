@@ -3544,7 +3544,8 @@ class BrowserAutomation:
                 current_url = self.driver.current_url
                 product_id_match = re.search(r'/product/(\d+)/', current_url)
                 if not product_id_match:
-                    logger.warning("Nie udało się wyodrębnić ID produktu z URL")
+                    logger.warning(
+                        "Nie udało się wyodrębnić ID produktu z URL")
                     print("[DEBUG] Nie udało się wyodrębnić ID produktu z URL")
                     return
 
@@ -3576,7 +3577,8 @@ class BrowserAutomation:
                         row = cursor.fetchone()
 
                     if not row:
-                        logger.warning("Brak szczegółów produktu w bazie danych")
+                        logger.warning(
+                            "Brak szczegółów produktu w bazie danych")
                         print("[DEBUG] Brak szczegółów produktu w bazie danych")
                         return
 
@@ -3586,13 +3588,16 @@ class BrowserAutomation:
                         logger.info("Pobrano size_table z bazy danych")
                         print("[DEBUG] Pobrano size_table z bazy danych")
                     else:
-                        logger.warning("Brak szczegółów produktu w bazie danych")
+                        logger.warning(
+                            "Brak szczegółów produktu w bazie danych")
                         print("[DEBUG] Brak szczegółów produktu w bazie danych")
                         return
 
                 except Exception as e_db:
-                    logger.warning(f"Błąd podczas pobierania z bazy danych: {e_db}")
-                    print(f"[DEBUG] Błąd podczas pobierania z bazy danych: {e_db}")
+                    logger.warning(
+                        f"Błąd podczas pobierania z bazy danych: {e_db}")
+                    print(
+                        f"[DEBUG] Błąd podczas pobierania z bazy danych: {e_db}")
                     return
 
             if not size_table_html:
