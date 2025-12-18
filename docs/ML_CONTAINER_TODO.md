@@ -24,7 +24,7 @@ Osobny kontener Docker dla tasków ML (embeddings, semantic search) z PyTorch, a
 - [x] `scikit-learn==1.5.2`
 - [x] `numpy==2.2.0`
 
-### 3. docker-compose.prod.ml.yml i docker-compose.dev.ml.yml ✅
+### 3. docker-compose.blue-green.ml.yml i docker-compose.dev.ml.yml ✅
 - [x] Serwis `celery-ml` z Dockerfile.ml
 - [x] Kolejka: `-Q ml`
 - [x] Memory: 2GB limit, 1GB reservation
@@ -91,12 +91,12 @@ Osobny kontener jest już gotowy!
 
 ### Bez ML (standardowy):
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+./scripts/deploy/deploy-blue-green.sh deploy
 ```
 
 ### Z ML (gdy potrzebny):
 ```bash
-docker-compose -f docker-compose.prod.yml -f docker-compose.prod.ml.yml up -d
+docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml up -d celery-ml
 ```
 
 ---
@@ -109,7 +109,7 @@ docker-compose -f docker-compose.prod.yml -f docker-compose.prod.ml.yml up -d
 ## 📦 Utworzone pliki:
 - ✅ `requirements.ml.txt` - zależności ML
 - ✅ `Dockerfile.ml` - kontener ML z PyTorch
-- ✅ `docker-compose.prod.ml.yml` - konfiguracja ML dla produkcji
+- ✅ `docker-compose.blue-green.ml.yml` - konfiguracja ML dla produkcji (blue-green)
 - ✅ `docker-compose.dev.ml.yml` - konfiguracja ML dla dev
 - ✅ `ML_CONTAINER_SETUP.md` - pełna dokumentacja
 - ✅ `nc/celery.py` - zaktualizowany routing
@@ -124,10 +124,10 @@ docker-compose -f docker-compose.dev.yml up -d --build
 docker-compose -f docker-compose.dev.yml -f docker-compose.dev.ml.yml up -d --build
 
 # PROD - Standardowy deploy (szybki, BEZ ML)
-docker-compose -f docker-compose.prod.yml up -d
+./scripts/deploy/deploy-blue-green.sh deploy
 
 # PROD - Deploy Z ML (gdy potrzebny)
-docker-compose -f docker-compose.prod.yml -f docker-compose.prod.ml.yml up -d
+docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml up -d celery-ml
 ```
 
 

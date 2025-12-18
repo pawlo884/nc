@@ -96,11 +96,8 @@ docker-compose -f docker-compose.dev.yml restart web
 
 ### Rollback
 ```powershell
-# Windows
-bash scripts/deploy/rollback.sh prod
-
-# Linux/Mac
-./scripts/deploy/rollback.sh prod
+# Rollback (blue-green)
+./scripts/deploy/deploy-blue-green.sh rollback
 ```
 
 ---
@@ -316,7 +313,7 @@ CACHES = {
 
 3. 🔙 Przetestuj rollback:
    ```powershell
-   bash scripts/deploy/rollback.sh dev
+   ./scripts/deploy/deploy-blue-green.sh rollback
    ```
 
 4. 📊 Sprawdź monitoring:
@@ -345,7 +342,7 @@ docker-compose -f docker-compose.dev.yml logs -f
 .\deploy-zero-downtime.ps1 -Environment dev
 
 # Rollback
-bash scripts/deploy/rollback.sh dev
+./scripts/deploy/deploy-blue-green.sh rollback
 
 # Cleanup
 docker system prune -a

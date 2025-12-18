@@ -47,7 +47,7 @@ effective_io_concurrency = 200     # Concurrent IO
 }
 ```
 
-### 3. Docker Compose (`docker-compose.prod.yml`)
+### 3. Docker Compose (`docker-compose.blue-green.yml`)
 
 ```yaml
 postgres:

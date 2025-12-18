@@ -1,5 +1,6 @@
-# docker-compose.prod.ml.yml - ML Container dla PRODUKCJI
-# Uruchamianie: docker-compose -f docker-compose.prod.yml -f docker-compose.prod.ml.yml up -d
+# docker-compose.blue-green.ml.yml - ML worker dla BLUE-GREEN (PROD)
+# Uruchamianie:
+#   docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml up -d celery-ml
 services:
   celery-ml:
     image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app-ml:latest
@@ -12,7 +13,7 @@ services:
           memory: 1G
     volumes:
       - .:/app
-      - celery_data:/var/lib/celery
+      - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
       - ml_models:/app/ml_models  # Cache dla pobranych modeli
     env_file:
       - .env.${ENVIRONMENT:-prod}
@@ -31,8 +32,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      web:
-        condition: service_started
+      postgres:
+        condition: service_healthy
     restart: always
     networks:
       - nc_network
@@ -41,9 +42,5 @@ services:
 volumes:
   ml_models:
     driver: local
-
-networks:
-  nc_network:
-    external: true
 
 

@@ -11,7 +11,7 @@ docker-compose up -d         # 2-3 min downtime
 
 ### PO (zero-downtime deploy):
 ```bash
-bash scripts/deploy/deploy-from-registry.sh
+./scripts/deploy/deploy-blue-green.sh deploy
 # Pull nowego obrazu (stary DZIAŁA)
 # Szybkie przełączenie (2-5s downtime)
 # Health check + auto rollback
@@ -53,13 +53,13 @@ git push origin main
 ```bash
 ssh user@server
 cd /srv/app
-bash scripts/deploy/deploy-from-registry.sh
+./scripts/deploy/deploy-blue-green.sh deploy
 ```
 
 ## ✅ Co zostało zaktualizowane?
 
 1. **`.github/workflows/deploy.yml`** - workflow używa nowego skryptu
-2. **`scripts/deploy/deploy-from-registry.sh`** - nowy skrypt zero-downtime dla Docker Hub
+2. **`scripts/deploy/deploy-blue-green.sh`** - blue-green deployment dla VPS
 3. **Wszystkie inne pliki** - bez zmian!
 
 ## 🧪 Test

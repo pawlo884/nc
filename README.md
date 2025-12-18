@@ -118,7 +118,7 @@ Główne skrypty:
 git push origin main          # Automatyczny zero-downtime deploy!
 
 # Rollback (na serwerze)
-bash scripts/deploy/rollback.sh              # Przywróć poprzednią wersję
+./scripts/deploy/deploy-blue-green.sh rollback              # Przywróć poprzednią wersję
 ```
 
 **Pełna dokumentacja:** [SCRIPTS_GUIDE.md](docs/SCRIPTS_GUIDE.md)

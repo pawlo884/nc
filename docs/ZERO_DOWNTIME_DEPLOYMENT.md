@@ -87,12 +87,12 @@ Nasz system orkiestracji zapewnia:
 
 #### Windows PowerShell:
 ```powershell
-bash scripts/deploy/rollback.sh dev
+./scripts/deploy/deploy-blue-green.sh rollback
 ```
 
 #### Linux/Mac:
 ```bash
-./scripts/deploy/rollback.sh dev
+./scripts/deploy/deploy-blue-green.sh rollback
 ```
 
 ## 📊 Przykładowy przebieg deployment
@@ -247,10 +247,10 @@ Jeśli health check nie przejdzie, skrypt automatycznie:
 ### Manualny rollback
 ```powershell
 # Windows
-bash scripts/deploy/rollback.sh dev
+./scripts/deploy/deploy-blue-green.sh rollback
 
 # Linux/Mac
-./scripts/deploy/rollback.sh dev
+./scripts/deploy/deploy-blue-green.sh rollback
 ```
 
 Rollback pozwala wybrać dowolny backup:

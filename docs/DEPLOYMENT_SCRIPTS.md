@@ -4,7 +4,7 @@
 
 ### 🎯 Chcę zero-downtime deployment (ZALECANE)
 ```powershell
-.\deploy-zero-downtime.ps1 -Environment dev
+./scripts/deploy/deploy-blue-green.sh deploy
 ```
 - ✅ Stary obraz działa podczas budowania
 - ✅ Tylko 2-5s downtime
@@ -29,7 +29,7 @@
 
 ### 🔙 Chcę rollback do poprzedniej wersji
 ```powershell
-bash scripts/deploy/rollback.sh dev
+./scripts/deploy/deploy-blue-green.sh rollback
 ```
 - ✅ Wybór z dostępnych backupów
 - ✅ Szybkie przywrócenie
@@ -54,9 +54,9 @@ docker-compose build --no-cache
 
 | Skrypt | Downtime | Czas | Cache | Rollback | Use Case |
 |--------|----------|------|-------|----------|----------|
-| `deploy-zero-downtime` | 2-5s | ~1min | ✅ | ✅ | **Production deploy** |
+| `deploy-blue-green` | 2-5s | ~1min | ✅ | ✅ | **Production deploy (blue-green)** |
 | `build-fast` | N/A | ~30s-1min | ✅ | ❌ | **Development** |
-| `rollback` | 2-5s | ~10s | ✅ | ✅ | **Przywracanie** |
+| `rollback` | 2-5s | ~10s | ✅ | ✅ | **Przywracanie (blue-green)** |
 | `build-no-cache` | N/A | ~10min | ❌ | ❌ | **Troubleshooting** |
 
 ---
@@ -77,14 +77,14 @@ docker-compose -f docker-compose.dev.yml up -d
 
 ### Scenario 2: Production deployment
 ```powershell
-# Zero-downtime deploy
-.\deploy-zero-downtime.ps1 -Environment prod
+# Blue-green deploy
+./scripts/deploy/deploy-blue-green.sh deploy
 
 # Sprawdź czy działa
 Start-Process "http://localhost"
 
 # Jeśli coś nie tak - rollback
-bash scripts/deploy/rollback.sh prod
+./scripts/deploy/deploy-blue-green.sh rollback
 ```
 
 ### Scenario 3: Dodałeś nowy pakiet do requirements.txt
@@ -110,11 +110,9 @@ docker-compose -f docker-compose.dev.yml up -d --force-recreate
 nc_project/
 │
 ├── 🎯 DEPLOYMENT SCRIPTS
-│   ├── deploy-zero-downtime.ps1    # Zero-downtime deploy (Windows)
-│   ├── deploy-zero-downtime.sh     # Zero-downtime deploy (Linux/Mac)
 │   ├── scripts/build/build-fast.ps1              # Szybki build z cache (Windows)
 │   ├── scripts/build/build-fast.sh               # Szybki build z cache (Linux/Mac)
-│   ├── scripts/deploy/rollback.sh  # Rollback (Linux/Mac/WSL)
+│   ├── scripts/deploy/deploy-blue-green.sh       # Blue-green deploy + rollback
 │   └── scripts/build/build-no-cache.sh           # Build bez cache
 │
 ├── 📚 DOKUMENTACJA
@@ -137,7 +135,7 @@ nc_project/
 ## 💡 Best Practices
 
 ### ✅ DO:
-- Używaj `deploy-zero-downtime` dla production
+- Używaj `deploy-blue-green` dla production
 - Używaj `build-fast` dla development
 - Testuj deployment na dev przed production
 - Regularnie sprawdzaj dostępne backupy
@@ -246,8 +244,8 @@ docker-compose -f docker-compose.dev.yml logs -f     # Logi
 docker-compose -f docker-compose.dev.yml down        # Stop
 
 # PRODUCTION DEPLOY
-.\deploy-zero-downtime.ps1 -Environment prod         # Deploy
-bash scripts/deploy/rollback.sh prod                     # Rollback
+./scripts/deploy/deploy-blue-green.sh deploy             # Deploy
+./scripts/deploy/deploy-blue-green.sh rollback           # Rollback
 
 # TROUBLESHOOTING
 docker-compose ps                                     # Status

@@ -669,7 +669,7 @@ commits:
 ```
 **Dodano:**
 - `deploy-zero-downtime.ps1` / `.sh`
-- `scripts/deploy/rollback.sh`
+- `scripts/deploy/deploy-blue-green.sh rollback`
 - Blue-Green deployment pattern
 - BuildKit cache optimization
 - Dokumentacja deployment
@@ -699,7 +699,7 @@ commit: feat: ml packages
   scikit-learn==1.5.2
   ```
 - `docker-compose.dev.ml.yml`
-- `docker-compose.prod.ml.yml`
+- `docker-compose.blue-green.ml.yml`
 - Celery queue `ml` dla ML tasków
 
 **Rezultat:**

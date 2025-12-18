@@ -134,7 +134,7 @@ if [ "$WEB_BLUE_EXISTS" = false ] && [ "$WEB_GREEN_EXISTS" = false ]; then
     echo ""
     
     if [ "$WEB_SINGLE_EXISTS" = true ]; then
-        log_warning "Uwaga: Działa pojedynczy kontener 'web' - prawdopodobnie używasz docker-compose.prod.yml zamiast docker-compose.blue-green.yml"
+        log_warning "Uwaga: Działa pojedynczy kontener 'web' - wygląda na stary (single-stack) deployment zamiast blue-green"
         echo ""
         log_info "Musisz przełączyć się na blue-green deployment:"
         echo "  1. Zatrzymaj obecny nginx i web"

@@ -6,8 +6,8 @@
 # 🛠️ DEVELOPMENT (twój komputer)
 docker-compose -f docker-compose.dev.yml [command]
 
-# 🚀 PRODUCTION (serwer Digital Ocean)
-docker-compose -f docker-compose.prod.yml [command]
+# 🚀 PRODUCTION (blue-green)
+docker-compose -f docker-compose.blue-green.yml [command]
 ```
 
 ---
@@ -67,7 +67,7 @@ docker-compose -f docker-compose.dev.yml up -d
 
 ---
 
-## 🚀 Production (Digital Ocean)
+## 🚀 Production (blue-green)
 
 ### Deploy (przez GitHub Actions)
 ```bash
@@ -77,9 +77,8 @@ git commit -m "feat: nowa funkcja"
 git push origin main
 
 # GitHub Actions automatycznie:
-# 1. Zbuduje Dockerfile.prod
-# 2. Wypchnie na Docker Hub
-# 3. Zdeployuje na DO z docker-compose.prod.yml
+# 1. Wypchnie zmiany na serwer
+# 2. Uruchomi blue-green deployment
 ```
 
 ### Ręczny deploy na serwerze
@@ -93,39 +92,37 @@ cd /srv/app
 # Pull zmian z repo
 git pull origin main
 
-# Deploy (zero-downtime)
-bash scripts/deploy/deploy-from-registry.sh
+# Deploy (blue-green, zero-downtime)
+./scripts/deploy/deploy-blue-green.sh deploy
 
 # Sprawdź status
-docker-compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.blue-green.yml ps
 
 # Logi
-docker-compose -f docker-compose.prod.yml logs -f web
+docker-compose -f docker-compose.blue-green.yml logs -f web-blue
+docker-compose -f docker-compose.blue-green.yml logs -f web-green
 ```
 
 ### Monitoring produkcji
 ```bash
 # Status wszystkich kontenerów
-docker-compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.blue-green.yml ps
 
 # Użycie zasobów
 docker stats
 
 # Logi ostatnie 100 linii
-docker-compose -f docker-compose.prod.yml logs --tail=100 web
+docker logs nc-web-blue --tail 100
+docker logs nc-web-green --tail 100
 
 # Logi na żywo (kilka serwisów)
-docker-compose -f docker-compose.prod.yml logs -f web celery-import celery-default
+docker-compose -f docker-compose.blue-green.yml logs -f celery-import celery-default
 ```
 
 ### Rollback (awaria)
 ```bash
-# Znajdź backup tag
-docker images | grep django-app
-
 # Rollback
-docker tag django-app:backup-20251007-120000 django-app:current
-docker-compose -f docker-compose.prod.yml up -d --force-recreate
+./scripts/deploy/deploy-blue-green.sh rollback
 ```
 
 ---
@@ -137,8 +134,8 @@ docker-compose -f docker-compose.prod.yml up -d --force-recreate
 # Dev
 ls -la | grep -E "Dockerfile.dev|docker-compose.dev.yml"
 
-# Prod  
-ls -la | grep -E "Dockerfile.prod|docker-compose.prod.yml"
+# Prod
+ls -la | grep -E "Dockerfile.prod|docker-compose.blue-green.yml|nginx-blue-green.conf"
 ```
 
 ### Sprawdź settings Django
@@ -147,8 +144,8 @@ ls -la | grep -E "Dockerfile.prod|docker-compose.prod.yml"
 docker-compose -f docker-compose.dev.yml exec web python -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])"
 # Powinno: zzz_default
 
-# Prod
-docker-compose -f docker-compose.prod.yml exec web python -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])"
+# Prod (sprawdź na aktywnym kontenerze: nc-web-blue lub nc-web-green)
+docker exec nc-web-blue python -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])"
 # Powinno: default (bez zzz_)
 ```
 
@@ -187,10 +184,10 @@ docker system prune -a --volumes
 | Akcja | Development | Production |
 |-------|-------------|------------|
 | **Build** | `docker-compose -f docker-compose.dev.yml build` | GitHub Actions |
-| **Start** | `docker-compose -f docker-compose.dev.yml up -d` | `bash scripts/deploy/deploy-from-registry.sh` |
-| **Logs** | `docker-compose -f docker-compose.dev.yml logs -f` | `docker-compose -f docker-compose.prod.yml logs -f` |
-| **Shell** | `docker-compose -f docker-compose.dev.yml exec web bash` | `docker-compose -f docker-compose.prod.yml exec web bash` |
-| **Stop** | `docker-compose -f docker-compose.dev.yml down` | `docker-compose -f docker-compose.prod.yml down` |
+| **Start** | `docker-compose -f docker-compose.dev.yml up -d` | `./scripts/deploy/deploy-blue-green.sh deploy` |
+| **Logs** | `docker-compose -f docker-compose.dev.yml logs -f` | `docker-compose -f docker-compose.blue-green.yml logs -f` |
+| **Shell** | `docker-compose -f docker-compose.dev.yml exec web bash` | `docker exec -it nc-web-blue bash` |
+| **Stop** | `docker-compose -f docker-compose.dev.yml down` | `docker-compose -f docker-compose.blue-green.yml stop web-blue web-green nginx-router celery-default celery-import celery-beat flower` |
 
 ---
 
@@ -205,8 +202,8 @@ alias dc-dev-logs='docker-compose -f docker-compose.dev.yml logs -f'
 alias dc-dev-shell='docker-compose -f docker-compose.dev.yml exec web bash'
 
 # Production
-alias dc-prod='docker-compose -f docker-compose.prod.yml'
-alias dc-prod-logs='docker-compose -f docker-compose.prod.yml logs -f'
+alias dc-prod='docker-compose -f docker-compose.blue-green.yml'
+alias dc-prod-logs='docker-compose -f docker-compose.blue-green.yml logs -f'
 ```
 
 Użycie:

@@ -401,8 +401,8 @@ docker exec nc-postgres-1 pg_dumpall -U postgres > backup_before_bluegreen.sql
 ### Krok 2: Deploy blue-green pierwszy raz
 
 ```bash
-# Zatrzymaj stary stack
-docker-compose -f docker-compose.prod.yml down
+# Zatrzymaj stary stack (single-stack) jeśli jeszcze istnieje na serwerze
+# (w repo usunęliśmy docker-compose.prod.yml, bo prod działa tylko blue-green)
 
 # Uruchom blue-green
 docker-compose -f docker-compose.blue-green.yml up -d
@@ -428,7 +428,7 @@ curl http://VPS_IP:5555/
 
 ```yaml
 # W .github/workflows/deploy-vps.yml
-# Zmień docker-compose.prod.yml na docker-compose.blue-green.yml
+# Używaj docker-compose.blue-green.yml (prod działa tylko blue-green)
 # Zmień komendy deploy na ./scripts/deploy/deploy-blue-green.sh deploy
 ```
 

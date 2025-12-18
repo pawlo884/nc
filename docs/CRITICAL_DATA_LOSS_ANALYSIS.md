@@ -16,7 +16,7 @@ PostgreSQL został **ODTWORZONY DZISIAJ** (2025-12-03 10:18:58) podczas deploy!
 
 ```bash
 # W deploy-vps.yml linia 76:
-docker-compose -f docker-compose.prod.yml up -d --force-recreate
+docker-compose -f docker-compose.blue-green.yml up -d --force-recreate
 ```
 
 **`--force-recreate` odtwarza WSZYSTKIE kontenery**, włączając PostgreSQL!
@@ -118,20 +118,20 @@ print(result)
 
 **PRZED** (deploy-vps.yml linia 75-76):
 ```bash
-docker-compose -f docker-compose.prod.yml build --no-cache
-docker-compose -f docker-compose.prod.yml up -d --force-recreate  # ❌ KASUJE WSZYSTKO
+docker-compose -f docker-compose.blue-green.yml build --no-cache
+docker-compose -f docker-compose.blue-green.yml up -d --force-recreate  # ❌ KASUJE WSZYSTKO
 ```
 
 **PO**:
 ```bash
 # Zatrzymaj tylko kontenery aplikacji (BEZ postgres i redis)
-docker-compose -f docker-compose.prod.yml stop web celery-default celery-import celery-beat flower nginx static-init
+docker-compose -f docker-compose.blue-green.yml stop web-blue web-green celery-default celery-import celery-beat flower nginx-router
 
 # Rebuild tylko aplikacji
-docker-compose -f docker-compose.prod.yml build --no-cache web celery-default celery-import celery-beat flower static-init
+docker-compose -f docker-compose.blue-green.yml build --no-cache web-blue web-green celery-default celery-import celery-beat flower
 
 # Uruchom (postgres i redis zostają NIETKNIĘTE)
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.blue-green.yml up -d
 ```
 
 ### 2. Automatyczny backup przed deploy

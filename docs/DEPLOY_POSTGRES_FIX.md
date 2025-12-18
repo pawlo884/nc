@@ -4,8 +4,8 @@
 
 ```bash
 # STARE (NIEBEZPIECZNE):
-docker-compose -f docker-compose.prod.yml build --no-cache
-docker-compose -f docker-compose.prod.yml up -d --force-recreate  # ❌ ODTWARZA WSZYSTKO!
+docker-compose -f docker-compose.blue-green.yml build --no-cache
+docker-compose -f docker-compose.blue-green.yml up -d --force-recreate  # ❌ ODTWARZA WSZYSTKO!
 ```
 
 **`--force-recreate`** odtwarzał **WSZYSTKIE** kontenery, włączając:
@@ -20,25 +20,24 @@ docker-compose -f docker-compose.prod.yml up -d --force-recreate  # ❌ ODTWARZA
 # NOWE (BEZPIECZNE):
 
 # 1. Zatrzymaj tylko kontenery aplikacji
-docker-compose -f docker-compose.prod.yml stop web celery-default celery-import celery-beat flower nginx static-init
+docker-compose -f docker-compose.blue-green.yml stop web-blue web-green celery-default celery-import celery-beat flower nginx-router
 
 # 2. Rebuild tylko aplikacji
-docker-compose -f docker-compose.prod.yml build --no-cache web celery-default celery-import celery-beat flower static-init
+docker-compose -f docker-compose.blue-green.yml build --no-cache web-blue web-green celery-default celery-import celery-beat flower
 
 # 3. Uruchom wszystko (postgres i redis pozostają NIETKNIĘTE)
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.blue-green.yml up -d
 ```
 
 ## Co się zmienia podczas deploy
 
 ### Kontenery które SĄ odtwarzane:
-- ✅ `web` - aplikacja Django
+- ✅ `web-blue` / `web-green` - aplikacja Django
 - ✅ `celery-default` - worker Celery
 - ✅ `celery-import` - worker importu
 - ✅ `celery-beat` - scheduler
 - ✅ `flower` - monitoring Celery
-- ✅ `nginx` - reverse proxy
-- ✅ `static-init` - inicjalizacja plików statycznych
+- ✅ `nginx-router` - reverse proxy (router blue/green)
 
 ### Kontenery które POZOSTAJĄ nietknięte:
 - 🛡️ `postgres` - **NIGDY nie jest odtwarzany**
@@ -48,7 +47,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### 1. `docker-compose stop` (tylko aplikacja)
 ```bash
-docker-compose stop web celery-default celery-import celery-beat flower nginx static-init
+docker-compose stop web-blue web-green celery-default celery-import celery-beat flower nginx-router
 ```
 - Zatrzymuje tylko kontenery aplikacji
 - **Postgres i Redis działają dalej**
@@ -56,7 +55,7 @@ docker-compose stop web celery-default celery-import celery-beat flower nginx st
 
 ### 2. `docker-compose build` (tylko aplikacja)
 ```bash
-docker-compose build --no-cache web celery-default celery-import celery-beat flower static-init
+docker-compose build --no-cache web-blue web-green celery-default celery-import celery-beat flower
 ```
 - Przebudowuje tylko obrazy aplikacji
 - Postgres i Redis nie są buildowane (używają gotowych obrazów)
@@ -154,7 +153,7 @@ Starting nc-web-1 ... done
 
 ### 1. Exclude postgres i redis z rebuild
 
-W `docker-compose.prod.yml` dodaj label:
+W `docker-compose.blue-green.yml` kontenery chronione mają label `nc.protected=true` (PostgreSQL/Redis).
 
 ```yaml
 postgres:

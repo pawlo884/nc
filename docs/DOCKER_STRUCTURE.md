@@ -9,7 +9,7 @@ nc_project/
 ├── Dockerfile.dev              # Development - Python 3.12 + Django
 ├── Dockerfile.prod             # Production - zoptymalizowany dla CI/CD
 ├── docker-compose.dev.yml      # Local development (localhost)
-├── docker-compose.prod.yml     # Production (Digital Ocean)
+├── docker-compose.blue-green.yml  # Production (blue-green)
 └── requirements.txt            # Wspólne dependencje (bez PyTorch)
 ```
 
@@ -55,7 +55,7 @@ DJANGO_SETTINGS_MODULE=nc.settings.dev
 
 ---
 
-## 🚀 Production (Serwer Digital Ocean)
+## 🚀 Production (blue-green)
 
 ### Pliki:
 - **Dockerfile.prod** - zoptymalizowany obraz produkcyjny
@@ -65,8 +65,7 @@ DJANGO_SETTINGS_MODULE=nc.settings.dev
   - BuildKit cache (szybki rebuild w CI/CD)
   - Collectstatic w czasie buildu
 
-- **docker-compose.prod.yml** - orkiestracja prod
-  - **Używa gotowych obrazów z Docker Hub**
+- **docker-compose.blue-green.yml** - orkiestracja prod (blue-green)
   - Bazy danych bez prefiksu `zzz_`
   - Redis z hasłem `prod_password`
   - Flower z basic auth
@@ -76,14 +75,11 @@ DJANGO_SETTINGS_MODULE=nc.settings.dev
 
 ### Użycie (na serwerze):
 ```bash
-# Pull gotowego obrazu z Docker Hub
-docker pull pawlo884/django-app:latest
+# Blue-green deploy (zero-downtime)
+./scripts/deploy/deploy-blue-green.sh deploy
 
-# Deploy z zero-downtime
-bash scripts/deploy/deploy-from-registry.sh
-
-# Lub ręcznie
-docker-compose -f docker-compose.prod.yml up -d
+# Status
+./scripts/deploy/deploy-blue-green.sh status
 ```
 
 ### Env file: `.env.prod`
@@ -97,7 +93,7 @@ DJANGO_SETTINGS_MODULE=nc.settings.prod
 
 ## 🔄 GitHub Actions CI/CD
 
-### Deploy workflow (`.github/workflows/deploy.yml`):
+### Deploy workflow (`.github/workflows/deploy-vps.yml`):
 
 ```yaml
 jobs:
@@ -111,9 +107,9 @@ jobs:
           cache-from: type=registry,ref=pawlo884/django-app:buildcache
           cache-to: type=registry,ref=pawlo884/django-app:buildcache,mode=max
           
-      # 2. Deploy na Digital Ocean
+      # 2. Deploy (blue-green)
       - name: Deploy
-        run: bash scripts/deploy/deploy-from-registry.sh  # ← Używa docker-compose.prod.yml
+        run: ./scripts/deploy/deploy-blue-green.sh deploy  # ← Używa docker-compose.blue-green.yml
 ```
 
 ### Czasy buildów:
@@ -130,9 +126,9 @@ jobs:
 | Aspekt | Development | Production |
 |--------|-------------|------------|
 | **Dockerfile** | `Dockerfile.dev` | `Dockerfile.prod` |
-| **Compose** | `docker-compose.dev.yml` | `docker-compose.prod.yml` |
+| **Compose** | `docker-compose.dev.yml` | `docker-compose.blue-green.yml` |
 | **Build** | Lokalnie | GitHub Actions |
-| **Image source** | Build local | Pull z Docker Hub |
+| **Image source** | Build local | Build na serwerze (blue-green) |
 | **Bazy danych** | Prefiks `zzz_*` | Bez prefiksu |
 | **Redis password** | `dev_password` | `prod_password` |
 | **Django settings** | `nc.settings.dev` | `nc.settings.prod` |
@@ -179,8 +175,8 @@ grep "dockerfile:" docker-compose.dev.yml
 # Powinno: dockerfile: Dockerfile.dev
 
 # Prod
-grep "image:" docker-compose.prod.yml
-# Powinno: image: ${DOCKERHUB_USERNAME}/django-app:latest
+grep "image:" docker-compose.blue-green.yml
+# Powinno: image: nc-django-app:latest (build na serwerze)
 ```
 
 ### Sprawdź settings Django:
@@ -190,7 +186,7 @@ docker-compose -f docker-compose.dev.yml exec web python -c "from django.conf im
 # Powinno: nc.settings.dev
 
 # Prod
-docker-compose -f docker-compose.prod.yml exec web python -c "from django.conf import settings; print(settings.SETTINGS_MODULE)"
+docker exec nc-web-blue python -c "from django.conf import settings; print(settings.SETTINGS_MODULE)"
 # Powinno: nc.settings.prod
 ```
 
@@ -218,7 +214,7 @@ git push origin main
 # 2. GitHub Actions automatycznie:
 #    - Zbuduje Dockerfile.prod
 #    - Wypchnie na Docker Hub
-#    - Zdeployuje na Digital Ocean z docker-compose.prod.yml
+#    - Wykona blue-green deploy na VPS (deploy-vps.yml)
 ```
 
 ---
@@ -237,9 +233,9 @@ Jeśli migrujesz ze starej struktury:
 
 - [x] ~~Dockerfile~~ → **Dockerfile.dev** + **Dockerfile.prod**
 - [x] ~~Dockerfile.simple~~ → Usunięty
-- [x] ~~docker-compose.yml~~ → **docker-compose.dev.yml** + **docker-compose.prod.yml**
+- [x] ~~docker-compose.yml~~ → **docker-compose.dev.yml** + **docker-compose.blue-green.yml**
 - [x] GitHub Actions używa **Dockerfile.prod**
-- [x] Deploy script używa **docker-compose.prod.yml**
+- [x] Deploy używa **docker-compose.blue-green.yml**
 - [x] Dokumentacja zaktualizowana
 
 ---
