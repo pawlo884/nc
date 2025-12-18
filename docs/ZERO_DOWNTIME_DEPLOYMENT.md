@@ -87,12 +87,12 @@ Nasz system orkiestracji zapewnia:
 
 #### Windows PowerShell:
 ```powershell
-.\rollback.ps1 -Environment dev
+bash scripts/deploy/rollback.sh dev
 ```
 
 #### Linux/Mac:
 ```bash
-./rollback.sh dev
+./scripts/deploy/rollback.sh dev
 ```
 
 ## 📊 Przykładowy przebieg deployment
@@ -247,10 +247,10 @@ Jeśli health check nie przejdzie, skrypt automatycznie:
 ### Manualny rollback
 ```powershell
 # Windows
-.\rollback.ps1 -Environment dev
+bash scripts/deploy/rollback.sh dev
 
 # Linux/Mac
-./rollback.sh dev
+./scripts/deploy/rollback.sh dev
 ```
 
 Rollback pozwala wybrać dowolny backup:

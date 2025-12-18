@@ -49,10 +49,10 @@ OSZCZĘDNOŚĆ: ~95% czasu przy codziennej pracy!
 ### Metoda 1: Szybkie skrypty (ZALECANE)
 ```powershell
 # Windows PowerShell
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 
 # Linux/Mac
-./build-fast.sh
+./scripts/build/build-fast.sh
 ```
 
 ### Metoda 2: Ręcznie z BuildKit

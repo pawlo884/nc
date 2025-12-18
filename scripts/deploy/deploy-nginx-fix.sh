@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Skrypt do wdrożenia poprawki nginx dla portu 8001
-# Użycie: ./deploy-nginx-fix.sh
+# Użycie: ./scripts/deploy/deploy-nginx-fix.sh
 
 set -e
 

@@ -60,11 +60,11 @@ Aplikacja Django służąca do zarządzania produktami, wariantami, stanami maga
 #### Pierwszy raz:
 ```powershell
 # Windows
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 docker-compose -f docker-compose.dev.yml up -d
 
 # Linux/Mac
-./build-fast.sh
+./scripts/build/build-fast.sh
 docker-compose -f docker-compose.dev.yml up -d
 ```
 
@@ -111,14 +111,14 @@ BuildKit cache dla przyśpieszenia budowania:
 Główne skrypty:
 ```bash
 # Development (lokalnie)
-.\build-fast.ps1              # Szybki build z cache (Windows)
-./build-fast.sh               # Szybki build z cache (Linux/Mac)
+.\scripts\build\build-fast.ps1              # Szybki build z cache (Windows)
+./scripts/build/build-fast.sh               # Szybki build z cache (Linux/Mac)
 
 # Production (automatycznie przez GitHub Actions)
 git push origin main          # Automatyczny zero-downtime deploy!
 
 # Rollback (na serwerze)
-bash rollback.sh              # Przywróć poprzednią wersję
+bash scripts/deploy/rollback.sh              # Przywróć poprzednią wersję
 ```
 
 **Pełna dokumentacja:** [SCRIPTS_GUIDE.md](docs/SCRIPTS_GUIDE.md)

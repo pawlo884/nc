@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Skrypt do wdrożenia/restartu blue-green deployment z nginx
-# Użycie: ./deploy-blue-green-nginx.sh
+# Użycie: ./scripts/deploy/deploy-blue-green-nginx.sh
 
 set -e
 

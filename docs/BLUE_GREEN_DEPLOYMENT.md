@@ -62,7 +62,7 @@ W każdym momencie **tylko jedno** środowisko obsługuje ruch produkcyjny.
 Masz już:
 - ✅ `docker-compose.blue-green.yml` - konfiguracja Docker
 - ✅ `nginx-blue-green.conf` - konfiguracja NGINX
-- ✅ `deploy-blue-green.sh` - skrypt deployment
+- ✅ `scripts/deploy/deploy-blue-green.sh` - skrypt deployment
 
 ### 2. Utwórz katalog dla stanu NGINX
 
@@ -77,7 +77,7 @@ mkdir -p /mnt/data2tb/docker/volumes/nc_nginx_state
 docker-compose -f docker-compose.blue-green.yml up -d
 
 # Sprawdź status
-./deploy-blue-green.sh status
+./scripts/deploy/deploy-blue-green.sh status
 ```
 
 ## Użycie
@@ -86,7 +86,7 @@ docker-compose -f docker-compose.blue-green.yml up -d
 
 ```bash
 # Podstawowy deploy
-./deploy-blue-green.sh deploy
+./scripts/deploy/deploy-blue-green.sh deploy
 ```
 
 **Co się dzieje:**
@@ -102,7 +102,7 @@ docker-compose -f docker-compose.blue-green.yml up -d
 ### Status
 
 ```bash
-./deploy-blue-green.sh status
+./scripts/deploy/deploy-blue-green.sh status
 ```
 
 **Output:**
@@ -125,7 +125,7 @@ BLUE-GREEN DEPLOYMENT STATUS
 ### Rollback (awaryjny powrót)
 
 ```bash
-./deploy-blue-green.sh rollback
+./scripts/deploy/deploy-blue-green.sh rollback
 ```
 
 **Czas rollback: ~5 sekund** ⚡
@@ -146,7 +146,7 @@ W `.github/workflows/deploy-vps.yml` zmień deploy na:
     script: |
       cd /home/pawel/apps/nc
       git pull origin main
-      ./deploy-blue-green.sh deploy
+      ./scripts/deploy/deploy-blue-green.sh deploy
 ```
 
 ### Opcja 2: Nowy workflow tylko dla blue-green
@@ -176,10 +176,10 @@ jobs:
             git pull origin main
             
             # Deploy blue-green
-            ./deploy-blue-green.sh deploy
+            ./scripts/deploy/deploy-blue-green.sh deploy
             
             # Sprawdź status
-            ./deploy-blue-green.sh status
+            ./scripts/deploy/deploy-blue-green.sh status
 ```
 
 ## Monitoring
@@ -223,7 +223,7 @@ curl http://localhost/health/
 
 ```bash
 # 1. Deploy
-./deploy-blue-green.sh deploy
+./scripts/deploy/deploy-blue-green.sh deploy
 
 # Output:
 🚀 Rozpoczynam Blue-Green Deployment
@@ -243,7 +243,7 @@ curl http://localhost/health/
 ### Scenariusz 2: Deploy z problemem (auto rollback)
 
 ```bash
-./deploy-blue-green.sh deploy
+./scripts/deploy/deploy-blue-green.sh deploy
 
 # Output:
 🚀 Rozpoczynam Blue-Green Deployment
@@ -262,7 +262,7 @@ curl http://localhost/health/
 
 ```bash
 # Deploy przeszedł ale znalazłeś bug
-./deploy-blue-green.sh rollback
+./scripts/deploy/deploy-blue-green.sh rollback
 
 # Output:
 🔙 ROLLBACK - przywracanie poprzedniego environment
@@ -283,7 +283,7 @@ Rollback z green na blue...
 
 1. **Po deploy zatrzymaj stary** (domyślne):
    ```bash
-   # W deploy-blue-green.sh już jest:
+   # W scripts/deploy/deploy-blue-green.sh już jest:
    docker-compose -f docker-compose.blue-green.yml stop web-${ACTIVE}
    ```
 
@@ -318,7 +318,7 @@ curl http://localhost:8001/admin/
 
 ### Smoke tests
 
-Dodaj do `deploy-blue-green.sh` przed przełączeniem:
+Dodaj do `scripts/deploy/deploy-blue-green.sh` przed przełączeniem:
 
 ```bash
 # Po health_check, przed switch_nginx
@@ -386,7 +386,7 @@ docker exec nc-nginx-router nginx -s reload
 docker-compose -f docker-compose.blue-green.yml up -d web-blue web-green
 
 # Sprawdź który działa
-./deploy-blue-green.sh status
+./scripts/deploy/deploy-blue-green.sh status
 ```
 
 ## Migracja z obecnego setup
@@ -408,7 +408,7 @@ docker-compose -f docker-compose.prod.yml down
 docker-compose -f docker-compose.blue-green.yml up -d
 
 # Sprawdź status
-./deploy-blue-green.sh status
+./scripts/deploy/deploy-blue-green.sh status
 ```
 
 ### Krok 3: Test
@@ -429,7 +429,7 @@ curl http://VPS_IP:5555/
 ```yaml
 # W .github/workflows/deploy-vps.yml
 # Zmień docker-compose.prod.yml na docker-compose.blue-green.yml
-# Zmień komendy deploy na ./deploy-blue-green.sh deploy
+# Zmień komendy deploy na ./scripts/deploy/deploy-blue-green.sh deploy
 ```
 
 ## Best Practices
@@ -450,9 +450,9 @@ curl http://VPS_IP:5555/
 
 **Użycie:**
 ```bash
-./deploy-blue-green.sh deploy    # Deploy nowej wersji
-./deploy-blue-green.sh rollback  # Awaryjny powrót
-./deploy-blue-green.sh status    # Status środowisk
+./scripts/deploy/deploy-blue-green.sh deploy    # Deploy nowej wersji
+./scripts/deploy/deploy-blue-green.sh rollback  # Awaryjny powrót
+./scripts/deploy/deploy-blue-green.sh status    # Status środowisk
 ```
 
 🎉 **Zero downtime, maximum safety!**

@@ -669,7 +669,7 @@ commits:
 ```
 **Dodano:**
 - `deploy-zero-downtime.ps1` / `.sh`
-- `rollback.ps1` / `.sh`
+- `scripts/deploy/rollback.sh`
 - Blue-Green deployment pattern
 - BuildKit cache optimization
 - Dokumentacja deployment

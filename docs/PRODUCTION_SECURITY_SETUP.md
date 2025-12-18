@@ -15,7 +15,7 @@
 - ✅ **Rozwiązanie**:
   - Dodano `AdminInterfaceStaticFilesFinder` do `STATICFILES_FINDERS`
   - Zoptymalizowano konfigurację WhiteNoise
-  - Dodano automatyczną naprawę w `docker-entrypoint.sh`
+  - Dodano automatyczną naprawę w `docker/docker-entrypoint.sh`
   - Skonfigurowano Nginx do obsługi plików statycznych
 
 ### 3. **Ochrona przed Atakami**
@@ -41,7 +41,7 @@ docker-compose up -d
 ### 2. **Sprawdź Logi Bezpieczeństwa**
 ```bash
 # Uruchom monitor bezpieczeństwa
-docker-compose exec web python security_monitor.py
+docker-compose exec web python scripts/monitoring/security_monitor.py
 
 # Sprawdź logi Django
 docker-compose exec web tail -f /app/logs/security.log
@@ -81,7 +81,7 @@ docker-compose ps
 ### **Ręczne Sprawdzanie**
 ```bash
 # Analiza prób ataków
-docker-compose exec web python security_monitor.py
+docker-compose exec web python scripts/monitoring/security_monitor.py
 
 # Sprawdzenie plików statycznych
 docker-compose exec web python fix_static_files.py
@@ -115,7 +115,7 @@ Referrer-Policy: strict-origin-when-cross-origin
 ### **Automatyczne Alerty**
 ```bash
 # Dodaj do crontab dla regularnego monitorowania
-0 */6 * * * docker-compose exec web python security_monitor.py > /dev/null 2>&1
+0 */6 * * * docker-compose exec web python scripts/monitoring/security_monitor.py > /dev/null 2>&1
 ```
 
 ## 🔐 Dodatkowe Zabezpieczenia

@@ -116,7 +116,7 @@ Upewnij się, że `.dockerignore` nie blokuje ważnych plików:
 !static/
 !nginx.conf
 !redis.conf
-!docker-entrypoint.sh
+!docker/docker-entrypoint.sh
 ```
 
 ### **2. Sprawdź Zmienne Środowiskowe**

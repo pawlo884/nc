@@ -4,7 +4,7 @@
 
 ### 🚀 Production (GitHub Actions)
 ```bash
-deploy-from-registry.sh
+scripts/deploy/deploy-from-registry.sh
 ```
 **Używany przez:** GitHub Actions na serwerze  
 **Kiedy:** Automatycznie po `git push origin main`  
@@ -18,10 +18,10 @@ deploy-from-registry.sh
 ### 💻 Development (lokalne)
 ```bash
 # Linux/Mac
-./build-fast.sh
+./scripts/build/build-fast.sh
 
 # Windows
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 ```
 **Używany przez:** Developer lokalnie  
 **Kiedy:** Po zmianach w kodzie/requirements.txt  
@@ -30,7 +30,7 @@ deploy-from-registry.sh
 **Przykład:**
 ```bash
 # Zmieniłeś requirements.txt?
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 docker-compose -f docker-compose.dev.yml up -d --force-recreate
 ```
 
@@ -40,7 +40,7 @@ docker-compose -f docker-compose.dev.yml up -d --force-recreate
 
 ### Na serwerze (przez SSH)
 ```bash
-rollback.sh
+scripts/deploy/rollback.sh
 ```
 **Używany przez:** Ręcznie na serwerze lub przez GitHub Actions  
 **Kiedy:** Gdy deployment się nie powiódł  
@@ -50,7 +50,7 @@ rollback.sh
 ```bash
 ssh user@server
 cd /srv/app
-bash rollback.sh
+bash scripts/deploy/rollback.sh
 ```
 
 ---
@@ -59,7 +59,7 @@ bash rollback.sh
 
 ### Build od zera (troubleshooting)
 ```bash
-build-no-cache.sh
+scripts/build/build-no-cache.sh
 ```
 **Kiedy:** Gdy cache się zepsuł lub potrzebujesz czystego buildu  
 **Downside:** Trwa ~10 minut (pobiera wszystko od nowa)
@@ -67,19 +67,19 @@ build-no-cache.sh
 **Przykład:**
 ```bash
 # Coś nie działa? Spróbuj rebuildu bez cache
-./build-no-cache.sh
+./scripts/build/build-no-cache.sh
 ```
 
 ---
 
 ### Monitoring
 ```bash
-monitor.sh
+scripts/monitoring/monitor.sh
 ```
 **Co robi:** Monitoruje zasoby systemowe i kontenery  
 **Przykład:**
 ```bash
-./monitor.sh
+./scripts/monitoring/monitor.sh
 # Pokazuje CPU, memory, disk dla kontenerów
 ```
 
@@ -87,13 +87,13 @@ monitor.sh
 
 ### Security Setup
 ```bash
-nginx_security_setup.sh
-redis-firewall-rules.sh
+scripts/security/nginx_security_setup.sh
+scripts/security/redis-firewall-rules.sh
 ```
 **Kiedy:** Setup produkcji, konfiguracja security  
 **Co robią:**
-- `nginx_security_setup.sh` - konfiguruje Nginx security headers
-- `redis-firewall-rules.sh` - ustawia firewall dla Redis
+- `scripts/security/nginx_security_setup.sh` - konfiguruje Nginx security headers
+- `scripts/security/redis-firewall-rules.sh` - ustawia firewall dla Redis
 
 ---
 
@@ -112,9 +112,9 @@ scripts/test_nginx_dev.ps1
 ## 🚫 Usunięte (niepotrzebne)
 
 ✅ Usunięte podczas cleanup:
-- ~~`deploy-zero-downtime.sh`~~ → zastąpiony przez `deploy-from-registry.sh`
+- ~~`deploy-zero-downtime.sh`~~ → zastąpiony przez `scripts/deploy/deploy-from-registry.sh`
 - ~~`deploy-zero-downtime.ps1`~~ → używamy GitHub Actions
-- ~~`rollback.ps1`~~ → używamy GitHub Actions lub `rollback.sh` na serwerze
+- ~~`rollback.ps1`~~ → używamy GitHub Actions lub `scripts/deploy/rollback.sh` na serwerze
 - ~~`deploy.sh`~~ → stary menu skrypt
 - ~~`deploy-smart.sh`~~ → stary
 - ~~`deploy-force-rebuild.sh`~~ → stary
@@ -131,7 +131,7 @@ scripts/test_nginx_dev.ps1
 # → Nic nie rób, Gunicorn przeładuje kod
 
 # Zmiana requirements.txt
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 docker-compose -f docker-compose.dev.yml up -d --force-recreate
 
 # ===== PRODUCTION =====
@@ -142,14 +142,14 @@ git push origin main
 # Rollback (jeśli coś poszło nie tak)
 ssh user@server
 cd /srv/app
-bash rollback.sh
+bash scripts/deploy/rollback.sh
 
 # ===== TROUBLESHOOTING =====
 # Build nie działa? Spróbuj bez cache
-./build-no-cache.sh
+./scripts/build/build-no-cache.sh
 
 # Sprawdź zasoby
-./monitor.sh
+./scripts/monitoring/monitor.sh
 ```
 
 ---
@@ -159,26 +159,26 @@ bash rollback.sh
 ```
 nc_project/
 ├── 🚀 DEPLOYMENT
-│   ├── deploy-from-registry.sh    # GitHub Actions (production)
-│   ├── rollback.sh                # Rollback na serwerze
+│   ├── scripts/deploy/deploy-from-registry.sh    # GitHub Actions (production)
+│   ├── scripts/deploy/rollback.sh                # Rollback na serwerze
 │   └── .github/workflows/
 │       └── deploy.yml             # Automatyczny workflow
 │
 ├── 💻 DEVELOPMENT  
-│   ├── build-fast.sh              # Szybki build (Linux/Mac)
-│   ├── build-fast.ps1             # Szybki build (Windows)
+│   ├── scripts/build/build-fast.sh              # Szybki build (Linux/Mac)
+│   ├── scripts/build/build-fast.ps1             # Szybki build (Windows)
 │   └── docker-compose.dev.yml     # Dev environment
 │
 ├── 🔧 UTILITIES
-│   ├── build-no-cache.sh          # Full rebuild (troubleshooting)
-│   ├── monitor.sh                 # System monitoring
-│   ├── nginx_security_setup.sh    # Nginx security
-│   ├── redis-firewall-rules.sh    # Redis security
+│   ├── scripts/build/build-no-cache.sh          # Full rebuild (troubleshooting)
+│   ├── scripts/monitoring/monitor.sh            # System monitoring
+│   ├── scripts/security/nginx_security_setup.sh # Nginx security
+│   ├── scripts/security/redis-firewall-rules.sh # Redis security
 │   ├── scripts/test_nginx_dev.sh  # Nginx testing (Linux)
 │   └── scripts/test_nginx_dev.ps1 # Nginx testing (Windows)
 │
 ├── 🐳 DOCKER
-│   ├── docker-entrypoint.sh       # Container entrypoint
+│   ├── docker/docker-entrypoint.sh       # Container entrypoint
 │   ├── Dockerfile                 # Dev dockerfile
 │   ├── Dockerfile.prod            # Prod dockerfile
 │   ├── docker-compose.yml         # Production
@@ -202,19 +202,19 @@ nc_project/
 A: Żaden ręcznie! `git push origin main` → GitHub Actions robi automatycznie.
 
 **Q: Jak zrobić rollback?**  
-A: SSH na serwer → `bash rollback.sh` lub GitHub Actions zrobi automatycznie jeśli fail.
+A: SSH na serwer → `bash scripts/deploy/rollback.sh` lub GitHub Actions zrobi automatycznie jeśli fail.
 
 **Q: Zmieniłem requirements.txt - co robić?**  
-A: `.\build-fast.ps1` + `docker-compose up -d --force-recreate`
+A: `.\scripts\build\build-fast.ps1` + `docker-compose up -d --force-recreate`
 
 **Q: Build trwa wieki, co robić?**  
-A: Sprawdź czy używasz `build-fast.ps1` (z cache), nie `build-no-cache.sh`
+A: Sprawdź czy używasz `scripts/build/build-fast.ps1` (z cache), nie `scripts/build/build-no-cache.sh`
 
 **Q: Skąd wiem czy używam cache?**  
-A: `build-fast.ps1` = z cache (szybki), `build-no-cache.sh` = bez cache (wolny)
+A: `scripts/build/build-fast.ps1` = z cache (szybki), `scripts/build/build-no-cache.sh` = bez cache (wolny)
 
 **Q: Gdzie są stare skrypty deploy-zero-downtime?**  
-A: Usunięte - zastąpione przez `deploy-from-registry.sh` (lepszy dla Docker Hub)
+A: Usunięte - zastąpione przez `scripts/deploy/deploy-from-registry.sh` (lepszy dla Docker Hub)
 
 ---
 
@@ -231,10 +231,10 @@ A: Usunięte - zastąpione przez `deploy-from-registry.sh` (lepszy dla Docker Hu
 
 Po cleanup powinieneś mieć:
 
-- [x] `deploy-from-registry.sh` - główny deployment
-- [x] `build-fast.ps1` / `build-fast.sh` - dev builds
-- [x] `rollback.sh` - rollback
-- [x] `docker-entrypoint.sh` - Docker entrypoint
+- [x] `scripts/deploy/deploy-from-registry.sh` - główny deployment
+- [x] `scripts/build/build-fast.ps1` / `scripts/build/build-fast.sh` - dev builds
+- [x] `scripts/deploy/rollback.sh` - rollback
+- [x] `docker/docker-entrypoint.sh` - Docker entrypoint
 - [x] Utility scripts (monitor, security, testing)
 - [x] Brak starych/zduplikowanych skryptów
 

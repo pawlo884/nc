@@ -17,7 +17,7 @@
 
 ### ⚡ Chcę tylko szybki build (bez orchestracji)
 ```powershell
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 ```
 - ✅ BuildKit cache (bardzo szybkie kolejne buildy)
 - ✅ Cache dla apt i pip
@@ -29,7 +29,7 @@
 
 ### 🔙 Chcę rollback do poprzedniej wersji
 ```powershell
-.\rollback.ps1 -Environment dev
+bash scripts/deploy/rollback.sh dev
 ```
 - ✅ Wybór z dostępnych backupów
 - ✅ Szybkie przywrócenie
@@ -40,7 +40,7 @@
 ### 🔨 Chcę pełny rebuild (od zera, bez cache)
 ```bash
 # Linux/Mac
-./build-no-cache.sh
+./scripts/build/build-no-cache.sh
 
 # Lub ręcznie
 docker-compose build --no-cache
@@ -69,7 +69,7 @@ docker-compose build --no-cache
 # ... edytujesz pliki ...
 
 # Szybki rebuild
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 
 # Start kontenerów
 docker-compose -f docker-compose.dev.yml up -d
@@ -84,13 +84,13 @@ docker-compose -f docker-compose.dev.yml up -d
 Start-Process "http://localhost"
 
 # Jeśli coś nie tak - rollback
-.\rollback.ps1 -Environment prod
+bash scripts/deploy/rollback.sh prod
 ```
 
 ### Scenario 3: Dodałeś nowy pakiet do requirements.txt
 ```powershell
 # Rebuild z cache (tylko nowy pakiet się pobierze)
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 
 # Restart kontenerów
 docker-compose -f docker-compose.dev.yml up -d --force-recreate
@@ -99,7 +99,7 @@ docker-compose -f docker-compose.dev.yml up -d --force-recreate
 ### Scenario 4: Problem z cache (coś się zepsuło)
 ```bash
 # Wyczyść cache i zbuduj od zera
-./build-no-cache.sh
+./scripts/build/build-no-cache.sh
 ```
 
 ---
@@ -112,11 +112,10 @@ nc_project/
 ├── 🎯 DEPLOYMENT SCRIPTS
 │   ├── deploy-zero-downtime.ps1    # Zero-downtime deploy (Windows)
 │   ├── deploy-zero-downtime.sh     # Zero-downtime deploy (Linux/Mac)
-│   ├── build-fast.ps1              # Szybki build z cache (Windows)
-│   ├── build-fast.sh               # Szybki build z cache (Linux/Mac)
-│   ├── rollback.ps1                # Rollback (Windows)
-│   ├── rollback.sh                 # Rollback (Linux/Mac)
-│   └── build-no-cache.sh           # Build bez cache
+│   ├── scripts/build/build-fast.ps1              # Szybki build z cache (Windows)
+│   ├── scripts/build/build-fast.sh               # Szybki build z cache (Linux/Mac)
+│   ├── scripts/deploy/rollback.sh  # Rollback (Linux/Mac/WSL)
+│   └── scripts/build/build-no-cache.sh           # Build bez cache
 │
 ├── 📚 DOKUMENTACJA
 │   ├── ZERO_DOWNTIME_DEPLOYMENT.md # Orkiestracja deployment
@@ -241,20 +240,20 @@ Masz problem? Sprawdź:
 
 ```powershell
 # DEVELOPMENT
-.\build-fast.ps1                                      # Szybki build
+.\scripts\build\build-fast.ps1                                      # Szybki build
 docker-compose -f docker-compose.dev.yml up -d       # Start
 docker-compose -f docker-compose.dev.yml logs -f     # Logi
 docker-compose -f docker-compose.dev.yml down        # Stop
 
 # PRODUCTION DEPLOY
 .\deploy-zero-downtime.ps1 -Environment prod         # Deploy
-.\rollback.ps1 -Environment prod                     # Rollback
+bash scripts/deploy/rollback.sh prod                     # Rollback
 
 # TROUBLESHOOTING
 docker-compose ps                                     # Status
 docker-compose logs web                               # Logi web
 docker system prune -a                                # Cleanup
-./build-no-cache.sh                                   # Full rebuild
+./scripts/build/build-no-cache.sh                                   # Full rebuild
 
 # MONITORING
 docker stats                                          # Resources

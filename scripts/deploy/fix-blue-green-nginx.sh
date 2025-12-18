@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Skrypt do diagnozy i naprawy blue-green deployment z nginx
-# Użycie: ./fix-blue-green-nginx.sh
+# Użycie: ./scripts/deploy/fix-blue-green-nginx.sh
 
 set -e
 

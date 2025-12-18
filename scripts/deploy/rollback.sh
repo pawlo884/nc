@@ -9,7 +9,7 @@ echo "🔙 ROLLBACK DO POPRZEDNIEJ WERSJI"
 echo "====================================="
 echo ""
 
-COMPOSE_FILE=$([ "$ENVIRONMENT" = "dev" ] && echo "docker-compose.dev.yml" || echo "docker-compose.yml")
+COMPOSE_FILE=$([ "$ENVIRONMENT" = "dev" ] && echo "docker-compose.dev.yml" || echo "docker-compose.prod.yml")
 
 # Znajdź ostatni backup
 echo "🔍 Szukam ostatniego backupu..."

@@ -38,7 +38,7 @@ COPY MPD/ ./MPD/
 COPY nginx.conf .
 COPY redis.conf .
 COPY package.json .
-COPY docker-entrypoint.sh .
+COPY docker/docker-entrypoint.sh ./docker/docker-entrypoint.sh
 
 # Utwórz katalogi
 RUN mkdir -p /app/staticfiles /app/logs/matterhorn /var/lib/celery /var/lib/flower
@@ -51,7 +51,7 @@ RUN touch /app/logs/security.log /app/logs/django.log && \
 RUN chown -R celery:celery /app /var/lib/celery /var/lib/flower && \
     chmod 755 /var/lib/celery /var/lib/flower && \
     chmod 755 /app/logs/matterhorn && \
-    chmod +x /app/docker-entrypoint.sh
+    chmod +x /app/docker/docker-entrypoint.sh
 
 # Ustaw zmienną środowiskową PRZED collectstatic
 ENV DJANGO_SETTINGS_MODULE=nc.settings.prod

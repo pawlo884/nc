@@ -80,7 +80,7 @@ DJANGO_SETTINGS_MODULE=nc.settings.dev
 docker pull pawlo884/django-app:latest
 
 # Deploy z zero-downtime
-bash deploy-from-registry.sh
+bash scripts/deploy/deploy-from-registry.sh
 
 # Lub ręcznie
 docker-compose -f docker-compose.prod.yml up -d
@@ -113,7 +113,7 @@ jobs:
           
       # 2. Deploy na Digital Ocean
       - name: Deploy
-        run: bash deploy-from-registry.sh  # ← Używa docker-compose.prod.yml
+        run: bash scripts/deploy/deploy-from-registry.sh  # ← Używa docker-compose.prod.yml
 ```
 
 ### Czasy buildów:

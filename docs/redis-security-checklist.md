@@ -24,14 +24,14 @@
 - [x] Użycie pliku konfiguracyjnego Redis
 
 ### 3. Monitoring i Logowanie
-- [x] `redis-security-monitor.py` - monitor bezpieczeństwa
+- [x] `scripts/monitoring/redis-security-monitor.py` - monitor bezpieczeństwa
 - [x] Logowanie wolnych zapytań
 - [x] Monitorowanie połączeń klientów
 - [x] Wykrywanie ataków brute force
 - [x] Raporty bezpieczeństwa
 
 ### 4. Firewall Rules
-- [x] `redis-firewall-rules.sh` - skrypt konfiguracji firewall
+- [x] `scripts/security/redis-firewall-rules.sh` - skrypt konfiguracji firewall
 - [x] Blokada portu 6379 dla zewnętrznych połączeń
 - [x] Rate limiting dla SSH
 - [x] Zezwolenie tylko na potrzebne porty
@@ -113,10 +113,10 @@ tail -f logs/redis-security.log
 
 ```bash
 # Uruchom monitor bezpieczeństwa
-python3 redis-security-monitor.py
+python3 scripts/monitoring/redis-security-monitor.py
 
 # Uruchom w tle
-nohup python3 redis-security-monitor.py > redis-monitor.log 2>&1 &
+nohup python3 scripts/monitoring/redis-security-monitor.py > redis-monitor.log 2>&1 &
 
 # Sprawdź status
 ps aux | grep redis-security-monitor

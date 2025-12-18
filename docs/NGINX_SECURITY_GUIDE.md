@@ -48,10 +48,10 @@ Skrypt monitorujący logi nginx w czasie rzeczywistym:
 
 ```bash
 # Analiza ostatnich 1000 linii
-python3 nginx_monitor.py --log-file /var/log/nginx/access.log --lines 1000
+python3 scripts/monitoring/nginx_monitor.py --log-file /var/log/nginx/access.log --lines 1000
 
 # Monitoring w czasie rzeczywistym
-python3 nginx_monitor.py --realtime
+python3 scripts/monitoring/nginx_monitor.py --realtime
 ```
 
 #### Funkcje monitora:
@@ -67,7 +67,7 @@ Skrypt konfigurujący nginx z zabezpieczeniami:
 
 ```bash
 # Uruchomienie setup
-./nginx_security_setup.sh
+./scripts/security/nginx_security_setup.sh
 ```
 
 #### Funkcje setup:
@@ -128,7 +128,7 @@ docker-compose up nginx
 tail -f /var/log/nginx/security.log
 
 # Uruchom monitor ręcznie
-python3 nginx_monitor.py --realtime
+python3 scripts/monitoring/nginx_monitor.py --realtime
 ```
 
 ### 3. Blokowanie IP
@@ -168,10 +168,10 @@ tail -f /var/log/nginx/error.log
 ### 2. Monitor nie działa
 ```bash
 # Sprawdź uprawnienia
-ls -la nginx_monitor.py
+ls -la scripts/monitoring/nginx_monitor.py
 
 # Uruchom z debug
-python3 nginx_monitor.py --log-file /var/log/nginx/access.log --lines 100
+python3 scripts/monitoring/nginx_monitor.py --log-file /var/log/nginx/access.log --lines 100
 ```
 
 ### 3. Zbyt wiele blokowanych IP

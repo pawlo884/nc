@@ -70,7 +70,7 @@ docker-compose logs flower
 
 ### Uruchom test bezpieczeństwa:
 ```bash
-python3 celery-security-test.py
+python3 scripts/monitoring/celery-security-test.py
 ```
 
 ### Test sprawdza:

@@ -94,7 +94,7 @@ cd /srv/app
 git pull origin main
 
 # Deploy (zero-downtime)
-bash deploy-from-registry.sh
+bash scripts/deploy/deploy-from-registry.sh
 
 # Sprawdź status
 docker-compose -f docker-compose.prod.yml ps
@@ -187,7 +187,7 @@ docker system prune -a --volumes
 | Akcja | Development | Production |
 |-------|-------------|------------|
 | **Build** | `docker-compose -f docker-compose.dev.yml build` | GitHub Actions |
-| **Start** | `docker-compose -f docker-compose.dev.yml up -d` | `bash deploy-from-registry.sh` |
+| **Start** | `docker-compose -f docker-compose.dev.yml up -d` | `bash scripts/deploy/deploy-from-registry.sh` |
 | **Logs** | `docker-compose -f docker-compose.dev.yml logs -f` | `docker-compose -f docker-compose.prod.yml logs -f` |
 | **Shell** | `docker-compose -f docker-compose.dev.yml exec web bash` | `docker-compose -f docker-compose.prod.yml exec web bash` |
 | **Stop** | `docker-compose -f docker-compose.dev.yml down` | `docker-compose -f docker-compose.prod.yml down` |

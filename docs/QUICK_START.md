@@ -16,10 +16,10 @@ cd C:\Users\pawlo\Desktop\kodowanie\nc_project
 ### 3️⃣ Zbuduj obrazy Docker (z cache!)
 ```powershell
 # Windows
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 
 # Linux/Mac
-./build-fast.sh
+./scripts/build/build-fast.sh
 ```
 ⏱️ Pierwszy build: ~5-10 minut (pobieranie pakietów)
 
@@ -70,7 +70,7 @@ docker-compose -f docker-compose.dev.yml logs -f celery-default
 ### Restart po zmianie kodu
 ```powershell
 # Opcja 1: Rebuild (jeśli zmieniłeś requirements.txt)
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 docker-compose -f docker-compose.dev.yml up -d --force-recreate
 
 # Opcja 2: Restart (jeśli tylko kod)
@@ -97,10 +97,10 @@ docker-compose -f docker-compose.dev.yml restart web
 ### Rollback
 ```powershell
 # Windows
-.\rollback.ps1 -Environment prod
+bash scripts/deploy/rollback.sh prod
 
 # Linux/Mac
-./rollback.sh prod
+./scripts/deploy/rollback.sh prod
 ```
 
 ---
@@ -221,7 +221,7 @@ $env:DOCKER_BUILDKIT = "1"
 $env:COMPOSE_DOCKER_CLI_BUILD = "1"
 
 # Rebuild
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 ```
 
 ### Problem: Baza danych nie działa
@@ -273,7 +273,7 @@ docker-compose -f docker-compose.dev.yml logs -f -t
 
 ### 1. Używaj BuildKit cache
 ```powershell
-.\build-fast.ps1  # Nie docker-compose build!
+.\scripts\build\build-fast.ps1  # Nie docker-compose build!
 ```
 
 ### 2. Zmniejsz liczbę rebuilds
@@ -316,7 +316,7 @@ CACHES = {
 
 3. 🔙 Przetestuj rollback:
    ```powershell
-   .\rollback.ps1 -Environment dev
+   bash scripts/deploy/rollback.sh dev
    ```
 
 4. 📊 Sprawdź monitoring:
@@ -335,7 +335,7 @@ docker-compose -f docker-compose.dev.yml up -d
 docker-compose -f docker-compose.dev.yml down
 
 # Rebuild i restart
-.\build-fast.ps1
+.\scripts\build\build-fast.ps1
 docker-compose -f docker-compose.dev.yml up -d --force-recreate
 
 # Logi
@@ -345,7 +345,7 @@ docker-compose -f docker-compose.dev.yml logs -f
 .\deploy-zero-downtime.ps1 -Environment dev
 
 # Rollback
-.\rollback.ps1 -Environment dev
+bash scripts/deploy/rollback.sh dev
 
 # Cleanup
 docker system prune -a
