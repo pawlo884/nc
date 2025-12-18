@@ -100,10 +100,10 @@ redis-firewall-rules.sh
 ### Testing
 ```bash
 # Linux/Mac
-test_nginx_dev.sh
+scripts/test_nginx_dev.sh
 
 # Windows  
-test_nginx_dev.ps1
+scripts/test_nginx_dev.ps1
 ```
 **Co robią:** Testują konfigurację Nginx w development
 
@@ -174,8 +174,8 @@ nc_project/
 │   ├── monitor.sh                 # System monitoring
 │   ├── nginx_security_setup.sh    # Nginx security
 │   ├── redis-firewall-rules.sh    # Redis security
-│   ├── test_nginx_dev.sh          # Nginx testing (Linux)
-│   └── test_nginx_dev.ps1         # Nginx testing (Windows)
+│   ├── scripts/test_nginx_dev.sh  # Nginx testing (Linux)
+│   └── scripts/test_nginx_dev.ps1 # Nginx testing (Windows)
 │
 ├── 🐳 DOCKER
 │   ├── docker-entrypoint.sh       # Container entrypoint
