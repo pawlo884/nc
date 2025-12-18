@@ -355,5 +355,5 @@ docker system prune -a
 
 **Happy coding! 🚀**
 
-Potrzebujesz pomocy? Sprawdź [README.md](README.md) lub [DEPLOYMENT_SCRIPTS.md](DEPLOYMENT_SCRIPTS.md)
+Potrzebujesz pomocy? Sprawdź [README.md](../README.md) lub [DEPLOYMENT_SCRIPTS.md](DEPLOYMENT_SCRIPTS.md)
 

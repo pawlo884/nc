@@ -82,7 +82,7 @@ docker-compose -f docker-compose.dev.yml up -d
 ./deploy-zero-downtime.sh prod
 ```
 
-**📚 Szczegóły:** Zobacz [DEPLOYMENT_SCRIPTS.md](DEPLOYMENT_SCRIPTS.md)
+**📚 Szczegóły:** Zobacz [DEPLOYMENT_SCRIPTS.md](docs/DEPLOYMENT_SCRIPTS.md)
 
 ## 8. Najczęstsze problemy i rozwiązania
 - **ProgrammingError: relation ... does not exist** – sprawdź, czy zapytanie jest wykonywane na właściwej bazie (np. `connections['MPD']`)
@@ -97,7 +97,7 @@ System orkiestracji z automatycznym rollbackiem:
 - Tylko 2-5 sekund downtime
 - Automatyczny backup i rollback
 
-**Dokumentacja:** [ZERO_DOWNTIME_DEPLOYMENT.md](ZERO_DOWNTIME_DEPLOYMENT.md)
+**Dokumentacja:** [ZERO_DOWNTIME_DEPLOYMENT.md](docs/ZERO_DOWNTIME_DEPLOYMENT.md)
 
 ### ⚡ Szybkie buildy
 BuildKit cache dla przyśpieszenia budowania:
@@ -105,7 +105,7 @@ BuildKit cache dla przyśpieszenia budowania:
 - Kolejne buildy: ~30-60 sekund (95% szybciej!)
 - Cache dla apt i pip packages
 
-**Dokumentacja:** [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md)
+**Dokumentacja:** [BUILD_OPTIMIZATION.md](docs/BUILD_OPTIMIZATION.md)
 
 ### 📋 Przewodnik po skryptach
 Główne skrypty:
@@ -121,7 +121,7 @@ git push origin main          # Automatyczny zero-downtime deploy!
 bash rollback.sh              # Przywróć poprzednią wersję
 ```
 
-**Pełna dokumentacja:** [SCRIPTS_GUIDE.md](SCRIPTS_GUIDE.md)
+**Pełna dokumentacja:** [SCRIPTS_GUIDE.md](docs/SCRIPTS_GUIDE.md)
 
 ## 10. Kontakt/autorzy
 - Główny programista: [Paweł Sowa]
