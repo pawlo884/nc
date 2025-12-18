@@ -81,18 +81,12 @@ docker-compose -f docker-compose.dev.yml restart web
 
 ## Deployment do Production
 
-### Zero-Downtime Deploy
-```powershell
-# Windows
-.\deploy-zero-downtime.ps1 -Environment prod
-
-# Linux/Mac  
-./deploy-zero-downtime.sh prod
+### Blue-Green Deploy (prod)
+```bash
+export ENVIRONMENT=prod
+./scripts/deploy/deploy-blue-green.sh deploy
+./scripts/deploy/deploy-blue-green.sh status
 ```
-
-⏱️ Build: ~1 minuta (z cache)  
-⏱️ Downtime: ~2-5 sekund  
-✅ Automatyczny rollback w razie błędów
 
 ### Rollback
 ```powershell
@@ -307,8 +301,8 @@ CACHES = {
    - [DEPLOYMENT_SCRIPTS.md](DEPLOYMENT_SCRIPTS.md)
 
 2. 🧪 Przetestuj deployment:
-   ```powershell
-   .\deploy-zero-downtime.ps1 -Environment dev
+   ```bash
+   ./scripts/deploy/deploy-blue-green.sh status
    ```
 
 3. 🔙 Przetestuj rollback:
@@ -337,9 +331,6 @@ docker-compose -f docker-compose.dev.yml up -d --force-recreate
 
 # Logi
 docker-compose -f docker-compose.dev.yml logs -f
-
-# Zero-downtime deploy
-.\deploy-zero-downtime.ps1 -Environment dev
 
 # Rollback
 ./scripts/deploy/deploy-blue-green.sh rollback
