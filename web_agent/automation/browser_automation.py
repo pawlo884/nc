@@ -3471,14 +3471,16 @@ class BrowserAutomation:
 
     def fill_fabric_materials(self):
         """
-        Wyodrębnia materiały z sekcji "Szczegóły produktu" (size_table_html) 
+        Wyodrębnia materiały z sekcji "Szczegóły produktu" (size_table_html)
         i wypełnia pola składu (materiały) w formularzu.
         """
         try:
             import re
+            import time
 
             logger.info("Wyodrębnianie materiałów z szczegółów produktu...")
             print("[DEBUG] Wyodrębnianie materiałów z szczegółów produktu...")
+            t0 = time.monotonic()
 
             # Spróbuj rozwinąć sekcję "Szczegóły produktu" jeśli jest zwinięta
             try:
@@ -3498,158 +3500,110 @@ class BrowserAutomation:
 
             # Pobierz zawartość z size_table (główne źródło danych)
             size_table_html = ""
-            try:
-                # Spróbuj najpierw size_table (główne źródło)
-                size_table_field = self.wait.until(
-                    EC.presence_of_element_located(
-                        (By.ID, "id_details-0-size_table"))
-                )
-                size_table_html = size_table_field.get_attribute("value") or ""
-                if size_table_html:
-                    logger.info("Pobrano dane z pola size_table")
-                    print("[DEBUG] Pobrano dane z pola size_table")
-            except:
+            # UWAGA o wydajności:
+            # Poprzednio używaliśmy self.wait.until(...) (30s) w kilku zagnieżdżonych fallbackach.
+            # Jeśli pola nie istnieją lub są w innym inlinie, potrafiło to zjadać 30s * N prób.
+            # Tutaj sprawdzamy szybko (find_elements) i dopiero jeśli nic nie ma, idziemy do DB.
+            field_sources = [
+                ("size_table", (By.ID, "id_details-0-size_table")),
+                ("size_table", (By.NAME, "details-0-size_table")),
+                ("size_table_html", (By.ID, "id_details-0-size_table_html")),
+                ("size_table_html", (By.NAME, "details-0-size_table_html")),
+                ("size_table_txt", (By.ID, "id_details-0-size_table_txt")),
+                ("size_table_txt", (By.NAME, "details-0-size_table_txt")),
+            ]
+
+            picked_source = None
+            for source_name, (by, locator) in field_sources:
                 try:
-                    # Spróbuj przez XPath dla size_table
-                    size_table_field = self.driver.find_element(
-                        By.XPATH, "//textarea[@name='details-0-size_table']"
-                    )
-                    size_table_html = size_table_field.get_attribute(
-                        "value") or ""
+                    elems = self.driver.find_elements(by, locator)
+                    if not elems:
+                        continue
+                    size_table_html = elems[0].get_attribute("value") or ""
                     if size_table_html:
-                        logger.info("Pobrano dane z pola size_table (XPath)")
-                        print("[DEBUG] Pobrano dane z pola size_table (XPath)")
-                except:
-                    # Fallback do size_table_html
-                    try:
-                        size_table_html_field = self.wait.until(
-                            EC.presence_of_element_located(
-                                (By.ID, "id_details-0-size_table_html"))
+                        picked_source = source_name
+                        logger.info(f"Pobrano dane z pola {source_name}")
+                        print(f"[DEBUG] Pobrano dane z pola {source_name}")
+                        break
+                except Exception:
+                    continue
+
+            t_fields = time.monotonic()
+            logger.info(
+                f"[PERF] Krok 13: pobranie danych z formularza: {(t_fields - t0):.2f}s (source={picked_source})"
+            )
+
+            if not size_table_html:
+                # Fallback: pobierz dane z bazy danych
+                logger.info(
+                    "Pola nie znalezione w formularzu lub są puste, próbuję pobrać z bazy danych...")
+                print(
+                    "[DEBUG] Pola nie znalezione w formularzu lub są puste, próbuję pobrać z bazy danych...")
+
+                # Wyodrębnij ID produktu z URL
+                current_url = self.driver.current_url
+                product_id_match = re.search(r'/product/(\d+)/', current_url)
+                if not product_id_match:
+                    logger.warning("Nie udało się wyodrębnić ID produktu z URL")
+                    print("[DEBUG] Nie udało się wyodrębnić ID produktu z URL")
+                    return
+
+                product_id = int(product_id_match.group(1))
+                logger.info(f"Znaleziono ID produktu w URL: {product_id}")
+                print(f"[DEBUG] Znaleziono ID produktu w URL: {product_id}")
+
+                # Pobierz szczegóły produktu z bazy danych
+                try:
+                    from django.conf import settings
+                    from django.db import connections
+
+                    # Preferuj dev-owy alias 'zzz_matterhorn1' jeśli jest skonfigurowany
+                    matterhorn1_db = (
+                        'zzz_matterhorn1'
+                        if 'zzz_matterhorn1' in settings.DATABASES
+                        else 'matterhorn1'
+                    )
+
+                    with connections[matterhorn1_db].cursor() as cursor:
+                        cursor.execute(
+                            """
+                            SELECT pd.size_table, pd.size_table_html, pd.size_table_txt
+                            FROM productdetails pd
+                            WHERE pd.product_id = %s
+                            """,
+                            [product_id],
                         )
-                        size_table_html = size_table_html_field.get_attribute(
-                            "value") or ""
-                        if size_table_html:
-                            logger.info("Pobrano dane z pola size_table_html")
-                            print("[DEBUG] Pobrano dane z pola size_table_html")
-                    except:
-                        try:
-                            # Spróbuj przez XPath dla size_table_html
-                            size_table_html_field = self.driver.find_element(
-                                By.XPATH, "//textarea[@name='details-0-size_table_html']"
-                            )
-                            size_table_html = size_table_html_field.get_attribute(
-                                "value") or ""
-                            if size_table_html:
-                                logger.info(
-                                    "Pobrano dane z pola size_table_html (XPath)")
-                                print(
-                                    "[DEBUG] Pobrano dane z pola size_table_html (XPath)")
-                        except:
-                            # Fallback do size_table_txt
-                            try:
-                                size_table_txt_field = self.wait.until(
-                                    EC.presence_of_element_located(
-                                        (By.ID, "id_details-0-size_table_txt"))
-                                )
-                                size_table_html = size_table_txt_field.get_attribute(
-                                    "value") or ""
-                                if size_table_html:
-                                    logger.info(
-                                        "Pobrano dane z pola size_table_txt")
-                                    print(
-                                        "[DEBUG] Pobrano dane z pola size_table_txt")
-                            except:
-                                try:
-                                    # Spróbuj przez XPath dla size_table_txt
-                                    size_table_txt_field = self.driver.find_element(
-                                        By.XPATH, "//textarea[@name='details-0-size_table_txt']"
-                                    )
-                                    size_table_html = size_table_txt_field.get_attribute(
-                                        "value") or ""
-                                    if size_table_html:
-                                        logger.info(
-                                            "Pobrano dane z pola size_table_txt (XPath)")
-                                        print(
-                                            "[DEBUG] Pobrano dane z pola size_table_txt (XPath)")
-                                except:
-                                    # Fallback: pobierz dane z bazy danych
-                                    logger.info(
-                                        "Pola nie znalezione w formularzu, próbuję pobrać z bazy danych...")
-                                    print(
-                                        "[DEBUG] Pola nie znalezione w formularzu, próbuję pobrać z bazy danych...")
+                        row = cursor.fetchone()
 
-                                    # Wyodrębnij ID produktu z URL
-                                    current_url = self.driver.current_url
-                                    product_id_match = re.search(
-                                        r'/product/(\d+)/', current_url)
+                    if not row:
+                        logger.warning("Brak szczegółów produktu w bazie danych")
+                        print("[DEBUG] Brak szczegółów produktu w bazie danych")
+                        return
 
-                                    if product_id_match:
-                                        product_id = int(
-                                            product_id_match.group(1))
-                                        logger.info(
-                                            f"Znaleziono ID produktu w URL: {product_id}")
-                                        print(
-                                            f"[DEBUG] Znaleziono ID produktu w URL: {product_id}")
+                    # Priorytet: size_table > size_table_html > size_table_txt
+                    size_table_html = row[0] or row[1] or row[2] or ""
+                    if size_table_html:
+                        logger.info("Pobrano size_table z bazy danych")
+                        print("[DEBUG] Pobrano size_table z bazy danych")
+                    else:
+                        logger.warning("Brak szczegółów produktu w bazie danych")
+                        print("[DEBUG] Brak szczegółów produktu w bazie danych")
+                        return
 
-                                        # Pobierz szczegóły produktu z bazy danych
-                                        try:
-                                            from django.conf import settings
-                                            from django.db import connections
-                                            from matterhorn1.models import Product
-
-                                            # Preferuj dev-owy alias 'zzz_matterhorn1' jeśli jest skonfigurowany
-                                            matterhorn1_db = (
-                                                'zzz_matterhorn1'
-                                                if 'zzz_matterhorn1' in settings.DATABASES
-                                                else 'matterhorn1'
-                                            )
-
-                                            with connections[matterhorn1_db].cursor() as cursor:
-                                                cursor.execute("""
-                                                    SELECT pd.size_table, pd.size_table_html, pd.size_table_txt
-                                                    FROM productdetails pd
-                                                    INNER JOIN product p ON pd.product_id = p.id
-                                                    WHERE p.id = %s
-                                                """, [product_id])
-
-                                                row = cursor.fetchone()
-                                                if row:
-                                                    # Priorytet: size_table > size_table_html > size_table_txt
-                                                    size_table_html = row[0] or row[1] or row[2] or ""
-                                                    if size_table_html:
-                                                        logger.info(
-                                                            "Pobrano size_table z bazy danych")
-                                                        print(
-                                                            "[DEBUG] Pobrano size_table z bazy danych")
-                                                    else:
-                                                        logger.warning(
-                                                            "Brak szczegółów produktu w bazie danych")
-                                                        print(
-                                                            "[DEBUG] Brak szczegółów produktu w bazie danych")
-                                                        return
-                                                else:
-                                                    logger.warning(
-                                                        "Brak szczegółów produktu w bazie danych")
-                                                    print(
-                                                        "[DEBUG] Brak szczegółów produktu w bazie danych")
-                                                    return
-                                        except Exception as e_db:
-                                            logger.warning(
-                                                f"Błąd podczas pobierania z bazy danych: {e_db}")
-                                            print(
-                                                f"[DEBUG] Błąd podczas pobierania z bazy danych: {e_db}")
-                                            return
-                                    else:
-                                        logger.warning(
-                                            "Nie udało się wyodrębnić ID produktu z URL")
-                                        print(
-                                            "[DEBUG] Nie udało się wyodrębnić ID produktu z URL")
-                                        return
+                except Exception as e_db:
+                    logger.warning(f"Błąd podczas pobierania z bazy danych: {e_db}")
+                    print(f"[DEBUG] Błąd podczas pobierania z bazy danych: {e_db}")
+                    return
 
             if not size_table_html:
                 logger.warning("Pole size_table_html jest puste")
                 print("[DEBUG] Pole size_table_html jest puste")
                 return
+
+            t_after_fetch = time.monotonic()
+            logger.info(
+                f"[PERF] Krok 13: pobranie HTML (formularz/DB): {(t_after_fetch - t0):.2f}s"
+            )
 
             # Wyodrębnij materiały i procenty z HTML
             materials = self._extract_materials_from_html(size_table_html)
@@ -3663,6 +3617,11 @@ class BrowserAutomation:
                 f"Wyodrębniono {len(materials)} materiałów: {materials}")
             print(
                 f"[DEBUG] Wyodrębniono {len(materials)} materiałów: {materials}")
+
+            t_after_parse = time.monotonic()
+            logger.info(
+                f"[PERF] Krok 13: parsowanie HTML: {(t_after_parse - t_after_fetch):.2f}s"
+            )
 
             # Mapowanie nazw materiałów na wartości w select
             material_mapping = {
@@ -3755,6 +3714,9 @@ class BrowserAutomation:
 
             # Poczekaj chwilę, aby upewnić się, że formularz jest gotowy
             time.sleep(1)
+
+            t_end = time.monotonic()
+            logger.info(f"[PERF] Krok 13: całość: {(t_end - t0):.2f}s")
 
         except Exception as e:
             logger.warning(f"Błąd podczas wypełniania materiałów: {e}")
