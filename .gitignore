@@ -1,4 +1,5 @@
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -18,8 +19,17 @@ __pycache__/
 .env.dev
 .env.prod
 .vscode/
+*.code-workspace
+.shotgun/
+*.ipynb
+.ipynb_checkpoints/
 celerybeat-schedule
 node_modules/
+Thumbs.db
+*.tmp
+*.backup*
+*.orig
+*.rej
 
 # pliki .xml
 MPD_test/*
