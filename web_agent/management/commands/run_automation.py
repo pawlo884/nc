@@ -226,6 +226,13 @@ class Command(BaseCommand):
                 logger.info(
                     f"Zapisano URL listy produktów z filtrami: {filtered_list_url}")
 
+                # WAŻNE:
+                # Po CREATE/ASSIGN produkt często znika z listy (np. gdy filtrujemy is_mapped=False),
+                # więc indeksy w tabeli przesuwają się i "produkt o indeksie 1" staje się innym produktem.
+                # Żeby nie przeskakiwać (np. 1->3), zawsze wybieramy kolejny NIEprzetworzony produkt
+                # na podstawie aktualnej listy checkboxów (ID) na stronie.
+                processed_product_ids = set()
+
                 for product_index in range(max_products):
                     self.stdout.write(
                         f"\n{'='*60}")
@@ -242,14 +249,30 @@ class Command(BaseCommand):
                             filtered_list_url=filtered_list_url)
                         time.sleep(2)
 
-                    # Otwórz produkt o danym indeksie
+                    # Otwórz kolejny nieprzetworzony produkt z listy (indeksy mogą się przesuwać)
                     try:
-                        success = browser.open_product_from_list_by_index(
-                            product_index)
+                        current_list_product_ids = browser.get_product_ids_from_list()
+                        next_product_id = None
+                        for pid in current_list_product_ids:
+                            if pid not in processed_product_ids:
+                                next_product_id = pid
+                                break
+
+                        if not next_product_id:
+                            self.stdout.write(self.style.WARNING(
+                                "[WARNING] Brak kolejnych produktów na liście do przetworzenia"))
+                            break
+
+                        target_index = current_list_product_ids.index(next_product_id)
+                        self.stdout.write(
+                            f"[INFO] Wybrany produkt z listy: ID={next_product_id} (index={target_index})")
+
+                        success = browser.open_product_from_list_by_index(target_index)
                         if not success:
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Nie udało się otworzyć produktu o indeksie {product_index}"))
                             continue
+                        processed_product_ids.add(next_product_id)
                         self.stdout.write(self.style.SUCCESS(
                             f"[OK] Otworzono produkt {product_index + 1} z listy"))
                     except Exception as e:
