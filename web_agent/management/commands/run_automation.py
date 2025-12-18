@@ -2,6 +2,7 @@
 Management command do uruchomienia automatyzacji wypełniania formularzy MPD
 """
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 from web_agent.automation.browser_automation import BrowserAutomation
 from web_agent.models import AutomationRun, BrandConfig
 from matterhorn1.models import Brand, Category
@@ -275,6 +276,7 @@ class Command(BaseCommand):
                                 f"[WARNING] Nie udało się otworzyć produktu o indeksie {product_index}"))
                             continue
                         processed_product_ids.add(next_product_id)
+                        current_product_id = next_product_id
                         self.stdout.write(self.style.SUCCESS(
                             f"[OK] Otworzono produkt {product_index + 1} z listy"))
                     except Exception as e:
@@ -315,6 +317,13 @@ class Command(BaseCommand):
                                 "[OK] Scenariusz ASSIGN zakończony - produkt został przypisany do istniejącego produktu w MPD"))
                             self.stdout.write(
                                 f"\n[OK] Produkt {product_index + 1}/{max_products} przetworzony pomyślnie (ASSIGN)")
+                            # Aktualizuj AutomationRun w bazie (żeby admin od razu widział postęp)
+                            automation_run.products_processed += 1
+                            automation_run.products_success += 1
+                            automation_run.save(update_fields=[
+                                'products_processed',
+                                'products_success',
+                            ])
                             # Scenariusz ASSIGN zakończony - metoda handle_assign_scenario już wróciła do listy
                             # Przejdź do następnego produktu (jeśli to nie ostatni)
                             continue
@@ -521,6 +530,7 @@ class Command(BaseCommand):
                                 f"[WARNING] Błąd podczas wypełniania materiałów: {e_fabric}"))
 
                         # KROK 14: Kliknij przycisk "Utwórz nowy produkt w MPD"
+                        create_clicked = False
                         try:
                             self.stdout.write(
                                 "\n[INFO] KROK 14: Klikanie przycisku 'Utwórz nowy produkt w MPD'...")
@@ -531,6 +541,7 @@ class Command(BaseCommand):
                                     (By.ID, "create-mpd-product-btn"))
                             )
                             create_button.click()
+                            create_clicked = True
                             self.stdout.write(self.style.SUCCESS(
                                 "[OK] Kliknięto przycisk 'Utwórz nowy produkt w MPD'"))
                             # Czekaj na przetworzenie i ewentualne przekierowanie
@@ -581,6 +592,23 @@ class Command(BaseCommand):
 
                         self.stdout.write(
                             f"\n[OK] Produkt {product_index + 1}/{max_products} przetworzony pomyślnie (CREATE)")
+                        # Aktualizuj AutomationRun w bazie (CREATE traktujemy jako sukces jeśli nie poleciał wyjątek)
+                        automation_run.products_processed += 1
+                        # jeśli nie udało się kliknąć, nadal to jest "przetworzone",
+                        # ale traktujemy jako błąd żeby było widać problem w adminie.
+                        if create_clicked:
+                            automation_run.products_success += 1
+                        else:
+                            automation_run.products_failed += 1
+                            automation_run.error_message = (
+                                f"Nie udało się kliknąć create-mpd-product-btn dla produktu {current_product_id}"
+                            )
+                        automation_run.save(update_fields=[
+                            'products_processed',
+                            'products_success',
+                            'products_failed',
+                            'error_message',
+                        ])
                         # Metoda już wróciła do listy po kliknięciu "Utwórz nowy produkt w MPD"
                         # Sprawdź czy faktycznie jesteśmy na liście przed przejściem do następnego produktu
                         try:
@@ -620,6 +648,15 @@ class Command(BaseCommand):
                         traceback.print_exc()
                         self.stdout.write(self.style.WARNING(
                             f"[WARNING] Błąd podczas przetwarzania produktu {product_index + 1}: {e}"))
+                        # Aktualizuj AutomationRun w bazie (żeby admin widział błędy)
+                        automation_run.products_processed += 1
+                        automation_run.products_failed += 1
+                        automation_run.error_message = str(e)
+                        automation_run.save(update_fields=[
+                            'products_processed',
+                            'products_failed',
+                            'error_message',
+                        ])
                         # W przypadku błędu również wróć do zapisanej listy (jeśli to nie ostatni produkt)
                         if product_index < max_products - 1:
                             try:
@@ -651,6 +688,13 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"   Wyniki: http://localhost:{port}/admin/web_agent/automationrun/{automation_run.id}/\n")
 
+            # Zakończ AutomationRun w bazie (żeby w adminie nie wisiało jako "W trakcie")
+            # Nawet jeśli przeglądarka zostaje otwarta do ręcznych działań, część automatyczna jest zakończona.
+            if automation_run.status == 'running':
+                automation_run.status = 'completed'
+                automation_run.completed_at = timezone.now()
+                automation_run.save(update_fields=['status', 'completed_at'])
+
             # Zostaw przeglądarkę otwartą - nie zamykaj!
             # Użytkownik może teraz ręcznie przetwarzać produkty
 
@@ -660,6 +704,7 @@ class Command(BaseCommand):
             traceback.print_exc()
             automation_run.status = 'failed'
             automation_run.error_message = str(e)
+            automation_run.completed_at = timezone.now()
             automation_run.save()
             if 'browser' in locals():
                 browser.close_browser()
