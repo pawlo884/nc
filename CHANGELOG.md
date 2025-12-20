@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.4.2 (2025-12-20)</small>
+
+* fix: dodanie *.backup do .gitignore i poprawka komentarza w nginx config ([0e72f6b](https://github.com/pawlo884/nc/commit/0e72f6b))
+
 ## <small>1.4.1 (2025-12-10)</small>
 
 * fix: naprawa automatycznego przełączania nginx w blue-green deployment ([1284e46](https://github.com/pawlo884/nc/commit/1284e46))
