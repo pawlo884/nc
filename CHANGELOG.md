@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.4.3 (2025-12-20)</small>
+
+* fix(deploy): automatyczny commit zmian nginx-blue-green.conf po deploy ([a764abd](https://github.com/pawlo884/nc/commit/a764abd))
+
 ## <small>1.4.2 (2025-12-20)</small>
 
 * fix: dodanie *.backup do .gitignore i poprawka komentarza w nginx config ([0e72f6b](https://github.com/pawlo884/nc/commit/0e72f6b))
