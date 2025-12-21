@@ -172,8 +172,8 @@ class Command(LoggingCommand):
         self.stdout_write(f"\n[OK] Utworzono AutomationRun ID: {automation_run.id}\n")
 
         try:
-            # Inicjalizuj automatyzację w tle
-            automation = BackgroundAutomation()
+            # Inicjalizuj automatyzację w tle z callback do logowania
+            automation = BackgroundAutomation(log_callback=self.stdout_write)
             ai_processor = AIProcessor()
 
             # Przygotuj filtry

@@ -17,16 +17,47 @@ logger = logging.getLogger(__name__)
 class BackgroundAutomation:
     """Klasa do automatyzacji w tle (bez przeglądarki)"""
 
-    def __init__(self, ai_processor: Optional[AIProcessor] = None):
+    def __init__(self, ai_processor: Optional[AIProcessor] = None, log_callback=None):
         """
         Inicjalizacja automatyzacji w tle.
 
         Args:
             ai_processor: Instancja AIProcessor do ulepszania nazw/opisów. Jeśli None, tworzy nową.
+            log_callback: Funkcja callback do logowania (np. self.stdout_write). Jeśli None, używa logger.
         """
         self.ai_processor = ai_processor or AIProcessor()
         self._original_product_name = None
+        self.log_callback = log_callback  # Callback do logowania (np. stdout_write)
         logger.info("BackgroundAutomation zainicjalizowany")
+    
+    def _log(self, message: str, level: str = 'info'):
+        """
+        Loguje wiadomość przez callback lub logger.
+        
+        Args:
+            message: Wiadomość do zalogowania
+            level: Poziom logowania ('info', 'success', 'warning', 'error')
+        """
+        if self.log_callback:
+            # Jeśli callback jest stdout_write, użyj go bezpośrednio
+            # stdout_write przyjmuje message i może użyć self.style
+            # Ale ponieważ callback jest funkcją, musimy przekazać już sformatowaną wiadomość
+            if level == 'success':
+                self.log_callback(f"[OK] {message}")
+            elif level == 'warning':
+                self.log_callback(f"[WARNING] {message}")
+            elif level == 'error':
+                self.log_callback(f"[ERROR] {message}")
+            else:
+                self.log_callback(message)
+        else:
+            # Użyj standardowego loggera
+            if level == 'error':
+                logger.error(message)
+            elif level == 'warning':
+                logger.warning(message)
+            else:
+                logger.info(message)
 
     def get_products_by_filters(self, filters: Dict) -> List[Product]:
         """
@@ -470,26 +501,38 @@ class BackgroundAutomation:
             True jeśli znaleziono i przypisano produkt, False jeśli nie
         """
         try:
-            logger.info("=" * 50)
-            logger.info("SCENARIUSZ ASSIGN: Sprawdzanie sugerowanych produktów")
-            logger.info("=" * 50)
+            self._log(f"\n{'='*60}")
+            self._log("SCENARIUSZ ASSIGN: Sprawdzanie sugerowanych produktów")
+            self._log(f"{'='*60}")
 
             product = Product.objects.get(id=product_id)
+            self._log(f"Szukanie wariantów dla produktu: {product.name[:100]}...")
             suggested_products = self.get_suggested_mpd_products(product)
+            
+            if suggested_products:
+                self._log(f"Znaleziono {len(suggested_products)} sugerowanych produktów:")
+                for idx, sug in enumerate(suggested_products[:5], 1):
+                    variant_info = " (WARIANT)" if sug.get('is_variant') else ""
+                    self._log(f"  {idx}. ID: {sug['id']}, Nazwa: {sug['name'][:60]}..., Pokrycie: {sug['coverage']:.1f}%{variant_info}")
+            else:
+                self._log("Brak sugerowanych produktów w MPD")
 
             if not suggested_products:
-                logger.info("Brak sugerowanych produktów w MPD")
+                self._log("Brak sugerowanych produktów w MPD")
                 return False
 
             # Znajdź produkt z pokryciem 100% (lub najbliższy 100%)
             for suggested in suggested_products:
                 if suggested['coverage'] >= 100.0:
                     mpd_product_id = suggested['id']
-                    logger.info(f"Znaleziono produkt MPD z pokryciem 100%: {mpd_product_id}")
+                    variant_info = " (WARIANT)" if suggested.get('is_variant') else ""
+                    self._log(f"\n[OK] Znaleziono produkt MPD z pokryciem 100%: {mpd_product_id}{variant_info}")
+                    self._log(f"Nazwa produktu MPD: {suggested['name'][:100]}...")
 
                     # Pobierz dane produktu
                     product_data = self.get_product_from_database(product_id)
                     if not product_data:
+                        self._log("Nie udało się pobrać danych produktu", 'warning')
                         continue
 
                     # Wyodrębnij dane potrzebne do przypisania
@@ -497,31 +540,50 @@ class BackgroundAutomation:
                     self._original_product_name = original_name
 
                     # KROK ASSIGN 1: Główny kolor
+                    self._log(f"\n[INFO] KROK ASSIGN 1: Wybieranie głównego koloru...")
                     color_name = product_data.get('color', '')
                     main_color_id = None
                     if color_name:
                         main_color_id = self.get_main_color_id(color_name)
+                        if main_color_id:
+                            self._log(f"Wybrano główny kolor: {color_name} (ID: {main_color_id})", 'success')
+                        else:
+                            self._log(f"Nie znaleziono koloru w bazie MPD: {color_name}", 'warning')
+                    else:
+                        self._log("Brak koloru w danych produktu", 'warning')
 
                     # KROK ASSIGN 2: Kolor producenta
+                    self._log(f"\n[INFO] KROK ASSIGN 2: Wyodrębnianie koloru producenta...")
                     producer_color_name = self.extract_color_from_name(original_name)
-                    if producer_color_name and brand_id and brand_name:
-                        # Sprawdź czy kolor istnieje w bazie
-                        try:
-                            color_obj = ProducerColor.objects.get(
-                                brand_id=brand_id,
-                                color_name=producer_color_name
-                            )
-                            color_obj.usage_count += 1
-                            color_obj.save(update_fields=['usage_count', 'updated_at'])
-                        except ProducerColor.DoesNotExist:
-                            ProducerColor.objects.create(
-                                brand_id=brand_id,
-                                brand_name=brand_name,
-                                color_name=producer_color_name
-                            )
+                    if producer_color_name:
+                        self._log(f"Wyodrębniono kolor producenta: {producer_color_name}", 'success')
+                        if brand_id and brand_name:
+                            # Sprawdź czy kolor istnieje w bazie
+                            try:
+                                color_obj = ProducerColor.objects.get(
+                                    brand_id=brand_id,
+                                    color_name=producer_color_name
+                                )
+                                color_obj.usage_count += 1
+                                color_obj.save(update_fields=['usage_count', 'updated_at'])
+                                self._log(f"Zaktualizowano licznik użyć koloru: {color_obj.usage_count}", 'info')
+                            except ProducerColor.DoesNotExist:
+                                ProducerColor.objects.create(
+                                    brand_id=brand_id,
+                                    brand_name=brand_name,
+                                    color_name=producer_color_name
+                                )
+                                self._log(f"Utworzono nowy kolor producenta w bazie", 'info')
+                    else:
+                        self._log("Nie udało się wyodrębnić koloru producenta z nazwy", 'warning')
 
                     # KROK ASSIGN 3: Kod producenta
+                    self._log(f"\n[INFO] KROK ASSIGN 3: Wyodrębnianie kodu producenta...")
                     producer_code = self.extract_producer_code_from_name(original_name)
+                    if producer_code:
+                        self._log(f"Wyodrębniono kod producenta: {producer_code}", 'success')
+                    else:
+                        self._log("Nie udało się wyodrębnić kodu producenta z nazwy", 'warning')
 
                     # Wywołaj assign_mapping bezpośrednio (zamiast klikania przycisku)
                     try:
@@ -553,19 +615,22 @@ class BackgroundAutomation:
                         if hasattr(response, 'content'):
                             response_data = json.loads(response.content)
                             if response_data.get('success'):
-                                logger.info(f"✓ Przypisano produkt do MPD ID: {mpd_product_id}")
+                                self._log(f"✓ Przypisano produkt do MPD ID: {mpd_product_id}", 'success')
                                 return True
+                            else:
+                                error_msg = response_data.get('error', 'Nieznany błąd')
+                                self._log(f"Błąd podczas przypisywania: {error_msg}", 'error')
                     except Exception as e:
-                        logger.error(f"Błąd podczas przypisywania produktu: {e}")
+                        self._log(f"Błąd podczas przypisywania produktu: {e}", 'error')
                         import traceback
                         traceback.print_exc()
                         return False
 
-            logger.info("Nie znaleziono produktu z pokryciem 100%")
+            self._log("Nie znaleziono produktu z pokryciem 100%")
             return False
 
         except Exception as e:
-            logger.error(f"Błąd podczas obsługi scenariusza ASSIGN: {e}")
+            self._log(f"Błąd podczas obsługi scenariusza ASSIGN: {e}", 'error')
             import traceback
             traceback.print_exc()
             return False
@@ -584,30 +649,53 @@ class BackgroundAutomation:
             Słownik z wynikiem (success, mpd_product_id, error_message)
         """
         try:
-            logger.info(f"Tworzenie produktu MPD dla produktu {product_id}")
+            self._log(f"\n{'='*60}")
+            self._log("SCENARIUSZ CREATE: Tworzenie nowego produktu w MPD")
+            self._log(f"{'='*60}")
+            self._log(f"Tworzenie produktu MPD dla produktu {product_id}")
 
             # Pobierz oryginalną nazwę produktu
             original_name = product_data.get('name', '')
             self._original_product_name = original_name
 
             # KROK 1: Ulepsz nazwę produktu
+            self._log(f"\n[INFO] KROK 1: Edycja nazwy produktu...")
             enhanced_name = self.enhance_product_name(original_name)
-            logger.info(f"Ulepszona nazwa: {enhanced_name}")
+            if enhanced_name:
+                self._log(f"Oryginalna nazwa: {original_name[:100]}...", 'info')
+                self._log(f"Ulepszona nazwa: {enhanced_name[:100]}...", 'success')
+            else:
+                self._log("Nie udało się ulepszyć nazwy, używam oryginalnej", 'warning')
+                enhanced_name = original_name
 
             # KROK 2: Ulepsz opis produktu
+            self._log(f"\n[INFO] KROK 2: Edycja opisu produktu...")
             original_description = product_data.get('description', '')
             enhanced_description = self.enhance_product_description(original_description)
-            logger.info(f"Ulepszony opis (długość: {len(enhanced_description)})")
+            if enhanced_description:
+                self._log(f"Ulepszony opis (długość: {len(enhanced_description)} znaków)", 'success')
+            else:
+                self._log("Nie udało się ulepszyć opisu, używam oryginalnego", 'warning')
+                enhanced_description = original_description
 
             # KROK 3: Utwórz krótki opis
+            self._log(f"\n[INFO] KROK 3: Edycja krótkiego opisu produktu...")
             short_description = self.create_short_description(enhanced_description)
-            logger.info(f"Krótki opis (długość: {len(short_description)})")
+            if short_description:
+                self._log(f"Krótki opis (długość: {len(short_description)} znaków)", 'success')
+            else:
+                self._log("Nie udało się utworzyć krótkiego opisu", 'warning')
 
             # KROK 4: Wyciągnij atrybuty z opisu
+            self._log(f"\n[INFO] KROK 4: Wyciąganie atrybutów z opisu produktu...")
             attribute_ids = self.extract_attributes_from_description(enhanced_description)
-            logger.info(f"Wyodrębniono {len(attribute_ids)} atrybutów: {attribute_ids}")
+            if attribute_ids:
+                self._log(f"Wyodrębniono {len(attribute_ids)} atrybutów: {attribute_ids}", 'success')
+            else:
+                self._log("Nie znaleziono atrybutów w opisie", 'warning')
 
             # KROK 5: Pobierz markę
+            self._log(f"\n[INFO] KROK 5: Zaznaczanie marki w dropdown...")
             brand_name_final = brand_name or product_data.get('brand_name', '')
             if not brand_name_final and brand_id:
                 try:
@@ -615,36 +703,61 @@ class BackgroundAutomation:
                     brand_name_final = brand.name
                 except Brand.DoesNotExist:
                     pass
+            if brand_name_final:
+                self._log(f"Wybrano markę: {brand_name_final}", 'success')
+            else:
+                self._log("Nie udało się pobrać marki", 'warning')
 
             # KROK 6: Grupa rozmiarowa (domyślnie "bielizna" dla kostiumów)
+            self._log(f"\n[INFO] KROK 6: Wybieranie grupy rozmiarowej...")
             size_category = "bielizna"
+            self._log(f"Wybrano grupę rozmiarową: {size_category}", 'success')
 
             # KROK 7: Główny kolor
+            self._log(f"\n[INFO] KROK 7: Wybieranie głównego koloru (main_color_id)...")
             color_name = product_data.get('color', '')
             main_color_id = None
             if color_name:
                 main_color_id = self.get_main_color_id(color_name)
+                if main_color_id:
+                    self._log(f"Wybrano główny kolor: {color_name} (ID: {main_color_id})", 'success')
+                else:
+                    self._log(f"Nie znaleziono koloru w bazie MPD: {color_name}", 'warning')
+            else:
+                self._log("Brak koloru w danych produktu", 'warning')
 
             # KROK 8: Kolor producenta
+            self._log(f"\n[INFO] KROK 8: Wyodrębnianie koloru producenta...")
             producer_color_name = self.extract_color_from_name(original_name)
-            if producer_color_name and brand_id and brand_name:
-                # Sprawdź czy kolor istnieje w bazie
-                try:
-                    color_obj = ProducerColor.objects.get(
-                        brand_id=brand_id,
-                        color_name=producer_color_name
-                    )
-                    color_obj.usage_count += 1
-                    color_obj.save(update_fields=['usage_count', 'updated_at'])
-                except ProducerColor.DoesNotExist:
-                    ProducerColor.objects.create(
-                        brand_id=brand_id,
-                        brand_name=brand_name,
-                        color_name=producer_color_name
-                    )
+            if producer_color_name:
+                self._log(f"Wyodrębniono kolor producenta: {producer_color_name}", 'success')
+                if brand_id and brand_name:
+                    # Sprawdź czy kolor istnieje w bazie
+                    try:
+                        color_obj = ProducerColor.objects.get(
+                            brand_id=brand_id,
+                            color_name=producer_color_name
+                        )
+                        color_obj.usage_count += 1
+                        color_obj.save(update_fields=['usage_count', 'updated_at'])
+                        self._log(f"Zaktualizowano licznik użyć koloru: {color_obj.usage_count}", 'info')
+                    except ProducerColor.DoesNotExist:
+                        ProducerColor.objects.create(
+                            brand_id=brand_id,
+                            brand_name=brand_name,
+                            color_name=producer_color_name
+                        )
+                        self._log(f"Utworzono nowy kolor producenta w bazie", 'info')
+            else:
+                self._log("Nie udało się wyodrębnić koloru producenta z nazwy", 'warning')
 
             # KROK 9: Kod producenta
+            self._log(f"\n[INFO] KROK 9: Wyodrębnianie kodu producenta...")
             producer_code = self.extract_producer_code_from_name(original_name)
+            if producer_code:
+                self._log(f"Wyodrębniono kod producenta: {producer_code}", 'success')
+            else:
+                self._log("Nie udało się wyodrębnić kodu producenta z nazwy", 'warning')
 
             # KROK 10: Series name (placeholder - puste)
             series_name = ""
@@ -656,8 +769,13 @@ class BackgroundAutomation:
             unit_id = 0
 
             # KROK 13: Materiały (skład)
+            self._log(f"\n[INFO] KROK 13: Wyodrębnianie materiałów (skład)...")
             size_table_html = product_data.get('size_table_html', '')
             fabric_data = self.extract_fabric_materials(size_table_html)
+            if fabric_data:
+                self._log(f"Wyodrębniono {len(fabric_data)} materiałów: {fabric_data}", 'success')
+            else:
+                self._log("Nie udało się wyodrębnić materiałów", 'warning')
 
             # Przygotuj dane dla MPD
             mpd_product_data = {
@@ -683,14 +801,21 @@ class BackgroundAutomation:
             }
 
             # Użyj Saga Pattern do utworzenia produktu
-            logger.info(f"Wysyłanie danych do Saga - MPD: {mpd_product_data}")
+            self._log(f"\n[INFO] Wysyłanie danych do Saga...")
+            self._log(f"Marka: {brand_name_final}")
+            self._log(f"Kod producenta: {producer_code or 'brak'}")
+            self._log(f"Kolor producenta: {producer_color_name or 'brak'}")
+            self._log(f"Główny kolor ID: {main_color_id or 'brak'}")
+            self._log(f"Atrybuty: {len(attribute_ids)}")
+            self._log(f"Materiały: {len(fabric_data)}")
+            
             saga_result = SagaService.create_product_with_mapping(
                 matterhorn_data, mpd_product_data
             )
 
             if saga_result.status.value != 'completed':
                 error_msg = f"Saga failed: {saga_result.error}"
-                logger.error(error_msg)
+                self._log(f"Błąd Saga: {error_msg}", 'error')
                 return {
                     'success': False,
                     'mpd_product_id': None,
@@ -705,13 +830,15 @@ class BackgroundAutomation:
                     break
 
             if not mpd_product_id:
+                error_msg = 'Nie udało się pobrać ID produktu MPD'
+                self._log(error_msg, 'error')
                 return {
                     'success': False,
                     'mpd_product_id': None,
-                    'error_message': 'Nie udało się pobrać ID produktu MPD'
+                    'error_message': error_msg
                 }
 
-            logger.info(f"✅ Utworzono produkt MPD z ID: {mpd_product_id}")
+            self._log(f"✅ Utworzono produkt MPD z ID: {mpd_product_id}", 'success')
 
             return {
                 'success': True,
