@@ -1,0 +1,130 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}Uruchom automatyzację | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo; <a href="{% url 'admin:web_agent_automationrun_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; Uruchom automatyzację
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>🚀 Uruchom automatyzację</h1>
+
+<form method="post" id="run-automation-form">
+    {% csrf_token %}
+    
+    <fieldset class="module aligned">
+        <h2>Parametry automatyzacji</h2>
+        
+        <div class="form-row">
+            <div>
+                <label for="id_automation_type">Typ automatyzacji:</label>
+                <select name="automation_type" id="id_automation_type" required>
+                    <option value="background" selected>W tle (bez przeglądarki)</option>
+                    <option value="browser">Z przeglądarką (Selenium)</option>
+                </select>
+                <p class="help">Wybierz typ automatyzacji</p>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div>
+                <label for="id_brand_name">Marka:</label>
+                <select name="brand_name" id="id_brand_name">
+                    {% for value, label in brand_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <p class="help">Wybierz markę z listy (opcjonalne)</p>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div>
+                <label for="id_category_name">Kategoria:</label>
+                <select name="category_name" id="id_category_name">
+                    {% for value, label in category_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <p class="help">Wybierz kategorię z listy (opcjonalne)</p>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div>
+                <label for="id_active_filter">Filtr Active:</label>
+                <select name="active_filter" id="id_active_filter">
+                    <option value="">---------</option>
+                    <option value="true">Tak</option>
+                    <option value="false">Nie</option>
+                </select>
+                <p class="help">Filtruj produkty aktywne (opcjonalne)</p>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div>
+                <label for="id_is_mapped_filter">Filtr Is Mapped:</label>
+                <select name="is_mapped_filter" id="id_is_mapped_filter">
+                    <option value="">---------</option>
+                    <option value="true">Tak</option>
+                    <option value="false">Nie</option>
+                </select>
+                <p class="help">Filtruj produkty zmapowane do MPD (opcjonalne)</p>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div>
+                <label for="id_max_products">Maksymalna liczba produktów:</label>
+                <input type="number" name="max_products" id="id_max_products" value="1" min="1" max="100" required>
+                <p class="help">Ile produktów przetworzyć (1-100)</p>
+            </div>
+        </div>
+    </fieldset>
+    
+    <div class="submit-row">
+        <input type="submit" value="🚀 Uruchom automatyzację" class="default" name="_save">
+        <a href="{% url 'admin:web_agent_automationrun_changelist' %}" class="button">Anuluj</a>
+    </div>
+</form>
+
+<style>
+.form-row {
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.form-row label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.form-row select,
+.form-row input[type="number"] {
+    width: 100%;
+    max-width: 400px;
+    padding: 5px;
+}
+
+.form-row .help {
+    margin-top: 5px;
+    color: #666;
+    font-size: 12px;
+}
+
+.submit-row {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+</style>
+{% endblock %}
+
