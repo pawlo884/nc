@@ -16,6 +16,9 @@ class Attributes(models.Model):
         verbose_name = 'Attribute'
         verbose_name_plural = 'Attributes'
 
+    def __str__(self):
+        return str(self.name) if self.name else 'Brak nazwy'
+
 
 class Brands(models.Model):
     id = models.BigAutoField(primary_key=True)

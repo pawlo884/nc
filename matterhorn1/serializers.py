@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from datetime import datetime
 import json
+import copy
 
 # Import drf_spectacular tylko jeśli jest dostępny
 try:
@@ -21,6 +22,7 @@ from .models import (
     Product, Brand, Category, ProductDetails,
     ProductImage, ProductVariant, ApiSyncLog
 )
+from .defs_db import normalize_storage_key, resolve_image_url
 
 
 @extend_schema_serializer(
@@ -247,11 +249,15 @@ class ProductSerializer(serializers.ModelSerializer):
     # Pola zewnętrzne (do parsowania z API)
     brand_id = serializers.CharField(write_only=True, required=False)
     category_id = serializers.CharField(write_only=True, required=False)
+    # Mapowanie product_id (z API) na product_uid (w modelu)
+    # Używamy write_only=True, żeby akceptować product_id w danych wejściowych
+    product_id = serializers.IntegerField(write_only=True, required=False)
+    product_uid = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Product
         fields = [
-            'product_id', 'active', 'name', 'description', 'creation_date',
+            'product_id', 'product_uid', 'active', 'name', 'description', 'creation_date',
             'color', 'url', 'new_collection', 'products_in_set', 'other_colors',
             'prices', 'brand_id', 'category_id', 'details', 'images', 'variants'
         ]
@@ -332,6 +338,14 @@ class ProductSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "URL musi zaczynać się od http:// lub https://")
         return value
+
+    def to_internal_value(self, data):
+        """Map product_id from incoming data to product_uid for the model."""
+        # Skopiuj dane głęboko, żeby nie modyfikować oryginalnych
+        data = copy.deepcopy(data) if isinstance(data, dict) else data
+        if isinstance(data, dict) and 'product_id' in data:
+            data['product_uid'] = data.pop('product_id')
+        return super().to_internal_value(data)
 
     def create(self, validated_data):
         """Tworzenie produktu z relacjami"""
@@ -461,9 +475,15 @@ class BulkProductSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "Lista produktów nie może być pusta")
 
-        # Sprawdź unikalność product_id
-        product_ids = [product.get('product_id')
-                       for product in value if product.get('product_id')]
+        # Sprawdź unikalność product_id/product_uid
+        product_ids = []
+        for product in value:
+            # ProductSerializer mapuje product_id na product_uid w to_internal_value
+            # Więc sprawdzamy oba pola
+            product_id = product.get('product_id') or product.get('product_uid')
+            if product_id:
+                product_ids.append(product_id)
+        
         if len(product_ids) != len(set(product_ids)):
             raise serializers.ValidationError("Duplikaty w product_id")
 
