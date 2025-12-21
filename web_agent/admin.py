@@ -143,7 +143,7 @@ class AutomationRunAdmin(admin.ModelAdmin):
     ]
     list_filter = ['status', 'started_at', 'brand_id', 'category_id']
     search_fields = ['id', 'error_message']
-    readonly_fields = ['started_at', 'completed_at', 'run_automation_button']
+    readonly_fields = ['started_at', 'completed_at', 'run_automation_button', 'live_logs']
     date_hierarchy = 'started_at'
 
     fieldsets = (
@@ -158,6 +158,10 @@ class AutomationRunAdmin(admin.ModelAdmin):
             ),
             'description': 'Wybierz parametry dla automatyzacji'
         }),
+        ('Logi na żywo', {
+            'fields': ('live_logs',),
+            'description': 'Logi automatyzacji w czasie rzeczywistym (auto-refresh co 2 sekundy)'
+        }),
         ('Podstawowe informacje', {
             'fields': ('status', 'started_at', 'completed_at')
         }),
@@ -170,6 +174,10 @@ class AutomationRunAdmin(admin.ModelAdmin):
         }),
         ('Błędy', {
             'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+        ('Logi (surowy tekst)', {
+            'fields': ('logs',),
             'classes': ('collapse',)
         }),
     )
@@ -195,6 +203,81 @@ class AutomationRunAdmin(admin.ModelAdmin):
                 return f"ID: {obj.category_id}"
         return "-"
     get_category_name.short_description = 'Kategoria'
+
+    def live_logs(self, obj):
+        """Wyświetl logi na żywo z auto-refresh"""
+        if not obj.pk:
+            return "Zapisz najpierw, aby zobaczyć logi"
+        
+        log_url = f'/api/web-agent/automation-runs/{obj.pk}/automation-logs/'
+        return format_html(
+            '''
+            <div id="live-logs-container-{}" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
+                <div id="live-logs-content-{}">{}</div>
+                <div id="live-logs-status-{}" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #444; color: #888;">
+                    <span id="live-logs-status-text-{}">Ładowanie...</span>
+                </div>
+            </div>
+            <script>
+            (function() {{
+                var runId = {};
+                var container = document.getElementById('live-logs-container-{}');
+                var content = document.getElementById('live-logs-content-{}');
+                var statusText = document.getElementById('live-logs-status-text-{}');
+                var isRunning = true;
+                var lastLength = 0;
+                
+                function updateLogs() {{
+                    if (!isRunning) return;
+                    
+                    fetch('{}')
+                        .then(response => response.json())
+                        .then(data => {{
+                            if (data.logs) {{
+                                var newLogs = data.logs;
+                                if (newLogs.length !== lastLength) {{
+                                    content.textContent = newLogs;
+                                    container.scrollTop = container.scrollHeight;
+                                    lastLength = newLogs.length;
+                                }}
+                            }}
+                            
+                            statusText.innerHTML = 'Status: <strong>' + data.status + '</strong> | ' +
+                                'Przetworzono: ' + data.products_processed + ' | ' +
+                                'Sukces: <span style="color: #4caf50;">' + data.products_success + '</span> | ' +
+                                'Błędy: <span style="color: #f44336;">' + data.products_failed + '</span>';
+                            
+                            // Zatrzymaj auto-refresh jeśli status to completed lub failed
+                            if (data.status === 'completed' || data.status === 'failed') {{
+                                isRunning = false;
+                                statusText.innerHTML += ' <span style="color: #888;">(Zakończono)</span>';
+                            }}
+                        }})
+                        .catch(error => {{
+                            console.error('Błąd podczas pobierania logów:', error);
+                            statusText.textContent = 'Błąd podczas pobierania logów';
+                        }});
+                }}
+                
+                // Aktualizuj logi co 2 sekundy
+                updateLogs();
+                var interval = setInterval(updateLogs, 2000);
+                
+                // Zatrzymaj interval gdy strona jest ukryta
+                document.addEventListener('visibilitychange', function() {{
+                    if (document.hidden) {{
+                        clearInterval(interval);
+                    }} else {{
+                        interval = setInterval(updateLogs, 2000);
+                    }}
+                }});
+            }})();
+            </script>
+            ''',
+            obj.pk, obj.pk, obj.logs or 'Brak logów...', obj.pk, obj.pk,
+            obj.pk, obj.pk, obj.pk, obj.pk, log_url
+        )
+    live_logs.short_description = 'Logi na żywo'
 
     def run_automation_button(self, obj):
         """Przycisk do uruchomienia automatyzacji (tylko w widoku szczegółów)"""
@@ -308,6 +391,9 @@ class AutomationRunAdmin(admin.ModelAdmin):
                 command_args['is_mapped'] = is_mapped_filter
             if max_products:
                 command_args['max'] = int(max_products)
+            
+            # Przekaż run_id do management command (dla logowania)
+            command_args['run_id'] = automation_run.id
 
             # Uruchom komendę w tle
             def run_command():
@@ -405,6 +491,9 @@ class AutomationRunAdmin(admin.ModelAdmin):
                 command_args['is_mapped'] = is_mapped_filter
             if max_products:
                 command_args['max'] = int(max_products)
+            
+            # Przekaż run_id do management command (dla logowania)
+            command_args['run_id'] = automation_run.id
 
             # Uruchom komendę w tle
             def run_command():
@@ -434,7 +523,7 @@ class AutomationRunAdmin(admin.ModelAdmin):
                 f'Automatyzacja została uruchomiona w tle (typ: {automation_type}). '
                 f'Sprawdź status w AutomationRun #{automation_run.id}'
             )
-            return redirect('admin:web_agent_automationrun_changelist')
+            return redirect('admin:web_agent_automationrun_change', automation_run.id)
 
         # Pobierz dostępne marki i kategorie
         brands = Brand.objects.all().order_by('name')

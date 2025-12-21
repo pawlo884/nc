@@ -101,6 +101,20 @@ class AutomationRunViewSet(viewsets.ModelViewSet):
         
         serializer = ProductProcessingLogSerializer(logs, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'], url_path='automation-logs')
+    def get_automation_logs(self, request, pk=None):
+        """
+        Endpoint do pobrania logów automatyzacji w czasie rzeczywistym.
+        """
+        automation_run = self.get_object()
+        return Response({
+            'logs': automation_run.logs or '',
+            'status': automation_run.status,
+            'products_processed': automation_run.products_processed,
+            'products_success': automation_run.products_success,
+            'products_failed': automation_run.products_failed,
+        })
 
 
 class ProductProcessingLogViewSet(viewsets.ReadOnlyModelViewSet):
