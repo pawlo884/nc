@@ -493,14 +493,27 @@ class Command(BaseCommand):
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Błąd podczas ustawiania placeholder w polu series_name: {e_series}"))
 
-                        # KROK 11: Zaznacz ścieżkę produktu (Dwuczęściowe)
+                        # KROK 11: Zaznacz ścieżkę produktu
                         try:
                             self.stdout.write(
                                 "\n[INFO] KROK 11: Wybieranie ścieżki produktu...")
-                            # value="5" dla Dwuczęściowe
-                            browser.select_product_path(path_value="5")
-                            self.stdout.write(self.style.SUCCESS(
-                                "[OK] Wybrano ścieżkę produktu"))
+                            
+                            # Sprawdź czy to figi (użyj zapisanej oryginalnej nazwy)
+                            from web_agent.automation.ai_processor import is_figi_product
+                            is_figi = False
+                            if hasattr(browser, '_original_product_name') and browser._original_product_name:
+                                is_figi = is_figi_product(browser._original_product_name)
+                            
+                            if is_figi:
+                                # value="6" dla Figi | Stringi | Szorty
+                                browser.select_product_path(path_value="6")
+                                self.stdout.write(self.style.SUCCESS(
+                                    "[OK] Wybrano ścieżkę produktu: Figi | Stringi | Szorty"))
+                            else:
+                                # value="5" dla Dwuczęściowe
+                                browser.select_product_path(path_value="5")
+                                self.stdout.write(self.style.SUCCESS(
+                                    "[OK] Wybrano ścieżkę produktu: Dwuczęściowe"))
                         except Exception as e_path:
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Błąd podczas wyboru ścieżki produktu: {e_path}"))

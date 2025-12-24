@@ -1794,8 +1794,10 @@ class BrowserAutomation:
                 f"[INFO] Długość oryginalnego opisu: {len(current_description)} znaków")
             print("[INFO] Wysyłam żądanie do API...")
             print("[INFO] To może zająć do 30 sekund - proszę czekać...")
+            # Użyj zapisanej oryginalnej nazwy produktu jeśli dostępna
+            product_name = getattr(self, '_original_product_name', None)
             enhanced_description = ai_processor.enhance_product_description(
-                current_description)
+                current_description, product_name=product_name)
             print("[INFO] ========================================")
             print(
                 f"[INFO] Opis został ulepszony! Nowa długość: {len(enhanced_description)} znaków")

@@ -19,14 +19,47 @@ if sys.stdout.encoding is None or sys.stdout.encoding.lower() != 'utf-8':
 logger = logging.getLogger(__name__)
 
 
+def is_figi_product(product_name: str) -> bool:
+    """
+    Sprawdza czy produkt to figi kąpielowe na podstawie nazwy.
+    
+    Args:
+        product_name: Nazwa produktu
+        
+    Returns:
+        True jeśli produkt to figi kąpielowe
+    """
+    if not product_name:
+        return False
+    
+    name_lower = product_name.lower()
+    # Sprawdź czy nazwa zawiera "figi" (ale nie "figi kąpielowe" jako część kostiumu)
+    figi_keywords = ['figi', 'figi kąpielowe', 'figi kapielowe']
+    
+    # Jeśli nazwa zawiera "figi" i nie zawiera "kostium" ani "dwuczęściowy"
+    if any(keyword in name_lower for keyword in figi_keywords):
+        # Upewnij się, że to nie jest kostium dwuczęściowy z figami
+        if 'kostium' not in name_lower and 'dwuczęściowy' not in name_lower:
+            return True
+        # Jeśli zawiera "figi" ale też "kostium", sprawdź kontekst
+        if 'figi' in name_lower and 'kostium' in name_lower:
+            # Jeśli "figi" pojawia się przed "kostium" lub jest głównym słowem
+            figi_index = name_lower.find('figi')
+            kostium_index = name_lower.find('kostium')
+            if figi_index < kostium_index or figi_index != -1:
+                return True
+    
+    return False
+
+
 class ProductNameStructure(BaseModel):
     """
     Struktura nazwy produktu zapewniająca spójność i profesjonalizm.
-    Format: "Kostium kąpielowy [nazwa_modelu]"
+    Format: "Kostium kąpielowy [nazwa_modelu]" lub "Figi kąpielowe [nazwa_modelu]"
     """
     base_type: str = Field(
         ...,
-        description="Podstawowy typ produktu - zawsze 'Kostium kąpielowy'",
+        description="Podstawowy typ produktu - 'Kostium kąpielowy' lub 'Figi kąpielowe'",
         min_length=3,
         max_length=50
     )
@@ -45,11 +78,11 @@ class ProductNameStructure(BaseModel):
 
     def to_final_name(self) -> str:
         """
-        Zwraca finalną nazwę produktu w formacie 'Kostium kąpielowy [nazwa_modelu]'.
+        Zwraca finalną nazwę produktu w formacie 'Kostium kąpielowy [nazwa_modelu]' lub 'Figi kąpielowe [nazwa_modelu]'.
         Zawsze buduje z base_type i model_name, ignorując final_name z JSON.
         """
-        # Zawsze buduj z base_type i model_name
-        base = "Kostium kąpielowy"  # Zawsze "Kostium kąpielowy"
+        # Użyj base_type zamiast hardcoded "Kostium kąpielowy"
+        base = self.base_type
         if self.model_name and self.model_name.strip():
             return f"{base} {self.model_name.strip()}".strip()
         return base
@@ -65,8 +98,11 @@ class ProductNameStructure(BaseModel):
     @field_validator('base_type')
     @classmethod
     def validate_base_type(cls, v: str) -> str:
-        """Walidacja base_type - zawsze zwraca 'Kostium kąpielowy'"""
-        # Zawsze zwracaj "Kostium kąpielowy" niezależnie od inputu
+        """Walidacja base_type - zwraca 'Kostium kąpielowy' lub 'Figi kąpielowe'"""
+        # Normalizuj do dozwolonych wartości
+        v_lower = v.lower().strip()
+        if 'figi' in v_lower:
+            return "Figi kąpielowe"
         return "Kostium kąpielowy"
 
 
@@ -81,9 +117,9 @@ class ProductDescriptionStructure(BaseModel):
         max_length=200
     )
     top_features: List[str] = Field(
-        ...,
-        description="Lista cech góry (biustonosz) - każda cecha jako osobny string",
-        min_length=1,
+        default=[],
+        description="Lista cech góry (biustonosz) - każda cecha jako osobny string. Dla fig kąpielowych może być pusta lista [].",
+        min_length=0,
         max_length=10
     )
     bottom_features: List[str] = Field(
@@ -114,14 +150,24 @@ class ProductDescriptionStructure(BaseModel):
     def to_formatted_text(self) -> str:
         """
         Konwertuje strukturę na sformatowany tekst opisu produktu.
+        Dla fig kąpielowych pomija sekcję "Góra (biustonosz)".
         """
-        lines = [
-            self.introduction,
-            "",
-            "Góra (biustonosz)",
-            "",
-            *[f"{feature}" for feature in self.top_features],
-            "",
+        lines = [self.introduction, ""]
+        
+        # Dodaj sekcję "Góra" tylko jeśli top_features nie jest puste i nie zawiera tylko "brak góry"
+        has_top = self.top_features and len(self.top_features) > 0
+        is_only_brak_gory = has_top and len(self.top_features) == 1 and self.top_features[0].lower().strip() == "brak góry"
+        
+        if has_top and not is_only_brak_gory:
+            lines.extend([
+                "Góra (biustonosz)",
+                "",
+                *[f"{feature}" for feature in self.top_features],
+                ""
+            ])
+        
+        # Zawsze dodaj sekcję "Dół"
+        lines.extend([
             "Dół (figi)",
             "",
             *[f"{feature}" for feature in self.bottom_features],
@@ -136,7 +182,7 @@ class ProductDescriptionStructure(BaseModel):
             "",
             "Wskazówka rozmiarowa",
             self.size_tip
-        ]
+        ])
         return "\n".join(lines)
 
     @field_validator('introduction', 'finishing', 'packaging', 'size_tip')
@@ -214,12 +260,13 @@ class AIProcessor:
         else:
             return 'openai'
 
-    def enhance_product_description(self, original_description: str, use_structured: bool = True) -> str:
+    def enhance_product_description(self, original_description: str, product_name: str = None, use_structured: bool = True) -> str:
         """
         Ulepsza opis produktu przez AI z użyciem strukturyzowanej formy (Pydantic).
 
         Args:
             original_description: Oryginalny opis produktu
+            product_name: Nazwa produktu (opcjonalne, używane do wykrywania typu produktu)
             use_structured: Czy używać strukturyzowanej formy (Pydantic). Domyślnie True.
 
         Returns:
@@ -230,7 +277,7 @@ class AIProcessor:
 
         try:
             if use_structured:
-                return self._enhance_with_structure(original_description)
+                return self._enhance_with_structure(original_description, product_name)
             else:
                 return self._enhance_legacy(original_description)
         except Exception as e:
@@ -286,13 +333,51 @@ class AIProcessor:
 
         return truncated_data
 
-    def _enhance_with_structure(self, original_description: str) -> str:
+    def _enhance_with_structure(self, original_description: str, product_name: str = None) -> str:
         """
         Ulepsza opis produktu używając strukturyzowanej formy (Pydantic).
         """
         import json
 
-        system_prompt = """Jesteś ekspertem od copywritingu e-commerce specjalizującym się w bieliźnie i kostiumach kąpielowych.
+        # Sprawdź czy to figi kąpielowe
+        is_figi = False
+        if product_name:
+            is_figi = is_figi_product(product_name)
+
+        # Dostosuj prompt w zależności od typu produktu
+        if is_figi:
+            product_type_instruction = "To są FIGI KĄPIELOWE - produkt składa się TYLKO z dołu (figi), NIE MA góry (biustonosza). NIE generuj sekcji 'Góra (biustonosz)' - produkt to tylko figi."
+            top_features_instruction = "top_features: NIE UŻYWAJ - produkt to tylko figi, nie ma góry. Ustaw jako pustą listę []."
+        else:
+            product_type_instruction = "To jest KOSTIUM KĄPIELOWY - produkt składa się z góry (biustonosz) i dołu (figi)."
+            top_features_instruction = "top_features: Lista cech góry (biustonosz) - WYMAGANE MINIMUM 1 cecha! Każda cecha jako osobny string w formacie \"cecha – elegancki opis korzyści\" (np. \"usztywniane miseczki z dolnymi fiszbinami – zapewniają stabilne podtrzymanie i pięknie modelują biust\"). Max 10 cech, każda max 300 znaków. Jeśli produkt nie ma góry, użyj [\"brak góry\"]."
+
+        system_prompt = f"""Jesteś ekspertem od copywritingu e-commerce specjalizującym się w bieliźnie i kostiumach kąpielowych.
+
+{product_type_instruction}
+
+TWOJE ZADANIE:
+Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. Podziel opis na sekcje: {"\"Dół\", \"Wykończenie\", \"Pakowanie\" oraz \"Wskazówka rozmiarowa\" (BEZ sekcji \"Góra\")" if is_figi else "\"Góra\", \"Dół\", \"Wykończenie\", \"Pakowanie\" oraz \"Wskazówka rozmiarowa\""}. Dodaj konkretne wskazówki dla klienta, aby łatwiej wybrał rozmiar i używał produktu.
+
+WYTYCZNE:
+
+1. STYL I TON:
+- Elegancki, kobiecy, zmysłowy
+- Profesjonalny, ale przyjazny i zachęcający
+- Skup się na korzyściach dla klientki
+- Używaj języka, który buduje emocjonalny związek z produktem
+- Podkreślaj wyjątkowość i jakość
+
+2. STRUKTURA (JSON) - WAŻNE: PRZESTRZEGAJ DOKŁADNIE LIMITÓW ZNAKÓW:
+- introduction: Krótkie, przyciągające wprowadzenie (jedno zdanie) opisujące produkt w elegancki sposób - MAKSYMALNIE 200 znaków!
+- {top_features_instruction}
+- bottom_features: Lista cech dołu (figi) - WYMAGANE MINIMUM 1 cecha! Każda cecha jako osobny string w formacie "cecha – elegancki opis korzyści" (np. "krój midi – wygodnie układa się na biodrach, subtelnie podkreślając kobiece kształty"). Max 10 cech, każda max 300 znaków. Jeśli produkt nie ma dołu, użyj ["brak dołu"].
+- finishing: Elegancki opis wykończenia i zdobień, podkreślający luksusowy charakter (50-300 znaków, MAKSYMALNIE 300 znaków!)
+- packaging: Opis pakowania produktu z naciskiem na praktyczność i wygodę (30-200 znaków, MAKSYMALNIE 200 znaków!)
+- size_tip: Konkretne wskazówki rozmiarowe dla klienta, aby łatwiej wybrał rozmiar (30-200 znaków, MAKSYMALNIE 200 znaków!)
+
+UWAGA: Jeśli przekroczysz limity znaków, odpowiedź zostanie odrzucona. Bądź zwięzły, ale elegancki!
+UWAGA: {"bottom_features MUSI zawierać przynajmniej 1 element - nie może być pustą listą!" if is_figi else "top_features i bottom_features MUSZĄ zawierać przynajmniej 1 element - nie mogą być pustymi listami!"}
 
 TWOJE ZADANIE:
 Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. Podziel opis na sekcje: „Góra”, „Dół”, „Wykończenie”, „Pakowanie” oraz „Wskazówka rozmiarowa”. Dodaj konkretne wskazówki dla klienta, aby łatwiej wybrał rozmiar i używał produktu.
@@ -373,7 +458,10 @@ UWAGA: top_features i bottom_features MUSZĄ zawierać przynajmniej 1 element - 
 
 ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
-        user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: Wyodrębnij WSZYSTKIE cechy góry (biustonosz) do top_features i WSZYSTKIE cechy dołu (figi) do bottom_features. Każda lista MUSI zawierać przynajmniej 1 element. Jeśli nie ma informacji o górze/dole, użyj odpowiednio [\"brak góry\"] lub [\"brak dołu\"]. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
+        if is_figi:
+            user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: To są FIGI KĄPIELOWE - produkt składa się TYLKO z dołu (figi), NIE MA góry. Ustaw top_features jako pustą listę []. Wyodrębnij WSZYSTKIE cechy dołu (figi) do bottom_features. bottom_features MUSI zawierać przynajmniej 1 element. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
+        else:
+            user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: Wyodrębnij WSZYSTKIE cechy góry (biustonosz) do top_features i WSZYSTKIE cechy dołu (figi) do bottom_features. Każda lista MUSI zawierać przynajmniej 1 element. Jeśli nie ma informacji o górze/dole, użyj odpowiednio [\"brak góry\"] lub [\"brak dołu\"]. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
 
         # Próba użycia structured output (jeśli dostępne)
         try:
@@ -1022,7 +1110,21 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
         """
         import json
 
-        system_prompt = """Jesteś ekspertem od nazewnictwa produktów tekstylnych i modowych.
+        # Sprawdź czy to figi
+        is_figi = is_figi_product(original_name)
+        
+        if is_figi:
+            base_type = "Figi kąpielowe"
+            example_format = "Figi kąpielowe [model_name]"
+            example_input = "Figi kąpielowe Model Ada M-803 (1) Lilia - Marko"
+            example_output = '{"base_type": "Figi kąpielowe", "model_name": "Ada", "final_name": "Figi kąpielowe Ada"}'
+        else:
+            base_type = "Kostium kąpielowy"
+            example_format = "Kostium kąpielowy [model_name]"
+            example_input = "Kostium dwuczęściowy Kostium kąpielowy Model Ada M-803 (1) Lilia - Marko"
+            example_output = '{"base_type": "Kostium kąpielowy", "model_name": "Ada", "final_name": "Kostium kąpielowy Ada"}'
+
+        system_prompt = f"""Jesteś ekspertem od nazewnictwa produktów tekstylnych i modowych.
 
 TWOJE ZADANIE:
 Przekształć podaną nazwę produktu w profesjonalną nazwę dla sklepu online.
@@ -1030,23 +1132,20 @@ Przekształć podaną nazwę produktu w profesjonalną nazwę dla sklepu online.
 WYTYCZNE:
 
 1. STRUKTURA (JSON) - WAŻNE: PRZESTRZEGAJ DOKŁADNIE LIMITÓW ZNAKÓW:
-- base_type: ZAWSZE "Kostium kąpielowy" (nie zmieniaj tego!)
+- base_type: "{base_type}" (nie zmieniaj tego!)
 - model_name: Nazwa modelu (np. 'Ada', 'Lupo', 'Elegant') - WYMAGANE, 1-30 znaków
-- final_name: Finalna nazwa w formacie "Kostium kąpielowy [model_name]" - 5-100 znaków, MAKSYMALNIE 100 znaków!
+- final_name: Finalna nazwa w formacie "{example_format}" - 5-100 znaków, MAKSYMALNIE 100 znaków!
 
 2. FORMAT FINALNEJ NAZWY:
-- Format: "Kostium kąpielowy [model_name]" (np. "Kostium kąpielowy Ada")
-- ZAWSZE zaczynaj od "Kostium kąpielowy"
+- Format: "{example_format}" (np. "{example_format.replace('[model_name]', 'Ada')}")
+- ZAWSZE zaczynaj od "{base_type}"
 - NIE dodawaj koloru, kodu produktu, numerów w nawiasach, marki
-- NIE dodawaj niczego poza "Kostium kąpielowy" i nazwą modelu
+- NIE dodawaj niczego poza "{base_type}" i nazwą modelu
 - Używaj wielkich liter tylko na początku wyrazów (Title Case)
 
 3. PRZYKŁADY:
-- Input: "Kostium dwuczęściowy Kostium kąpielowy Model Ada M-803 (1) Lilia - Marko"
-- Output: {"base_type": "Kostium kąpielowy", "model_name": "Ada", "final_name": "Kostium kąpielowy Ada"}
-
-- Input: "Kostium kąpielowy Model Elegant Czarny"
-- Output: {"base_type": "Kostium kąpielowy", "model_name": "Elegant", "final_name": "Kostium kąpielowy Elegant"}
+- Input: "{example_input}"
+- Output: {example_output}
 
 4. CZEGO UNIKAĆ:
 - Kodów modeli (M-803, M-123)
@@ -1332,11 +1431,15 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
             raise ValueError(
                 f"Nie udało się wyodrębnić nazwy modelu z nazwy produktu: '{original_name}'")
 
+        # Sprawdź czy to figi
+        is_figi = is_figi_product(original_name)
+        base_type = "Figi kąpielowe" if is_figi else "Kostium kąpielowy"
+        
         # Zbuduj strukturę zgodnie z ProductNameStructure
         data = {
-            "base_type": "Kostium kąpielowy",
+            "base_type": base_type,
             "model_name": model_name,
-            "final_name": f"Kostium kąpielowy {model_name}",
+            "final_name": f"{base_type} {model_name}",
         }
 
         name_structure = ProductNameStructure(**data)
@@ -1923,16 +2026,36 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
             "Jesteś ekspertem w ekstrakcji cech produktu tekstylnego. "
             "Wyodrębnij atrybuty kostiumu kąpielowego z poniższego opisu, "
             "zwracając wynik wyłącznie w formacie JSON. "
-            "Wybierz tylko atrybuty, które rzeczywiście występują w opisie produktu."
+            "WAŻNE: Wybierz TYLKO atrybuty, które są BEZPOŚREDNIO i WYRAŹNIE wspomniane w opisie produktu. "
+            "NIE wybieraj atrybutów na podstawie domysłów, interpretacji lub podobieństwa słów. "
+            "NIE wybieraj atrybutów, które mogą być tylko implikowane - muszą być wyraźnie wspomniane. "
+            "NIE myl PRZECIWNYCH atrybutów - \"wysoki stan\" to NIE \"niski stan\"!"
         )
 
         user_prompt = (
             f"Opis produktu: {description}\n\n"
             f"Dostępne atrybuty do wyboru: {available_attrs_text}\n\n"
-            "Wyodrębnij listę kluczowych atrybutów, które pasują do opisu produktu. "
-            "Zwróć wynik w formacie JSON: {\"attributes\": [\"nazwa atrybutu 1\", \"nazwa atrybutu 2\", ...]}. "
+            "Wyodrębnij listę kluczowych atrybutów, które są BEZPOŚREDNIO i WYRAŹNIE wspomniane w opisie produktu. "
+            "Zwróć wynik w formacie JSON: {{\"attributes\": [\"nazwa atrybutu 1\", \"nazwa atrybutu 2\", ...]}}. "
             "Używaj dokładnie takich nazw atrybutów, jakie są w liście dostępnych atrybutów. "
-            "Wybierz tylko te atrybuty, które rzeczywiście są wspomniane w opisie produktu."
+            "\n"
+            "KRYTYCZNE ZASADY - PRZECZYTAJ UWAŻNIE:\n"
+            "1. \"WYSOKI STAN\" i \"NISKI STAN\" to PRZECIWNE atrybuty:\n"
+            "   - Jeśli w opisie jest \"wysoki stan\" lub \"wysokie figi\" - NIE wybieraj \"niski stan\"!\n"
+            "   - Jeśli w opisie jest \"niski stan\" lub \"niskie figi\" - wybierz \"niski stan\"\n"
+            "   - Jeśli w opisie jest \"wysoki stan\" - NIE wybieraj \"niski stan\" (to są PRZECIWNE rzeczy!)\n"
+            "\n"
+            "2. Inne przykłady:\n"
+            "   - Jeśli w opisie jest \"krój midi\" - NIE wybieraj \"niski stan\" (to są różne rzeczy)\n"
+            "   - Jeśli w opisie jest \"gładkie\" - wybierz \"gładkie\"\n"
+            "   - Jeśli w opisie jest \"bezszwowe\" - wybierz \"bezszwowe\"\n"
+            "\n"
+            "3. OGÓLNA ZASADA:\n"
+            "   - Wybierz TYLKO atrybuty, które są WYRAŹNIE i BEZPOŚREDNIO wspomniane w tekście\n"
+            "   - NIE wybieraj atrybutów na podstawie domysłów lub podobieństwa\n"
+            "   - NIE myl przeciwnych atrybutów (wysoki ≠ niski)\n"
+            "\n"
+            "Wybierz tylko te atrybuty, które rzeczywiście są WYRAŹNIE wspomniane w opisie produktu."
         )
 
         # Określ model OpenAI

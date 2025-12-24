@@ -269,18 +269,19 @@ class BackgroundAutomation:
             logger.error(f"Błąd podczas ulepszania nazwy: {e}")
             return original_name
 
-    def enhance_product_description(self, description: str) -> str:
+    def enhance_product_description(self, description: str, product_name: str = None) -> str:
         """
         Ulepsza opis produktu przez AI.
 
         Args:
             description: Oryginalny opis produktu
+            product_name: Nazwa produktu (opcjonalne, używane do wykrywania typu produktu)
 
         Returns:
             Ulepszony opis produktu
         """
         try:
-            enhanced_description = self.ai_processor.enhance_product_description(description)
+            enhanced_description = self.ai_processor.enhance_product_description(description, product_name=product_name)
             if not enhanced_description:
                 return description
             return enhanced_description
@@ -671,7 +672,7 @@ class BackgroundAutomation:
             # KROK 2: Ulepsz opis produktu
             self._log(f"\n[INFO] KROK 2: Edycja opisu produktu...")
             original_description = product_data.get('description', '')
-            enhanced_description = self.enhance_product_description(original_description)
+            enhanced_description = self.enhance_product_description(original_description, product_name=original_name)
             if enhanced_description:
                 self._log(f"Ulepszony opis (długość: {len(enhanced_description)} znaków)", 'success')
             else:
@@ -762,8 +763,16 @@ class BackgroundAutomation:
             # KROK 10: Series name (placeholder - puste)
             series_name = ""
 
-            # KROK 11: Ścieżka produktu (domyślnie "5" dla Dwuczęściowe)
-            path_ids = ["5"]
+            # KROK 11: Ścieżka produktu
+            # Sprawdź czy to figi kąpielowe
+            from web_agent.automation.ai_processor import is_figi_product
+            is_figi = is_figi_product(original_name)
+            if is_figi:
+                path_ids = ["6"]  # Figi | Stringi | Szorty
+                self._log(f"Wykryto figi kąpielowe - ustawiam ścieżkę: Figi | Stringi | Szorty (value=6)", 'info')
+            else:
+                path_ids = ["5"]  # Dwuczęściowe
+                self._log(f"Kostium dwuczęściowy - ustawiam ścieżkę: Dwuczęściowe (value=5)", 'info')
 
             # KROK 12: Jednostka (domyślnie "0" dla szt.)
             unit_id = 0
