@@ -22,20 +22,20 @@ logger = logging.getLogger(__name__)
 def is_figi_product(product_name: str) -> bool:
     """
     Sprawdza czy produkt to figi kąpielowe na podstawie nazwy.
-    
+
     Args:
         product_name: Nazwa produktu
-        
+
     Returns:
         True jeśli produkt to figi kąpielowe
     """
     if not product_name:
         return False
-    
+
     name_lower = product_name.lower()
     # Sprawdź czy nazwa zawiera "figi" (ale nie "figi kąpielowe" jako część kostiumu)
     figi_keywords = ['figi', 'figi kąpielowe', 'figi kapielowe']
-    
+
     # Jeśli nazwa zawiera "figi" i nie zawiera "kostium" ani "dwuczęściowy"
     if any(keyword in name_lower for keyword in figi_keywords):
         # Upewnij się, że to nie jest kostium dwuczęściowy z figami
@@ -48,8 +48,75 @@ def is_figi_product(product_name: str) -> bool:
             kostium_index = name_lower.find('kostium')
             if figi_index < kostium_index or figi_index != -1:
                 return True
-    
+
     return False
+
+
+def get_product_config(brand_config, category_name: str = None, product_name: str = None) -> Dict:
+    """
+    Pobiera konfigurację produktu na podstawie marki, kategorii i nazwy produktu.
+
+    Args:
+        brand_config: BrandConfig obiekt (może być None)
+        category_name: Nazwa kategorii produktu (opcjonalne)
+        product_name: Nazwa produktu (opcjonalne, dla wykrywania fig w kategorii)
+
+    Returns:
+        Słownik z konfiguracją: {
+            "path_value": str,
+            "base_type": str,
+            "has_top": bool,
+            "description_sections": list
+        }
+    """
+    # Domyślna konfiguracja dla kostiumów dwuczęściowych
+    default_config = {
+        "path_value": "5",
+        "base_type": "Kostium kąpielowy",
+        "has_top": True,
+        "description_sections": ["Góra", "Dół", "Wykończenie", "Pakowanie", "Wskazówka rozmiarowa"]
+    }
+
+    # Sprawdź czy to figi (nawet jeśli w innej kategorii)
+    if product_name and is_figi_product(product_name):
+        # Sprawdź czy jest konfiguracja dla fig
+        if brand_config and brand_config.category_config and "Figi kąpielowe" in brand_config.category_config:
+            figi_config = brand_config.category_config["Figi kąpielowe"].copy()
+            figi_config["has_top"] = False
+            if "description_sections" not in figi_config:
+                figi_config["description_sections"] = [
+                    "Dół", "Wykończenie", "Pakowanie", "Wskazówka rozmiarowa"]
+            return figi_config
+        # Fallback dla fig bez konfiguracji
+        return {
+            "path_value": "6",
+            "base_type": "Figi kąpielowe",
+            "has_top": False,
+            "description_sections": ["Dół", "Wykończenie", "Pakowanie", "Wskazówka rozmiarowa"]
+        }
+
+    # Sprawdź konfigurację dla kategorii
+    if brand_config and brand_config.category_config and category_name:
+        if category_name in brand_config.category_config:
+            category_config = brand_config.category_config[category_name].copy(
+            )
+            # Uzupełnij brakujące pola domyślnymi wartościami
+            if "path_value" not in category_config:
+                category_config["path_value"] = default_config["path_value"]
+            if "base_type" not in category_config:
+                category_config["base_type"] = default_config["base_type"]
+            if "has_top" not in category_config:
+                category_config["has_top"] = default_config["has_top"]
+            if "description_sections" not in category_config:
+                if category_config.get("has_top", True):
+                    category_config["description_sections"] = default_config["description_sections"]
+                else:
+                    category_config["description_sections"] = [
+                        "Dół", "Wykończenie", "Pakowanie", "Wskazówka rozmiarowa"]
+            return category_config
+
+    # Fallback - domyślna konfiguracja
+    return default_config
 
 
 class ProductNameStructure(BaseModel):
@@ -153,11 +220,12 @@ class ProductDescriptionStructure(BaseModel):
         Dla fig kąpielowych pomija sekcję "Góra (biustonosz)".
         """
         lines = [self.introduction, ""]
-        
+
         # Dodaj sekcję "Góra" tylko jeśli top_features nie jest puste i nie zawiera tylko "brak góry"
         has_top = self.top_features and len(self.top_features) > 0
-        is_only_brak_gory = has_top and len(self.top_features) == 1 and self.top_features[0].lower().strip() == "brak góry"
-        
+        is_only_brak_gory = has_top and len(
+            self.top_features) == 1 and self.top_features[0].lower().strip() == "brak góry"
+
         if has_top and not is_only_brak_gory:
             lines.extend([
                 "Góra (biustonosz)",
@@ -165,7 +233,7 @@ class ProductDescriptionStructure(BaseModel):
                 *[f"{feature}" for feature in self.top_features],
                 ""
             ])
-        
+
         # Zawsze dodaj sekcję "Dół"
         lines.extend([
             "Dół (figi)",
@@ -260,13 +328,14 @@ class AIProcessor:
         else:
             return 'openai'
 
-    def enhance_product_description(self, original_description: str, product_name: str = None, use_structured: bool = True) -> str:
+    def enhance_product_description(self, original_description: str, product_name: str = None, product_config: Dict = None, use_structured: bool = True) -> str:
         """
         Ulepsza opis produktu przez AI z użyciem strukturyzowanej formy (Pydantic).
 
         Args:
             original_description: Oryginalny opis produktu
             product_name: Nazwa produktu (opcjonalne, używane do wykrywania typu produktu)
+            product_config: Konfiguracja produktu (opcjonalne)
             use_structured: Czy używać strukturyzowanej formy (Pydantic). Domyślnie True.
 
         Returns:
@@ -277,7 +346,7 @@ class AIProcessor:
 
         try:
             if use_structured:
-                return self._enhance_with_structure(original_description, product_name)
+                return self._enhance_with_structure(original_description, product_name, product_config)
             else:
                 return self._enhance_legacy(original_description)
         except Exception as e:
@@ -333,19 +402,32 @@ class AIProcessor:
 
         return truncated_data
 
-    def _enhance_with_structure(self, original_description: str, product_name: str = None) -> str:
+    def _enhance_with_structure(self, original_description: str, product_name: str = None, product_config: Dict = None) -> str:
         """
         Ulepsza opis produktu używając strukturyzowanej formy (Pydantic).
+
+        Args:
+            original_description: Oryginalny opis produktu
+            product_name: Nazwa produktu (opcjonalne)
+            product_config: Konfiguracja produktu (opcjonalne)
         """
         import json
 
-        # Sprawdź czy to figi kąpielowe
-        is_figi = False
-        if product_name:
-            is_figi = is_figi_product(product_name)
+        # Jeśli nie podano konfiguracji, użyj wykrywania
+        if not product_config:
+            is_figi = False
+            if product_name:
+                is_figi = is_figi_product(product_name)
+            has_top = not is_figi
+            description_sections = ["Dół", "Wykończenie", "Pakowanie", "Wskazówka rozmiarowa"] if is_figi else [
+                "Góra", "Dół", "Wykończenie", "Pakowanie", "Wskazówka rozmiarowa"]
+        else:
+            has_top = product_config.get("has_top", True)
+            description_sections = product_config.get("description_sections", [
+                                                      "Góra", "Dół", "Wykończenie", "Pakowanie", "Wskazówka rozmiarowa"])
 
-        # Dostosuj prompt w zależności od typu produktu
-        if is_figi:
+        # Dostosuj prompt w zależności od konfiguracji
+        if not has_top:
             product_type_instruction = "To są FIGI KĄPIELOWE - produkt składa się TYLKO z dołu (figi), NIE MA góry (biustonosza). NIE generuj sekcji 'Góra (biustonosz)' - produkt to tylko figi."
             top_features_instruction = "top_features: NIE UŻYWAJ - produkt to tylko figi, nie ma góry. Ustaw jako pustą listę []."
         else:
@@ -357,7 +439,7 @@ class AIProcessor:
 {product_type_instruction}
 
 TWOJE ZADANIE:
-Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. Podziel opis na sekcje: {"\"Dół\", \"Wykończenie\", \"Pakowanie\" oraz \"Wskazówka rozmiarowa\" (BEZ sekcji \"Góra\")" if is_figi else "\"Góra\", \"Dół\", \"Wykończenie\", \"Pakowanie\" oraz \"Wskazówka rozmiarowa\""}. Dodaj konkretne wskazówki dla klienta, aby łatwiej wybrał rozmiar i używał produktu.
+Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. Podziel opis na sekcje: {", ".join([f'"{s}"' for s in description_sections])}. Dodaj konkretne wskazówki dla klienta, aby łatwiej wybrał rozmiar i używał produktu.
 
 WYTYCZNE:
 
@@ -377,7 +459,7 @@ WYTYCZNE:
 - size_tip: Konkretne wskazówki rozmiarowe dla klienta, aby łatwiej wybrał rozmiar (30-200 znaków, MAKSYMALNIE 200 znaków!)
 
 UWAGA: Jeśli przekroczysz limity znaków, odpowiedź zostanie odrzucona. Bądź zwięzły, ale elegancki!
-UWAGA: {"bottom_features MUSI zawierać przynajmniej 1 element - nie może być pustą listą!" if is_figi else "top_features i bottom_features MUSZĄ zawierać przynajmniej 1 element - nie mogą być pustymi listami!"}
+UWAGA: {"bottom_features MUSI zawierać przynajmniej 1 element - nie może być pustą listą!" if not has_top else "top_features i bottom_features MUSZĄ zawierać przynajmniej 1 element - nie mogą być pustymi listami!"}
 
 TWOJE ZADANIE:
 Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. Podziel opis na sekcje: „Góra”, „Dół”, „Wykończenie”, „Pakowanie” oraz „Wskazówka rozmiarowa”. Dodaj konkretne wskazówki dla klienta, aby łatwiej wybrał rozmiar i używał produktu.
@@ -458,7 +540,7 @@ UWAGA: top_features i bottom_features MUSZĄ zawierać przynajmniej 1 element - 
 
 ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
-        if is_figi:
+        if not has_top:
             user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: To są FIGI KĄPIELOWE - produkt składa się TYLKO z dołu (figi), NIE MA góry. Ustaw top_features jako pustą listę []. Wyodrębnij WSZYSTKIE cechy dołu (figi) do bottom_features. bottom_features MUSI zawierać przynajmniej 1 element. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
         else:
             user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: Wyodrębnij WSZYSTKIE cechy góry (biustonosz) do top_features i WSZYSTKIE cechy dołu (figi) do bottom_features. Każda lista MUSI zawierać przynajmniej 1 element. Jeśli nie ma informacji o górze/dole, użyj odpowiednio [\"brak góry\"] lub [\"brak dołu\"]. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
@@ -1070,12 +1152,13 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
             traceback.print_exc()
             return original_description
 
-    def enhance_product_name(self, original_name: str, use_structured: bool = True) -> str:
+    def enhance_product_name(self, original_name: str, product_config: Dict = None, use_structured: bool = True) -> str:
         """
         Ulepsza nazwę produktu przez AI używając struktury Pydantic.
 
         Args:
             original_name: Oryginalna nazwa produktu
+            product_config: Konfiguracja produktu (opcjonalne)
             use_structured: Czy używać strukturyzowanej formy (Pydantic). Domyślnie True.
 
         Returns:
@@ -1089,7 +1172,7 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
         if use_structured:
             try:
-                return self._enhance_name_with_structure(original_name)
+                return self._enhance_name_with_structure(original_name, product_config)
             except Exception as e:
                 logger.error(
                     f"Błąd podczas strukturyzowanego ulepszania nazwy: {e}")
@@ -1104,25 +1187,26 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
                 raise Exception(
                     f"Nie udało się ulepszyć nazwy produktu: {e}") from e
 
-    def _enhance_name_with_structure(self, original_name: str) -> str:
+    def _enhance_name_with_structure(self, original_name: str, product_config: Dict = None) -> str:
         """
         Ulepsza nazwę produktu używając strukturyzowanej formy (Pydantic).
+
+        Args:
+            original_name: Oryginalna nazwa produktu
+            product_config: Konfiguracja produktu (opcjonalne)
         """
         import json
 
-        # Sprawdź czy to figi
-        is_figi = is_figi_product(original_name)
-        
-        if is_figi:
-            base_type = "Figi kąpielowe"
-            example_format = "Figi kąpielowe [model_name]"
-            example_input = "Figi kąpielowe Model Ada M-803 (1) Lilia - Marko"
-            example_output = '{"base_type": "Figi kąpielowe", "model_name": "Ada", "final_name": "Figi kąpielowe Ada"}'
+        # Jeśli nie podano konfiguracji, użyj domyślnej
+        if not product_config:
+            is_figi = is_figi_product(original_name)
+            base_type = "Figi kąpielowe" if is_figi else "Kostium kąpielowy"
         else:
-            base_type = "Kostium kąpielowy"
-            example_format = "Kostium kąpielowy [model_name]"
-            example_input = "Kostium dwuczęściowy Kostium kąpielowy Model Ada M-803 (1) Lilia - Marko"
-            example_output = '{"base_type": "Kostium kąpielowy", "model_name": "Ada", "final_name": "Kostium kąpielowy Ada"}'
+            base_type = product_config.get("base_type", "Kostium kąpielowy")
+
+        example_format = f"{base_type} [model_name]"
+        example_input = f"{base_type} Model Ada M-803 (1) Lilia - Marko"
+        example_output = f'{{"base_type": "{base_type}", "model_name": "Ada", "final_name": "{base_type} Ada"}}'
 
         system_prompt = f"""Jesteś ekspertem od nazewnictwa produktów tekstylnych i modowych.
 
@@ -1431,10 +1515,10 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
             raise ValueError(
                 f"Nie udało się wyodrębnić nazwy modelu z nazwy produktu: '{original_name}'")
 
-        # Sprawdź czy to figi
+        # Sprawdź czy to figi (jeśli nie ma konfiguracji)
         is_figi = is_figi_product(original_name)
         base_type = "Figi kąpielowe" if is_figi else "Kostium kąpielowy"
-        
+
         # Zbuduj strukturę zgodnie z ProductNameStructure
         data = {
             "base_type": base_type,

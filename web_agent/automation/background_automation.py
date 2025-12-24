@@ -659,9 +659,23 @@ class BackgroundAutomation:
             original_name = product_data.get('name', '')
             self._original_product_name = original_name
 
-            # KROK 1: Ulepsz nazwę produktu
+            # Pobierz konfigurację marki
+            brand_config = None
+            if brand_id:
+                try:
+                    from web_agent.models import BrandConfig
+                    brand_config = BrandConfig.objects.get(brand_id=brand_id)
+                except BrandConfig.DoesNotExist:
+                    pass
+
+            # Pobierz konfigurację produktu
+            from web_agent.automation.ai_processor import get_product_config
+            category_name = product_data.get('category_name', '')
+            product_config = get_product_config(brand_config, category_name, original_name)
+
+            # KROK 1: Ulepsz nazwę produktu (z konfiguracją)
             self._log(f"\n[INFO] KROK 1: Edycja nazwy produktu...")
-            enhanced_name = self.enhance_product_name(original_name)
+            enhanced_name = self.enhance_product_name(original_name, product_config)
             if enhanced_name:
                 self._log(f"Oryginalna nazwa: {original_name[:100]}...", 'info')
                 self._log(f"Ulepszona nazwa: {enhanced_name[:100]}...", 'success')
@@ -669,10 +683,10 @@ class BackgroundAutomation:
                 self._log("Nie udało się ulepszyć nazwy, używam oryginalnej", 'warning')
                 enhanced_name = original_name
 
-            # KROK 2: Ulepsz opis produktu
+            # KROK 2: Ulepsz opis produktu (z konfiguracją)
             self._log(f"\n[INFO] KROK 2: Edycja opisu produktu...")
             original_description = product_data.get('description', '')
-            enhanced_description = self.enhance_product_description(original_description, product_name=original_name)
+            enhanced_description = self.enhance_product_description(original_description, product_name=original_name, product_config=product_config)
             if enhanced_description:
                 self._log(f"Ulepszony opis (długość: {len(enhanced_description)} znaków)", 'success')
             else:
@@ -763,16 +777,9 @@ class BackgroundAutomation:
             # KROK 10: Series name (placeholder - puste)
             series_name = ""
 
-            # KROK 11: Ścieżka produktu
-            # Sprawdź czy to figi kąpielowe
-            from web_agent.automation.ai_processor import is_figi_product
-            is_figi = is_figi_product(original_name)
-            if is_figi:
-                path_ids = ["6"]  # Figi | Stringi | Szorty
-                self._log(f"Wykryto figi kąpielowe - ustawiam ścieżkę: Figi | Stringi | Szorty (value=6)", 'info')
-            else:
-                path_ids = ["5"]  # Dwuczęściowe
-                self._log(f"Kostium dwuczęściowy - ustawiam ścieżkę: Dwuczęściowe (value=5)", 'info')
+            # KROK 11: Ścieżka produktu (z konfiguracji)
+            path_ids = [product_config['path_value']]
+            self._log(f"Ustawiam ścieżkę produktu: {product_config['path_value']} (base_type: {product_config['base_type']})", 'info')
 
             # KROK 12: Jednostka (domyślnie "0" dla szt.)
             unit_id = 0

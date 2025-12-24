@@ -1186,7 +1186,7 @@ class BrowserAutomation:
             logger.error(f"Błąd podczas oczekiwania na wynik: {e}")
             return {'success': False, 'message': str(e), 'mpd_product_id': None}
 
-    def update_product_name(self, ai_processor=None):
+    def update_product_name(self, ai_processor=None, product_config: Dict = None):
         """
         Edycja nazwy produktu w polu mpd_name używając AI i struktury Pydantic.
 
@@ -1223,7 +1223,7 @@ class BrowserAutomation:
             logger.info("Ulepszanie nazwy przez AI...")
             print("[DEBUG] Ulepszanie nazwy przez AI...")
             new_name = ai_processor.enhance_product_name(
-                current_name, use_structured=True)
+                current_name, product_config=product_config, use_structured=True)
 
             if not new_name:
                 raise ValueError("Ulepszona nazwa produktu jest pusta")
@@ -1709,7 +1709,7 @@ class BrowserAutomation:
 
         return result
 
-    def fill_mpd_description(self, ai_processor=None):
+    def fill_mpd_description(self, ai_processor=None, product_config: Dict = None):
         """
         SCENARIUSZ CREATE, KROK 2: Wypełnia pole mpd_description w sekcji MPD.
 
@@ -1797,7 +1797,7 @@ class BrowserAutomation:
             # Użyj zapisanej oryginalnej nazwy produktu jeśli dostępna
             product_name = getattr(self, '_original_product_name', None)
             enhanced_description = ai_processor.enhance_product_description(
-                current_description, product_name=product_name)
+                current_description, product_name=product_name, product_config=product_config)
             print("[INFO] ========================================")
             print(
                 f"[INFO] Opis został ulepszony! Nowa długość: {len(enhanced_description)} znaków")
@@ -1924,7 +1924,7 @@ class BrowserAutomation:
             # Zwróć None w przypadku błędu
             return None
 
-    def update_product_description(self, ai_processor=None):
+    def update_product_description(self, ai_processor=None, product_config: Dict = None):
         """
         DEPRECATED: Użyj fill_mpd_description() zamiast tej metody.
         Wrapper dla kompatybilności wstecznej.
@@ -1937,7 +1937,7 @@ class BrowserAutomation:
         except UnicodeEncodeError:
             logger.warning(
                 "update_product_description() is deprecated. Use fill_mpd_description()")
-        return self.fill_mpd_description(ai_processor=ai_processor)
+        return self.fill_mpd_description(ai_processor=ai_processor, product_config=product_config)
 
     def fill_mpd_short_description(self, ai_processor=None):
         """

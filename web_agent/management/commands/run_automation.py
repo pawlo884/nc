@@ -333,11 +333,26 @@ class Command(BaseCommand):
                                 "[INFO] Brak sugerowanych produktów z pokryciem 100% - przechodzę do scenariusza CREATE")
 
                         # SCENARIUSZ CREATE: Wypełnij wszystkie pola i utwórz nowy produkt
+                        
+                        # Pobierz konfigurację marki (przed KROK 1)
+                        brand_config = None
+                        if brand_id:
+                            try:
+                                brand_config = BrandConfig.objects.get(brand_id=brand_id)
+                            except BrandConfig.DoesNotExist:
+                                pass
+                        
+                        # Pobierz konfigurację produktu (przed KROK 1)
+                        from web_agent.automation.ai_processor import get_product_config
+                        category_name_for_config = automation_filters.get('category_name') if automation_filters else category_name
+                        original_name = getattr(browser, '_original_product_name', None)
+                        product_config = get_product_config(brand_config, category_name_for_config, original_name)
+                        
                         # KROK 1: Edycja nazwy produktu
                         self.stdout.write(
                             "\n[INFO] KROK 1: Edycja nazwy produktu...")
                         try:
-                            browser.update_product_name()
+                            browser.update_product_name(product_config=product_config)
                             self.stdout.write(self.style.SUCCESS(
                                 "[OK] Zaktualizowano nazwę produktu"))
                         except Exception as e_name:
@@ -351,7 +366,7 @@ class Command(BaseCommand):
                         try:
                             self.stdout.write(
                                 "\n[INFO] KROK 2: Edycja opisu produktu...")
-                            enhanced_description = browser.update_product_description()
+                            enhanced_description = browser.update_product_description(product_config=product_config)
                             self.stdout.write(self.style.SUCCESS(
                                 "[OK] Zaktualizowano opis produktu"))
                         except Exception as e_desc:
@@ -493,27 +508,15 @@ class Command(BaseCommand):
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Błąd podczas ustawiania placeholder w polu series_name: {e_series}"))
 
-                        # KROK 11: Zaznacz ścieżkę produktu
+                        # KROK 11: Zaznacz ścieżkę produktu (użyj konfiguracji)
                         try:
                             self.stdout.write(
                                 "\n[INFO] KROK 11: Wybieranie ścieżki produktu...")
                             
-                            # Sprawdź czy to figi (użyj zapisanej oryginalnej nazwy)
-                            from web_agent.automation.ai_processor import is_figi_product
-                            is_figi = False
-                            if hasattr(browser, '_original_product_name') and browser._original_product_name:
-                                is_figi = is_figi_product(browser._original_product_name)
-                            
-                            if is_figi:
-                                # value="6" dla Figi | Stringi | Szorty
-                                browser.select_product_path(path_value="6")
-                                self.stdout.write(self.style.SUCCESS(
-                                    "[OK] Wybrano ścieżkę produktu: Figi | Stringi | Szorty"))
-                            else:
-                                # value="5" dla Dwuczęściowe
-                                browser.select_product_path(path_value="5")
-                                self.stdout.write(self.style.SUCCESS(
-                                    "[OK] Wybrano ścieżkę produktu: Dwuczęściowe"))
+                            # Użyj konfiguracji produktu (już pobrana wcześniej)
+                            browser.select_product_path(path_value=product_config['path_value'])
+                            self.stdout.write(self.style.SUCCESS(
+                                f"[OK] Wybrano ścieżkę produktu: {product_config['path_value']} (base_type: {product_config['base_type']})"))
                         except Exception as e_path:
                             self.stdout.write(self.style.WARNING(
                                 f"[WARNING] Błąd podczas wyboru ścieżki produktu: {e_path}"))

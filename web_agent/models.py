@@ -132,6 +132,12 @@ class BrandConfig(models.Model):
         verbose_name='Próg podobieństwa',
         help_text='Próg podobieństwa dla wyszukiwania atrybutów (0.0-1.0, domyślnie 0.7)'
     )
+    category_config = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Konfiguracja kategorii',
+        help_text='JSON z konfiguracją dla każdej kategorii. Przykład: {"Kostiumy dwuczęściowe": {"path_value": "5", "base_type": "Kostium kąpielowy", "has_top": true}, "Jednoczęściowe": {"path_value": "7", "base_type": "Kostium kąpielowy", "has_top": true}, "Figi kąpielowe": {"path_value": "6", "base_type": "Figi kąpielowe", "has_top": false}}'
+    )
     created_at = models.DateTimeField(
         auto_now_add=True, verbose_name='Utworzono')
     updated_at = models.DateTimeField(
