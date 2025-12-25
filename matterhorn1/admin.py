@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.admin import SimpleListFilter
 from django.http import JsonResponse
 from django.db import connections, transaction
 from django.views.decorators.csrf import csrf_exempt
@@ -56,6 +57,82 @@ class CategoryAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+class BrandFilter(SimpleListFilter):
+    """Filtr marki, który filtruje opcje na podstawie wybranej kategorii"""
+    title = 'Marka'
+    parameter_name = 'brand'
+    
+    def lookups(self, request, model_admin):
+        """Generuje opcje filtrów marki na podstawie wybranej kategorii"""
+        # Pobierz wybraną kategorię z parametrów URL (używamy ID obiektu Category, nie category_id)
+        category_pk = request.GET.get('category')
+        
+        # Bazowy queryset produktów
+        qs = model_admin.get_queryset(request)
+        
+        # Jeśli wybrano kategorię, filtruj produkty tylko z tą kategorią
+        if category_pk:
+            try:
+                qs = qs.filter(category_id=int(category_pk))
+            except (ValueError, TypeError):
+                pass
+        
+        # Pobierz unikalne marki z przefiltrowanego querysetu (używamy ID obiektu Brand)
+        brand_pks = list(qs.exclude(brand__isnull=True).values_list('brand_id', flat=True).distinct())
+        if not brand_pks:
+            return []
+        brands = Brand.objects.filter(id__in=brand_pks).order_by('name')
+        
+        return [(str(brand.id), brand.name) for brand in brands]
+    
+    def queryset(self, request, queryset):
+        """Filtruje queryset na podstawie wybranej marki"""
+        if self.value():
+            try:
+                return queryset.filter(brand_id=int(self.value()))
+            except (ValueError, TypeError):
+                return queryset
+        return queryset
+
+
+class CategoryFilter(SimpleListFilter):
+    """Filtr kategorii, który filtruje opcje na podstawie wybranej marki"""
+    title = 'Kategoria'
+    parameter_name = 'category'
+    
+    def lookups(self, request, model_admin):
+        """Generuje opcje filtrów kategorii na podstawie wybranej marki"""
+        # Pobierz wybraną markę z parametrów URL (używamy ID obiektu Brand, nie brand_id)
+        brand_pk = request.GET.get('brand')
+        
+        # Bazowy queryset produktów
+        qs = model_admin.get_queryset(request)
+        
+        # Jeśli wybrano markę, filtruj produkty tylko z tą marką
+        if brand_pk:
+            try:
+                qs = qs.filter(brand_id=int(brand_pk))
+            except (ValueError, TypeError):
+                pass
+        
+        # Pobierz unikalne kategorie z przefiltrowanego querysetu (używamy ID obiektu Category)
+        category_pks = list(qs.exclude(category__isnull=True).values_list('category_id', flat=True).distinct())
+        if not category_pks:
+            return []
+        categories = Category.objects.filter(id__in=category_pks).order_by('name')
+        
+        return [(str(category.id), category.name) for category in categories]
+    
+    def queryset(self, request, queryset):
+        """Filtruje queryset na podstawie wybranej kategorii"""
+        if self.value():
+            try:
+                return queryset.filter(category_id=int(self.value()))
+            except (ValueError, TypeError):
+                return queryset
+        return queryset
 
 
 class ProductDetailsInline(admin.StackedInline):
@@ -124,7 +201,7 @@ class ProductAdmin(admin.ModelAdmin):
     ]
     list_display_links = ['product_uid', 'name']
     list_filter = [
-        ('brand', admin.RelatedOnlyFieldListFilter), 'category', 'active', 'is_mapped', 'created_at', 'updated_at'
+        BrandFilter, CategoryFilter, 'active', 'is_mapped', 'created_at', 'updated_at'
     ]
     # Wymuś dropdown dla filtra brand
     list_max_show_all = 200
