@@ -88,8 +88,6 @@ function SingleProductCreate({ productId, productData, onComplete }) {
   return React.createElement('div', {
     style: { marginTop: '20px', padding: '20px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f9f9f9' }
   }, [
-    React.createElement('h3', { key: 'title' }, 'Edytuj dane przed utworzeniem w MPD'),
-    
     message && React.createElement('div', {
       key: 'message',
       className: `status-message ${messageType}`,
@@ -869,7 +867,6 @@ function BulkCreate({ productsData, onComplete }) {
     style: { maxWidth: '1200px', margin: '20px auto', padding: '20px' }
   }, [
     React.createElement('h1', { key: 'title' }, 'Tworzenie nowych produktów w MPD'),
-    React.createElement('p', { key: 'subtitle' }, 'Edytuj dane produktów przed utworzeniem w MPD:'),
     
     message && React.createElement('div', {
       key: 'message',

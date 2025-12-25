@@ -103,7 +103,6 @@ const BulkCreate = ({ productsData, onComplete }) => {
   return (
     <div style={{ maxWidth: '1200px', margin: '20px auto', padding: '20px' }}>
       <h1>Tworzenie nowych produktów w MPD</h1>
-      <p>Edytuj dane produktów przed utworzeniem w MPD:</p>
       
       {message && (
         <div className={`status-message ${messageType}`} style={{

@@ -11,4 +11,6 @@ if [ -z "$1" ]; then
   exit 0
 fi
 
-npx --no commitlint --edit "$1"
+# Użyj separatora --, żeby przekazać --edit do commitlint,
+# a nie do npm (inaczej pojawia się błąd „input is required”)
+npx --no commitlint -- --edit "$1"

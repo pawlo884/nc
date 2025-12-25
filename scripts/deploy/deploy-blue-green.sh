@@ -192,6 +192,9 @@ switch_nginx() {
     # 5. Zmień deployment-status endpoint
     sed -i.bak "s/\"active\":\"${current}\"/\"active\":\"${target}\"/g" nginx-blue-green.conf
     
+    # Usuń pliki .bak utworzone przez sed (są już w .gitignore)
+    rm -f nginx-blue-green.conf.bak
+    
     # 6. Test konfiguracji przed restartem (sprawdza tylko składnię, nie DNS)
     # Plik jest mountowany jako volume, więc zmiany są automatycznie widoczne
     log_info "🔍 Testowanie konfiguracji nginx (tylko składnia)..."
@@ -354,6 +357,16 @@ deploy() {
     if ! switch_nginx $TARGET; then
         log_error "❌ Nie udało się przełączyć NGINX"
         exit 1
+    fi
+    
+    # 8.1. Commit zmian w konfiguracji nginx (jeśli są zmiany)
+    if git diff --quiet nginx-blue-green.conf; then
+        log_info "ℹ️  Brak zmian w nginx-blue-green.conf do commitowania"
+    else
+        log_info "📝 Commitowanie zmian w nginx-blue-green.conf..."
+        git add nginx-blue-green.conf
+        git commit -m "chore(deploy): przełączenie nginx na ${TARGET} environment" || log_warning "⚠️  Nie udało się commitować zmian (może nie być w repo?)"
+        log_success "✅ Zmiany w nginx-blue-green.conf zacommitowane"
     fi
     
     # 9. Opcjonalnie: poczekaj chwilę i zatrzymaj stary environment

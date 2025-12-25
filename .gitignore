@@ -15,6 +15,7 @@ __pycache__/
 *.egg-info/
 *.egg
 *.bak
+*.backup
 .env
 .env.dev
 .env.prod
@@ -40,3 +41,4 @@ static/
 .env.dev1
 backups/*
 ..env.prod
+nginx-blue-green.conf

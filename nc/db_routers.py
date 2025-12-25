@@ -90,9 +90,48 @@ class Matterhorn1Router:
         return None
 
 
+class WebAgentRouter:
+    """
+    Router dla aplikacji web_agent - dedykowana baza danych
+    """
+
+    def db_for_read(self, model, **hints):
+        if model._meta.app_label == 'web_agent':
+            from django.conf import settings
+            # Development używa zzz_web_agent, produkcja web_agent
+            if 'zzz_web_agent' in settings.DATABASES:
+                return 'zzz_web_agent'
+            return 'web_agent'
+        return None
+
+    def db_for_write(self, model, **hints):
+        if model._meta.app_label == 'web_agent':
+            from django.conf import settings
+            # Development używa zzz_web_agent, produkcja web_agent
+            if 'zzz_web_agent' in settings.DATABASES:
+                return 'zzz_web_agent'
+            return 'web_agent'
+        return None
+
+    def allow_relation(self, obj1, obj2, **hints):
+        # Zezwalamy na relacje między obiektami z różnych baz danych
+        if obj1._meta.app_label == 'web_agent' or obj2._meta.app_label == 'web_agent':
+            return True
+        return None
+
+    def allow_migrate(self, db, app_label, model_name=None, **hints):
+        if app_label == 'web_agent':
+            from django.conf import settings
+            # Development używa zzz_web_agent, produkcja web_agent
+            if 'zzz_web_agent' in settings.DATABASES:
+                return db == 'zzz_web_agent'
+            return db == 'web_agent'
+        return None
+
+
 class DefaultRouter:
     """
-    Router dla aplikacji systemowych Django
+    Router dla aplikacji systemowych Django (bez web_agent)
     """
     # Lista aplikacji systemowych - tworzona raz jako atrybut klasy
     SYSTEM_APPS = frozenset([

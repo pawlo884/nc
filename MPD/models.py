@@ -245,8 +245,38 @@ class ProductImage(models.Model):
         verbose_name = 'Product Image'
         verbose_name_plural = 'Product Images'
 
+    def save(self, *args, **kwargs):
+        # Wymuś użycie bazy danych MPD
+        if 'using' not in kwargs:
+            kwargs['using'] = 'MPD'
+        # Upewnij się, że product_id jest liczbą, nie ścieżką
+        if self.product_id and not isinstance(self.product_id, (int, type(None))):
+            try:
+                # Jeśli product_id jest stringiem, spróbuj wyciągnąć ID z początku
+                if isinstance(self.product_id, str):
+                    # Jeśli to ścieżka, nie używaj jej jako ID
+                    if '/' in str(self.product_id) or 'MPD_test' in str(self.product_id) or 'MPD/' in str(self.product_id):
+                        raise ValueError(f"Nieprawidłowe product_id: {self.product_id}. Oczekiwano liczby, otrzymano ścieżkę.")
+                    self.product_id = int(self.product_id)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Nieprawidłowe product_id: {self.product_id}. {str(e)}")
+        return super().save(*args, **kwargs)
+
+    def get_image_url(self):
+        """Zwróć pełny URL obrazu z MinIO"""
+        from matterhorn1.defs_db import resolve_image_url
+        if self.file_path:
+            return resolve_image_url(self.file_path) or self.file_path
+        return None
+
+    def get_absolute_url(self):
+        """Zwróć URL do edycji obrazu w admin - używa tylko ID, nie file_path"""
+        from django.urls import reverse
+        return reverse('admin:MPD_productimage_change', args=[self.pk])
+
     def __str__(self):
-        return str(self.file_path)
+        # Używaj ID zamiast file_path, aby uniknąć problemów z URL-ami w Django admin
+        return f"Obraz {self.id} (produkt {self.product_id})"
 
 
 class ProductSet(models.Model):

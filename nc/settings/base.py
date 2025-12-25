@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     # 'matterhorn',  # usunięta stara aplikacja
     'MPD',
     'matterhorn1',
+    'web_agent',
 ]
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
@@ -123,6 +124,8 @@ TEMPLATES = [
 
 
 # Database
+# Base zawiera konfigurację produkcyjną (bez przedrostka zzz_)
+# Development (dev.py) nadpisuje na wersje z przedrostkiem zzz_
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -209,13 +212,13 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
-    'zzz_matterhorn1': {
+    'web_agent': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('MATTERHORN1_DB_NAME'),
-        'USER': os.getenv('MATTERHORN1_DB_USER'),
-        'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
-        'HOST': os.getenv('MATTERHORN1_DB_HOST'),
-        'PORT': os.getenv('MATTERHORN1_DB_PORT'),
+        'NAME': os.getenv('WEB_AGENT_DB_NAME'),
+        'USER': os.getenv('WEB_AGENT_DB_USER'),
+        'PASSWORD': os.getenv('WEB_AGENT_DB_PASSWORD'),
+        'HOST': os.getenv('WEB_AGENT_DB_HOST'),
+        'PORT': os.getenv('WEB_AGENT_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
             'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
@@ -225,13 +228,14 @@ DATABASES = {
             'keepalives_count': 5, # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
-    }
+    },
 }
 
 # Database routers
 DATABASE_ROUTERS = [
     'nc.db_routers.MPDRouter',
     'nc.db_routers.Matterhorn1Router',
+    'nc.db_routers.WebAgentRouter',
     'nc.db_routers.DefaultRouter',
 ]
 
@@ -470,13 +474,17 @@ if S3_BUCKET_NAME and S3_ACCESS_KEY and S3_SECRET_KEY:
         )
         AWS_S3_ENDPOINT_URL = S3_ENDPOINT
         AWS_S3_ADDRESSING_STYLE = os.getenv('AWS_S3_ADDRESSING_STYLE', 'path')
-        AWS_S3_SIGNATURE_VERSION = os.getenv('AWS_S3_SIGNATURE_VERSION', 's3v4')
+        AWS_S3_SIGNATURE_VERSION = os.getenv(
+            'AWS_S3_SIGNATURE_VERSION', 's3v4')
         if MINIO_ENDPOINT:
-            AWS_S3_VERIFY = os.getenv('MINIO_VERIFY_SSL', 'false').lower() == 'true'
+            AWS_S3_VERIFY = os.getenv(
+                'MINIO_VERIFY_SSL', 'false').lower() == 'true'
         else:
-            AWS_S3_VERIFY = os.getenv('AWS_S3_VERIFY', 'true').lower() == 'true'
+            AWS_S3_VERIFY = os.getenv(
+                'AWS_S3_VERIFY', 'true').lower() == 'true'
         AWS_DEFAULT_ACL = os.getenv('AWS_DEFAULT_ACL') or None
-        AWS_QUERYSTRING_AUTH = os.getenv('AWS_QUERYSTRING_AUTH', 'false').lower() == 'true'
+        AWS_QUERYSTRING_AUTH = os.getenv(
+            'AWS_QUERYSTRING_AUTH', 'false').lower() == 'true'
 
         if AWS_S3_ENDPOINT_URL and AWS_STORAGE_BUCKET_NAME:
             MEDIA_URL = os.getenv(

@@ -156,6 +156,15 @@ class ProductsAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD').select_related('brand', 'series', 'unit')
 
+    def delete_model(self, request, obj):
+        """Usuń pojedynczy produkt z użyciem bazy MPD"""
+        obj.delete(using='MPD')
+
+    def delete_queryset(self, request, queryset):
+        """Usuń wiele produktów z użyciem bazy MPD"""
+        for obj in queryset:
+            obj.delete(using='MPD')
+
     @admin.action(description='Oznacz wybrane produkty jako widoczne')
     def make_visible(self, request, queryset):
         """Masowa akcja - oznacz produkty jako widoczne"""
@@ -836,7 +845,12 @@ class ProductsAdmin(admin.ModelAdmin):
                 html += f'<div style="margin-bottom: 12px;"><b>{color_name}</b><br>'
                 for img in imgs:
                     url = resolve_image_url(img.file_path) or img.file_path
-                    html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
+                    # Upewnij się, że URL jest bezwzględny (zaczyna się od http:// lub https://)
+                    if url and not url.startswith(('http://', 'https://')):
+                        # Jeśli to surowa ścieżka, nie używaj jej jako linku
+                        logger.warning(f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
+                        url = "#"
+                    html += f'<a href="{url}" target="_blank" rel="noopener noreferrer"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
                 html += '</div>'
         # Wyświetl zdjęcia z przypisanym zwykłym kolorem
         for cid, imgs in images_by_normal_color.items():
@@ -845,14 +859,24 @@ class ProductsAdmin(admin.ModelAdmin):
                 html += f'<div style="margin-bottom: 12px;"><b>{color_name}</b><br>'
                 for img in imgs:
                     url = resolve_image_url(img.file_path) or img.file_path
-                    html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
+                    # Upewnij się, że URL jest bezwzględny (zaczyna się od http:// lub https://)
+                    if url and not url.startswith(('http://', 'https://')):
+                        # Jeśli to surowa ścieżka, nie używaj jej jako linku
+                        logger.warning(f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
+                        url = "#"
+                    html += f'<a href="{url}" target="_blank" rel="noopener noreferrer"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
                 html += '</div>'
         # Wyświetl zdjęcia bez przypisanego koloru
         if images_no_color:
             html += '<div style="margin-bottom: 12px;"><b>Inne zdjęcia</b><br>'
             for img in images_no_color:
-                url = img.file_path
-                html += f'<a href="{url}" target="_blank"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
+                url = resolve_image_url(img.file_path) or img.file_path
+                # Upewnij się, że URL jest bezwzględny (zaczyna się od http:// lub https://)
+                if url and not url.startswith(('http://', 'https://')):
+                    # Jeśli to surowa ścieżka, nie używaj jej jako linku
+                    logger.warning(f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
+                    url = "#"
+                html += f'<a href="{url}" target="_blank" rel="noopener noreferrer"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
             html += '</div>'
         if not html:
             return "Brak zdjęć produktu"
@@ -1188,14 +1212,63 @@ class ProductVariantsRetailPriceAdmin(admin.ModelAdmin):
 @admin.register(ProductImage)
 class ProductImageAdmin(admin.ModelAdmin):
     list_display = ['id', 'product',
-                    'iai_product_id', 'file_path', 'updated_at']
+                    'iai_product_id', 'image_thumbnail', 'updated_at']
     list_filter = ['updated_at']
     search_fields = ['product__name', 'file_path', 'iai_product_id']
     raw_id_fields = ['product']
-    readonly_fields = ['id', 'updated_at']
+    readonly_fields = ['id', 'image_thumbnail', 'file_path', 'updated_at']
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('product', 'iai_product_id')
+        }),
+        ('Obraz', {
+            'fields': ('file_path', 'image_thumbnail'),
+            'description': 'Miniatura obrazu - kliknij, aby otworzyć pełny obraz'
+        }),
+        ('Metadane', {
+            'fields': ('id', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
+
+    @admin.display(description='Obraz')
+    def image_thumbnail(self, obj):
+        """Wyświetl miniaturę obrazu z możliwością kliknięcia"""
+        if obj.file_path:
+            url = resolve_image_url(obj.file_path) or obj.file_path
+            # Jeśli to już pełny URL, użyj go
+            if not url.startswith(('http://', 'https://')):
+                # Jeśli to bucket key, skonwertuj na URL
+                url = resolve_image_url(obj.file_path) or obj.file_path
+            
+            if url and url.startswith(('http://', 'https://')):
+                return format_html(
+                    '<a href="{}" target="_blank" title="Kliknij, aby otworzyć pełny obraz">'
+                    '<img src="{}" style="max-width:150px; max-height:150px; border:1px solid #ddd; border-radius:4px; cursor:pointer;" />'
+                    '</a>',
+                    url, url
+                )
+        return format_html('<span style="color:#999;">Brak obrazu</span>')
+
+    def save_model(self, request, obj, form, change):
+        # Upewnij się, że product_id jest liczbą, nie ścieżką
+        if obj.product_id and not isinstance(obj.product_id, int):
+            if isinstance(obj.product_id, str):
+                # Jeśli to ścieżka, nie używaj jej jako ID
+                if '/' in str(obj.product_id) or 'MPD_test' in str(obj.product_id) or 'MPD/' in str(obj.product_id):
+                    from django.contrib import messages
+                    messages.error(request, f"Nieprawidłowe product_id: {obj.product_id}. Oczekiwano liczby, otrzymano ścieżkę.")
+                    return
+                try:
+                    obj.product_id = int(obj.product_id)
+                except (ValueError, TypeError):
+                    from django.contrib import messages
+                    messages.error(request, f"Nieprawidłowe product_id: {obj.product_id}.")
+                    return
+        obj.save(using='MPD')
 
 
 @admin.register(ProductSeries)
