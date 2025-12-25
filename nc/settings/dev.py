@@ -1,4 +1,5 @@
 import socket
+import sys
 from .base import *
 
 # Development rozszerza DATABASES z base.py o wersje z zzz_
@@ -152,3 +153,60 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
+
+# Konfiguracja testów - określa które bazy mają być używane podczas testów
+# Django automatycznie tworzy testowe bazy z prefiksem test_
+# Dla wielu baz danych, Django tworzy testowe wersje wszystkich baz
+TEST_RUNNER = 'django.test.runner.DiscoverRunner'
+
+# Wyłącz database routers podczas testów - używamy tylko bazy default
+# To rozwiązuje problemy z tworzeniem wielu testowych baz jednocześnie
+if 'test' in sys.argv:
+    DATABASE_ROUTERS = []  # Wyłącz routing podczas testów - wszystkie modele idą do default
+    
+    # Wyłącz cache/throttling dla testów - użyj dummy cache zamiast Redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        }
+    }
+    
+    # Wyłącz throttling dla testów (REST_FRAMEWORK jest już zdefiniowany w base.py)
+    from .base import REST_FRAMEWORK as BASE_REST_FRAMEWORK
+    REST_FRAMEWORK = BASE_REST_FRAMEWORK.copy()
+    REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []  # Wyłącz throttling całkowicie
+    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {
+        'user': '1000000/day',  # Bardzo wysoki limit dla testów
+        'anon': '1000000/day',
+        'bulk': '1000000/min',
+    }
+
+# Konfiguracja testów dla baz danych
+# Dla testów wszystkie bazy używają tej samej testowej bazy (MIRROR)
+# To rozwiązuje problemy z tworzeniem wielu testowych baz jednocześnie
+DATABASES['default']['TEST'] = {
+    'NAME': None,  # Django automatycznie utworzy test_zzz_default
+    'DEPENDENCIES': [],
+}
+# Pozostałe bazy używają tej samej testowej bazy co default
+DATABASES['zzz_default']['TEST'] = {
+    'MIRROR': 'default',  # Użyj tej samej bazy co default
+}
+DATABASES['MPD']['TEST'] = {
+    'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
+}
+DATABASES['zzz_MPD']['TEST'] = {
+    'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
+}
+DATABASES['matterhorn1']['TEST'] = {
+    'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
+}
+DATABASES['zzz_matterhorn1']['TEST'] = {
+    'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
+}
+DATABASES['web_agent']['TEST'] = {
+    'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
+}
+DATABASES['zzz_web_agent']['TEST'] = {
+    'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
+}

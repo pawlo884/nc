@@ -164,7 +164,7 @@ class ProductBulkUpdateAPI(BulkThrottleMixin, APIView):
                     continue
 
                 try:
-                    product = Product.objects.get(product_id=product_id)
+                    product = Product.objects.get(product_uid=product_id)
                     serializer = ProductSerializer(
                         product,
                         data=product_data,
@@ -265,11 +265,16 @@ class VariantBulkCreateAPI(BulkThrottleMixin, APIView):
                     continue
 
                 try:
-                    product = Product.objects.get(product_id=product_id)
-                    variant_data['product'] = product.id
+                    product = Product.objects.get(product_uid=product_id)
+                    # Waliduj dane przez serializer, ale utwórz obiekt bezpośrednio
                     serializer = ProductVariantSerializer(data=variant_data)
                     if serializer.is_valid():
-                        created_objects.append(serializer.save())
+                        # Utwórz wariant bezpośrednio z obiektem product
+                        variant = ProductVariant.objects.create(
+                            product=product,
+                            **serializer.validated_data
+                        )
+                        created_objects.append(variant)
                     else:
                         errors.append(
                             {
@@ -374,16 +379,13 @@ class VariantBulkUpdateAPI(BulkThrottleMixin, APIView):
                             }
                         )
                 except ProductVariant.DoesNotExist:
-                    serializer = ProductVariantSerializer(data=variant_data)
-                    if serializer.is_valid():
-                        created_objects.append(serializer.save())
-                    else:
-                        errors.append(
-                            {
-                                'variant_uid': variant_uid,
-                                'errors': serializer.errors,
-                            }
-                        )
+                    # Jeśli wariant nie istnieje, nie możemy go utworzyć bez product
+                    errors.append(
+                        {
+                            'variant_uid': variant_uid,
+                            'errors': {'variant_uid': ['Wariant nie istnieje i nie można go utworzyć bez product']},
+                        }
+                    )
                 except Exception as exc:
                     logger.exception('Błąd podczas aktualizacji wariantu')
                     errors.append(
@@ -587,11 +589,16 @@ class ImageBulkCreateAPI(BulkThrottleMixin, APIView):
                     continue
 
                 try:
-                    product = Product.objects.get(product_id=product_id)
-                    image_data['product'] = product.id
+                    product = Product.objects.get(product_uid=product_id)
+                    # Waliduj dane przez serializer, ale utwórz obiekt bezpośrednio
                     serializer = ProductImageSerializer(data=image_data)
                     if serializer.is_valid():
-                        created_objects.append(serializer.save())
+                        # Utwórz obraz bezpośrednio z obiektem product
+                        image = ProductImage.objects.create(
+                            product=product,
+                            **serializer.validated_data
+                        )
+                        created_objects.append(image)
                     else:
                         errors.append(
                             {

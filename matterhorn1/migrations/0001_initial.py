@@ -215,7 +215,7 @@ class Migration(migrations.Migration):
             options={
                 'verbose_name': 'Historia stanów magazynowych',
                 'verbose_name_plural': 'Historia stanów magazynowych',
-                'db_table': 'stock_history',
+                'db_table': 'matterhorn1_stock_history',
                 'ordering': ['-timestamp'],
                 'indexes': [models.Index(fields=['variant_uid'], name='mh1_sh_variant_idx'), models.Index(fields=['product_uid'], name='mh1_sh_product_idx'), models.Index(fields=['timestamp'], name='mh1_sh_timestamp_idx'), models.Index(fields=['change_type'], name='mh1_sh_change_idx'), models.Index(fields=['product_uid', 'timestamp'], name='mh1_sh_prod_time_idx')],
             },
