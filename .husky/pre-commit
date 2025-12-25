@@ -5,5 +5,24 @@ if [ -n "$CI" ]; then
   exit 0
 fi
 
-# Lekki check lokalnie zamiast testów (bo brak skryptu test)
-npm run lint || npm run format:check || true
+# Uruchamiaj checks tylko dla plików, które są staged.
+# Dzięki temu nie ma spamowania błędami typu "No files matching '.'"
+# ani przeglądania całego repo przez Prettier przy commicie zmian w Pythonie.
+
+# Jeśli nie ma node/npm (np. minimalne środowisko), nie blokuj commita.
+command -v npm >/dev/null 2>&1 || exit 0
+
+JS_TS_FILES="$(git diff --cached --name-only --diff-filter=ACMR -- '*.js' '*.jsx' '*.ts' '*.tsx')"
+PRETTIER_FILES="$(git diff --cached --name-only --diff-filter=ACMR -- '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.css' '*.scss' '*.md')"
+
+if [ -n "$JS_TS_FILES" ]; then
+  echo "husky: eslint (staged js/ts)"
+  # Nie blokuj commita - tylko informacyjnie.
+  npx --no eslint --max-warnings=0 --ext .js,.jsx,.ts,.tsx $JS_TS_FILES || true
+fi
+
+if [ -n "$PRETTIER_FILES" ]; then
+  echo "husky: prettier --check (staged)"
+  # Nie blokuj commita - tylko informacyjnie.
+  npx --no prettier --check $PRETTIER_FILES || true
+fi

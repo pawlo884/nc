@@ -1,1201 +1,1927 @@
-{% extends "admin/change_form.html" %}
-{% load static %}
-
-{% block extrahead %}
-{{ block.super }}
+{% extends "admin/change_form.html" %} {% load static %} {% block extrahead %} {{ block.super }}
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="/static/matterhorn1/js/components-simple.js"></script>
 <style>
-    .container {
-        display: flex;
-        width: 100%;
-        height: calc(100vh - 200px);
-        margin-top: 20px;
-        position: relative;
-    }
+  .container {
+    display: flex;
+    width: 100%;
+    height: calc(100vh - 200px);
+    margin-top: 20px;
+    position: relative;
+  }
 
-    .column {
-        padding: 20px;
-        overflow: auto;
-    }
+  .column {
+    padding: 20px;
+    overflow: auto;
+  }
 
-    .left-column {
-        flex: 1;
-        border-right: 1px solid #ccc;
-    }
+  .left-column {
+    flex: 1;
+    border-right: 1px solid #ccc;
+  }
 
-    .right-column {
-        flex: 1;
-        background-color: #f8f8f8;
-        transition: all 0.3s ease;
-    }
-    
-    .right-column.collapsed {
-        flex: 0;
-        padding: 0;
-        overflow: hidden;
-    }
-    
-    .toggle-button {
-        position: absolute;
-        right: -40px;
-        top: 50%;
-        transform: translateY(-50%);
-        background-color: #417690;
-        color: white;
-        border: none;
-        padding: 5px 10px;
-        cursor: pointer;
-        border-radius: 3px;
-        z-index: 1000;
-        font-size: 16px;
-    }
+  .right-column {
+    flex: 1;
+    background-color: #f8f8f8;
+    transition: all 0.3s ease;
+  }
 
-    .toggle-button:hover {
-        background-color: #295270;
-    }
+  .right-column.collapsed {
+    flex: 0;
+    padding: 0;
+    overflow: hidden;
+  }
 
-    .mpd-form {
-        margin-top: 20px;
-    }
+  .toggle-button {
+    position: absolute;
+    right: -40px;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #417690;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    z-index: 1000;
+    font-size: 16px;
+  }
 
-    .mpd-form h2 {
-        margin-bottom: 20px;
-        color: #417690;
-    }
-    
-    .mpd-form .form-row {
-        margin-bottom: 15px;
-    }
-    
-    .mpd-form label {
-        display: block;
-        margin-bottom: 3px;
-        font-weight: bold;
-        font-size: 11px;
-        color: #555;
-    }
-    
-    .mpd-form input[type="text"],
-    .mpd-form textarea,
-    .mpd-form select {
-        width: 100%;
-        padding: 4px;
-        border: 1px solid #ccc;
-        border-radius: 2px;
-        color: #333;
-        background-color: #fff;
-        line-height: 1.2;
-        font-size: 11px;
-        height: auto;
-        min-height: 36px;
-        vertical-align: top;
-    }
-    
-    .mpd-form select option {
-        color: #333 !important;
-        background-color: #fff !important;
-    }
-    
-    .mpd-form select {
-        color: #333 !important;
-        background-color: #fff !important;
-    }
-    
-    #main_color_id, #unit_id {
-        color: #333 !important;
-        background-color: #fff !important;
-        font-size: 11px !important;
-        line-height: 1.2 !important;
-        padding: 4px !important;
-        height: auto !important;
-        min-height: 28px !important;
-        vertical-align: top !important;
-    }
-    
-    #main_color_id option, #unit_id option {
-        color: #333 !important;
-        background-color: #fff !important;
-        font-size: 11px !important;
-        padding: 3px !important;
-    }
-    
-    select#main_color_id, select#unit_id {
-        color: #333 !important;
-        background-color: #fff !important;
-        font-size: 11px !important;
-    }
-    
-    select#main_color_id option, select#unit_id option {
-        color: #333 !important;
-        background-color: #fff !important;
-        font-size: 11px !important;
-        padding: 3px !important;
-    }
-    
-    /* Override Django admin styles */
-    .form-row select {
-        color: #333 !important;
-        background-color: #fff !important;
-        font-size: 11px !important;
-    }
-    
-    .form-row select option {
-        color: #333 !important;
-        background-color: #fff !important;
-        font-size: 11px !important;
-    }
-    
-    /* Force visibility */
-    select, select option {
-        color: #333 !important;
-        background-color: #fff !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-    }
-    
-    /* Specific fix for selected text visibility */
-    select:focus {
-        color: #333 !important;
-        background-color: #fff !important;
-        border-color: #007cba !important;
-    }
-    
-    select:focus option {
-        color: #333 !important;
-        background-color: #fff !important;
-    }
-    
-    /* Override any inherited styles */
-    .mpd-form select, .mpd-form select:focus, .mpd-form select:active {
-        color: #333 !important;
-        background-color: #fff !important;
-        text-shadow: none !important;
-        -webkit-text-fill-color: #333 !important;
-        -moz-text-fill-color: #333 !important;
-    }
-    
-    /* Ensure text is visible in all states */
-    select option:checked, select option:selected {
-        color: #333 !important;
-        background-color: #fff !important;
-    }
-    
-    /* Style dla zaznaczonych atrybutów - wyróżnij je */
-    #mpd_attributes option:checked {
-        background-color: #28a745 !important;
-        color: white !important;
-        font-weight: bold !important;
-        border: 2px solid #1e7e34 !important;
-    }
-    
-    #mpd_attributes option:hover {
-        background-color: #e9ecef !important;
-        color: #333 !important;
-    }
-    
-    #mpd_attributes option:checked:hover {
-        background-color: #218838 !important;
-        color: white !important;
-    }
-    
-    .mpd-form textarea {
-        height: 100px;
-        resize: vertical;
-    }
+  .toggle-button:hover {
+    background-color: #295270;
+  }
 
-    .mpd-form button {
-        background-color: #28a745;
-        color: white;
-        border: none;
-        padding: 3px 6px;
-        border-radius: 2px;
-        cursor: pointer;
-        font-size: 10px;
-        margin-right: 10px;
-    }
+  .mpd-form {
+    margin-top: 20px;
+  }
 
-    .mpd-form button:hover {
-        background-color: #218838;
-    }
+  .mpd-form h2 {
+    margin-bottom: 20px;
+    color: #417690;
+  }
 
-    .mpd-form button:disabled {
-        background-color: #cccccc;
-        cursor: not-allowed;
-    }
+  .mpd-form .form-row {
+    margin-bottom: 15px;
+  }
 
-    .status-message {
-        margin-top: 15px;
-        padding: 10px;
-        border-radius: 4px;
-    }
-    
-    .status-message.success {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-    }
-    
-    .status-message.error {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-    }
+  .mpd-form label {
+    display: block;
+    margin-bottom: 3px;
+    font-weight: bold;
+    font-size: 11px;
+    color: #555;
+  }
 
-    .variant-mapped {
-        border: 2px solid #28a745 !important;
-        box-shadow: 0 0 8px #28a74533;
-    }
-    .variant-box {
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        padding: 10px;
-        margin: 10px;
-        background: #fff;
-    }
+  .mpd-form input[type='text'],
+  .mpd-form textarea,
+  .mpd-form select {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #ccc;
+    border-radius: 2px;
+    color: #333;
+    background-color: #fff;
+    line-height: 1.2;
+    font-size: 11px;
+    height: auto;
+    min-height: 36px;
+    vertical-align: top;
+  }
 
-    .alert {
-        padding: 10px;
-        margin-top: 10px;
-        border-radius: 4px;
-    }
+  .mpd-form select option {
+    color: #333 !important;
+    background-color: #fff !important;
+  }
 
-    .alert-info {
-        background-color: #d1ecf1;
-        color: #0c5460;
-        border: 1px solid #bee5eb;
-    }
+  .mpd-form select {
+    color: #333 !important;
+    background-color: #fff !important;
+  }
 
-    .alert-success {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-    }
+  #main_color_id,
+  #unit_id {
+    color: #333 !important;
+    background-color: #fff !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    padding: 4px !important;
+    height: auto !important;
+    min-height: 28px !important;
+    vertical-align: top !important;
+  }
 
-    .alert-danger {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-    }
+  #main_color_id option,
+  #unit_id option {
+    color: #333 !important;
+    background-color: #fff !important;
+    font-size: 11px !important;
+    padding: 3px !important;
+  }
+
+  select#main_color_id,
+  select#unit_id {
+    color: #333 !important;
+    background-color: #fff !important;
+    font-size: 11px !important;
+  }
+
+  select#main_color_id option,
+  select#unit_id option {
+    color: #333 !important;
+    background-color: #fff !important;
+    font-size: 11px !important;
+    padding: 3px !important;
+  }
+
+  /* Override Django admin styles */
+  .form-row select {
+    color: #333 !important;
+    background-color: #fff !important;
+    font-size: 11px !important;
+  }
+
+  .form-row select option {
+    color: #333 !important;
+    background-color: #fff !important;
+    font-size: 11px !important;
+  }
+
+  /* Force visibility */
+  select,
+  select option {
+    color: #333 !important;
+    background-color: #fff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  /* Specific fix for selected text visibility */
+  select:focus {
+    color: #333 !important;
+    background-color: #fff !important;
+    border-color: #007cba !important;
+  }
+
+  select:focus option {
+    color: #333 !important;
+    background-color: #fff !important;
+  }
+
+  /* Override any inherited styles */
+  .mpd-form select,
+  .mpd-form select:focus,
+  .mpd-form select:active {
+    color: #333 !important;
+    background-color: #fff !important;
+    text-shadow: none !important;
+    -webkit-text-fill-color: #333 !important;
+    -moz-text-fill-color: #333 !important;
+  }
+
+  /* Ensure text is visible in all states */
+  select option:checked,
+  select option:selected {
+    color: #333 !important;
+    background-color: #fff !important;
+  }
+
+  /* Style dla zaznaczonych atrybutów - wyróżnij je */
+  #mpd_attributes option:checked {
+    background-color: #28a745 !important;
+    color: white !important;
+    font-weight: bold !important;
+    border: 2px solid #1e7e34 !important;
+  }
+
+  #mpd_attributes option:hover {
+    background-color: #e9ecef !important;
+    color: #333 !important;
+  }
+
+  #mpd_attributes option:checked:hover {
+    background-color: #218838 !important;
+    color: white !important;
+  }
+
+  .mpd-form textarea {
+    height: 100px;
+    resize: vertical;
+  }
+
+  .mpd-form button {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 3px 6px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 10px;
+    margin-right: 10px;
+  }
+
+  .mpd-form button:hover {
+    background-color: #218838;
+  }
+
+  .mpd-form button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+
+  .status-message {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+  }
+
+  .status-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+
+  .status-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+
+  .variant-mapped {
+    border: 2px solid #28a745 !important;
+    box-shadow: 0 0 8px #28a74533;
+  }
+  .variant-box {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 10px;
+    background: #fff;
+  }
+
+  .alert {
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 4px;
+  }
+
+  .alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+  }
+
+  .alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+
+  .alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
 </style>
-{% endblock %}
-
-{% block content %}
+{% endblock %} {% block content %}
 <div class="container">
-    <div class="column left-column">
-        {{ block.super }}
-    </div>
-    <div class="column right-column">
-        <div class="mpd-form">
-            <h2 style="margin:0 0 12px 0; font-size:14px; color:#333; font-weight:bold;">Dane MPD</h2>
-            <div id="inline-status-message" class="status-message" style="display:none;"></div>
-            <div id="status-message"></div>
-            
-            {% if suggested_products %}
-            <div class="form-row" style="margin-bottom:30px; padding:12px; border:1px solid #ddd; border-radius:4px; background:#f8f9fa;">
-                <h3 style="margin:0 0 12px 0; color:#333; font-size:14px; font-weight:bold;">Sugerowane podobne produkty w MPD:</h3>
-                <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-                    <label for="sort-select" style="font-size:12px; font-weight:bold; color:#666;">Sortuj według:</label>
-                    <select id="sort-select" onchange="changeSort()" style="padding: 4px 6px; border: 1px solid #ccc; border-radius: 3px; font-size:12px;">
-                        <option value="similarity" {% if request.GET.sort_by != 'suggested_in_query' %}selected{% endif %}>Podobieństwo</option>
-                        <option value="suggested_in_query" {% if request.GET.sort_by == 'suggested_in_query' %}selected{% endif %}>Pokrycie słów</option>
-                    </select>
-                </div>
-                <table style="width:100%; border-collapse:collapse; font-size:12px;">
-                    <thead>
-                        <tr style="background:#f8f9fa;">
-                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px;">Nazwa</th>
-                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px; width:80px;">Marka</th>
-                            <th style="text-align:center; border:1px solid #ddd; padding:6px; font-size:11px; width:60px;">Podob.</th>
-                            <th style="text-align:center; border:1px solid #ddd; padding:6px; font-size:11px; width:60px;">Pokrycie</th>
-                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px; width:120px;">Główny kolor</th>
-                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px; width:120px;">Kolor prod.</th>
-                            <th style="text-align:left; border:1px solid #ddd; padding:6px; font-size:11px; width:100px;">Kod prod.</th>
-                            <th style="text-align:center; border:1px solid #ddd; padding:6px; font-size:11px; width:80px;">Akcja</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for product in suggested_products %}
-                        <tr style="border-bottom:1px solid #eee; transition:background-color 0.2s;" onmouseover="this.style.backgroundColor='#f0f8ff'" onmouseout="this.style.backgroundColor=''">
-                            <td style="border:1px solid #ddd; padding:6px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ product.name }}">{{ product.name|truncatechars:30 }}</td>
-                            <td style="border:1px solid #ddd; padding:6px; text-align:center;">{{ product.brand|truncatechars:10 }}</td>
-                            <td style="border:1px solid #ddd; padding:6px; text-align:center; font-weight:bold; color:#28a745;">{{ product.similarity|floatformat:1 }}%</td>
-                            <td style="border:1px solid #ddd; padding:6px; text-align:center; color:#17a2b8;">{{ product.suggested_in_query|floatformat:1 }}%</td>
-                            <td style="border:1px solid #ddd; padding:4px;">
-                                <select class="main-color-select" style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;">
-                                    <option value="">-- kolor --</option>
-                                    {% for color in main_colors %}
-                                    <option value="{{ color.id }}">{{ color.name|truncatechars:15 }}</option>
-                                    {% endfor %}
-                                </select>
-                            </td>
-                            <td style="border:1px solid #ddd; padding:4px;">
-                                <input type="text" class="producer-color-input" list="producer_colors_list" autocomplete="off" 
-                                       style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;" 
-                                       placeholder="Kolor prod.">
-                                <datalist id="producer_colors_list">
-                                    {% for color in producer_colors %}
-                                    <option value="{{ color.name }}">{{ color.name }}</option>
-                                    {% endfor %}
-                                </datalist>
-                            </td>
-                            <td style="border:1px solid #ddd; padding:4px;">
-                                <input type="text" class="producer-code-input" placeholder="Kod" 
-                                       style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;">
-                            </td>
-                            <td style="border:1px solid #ddd; padding:4px; text-align:center;">
-                                <button type="button" class="assign-mapping-btn" data-mpd-id="{{ product.id }}" 
-                                        style="background:#007cba; color:white; border:none; padding:4px 8px; border-radius:3px; font-size:11px; cursor:pointer; transition:background-color 0.2s;"
-                                        onmouseover="this.style.backgroundColor='#005a87'" onmouseout="this.style.backgroundColor='#007cba'">
-                                    Przypisz
-                                </button>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% endif %}
-            
-            <form id="mpd-form">
-                {% csrf_token %}
-                <input type="hidden" name="product_id" value="{{ original.id }}">
-                
-                <!-- Kompaktowy formularz w dwóch kolumnach -->
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div class="form-row" style="margin:0;">
-                        <label for="mpd_name" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Nazwa:</label>
-                        <input type="text" id="mpd_name" name="mpd_name" value="{{ original.name }}" 
-                               style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
-                        <button type="button" onclick="updateField('name', 'mpd_name')" 
-                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Zapisz
-                        </button>
-                    </div>
-                    
-                    <div class="form-row" style="margin:0;">
-                        <label for="mpd_short_description" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Krótki opis:</label>
-                        <textarea id="mpd_short_description" name="mpd_short_description" style="height: 35px; width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px; resize:vertical;">{{ mpd_data.short_description }}</textarea>
-                        <button type="button" onclick="updateField('short_description', 'mpd_short_description')" 
-                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Zapisz
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="form-row" style="margin-bottom:10px;">
-                    <label for="mpd_description" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Opis:</label>
-                    <textarea id="mpd_description" name="mpd_description" style="height: 60px; width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px; resize:vertical;">{{ original.description }}</textarea>
-                    <button type="button" onclick="updateField('description', 'mpd_description')" 
-                            style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                        Zapisz
-                    </button>
-                </div>
-                
-                <!-- KROK 4: ATRYBUTY - Kompaktowa wersja -->
-                <div class="form-row" style="margin-bottom:10px;">
-                    <label for="mpd_attributes" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Atrybuty:</label>
-                    <div style="display:grid; grid-template-columns:2fr 1fr; gap:6px; align-items:start;">
-                        <select multiple name="mpd_attributes" id="mpd_attributes" size="15" 
-                                style="width:100%; padding:3px; border:1px solid #ccc; border-radius:2px; font-size:10px;" 
-                                onchange="saveAttributeSelection()" onblur="saveAttributeSelection()" onfocus="restoreAttributeSelection()" onclick="saveAttributeSelection()">
-                            {% for attribute in mpd_attributes %}
-                            <option value="{{ attribute.id }}" {% if attribute.id in selected_attributes %}selected{% endif %}>
-                                {{ attribute.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <div>
-                            <button type="button" onclick="updateAttributes()" 
-                                    style="background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px; width:100%; margin-bottom:4px;">
-                                Zapisz atrybuty
-                            </button>
-                            <button type="button" onclick="removeSelectedAttributes()" 
-                                    style="background:#dc3545; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px; width:100%; margin-bottom:6px;">
-                                Usuń wybrane
-                            </button>
-                            <div id="selected-attributes-list" style="font-size:9px; color:#666; background:#f8f9fa; padding:4px; border-radius:2px; border:1px solid #ddd; max-height:120px; overflow-y:auto;">
-                                <strong>Wybrane:</strong><br>
-                                <div id="selected-attributes-content">
-                                    {% for attribute in mpd_attributes %}
-                                        {% if attribute.id in selected_attributes %}
-                                        <div class="selected-attribute" data-attribute-id="{{ attribute.id }}" style="display:flex; justify-content:space-between; align-items:center; margin:2px 0; padding:2px; background:#e8f5e8; border-radius:2px;">
-                                            <span>{{ attribute.name }}</span>
-                                            <button type="button" onclick="removeSingleAttribute({{ attribute.id }})" 
-                                                    style="background:#dc3545; color:white; border:none; padding:1px 4px; border-radius:1px; cursor:pointer; font-size:8px; margin-left:4px;">
-                                                ×
-                                            </button>
-                                        </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+  <div class="column left-column">{{ block.super }}</div>
+  <div class="column right-column">
+    <div class="mpd-form">
+      <h2 style="margin: 0 0 12px 0; font-size: 14px; color: #333; font-weight: bold">Dane MPD</h2>
+      <div id="inline-status-message" class="status-message" style="display: none"></div>
+      <div id="status-message"></div>
 
-                <!-- KROK 5-6: MARKA I GRUPA ROZMIAROWA - W dwóch kolumnach -->
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div class="form-row" style="margin:0;">
-                        <label for="mpd_brand" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Marka:</label>
-                        <select id="mpd_brand" name="mpd_brand" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
-                            <option value="">-- wybierz markę --</option>
-                            {% for brand in mpd_brands %}
-                            <option value="{{ brand.name }}" {% if brand.name == original.brand.name %}selected{% endif %}>{{ brand.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="button" onclick="updateField('brand_id', 'mpd_brand')" 
-                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Zapisz
-                        </button>
-                    </div>
-                    
-                    <div class="form-row" style="margin:0;">
-                        <label for="mpd_size_category" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Grupa rozmiarowa:</label>
-                        <select id="mpd_size_category" name="mpd_size_category" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
-                            <option value="">-- wybierz grupę --</option>
-                            {% for cat in size_categories %}
-                            <option value="{{ cat }}">{{ cat }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="button" onclick="updateField('size_category', 'mpd_size_category')" 
-                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Zapisz
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- KROK 7-9: KOLORY I KOD - W trzech kolumnach -->
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div class="form-row" style="margin:0;">
-                        <label for="main_color_id" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Główny kolor:</label>
-                        <select id="main_color_id" name="main_color_id" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
-                            <option value="">-- wybierz kolor --</option>
-                            {% for color in main_colors %}
-                            <option value="{{ color.id }}" {% if mpd_data.main_color_id == color.id or original.color == color.name %}selected{% endif %}>{{ color.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="button" onclick="updateField('color_id', 'main_color_id')" 
-                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Zapisz
-                        </button>
-                    </div>
-                    
-                    <div class="form-row" style="margin:0;">
-                        <label for="producer_color_name" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Kolor producenta:</label>
-                        <input type="text" id="producer_color_name" name="producer_color_name" list="producer_colors_list" autocomplete="off" 
-                               placeholder="Kolor producenta" 
-                               style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
-                        <button type="button" onclick="updateField('producer_color_id', 'producer_color_name')" 
-                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Zapisz
-                        </button>
-                        <datalist id="producer_colors_list">
-                            {% for color in producer_colors %}
-                                <option value="{{ color.name }}">{{ color.name }}</option>
-                            {% endfor %}
-                        </datalist>
-                    </div>
-                    
-                    <div class="form-row" style="margin:0;">
-                        <label for="producer_code" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Kod producenta:</label>
-                        <input type="text" id="producer_code" name="producer_code" value="{{ producer_code|default:'' }}" 
-                               placeholder="Kod producenta" 
-                               style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
-                        <button type="button" onclick="updateField('producer_code', 'producer_code')" 
-                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Zapisz
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- KROK 10-12: NAZWA SERII, ŚCIEŻKI, JEDNOSTKA - W trzech kolumnach -->
-                <div style="display:grid; grid-template-columns:1fr 2fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div class="form-row" style="margin:0;">
-                        <label for="series_name" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Nazwa serii:</label>
-                        <input type="text" id="series_name" name="series_name" value="{{ series_name|default:'' }}" 
-                               placeholder="Nazwa serii" 
-                               style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
-                        <button type="button" onclick="updateField('series_id', 'series_name')" 
-                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Zapisz
-                        </button>
-                    </div>
-                    
-                    <div class="form-row" style="margin:0;">
-                        <label for="mpd_paths" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Ścieżki produktu:</label>
-                        <select id="mpd_paths" name="mpd_paths" multiple size="10" 
-                                style="width:100%; padding:3px; border:1px solid #ccc; border-radius:2px; font-size:10px;">
-                            {% for path in mpd_paths %}
-                            <option value="{{ path.id }}" {% if path.id in selected_paths %}selected{% endif %}>
-                                {{ path.name }} ({{ path.path }})
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <button type="button" onclick="addPaths()" 
-                                style="margin-top:3px; background:#17a2b8; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Dodaj
-                        </button>
-                    </div>
-                    
-                    <div class="form-row" style="margin:0;">
-                        <label for="unit_id" style="font-size:11px; font-weight:bold; color:#555; margin-bottom:3px; display:block;">Jednostka:</label>
-                        <select id="unit_id" name="unit_id" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:2px; font-size:11px;">
-                            <option value="">-- wybierz jednostkę --</option>
-                            {% for unit in units %}
-                            <option value="{{ unit.id }}" {% if unit.id == selected_unit_id %}selected{% endif %}>{{ unit.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="button" onclick="updateField('unit', 'unit_id')" 
-                                style="margin-top:3px; background:#28a745; color:white; border:none; padding:3px 6px; border-radius:2px; cursor:pointer; font-size:10px;">
-                            Zapisz
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- KROK 13: SKŁAD (MATERIAŁY) -->
-                <div class="form-row" id="fabric-section">
-                    <label>Skład (materiały):</label>
-                    <div id="fabric-list">
-                        <div class="fabric-row" style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
-                            <select name="fabric_component[]">
-                                <option value="">-- wybierz materiał --</option>
-                                {% for fabric in fabric_components %}
-                                    <option value="{{ fabric.id }}">{{ fabric.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <input type="number" name="fabric_percentage[]" min="0" max="100" placeholder="%" style="width:60px;" />
-                            <button type="button" onclick="removeFabricRow(this)">Usuń</button>
-                        </div>
-                    </div>
-                    <button type="button" onclick="addFabricRow()" style="margin-top:5px;">Dodaj materiał</button>
-                </div>
-                
-                <div class="form-row" style="margin-bottom: 10px;">
-                    <b>ID w MPD:</b> {{ original.mapped_product_uid|default:'-' }}
-                </div>
-            </form>
-            {% if not is_mapped %}
-            <button type="button" id="create-mpd-product-btn" class="mpd-form-btn" style="margin-top:20px; background:#417690; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Utwórz nowy produkt w MPD</button>
-            {% else %}
-            <!-- KROK 14: UPLOAD ZDJĘĆ -->
-            <div class="form-row" style="margin-top:20px;">
-                <button type="button" onclick="uploadImages()" style="background:#28a745; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Upload zdjęć do bucketa</button>
-                <div id="status-message" style="margin-top:10px; padding:10px; border-radius:4px; display:none;"></div>
-            </div>
-            {% endif %}
-            <div id="bulk-create-single-container" style="display:none; margin-top:20px;">
-                <div id="single-product-create-container" 
-                     data-product-id="{{ original.product_id }}"
-                     data-product-name="{{ original.name }}"
-                     data-product-description="{{ original.description }}"
-                     data-brand-name="{{ original.brand.name|default:'' }}"
-                     data-variants="{{ variants_json }}">
-                </div>
-            </div>
+      {% if suggested_products %}
+      <div
+        class="form-row"
+        style="
+          margin-bottom: 30px;
+          padding: 12px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          background: #f8f9fa;
+        "
+      >
+        <h3 style="margin: 0 0 12px 0; color: #333; font-size: 14px; font-weight: bold">
+          Sugerowane podobne produkty w MPD:
+        </h3>
+        <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px">
+          <label for="sort-select" style="font-size: 12px; font-weight: bold; color: #666"
+            >Sortuj według:</label
+          >
+          <select
+            id="sort-select"
+            onchange="changeSort()"
+            style="padding: 4px 6px; border: 1px solid #ccc; border-radius: 3px; font-size: 12px"
+          >
+            <option
+              value="similarity"
+              {%
+              if
+              request.GET.sort_by
+              !="suggested_in_query"
+              %}selected{%
+              endif
+              %}
+            >
+              Podobieństwo
+            </option>
+            <option
+              value="suggested_in_query"
+              {%
+              if
+              request.GET.sort_by=""
+              ="suggested_in_query"
+              %}selected{%
+              endif
+              %}
+            >
+              Pokrycie słów
+            </option>
+          </select>
         </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px">
+          <thead>
+            <tr style="background: #f8f9fa">
+              <th style="text-align: left; border: 1px solid #ddd; padding: 6px; font-size: 11px">
+                Nazwa
+              </th>
+              <th
+                style="
+                  text-align: left;
+                  border: 1px solid #ddd;
+                  padding: 6px;
+                  font-size: 11px;
+                  width: 80px;
+                "
+              >
+                Marka
+              </th>
+              <th
+                style="
+                  text-align: center;
+                  border: 1px solid #ddd;
+                  padding: 6px;
+                  font-size: 11px;
+                  width: 60px;
+                "
+              >
+                Podob.
+              </th>
+              <th
+                style="
+                  text-align: center;
+                  border: 1px solid #ddd;
+                  padding: 6px;
+                  font-size: 11px;
+                  width: 60px;
+                "
+              >
+                Pokrycie
+              </th>
+              <th
+                style="
+                  text-align: left;
+                  border: 1px solid #ddd;
+                  padding: 6px;
+                  font-size: 11px;
+                  width: 120px;
+                "
+              >
+                Główny kolor
+              </th>
+              <th
+                style="
+                  text-align: left;
+                  border: 1px solid #ddd;
+                  padding: 6px;
+                  font-size: 11px;
+                  width: 120px;
+                "
+              >
+                Kolor prod.
+              </th>
+              <th
+                style="
+                  text-align: left;
+                  border: 1px solid #ddd;
+                  padding: 6px;
+                  font-size: 11px;
+                  width: 100px;
+                "
+              >
+                Kod prod.
+              </th>
+              <th
+                style="
+                  text-align: center;
+                  border: 1px solid #ddd;
+                  padding: 6px;
+                  font-size: 11px;
+                  width: 80px;
+                "
+              >
+                Akcja
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in suggested_products %}
+            <tr
+              style="border-bottom: 1px solid #eee; transition: background-color 0.2s"
+              onmouseover="this.style.backgroundColor='#f0f8ff'"
+              onmouseout="this.style.backgroundColor=''"
+            >
+              <td
+                style="
+                  border: 1px solid #ddd;
+                  padding: 6px;
+                  max-width: 200px;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  white-space: nowrap;
+                "
+                title="{{ product.name }}"
+              >
+                {{ product.name|truncatechars:30 }}
+              </td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center">
+                {{ product.brand|truncatechars:10 }}
+              </td>
+              <td
+                style="
+                  border: 1px solid #ddd;
+                  padding: 6px;
+                  text-align: center;
+                  font-weight: bold;
+                  color: #28a745;
+                "
+              >
+                {{ product.similarity|floatformat:1 }}%
+              </td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; color: #17a2b8">
+                {{ product.suggested_in_query|floatformat:1 }}%
+              </td>
+              <td style="border: 1px solid #ddd; padding: 4px">
+                <select
+                  class="main-color-select"
+                  style="
+                    width: 100%;
+                    font-size: 11px;
+                    padding: 2px;
+                    border: 1px solid #ccc;
+                    border-radius: 3px;
+                  "
+                >
+                  <option value="">-- kolor --</option>
+                  {% for color in main_colors %}
+                  <option value="{{ color.id }}">{{ color.name|truncatechars:15 }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td style="border: 1px solid #ddd; padding: 4px">
+                <input
+                  type="text"
+                  class="producer-color-input"
+                  list="producer_colors_list"
+                  autocomplete="off"
+                  style="
+                    width: 100%;
+                    font-size: 11px;
+                    padding: 2px;
+                    border: 1px solid #ccc;
+                    border-radius: 3px;
+                  "
+                  placeholder="Kolor prod."
+                />
+                <datalist id="producer_colors_list">
+                  {% for color in producer_colors %}
+                  <option value="{{ color.name }}">{{ color.name }}</option>
+                  {% endfor %}
+                </datalist>
+              </td>
+              <td style="border: 1px solid #ddd; padding: 4px">
+                <input
+                  type="text"
+                  class="producer-code-input"
+                  placeholder="Kod"
+                  style="
+                    width: 100%;
+                    font-size: 11px;
+                    padding: 2px;
+                    border: 1px solid #ccc;
+                    border-radius: 3px;
+                  "
+                />
+              </td>
+              <td style="border: 1px solid #ddd; padding: 4px; text-align: center">
+                <button
+                  type="button"
+                  class="assign-mapping-btn"
+                  data-mpd-id="{{ product.id }}"
+                  style="
+                    background: #007cba;
+                    color: white;
+                    border: none;
+                    padding: 4px 8px;
+                    border-radius: 3px;
+                    font-size: 11px;
+                    cursor: pointer;
+                    transition: background-color 0.2s;
+                  "
+                  onmouseover="this.style.backgroundColor='#005a87'"
+                  onmouseout="this.style.backgroundColor='#007cba'"
+                >
+                  Przypisz
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <form id="mpd-form">
+        {% csrf_token %}
+        <input type="hidden" name="product_id" value="{{ original.id }}" />
+
+        <!-- Kompaktowy formularz w dwóch kolumnach -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px">
+          <div class="form-row" style="margin: 0">
+            <label
+              for="mpd_name"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Nazwa:</label
+            >
+            <input
+              type="text"
+              id="mpd_name"
+              name="mpd_name"
+              value="{{ original.name }}"
+              style="
+                width: 100%;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 11px;
+              "
+            />
+            <button
+              type="button"
+              onclick="updateField('name', 'mpd_name')"
+              style="
+                margin-top: 3px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Zapisz
+            </button>
+          </div>
+
+          <div class="form-row" style="margin: 0">
+            <label
+              for="mpd_short_description"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Krótki opis:</label
+            >
+            <textarea
+              id="mpd_short_description"
+              name="mpd_short_description"
+              style="
+                height: 35px;
+                width: 100%;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 11px;
+                resize: vertical;
+              "
+            >
+{{ mpd_data.short_description }}</textarea
+            >
+            <button
+              type="button"
+              onclick="updateField('short_description', 'mpd_short_description')"
+              style="
+                margin-top: 3px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Zapisz
+            </button>
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-bottom: 10px">
+          <label
+            for="mpd_description"
+            style="
+              font-size: 11px;
+              font-weight: bold;
+              color: #555;
+              margin-bottom: 3px;
+              display: block;
+            "
+            >Opis:</label
+          >
+          <textarea
+            id="mpd_description"
+            name="mpd_description"
+            style="
+              height: 60px;
+              width: 100%;
+              padding: 4px;
+              border: 1px solid #ccc;
+              border-radius: 2px;
+              font-size: 11px;
+              resize: vertical;
+            "
+          >
+{{ original.description }}</textarea
+          >
+          <button
+            type="button"
+            onclick="updateField('description', 'mpd_description')"
+            style="
+              margin-top: 3px;
+              background: #28a745;
+              color: white;
+              border: none;
+              padding: 3px 6px;
+              border-radius: 2px;
+              cursor: pointer;
+              font-size: 10px;
+            "
+          >
+            Zapisz
+          </button>
+        </div>
+
+        <!-- KROK 4: ATRYBUTY - Kompaktowa wersja -->
+        <div class="form-row" style="margin-bottom: 10px">
+          <label
+            for="mpd_attributes"
+            style="
+              font-size: 11px;
+              font-weight: bold;
+              color: #555;
+              margin-bottom: 3px;
+              display: block;
+            "
+            >Atrybuty:</label
+          >
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 6px; align-items: start">
+            <select
+              multiple
+              name="mpd_attributes"
+              id="mpd_attributes"
+              size="15"
+              style="
+                width: 100%;
+                padding: 3px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 10px;
+              "
+              onchange="saveAttributeSelection()"
+              onblur="saveAttributeSelection()"
+              onfocus="restoreAttributeSelection()"
+              onclick="saveAttributeSelection()"
+            >
+              {% for attribute in mpd_attributes %}
+              <option
+                value="{{ attribute.id }}"
+                {%
+                if
+                attribute.id
+                in
+                selected_attributes
+                %}selected{%
+                endif
+                %}
+              >
+                {{ attribute.name }}
+              </option>
+              {% endfor %}
+            </select>
+            <div>
+              <button
+                type="button"
+                onclick="updateAttributes()"
+                style="
+                  background: #28a745;
+                  color: white;
+                  border: none;
+                  padding: 3px 6px;
+                  border-radius: 2px;
+                  cursor: pointer;
+                  font-size: 10px;
+                  width: 100%;
+                  margin-bottom: 4px;
+                "
+              >
+                Zapisz atrybuty
+              </button>
+              <button
+                type="button"
+                onclick="removeSelectedAttributes()"
+                style="
+                  background: #dc3545;
+                  color: white;
+                  border: none;
+                  padding: 3px 6px;
+                  border-radius: 2px;
+                  cursor: pointer;
+                  font-size: 10px;
+                  width: 100%;
+                  margin-bottom: 6px;
+                "
+              >
+                Usuń wybrane
+              </button>
+              <div
+                id="selected-attributes-list"
+                style="
+                  font-size: 9px;
+                  color: #666;
+                  background: #f8f9fa;
+                  padding: 4px;
+                  border-radius: 2px;
+                  border: 1px solid #ddd;
+                  max-height: 120px;
+                  overflow-y: auto;
+                "
+              >
+                <strong>Wybrane:</strong><br />
+                <div id="selected-attributes-content">
+                  {% for attribute in mpd_attributes %} {% if attribute.id in selected_attributes %}
+                  <div
+                    class="selected-attribute"
+                    data-attribute-id="{{ attribute.id }}"
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      margin: 2px 0;
+                      padding: 2px;
+                      background: #e8f5e8;
+                      border-radius: 2px;
+                    "
+                  >
+                    <span>{{ attribute.name }}</span>
+                    <button
+                      type="button"
+                      onclick="removeSingleAttribute({{ attribute.id }})"
+                      style="
+                        background: #dc3545;
+                        color: white;
+                        border: none;
+                        padding: 1px 4px;
+                        border-radius: 1px;
+                        cursor: pointer;
+                        font-size: 8px;
+                        margin-left: 4px;
+                      "
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {% endif %} {% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- KROK 5-6: MARKA I GRUPA ROZMIAROWA - W dwóch kolumnach -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px">
+          <div class="form-row" style="margin: 0">
+            <label
+              for="mpd_brand"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Marka:</label
+            >
+            <select
+              id="mpd_brand"
+              name="mpd_brand"
+              style="
+                width: 100%;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 11px;
+              "
+            >
+              <option value="">-- wybierz markę --</option>
+              {% for brand in mpd_brands %}
+              <option
+                value="{{ brand.name }}"
+                {%
+                if
+                brand.name=""
+                ="original.brand.name"
+                %}selected{%
+                endif
+                %}
+              >
+                {{ brand.name }}
+              </option>
+              {% endfor %}
+            </select>
+            <button
+              type="button"
+              onclick="updateField('brand_id', 'mpd_brand')"
+              style="
+                margin-top: 3px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Zapisz
+            </button>
+          </div>
+
+          <div class="form-row" style="margin: 0">
+            <label
+              for="mpd_size_category"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Grupa rozmiarowa:</label
+            >
+            <select
+              id="mpd_size_category"
+              name="mpd_size_category"
+              style="
+                width: 100%;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 11px;
+              "
+            >
+              <option value="">-- wybierz grupę --</option>
+              {% for cat in size_categories %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+            <button
+              type="button"
+              onclick="updateField('size_category', 'mpd_size_category')"
+              style="
+                margin-top: 3px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Zapisz
+            </button>
+          </div>
+        </div>
+
+        <!-- KROK 7-9: KOLORY I KOD - W trzech kolumnach -->
+        <div
+          style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px"
+        >
+          <div class="form-row" style="margin: 0">
+            <label
+              for="main_color_id"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Główny kolor:</label
+            >
+            <select
+              id="main_color_id"
+              name="main_color_id"
+              style="
+                width: 100%;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 11px;
+              "
+            >
+              <option value="">-- wybierz kolor --</option>
+              {% for color in main_colors %}
+              <option
+                value="{{ color.id }}"
+                {%
+                if
+                mpd_data.main_color_id=""
+                ="color.id"
+                or
+                original.color=""
+                ="color.name"
+                %}selected{%
+                endif
+                %}
+              >
+                {{ color.name }}
+              </option>
+              {% endfor %}
+            </select>
+            <button
+              type="button"
+              onclick="updateField('color_id', 'main_color_id')"
+              style="
+                margin-top: 3px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Zapisz
+            </button>
+          </div>
+
+          <div class="form-row" style="margin: 0">
+            <label
+              for="producer_color_name"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Kolor producenta:</label
+            >
+            <input
+              type="text"
+              id="producer_color_name"
+              name="producer_color_name"
+              list="producer_colors_list"
+              autocomplete="off"
+              placeholder="Kolor producenta"
+              style="
+                width: 100%;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 11px;
+              "
+            />
+            <button
+              type="button"
+              onclick="updateField('producer_color_id', 'producer_color_name')"
+              style="
+                margin-top: 3px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Zapisz
+            </button>
+            <datalist id="producer_colors_list">
+              {% for color in producer_colors %}
+              <option value="{{ color.name }}">{{ color.name }}</option>
+              {% endfor %}
+            </datalist>
+          </div>
+
+          <div class="form-row" style="margin: 0">
+            <label
+              for="producer_code"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Kod producenta:</label
+            >
+            <input
+              type="text"
+              id="producer_code"
+              name="producer_code"
+              value="{{ producer_code|default:'' }}"
+              placeholder="Kod producenta"
+              style="
+                width: 100%;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 11px;
+              "
+            />
+            <button
+              type="button"
+              onclick="updateField('producer_code', 'producer_code')"
+              style="
+                margin-top: 3px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Zapisz
+            </button>
+          </div>
+        </div>
+
+        <!-- KROK 10-12: NAZWA SERII, ŚCIEŻKI, JEDNOSTKA - W trzech kolumnach -->
+        <div
+          style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; margin-bottom: 10px"
+        >
+          <div class="form-row" style="margin: 0">
+            <label
+              for="series_name"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Nazwa serii:</label
+            >
+            <input
+              type="text"
+              id="series_name"
+              name="series_name"
+              value="{{ series_name|default:'' }}"
+              placeholder="Nazwa serii"
+              style="
+                width: 100%;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 11px;
+              "
+            />
+            <button
+              type="button"
+              onclick="updateField('series_id', 'series_name')"
+              style="
+                margin-top: 3px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Zapisz
+            </button>
+          </div>
+
+          <div class="form-row" style="margin: 0">
+            <label
+              for="mpd_paths"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Ścieżki produktu:</label
+            >
+            <select
+              id="mpd_paths"
+              name="mpd_paths"
+              multiple
+              size="10"
+              style="
+                width: 100%;
+                padding: 3px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 10px;
+              "
+            >
+              {% for path in mpd_paths %}
+              <option value="{{ path.id }}" {% if path.id in selected_paths %}selected{% endif %}>
+                {{ path.name }} ({{ path.path }})
+              </option>
+              {% endfor %}
+            </select>
+            <button
+              type="button"
+              onclick="addPaths()"
+              style="
+                margin-top: 3px;
+                background: #17a2b8;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Dodaj
+            </button>
+          </div>
+
+          <div class="form-row" style="margin: 0">
+            <label
+              for="unit_id"
+              style="
+                font-size: 11px;
+                font-weight: bold;
+                color: #555;
+                margin-bottom: 3px;
+                display: block;
+              "
+              >Jednostka:</label
+            >
+            <select
+              id="unit_id"
+              name="unit_id"
+              style="
+                width: 100%;
+                padding: 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                font-size: 11px;
+              "
+            >
+              <option value="">-- wybierz jednostkę --</option>
+              {% for unit in units %}
+              <option
+                value="{{ unit.id }}"
+                {%
+                if
+                unit.id=""
+                ="selected_unit_id"
+                %}selected{%
+                endif
+                %}
+              >
+                {{ unit.name }}
+              </option>
+              {% endfor %}
+            </select>
+            <button
+              type="button"
+              onclick="updateField('unit', 'unit_id')"
+              style="
+                margin-top: 3px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 3px 6px;
+                border-radius: 2px;
+                cursor: pointer;
+                font-size: 10px;
+              "
+            >
+              Zapisz
+            </button>
+          </div>
+        </div>
+
+        <!-- KROK 13: SKŁAD (MATERIAŁY) -->
+        <div class="form-row" id="fabric-section">
+          <label>Skład (materiały):</label>
+          <div id="fabric-list">
+            <div
+              class="fabric-row"
+              style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px"
+            >
+              <select name="fabric_component[]">
+                <option value="">-- wybierz materiał --</option>
+                {% for fabric in fabric_components %}
+                <option value="{{ fabric.id }}">{{ fabric.name }}</option>
+                {% endfor %}
+              </select>
+              <input
+                type="number"
+                name="fabric_percentage[]"
+                min="0"
+                max="100"
+                placeholder="%"
+                style="width: 60px"
+              />
+              <button type="button" onclick="removeFabricRow(this)">Usuń</button>
+            </div>
+          </div>
+          <button type="button" onclick="addFabricRow()" style="margin-top: 5px">
+            Dodaj materiał
+          </button>
+        </div>
+
+        <div class="form-row" style="margin-bottom: 10px">
+          <b>ID w MPD:</b> {{ original.mapped_product_uid|default:'-' }}
+        </div>
+      </form>
+      {% if not is_mapped %}
+      <button
+        type="button"
+        id="create-mpd-product-btn"
+        class="mpd-form-btn"
+        style="
+          margin-top: 20px;
+          background: #417690;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 4px;
+          cursor: pointer;
+        "
+      >
+        Utwórz nowy produkt w MPD
+      </button>
+      {% else %}
+      <!-- KROK 14: UPLOAD ZDJĘĆ -->
+      <div class="form-row" style="margin-top: 20px">
+        <button
+          type="button"
+          onclick="uploadImages()"
+          style="
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+          "
+        >
+          Upload zdjęć do bucketa
+        </button>
+        <div
+          id="status-message"
+          style="margin-top: 10px; padding: 10px; border-radius: 4px; display: none"
+        ></div>
+      </div>
+      {% endif %}
+      <div id="bulk-create-single-container" style="display: none; margin-top: 20px">
+        <div
+          id="single-product-create-container"
+          data-product-id="{{ original.product_id }}"
+          data-product-name="{{ original.name }}"
+          data-product-description="{{ original.description }}"
+          data-brand-name="{{ original.brand.name|default:'' }}"
+          data-variants="{{ variants_json }}"
+        ></div>
+      </div>
     </div>
-    <button class="toggle-button">{% if is_mapped %}◀{% else %}▶{% endif %}</button>
+  </div>
+  <button class="toggle-button">{% if is_mapped %}◀{% else %}▶{% endif %}</button>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const toggleButton = document.querySelector('.toggle-button');
-    const rightColumn = document.querySelector('.right-column');
-    
-    toggleButton.addEventListener('click', function() {
-        rightColumn.classList.toggle('collapsed');
-        toggleButton.textContent = rightColumn.classList.contains('collapsed') ? '▶' : '◀';
-    });
+  document.addEventListener('DOMContentLoaded', function() {
+      const toggleButton = document.querySelector('.toggle-button');
+      const rightColumn = document.querySelector('.right-column');
 
-    document.querySelectorAll('.assign-mapping-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            const mpdId = this.getAttribute('data-mpd-id');
-            const row = this.closest('tr');
-            const mainColorId = row.querySelector('.main-color-select').value;
-            const producerColorName = row.querySelector('.producer-color-input').value;
-            const producerCode = row.querySelector('.producer-code-input').value;
-            
-            if (confirm('Czy na pewno chcesz przypisać ten produkt do MPD ID ' + mpdId + '?')) {
-                const formData = new FormData();
-                
-                formData.append('main_color_id', mainColorId);
-                formData.append('producer_color_name', producerColorName);
-                formData.append('producer_code', producerCode);
-                
-                fetch(`/admin/matterhorn1/product/assign-mapping/${document.querySelector('[name=product_id]').value}/${mpdId}/`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    },
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    const statusMessage = document.getElementById('status-message');
-                    statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
-                    statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
-                    if (data.success) {
-                        setTimeout(() => { window.location.reload(); }, 1500);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    const statusMessage = document.getElementById('status-message');
-                    statusMessage.className = 'status-message error';
-                    statusMessage.textContent = 'Wystąpił błąd podczas przypisywania produktu.';
-                });
-            }
-        });
-    });
+      toggleButton.addEventListener('click', function() {
+          rightColumn.classList.toggle('collapsed');
+          toggleButton.textContent = rightColumn.classList.contains('collapsed') ? '▶' : '◀';
+      });
 
-    // Dodaj obsługę przycisku "Utwórz nowy produkt w MPD"
+      document.querySelectorAll('.assign-mapping-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+              const mpdId = this.getAttribute('data-mpd-id');
+              const row = this.closest('tr');
+              const mainColorId = row.querySelector('.main-color-select').value;
+              const producerColorName = row.querySelector('.producer-color-input').value;
+              const producerCode = row.querySelector('.producer-code-input').value;
+
+              const formData = new FormData();
+
+              formData.append('main_color_id', mainColorId);
+              formData.append('producer_color_name', producerColorName);
+              formData.append('producer_code', producerCode);
+
+              fetch(`/admin/matterhorn1/product/assign-mapping/${document.querySelector('[name=product_id]').value}/${mpdId}/`, {
+                  method: 'POST',
+                  headers: {
+                      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                  },
+                  body: formData
+              })
+              .then(response => response.json())
+              .then(data => {
+                  const statusMessage = document.getElementById('status-message');
+                  statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+                  statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+                  if (data.success) {
+                      setTimeout(() => { window.location.reload(); }, 1500);
+                  }
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  const statusMessage = document.getElementById('status-message');
+                  statusMessage.className = 'status-message error';
+                  statusMessage.textContent = 'Wystąpił błąd podczas przypisywania produktu.';
+              });
+          });
+      });
+
+      // Dodaj obsługę przycisku "Utwórz nowy produkt w MPD"
+      const createBtn = document.getElementById('create-mpd-product-btn');
+      if (createBtn) {
+          createBtn.addEventListener('click', function() {
+              const productId = {{ original.id }};
+              const formData = new FormData(document.getElementById('mpd-form'));
+              const statusMessage = document.getElementById('status-message');
+              statusMessage.className = 'status-message';
+              statusMessage.textContent = 'Tworzenie produktu w MPD...';
+
+              // Debug: sprawdź CSRF token
+              const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+              console.log('CSRF Token:', csrfToken ? csrfToken.value : 'NOT FOUND');
+              console.log('Product ID:', productId);
+              console.log('Form Data:', Array.from(formData.entries()));
+
+              fetch(`/admin/matterhorn1/product/mpd-create/${productId}/`, {
+                  method: 'POST',
+                  headers: {
+                      'X-CSRFToken': csrfToken ? csrfToken.value : ''
+                  },
+                  body: formData
+              })
+              .then(response => {
+                  console.log('Response status:', response.status);
+                  console.log('Response headers:', response.headers);
+
+                  if (!response.ok) {
+                      throw new Error(`HTTP error! status: ${response.status}`);
+                  }
+
+                  // Sprawdź content-type przed parsowaniem
+                  const contentType = response.headers.get('content-type');
+                  console.log('Content-Type:', contentType);
+
+                  if (contentType && contentType.includes('application/json')) {
+                      return response.json();
+                  } else {
+                      // Jeśli nie jest JSON, przeczytaj jako text
+                      return response.text().then(text => {
+                          console.log('Response text (not JSON):', text);
+                          throw new Error('Server returned non-JSON response: ' + text.substring(0, 100));
+                      });
+                  }
+              })
+              .then(data => {
+                  console.log('Parsed JSON data:', data);
+                  statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+                  statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+                  if (data.success) {
+                      setTimeout(() => { window.location.reload(); }, 1500);
+                  }
+              })
+              .catch(error => {
+                  console.error('Error:', error);
+                  statusMessage.className = 'status-message error';
+                  statusMessage.textContent = 'Wystąpił błąd podczas tworzenia produktu MPD.';
+              });
+          });
+      }
+
+      // Add event listeners for select elements to force text visibility
+      const selectElements = document.querySelectorAll('select');
+      selectElements.forEach(select => {
+          select.addEventListener('change', function() {
+              this.style.color = '#333';
+              this.style.backgroundColor = '#fff';
+              this.style.textShadow = 'none';
+              this.style.webkitTextFillColor = '#333';
+              this.style.mozTextFillColor = '#333';
+              this.style.lineHeight = '1.2';
+              this.style.padding = '8px 12px';
+              this.style.height = 'auto';
+              this.style.minHeight = '36px';
+              this.style.verticalAlign = 'top';
+          });
+
+          select.addEventListener('focus', function() {
+              this.style.color = '#333';
+              this.style.backgroundColor = '#fff';
+              this.style.textShadow = 'none';
+              this.style.webkitTextFillColor = '#333';
+              this.style.mozTextFillColor = '#333';
+              this.style.lineHeight = '1.2';
+              this.style.padding = '8px 12px';
+              this.style.height = 'auto';
+              this.style.minHeight = '36px';
+              this.style.verticalAlign = 'top';
+          });
+      });
+
+      // Dodaj obsługę przycisków usuwania atrybutów
+      document.querySelectorAll('.remove-attribute-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+              const attributeId = this.getAttribute('data-attribute-id');
+              removeAttribute(attributeId);
+          });
+      });
+
+      // Inicjalizuj zaznaczenie atrybutów
+      const attributesSelect = document.getElementById('mpd_attributes');
+      if (attributesSelect) {
+          const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
+          window.lastAttributeSelection = selectedAttributes;
+
+          // Aktualizuj style wizualne
+          updateAttributeVisualStyles();
+      }
+
+  });
+
+  function updateField(field, inputId) {
+      const value = document.getElementById(inputId).value;
+      const productId = {{ original.mapped_product_uid|default:'null' }};
+
+      // Force text visibility for select elements
+      const selectElement = document.getElementById(inputId);
+      if (selectElement && selectElement.tagName === 'SELECT') {
+          selectElement.style.color = '#333';
+          selectElement.style.backgroundColor = '#fff';
+          selectElement.style.textShadow = 'none';
+          selectElement.style.webkitTextFillColor = '#333';
+          selectElement.style.mozTextFillColor = '#333';
+          selectElement.style.lineHeight = '1.2';
+          selectElement.style.padding = '8px 12px';
+          selectElement.style.height = 'auto';
+          selectElement.style.minHeight = '36px';
+          selectElement.style.verticalAlign = 'top';
+      }
+
+      if (!productId) {
+          // Dla niezmapowanych produktów - użyj mpd-create
+          const matterhornProductId = {{ original.id }};
+          const formData = new FormData(document.getElementById('mpd-form'));
+
+          fetch(`/admin/matterhorn1/product/mpd-create/${matterhornProductId}/`, {
+              method: 'POST',
+              headers: {
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  showInlineStatus('Produkt utworzony w MPD!', true);
+                  // Odśwież stronę żeby pokazać zmapowany produkt
+                  setTimeout(() => location.reload(), 1000);
+              } else {
+                  showInlineStatus('Błąd: ' + data.error, false);
+              }
+          })
+          .catch(error => {
+              showInlineStatus('Błąd: ' + error, false);
+          });
+          return;
+      }
+
+      // Dla zmapowanych produktów - użyj mpd-update-field
+      const requestData = { value: value };
+
+      fetch(`/admin/matterhorn1/product/mpd-update-field/${productId}/${field}/`, {
+          method: 'POST',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestData)
+      })
+      .then(response => response.json())
+      .then(data => {
+          showInlineStatus(data.success ? 'Zaktualizowano!' : 'Błąd: ' + data.error, data.success);
+      })
+      .catch(error => {
+          showInlineStatus('Błąd: ' + error, false);
+      });
+  }
+
+  function showInlineStatus(msg, success) {
+      const el = document.getElementById('inline-status-message');
+      el.textContent = msg;
+      el.className = 'status-message ' + (success ? 'success' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 2500);
+  }
+
+  function addPaths() {
+      const formData = new FormData();
+      const select = document.getElementById('mpd_paths');
+      for (const option of select.selectedOptions) {
+          formData.append('mpd_paths', option.value);
+      }
+      const productId = {{ original.id }};
+      fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
+          method: 'POST',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+          showInlineStatus(data.success ? 'Dodano ścieżki!' : (data.error || 'Błąd dodawania ścieżek.'), data.success);
+          if(data.success) window.location.reload();
+      });
+  }
+
+  function removePath(pathId) {
+      const productId = {{ original.id }};
+      const formData = new FormData();
+      formData.append('remove_path_id', pathId);
+
+      fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
+          method: 'POST',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+          showInlineStatus(data.success ? 'Usunięto ścieżkę!' : (data.error || 'Błąd usuwania ścieżki.'), data.success);
+          if(data.success) window.location.reload();
+      });
+  }
+
+  function removeAttribute(attributeId) {
+      const productId = {{ original.id }};
+      const formData = new FormData();
+      formData.append('remove_attribute_id', attributeId);
+
+      fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
+          method: 'POST',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+          showInlineStatus(data.success ? 'Usunięto atrybut!' : (data.error || 'Błąd usuwania atrybutu.'), data.success);
+          if(data.success) window.location.reload();
+      });
+  }
+
+  function removeSingleAttribute(attributeId) {
+      removeAttribute(attributeId);
+  }
+
+  function removeSelectedAttributes() {
+      const attributesSelect = document.getElementById('mpd_attributes');
+      const selectedOptions = Array.from(attributesSelect.selectedOptions);
+
+      if (selectedOptions.length === 0) {
+          alert('Nie wybrano żadnych atrybutów do usunięcia.');
+          return;
+      }
+
+      const productId = {{ original.id }};
+      const attributeIds = selectedOptions.map(option => option.value);
+
+      // Usuń każdy atrybut
+      let completed = 0;
+      let errors = 0;
+
+      attributeIds.forEach(attributeId => {
+          const formData = new FormData();
+          formData.append('remove_attribute_id', attributeId);
+
+          fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
+              method: 'POST',
+              headers: {
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  completed++;
+              } else {
+                  errors++;
+              }
+
+              // Po usunięciu wszystkich atrybutów, odśwież stronę
+              if (completed + errors === attributeIds.length) {
+                  if (completed > 0) {
+                      showInlineStatus(`Usunięto ${completed} atrybutów${errors > 0 ? `, ${errors} błędów` : ''}.`, completed > 0);
+                      setTimeout(() => window.location.reload(), 1000);
+                  } else {
+                      showInlineStatus('Błąd usuwania atrybutów.', false);
+                  }
+              }
+          })
+          .catch(error => {
+              errors++;
+              if (completed + errors === attributeIds.length) {
+                  showInlineStatus('Błąd usuwania atrybutów.', false);
+              }
+          });
+      });
+  }
+
+
+  function saveAttributeSelection() {
+      const attributesSelect = document.getElementById('mpd_attributes');
+      const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
+      window.lastAttributeSelection = selectedAttributes;
+
+      // Aktualizuj style wizualne
+      updateAttributeVisualStyles();
+  }
+
+  function updateAttributeVisualStyles() {
+      const attributesSelect = document.getElementById('mpd_attributes');
+      if (attributesSelect) {
+          Array.from(attributesSelect.options).forEach(option => {
+              if (option.selected) {
+                  option.style.backgroundColor = '#28a745';
+                  option.style.color = 'white';
+                  option.style.fontWeight = 'bold';
+              } else {
+                  option.style.backgroundColor = '';
+                  option.style.color = '';
+                  option.style.fontWeight = '';
+              }
+          });
+      }
+  }
+
+  function restoreAttributeSelection() {
+      if (window.lastAttributeSelection) {
+          const attributesSelect = document.getElementById('mpd_attributes');
+          Array.from(attributesSelect.options).forEach(option => {
+              option.selected = window.lastAttributeSelection.includes(option.value);
+          });
+
+          // Aktualizuj style wizualne
+          updateAttributeVisualStyles();
+      }
+  }
+
+  function updateAttributes() {
+      const attributesSelect = document.getElementById('mpd_attributes');
+      const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
+      const productId = {{ original.mapped_product_uid|default:'null' }};
+
+      if (!productId) {
+          // Dla niezmapowanych produktów - użyj mpd-create z całym formularzem
+          const matterhornProductId = {{ original.id }};
+          const formData = new FormData(document.getElementById('mpd-form'));
+
+          fetch(`/admin/matterhorn1/product/mpd-create/${matterhornProductId}/`, {
+              method: 'POST',
+              headers: {
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  showInlineStatus('Produkt utworzony w MPD z atrybutami!', true);
+                  setTimeout(() => location.reload(), 1500);
+              } else {
+                  showInlineStatus('Błąd: ' + data.error, false);
+              }
+          });
+      } else {
+          // Dla zmapowanych produktów - użyj mpd-update
+          fetch(`/admin/matterhorn1/product/mpd-update/{{ original.id }}/`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: new URLSearchParams({
+                  'mpd_attributes': selectedAttributes
+              })
+          })
+          .then(response => response.json())
+          .then(data => {
+              showInlineStatus(data.success ? 'Zaktualizowano atrybuty!' : (data.error || 'Błąd aktualizacji atrybutów.'), data.success);
+              if(data.success) {
+                  setTimeout(() => {
+                      window.location.reload();
+                  }, 1500);
+              }
+          });
+      }
+  }
+
+
+  function addFabricRow() {
+      var row = document.createElement('div');
+      row.className = 'fabric-row';
+      row.style = 'display:flex; gap:10px; align-items:center; margin-bottom:5px;';
+      row.innerHTML = `
+          <select name="fabric_component[]">
+              <option value="">-- wybierz materiał --</option>
+              {% for fabric in fabric_components %}
+                  <option value="{{ fabric.id }}">{{ fabric.name }}</option>
+              {% endfor %}
+          </select>
+          <input type="number" name="fabric_percentage[]" min="0" max="100" placeholder="%" style="width:60px;" />
+          <button type="button" onclick="removeFabricRow(this)">Usuń</button>
+      `;
+      document.getElementById('fabric-list').appendChild(row);
+  }
+
+  function removeFabricRow(btn) {
+      btn.parentElement.remove();
+  }
+
+  function changeSort() {
+      const sortBy = document.getElementById('sort-select').value;
+      const currentUrl = new URL(window.location);
+      currentUrl.searchParams.set('sort_by', sortBy);
+      window.location.href = currentUrl.toString();
+  }
+
+  // ===== NOWE ZAAWANSOWANE FUNKCJE =====
+
+  function uploadImages() {
+      const productId = {{ original.id }};
+      const statusMessage = document.getElementById('status-message');
+      statusMessage.className = 'status-message';
+      statusMessage.textContent = 'Uploadowanie obrazów...';
+
+      fetch(`/admin/matterhorn1/product/upload-images/${productId}/`, {
+          method: 'POST',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          }
+      })
+      .then(response => response.json())
+      .then(data => {
+          statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+          statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          statusMessage.className = 'status-message error';
+          statusMessage.textContent = 'Wystąpił błąd podczas uploadowania obrazów.';
+      });
+  }
+
+  function autoMapVariants() {
+      const productId = {{ original.id }};
+      const statusMessage = document.getElementById('status-message');
+      statusMessage.className = 'status-message';
+      statusMessage.textContent = 'Mapowanie wariantów...';
+
+      fetch(`/admin/matterhorn1/product/auto-map-variants/${productId}/`, {
+          method: 'POST',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          }
+      })
+      .then(response => response.json())
+      .then(data => {
+          statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+          statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+          if (data.success) {
+              setTimeout(() => { window.location.reload(); }, 1500);
+          }
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          statusMessage.className = 'status-message error';
+          statusMessage.textContent = 'Wystąpił błąd podczas mapowania wariantów.';
+      });
+  }
+
+  function syncWithMpd() {
+      const productId = {{ original.id }};
+      const statusMessage = document.getElementById('status-message');
+      statusMessage.className = 'status-message';
+      statusMessage.textContent = 'Synchronizacja z MPD...';
+
+      fetch(`/admin/matterhorn1/product/sync-with-mpd/${productId}/`, {
+          method: 'POST',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          }
+      })
+      .then(response => response.json())
+      .then(data => {
+          statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
+          statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
+          if (data.success) {
+              setTimeout(() => { window.location.reload(); }, 1500);
+          }
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          statusMessage.className = 'status-message error';
+          statusMessage.textContent = 'Wystąpił błąd podczas synchronizacji.';
+      });
+  }
+
+  // Inicjalizacja React komponentów
+  document.addEventListener('DOMContentLoaded', function() {
+    // SingleProductCreate - dla tworzenia pojedynczego produktu
+    const singleProductCreateContainer = document.getElementById('single-product-create-container');
+    if (singleProductCreateContainer) {
+      // Debug: sprawdź co jest w dataset.variants
+      console.log('dataset.variants:', singleProductCreateContainer.dataset.variants);
+      console.log('typeof dataset.variants:', typeof singleProductCreateContainer.dataset.variants);
+
+      const productData = {
+        product_id: parseInt(singleProductCreateContainer.dataset.productId),
+        name: singleProductCreateContainer.dataset.productName,
+        description: singleProductCreateContainer.dataset.productDescription,
+        brand: {
+          name: singleProductCreateContainer.dataset.brandName
+        },
+        variants: JSON.parse(singleProductCreateContainer.dataset.variants || '[]').map(v => ({
+          size_name: v.name || '',
+          stock: v.stock || 0,
+          ean: v.ean || '',
+          producer_code: `${singleProductCreateContainer.dataset.productId}_${v.name || ''}`
+        }))
+      };
+
+      ReactDOM.render(
+        React.createElement(SingleProductCreate, {
+          productId: productData.product_id,
+          productData: productData,
+          onComplete: () => window.location.reload()
+        }),
+        singleProductCreateContainer
+      );
+    }
+
+    // Obsługa przycisku "Utwórz nowy produkt w MPD"
     const createBtn = document.getElementById('create-mpd-product-btn');
-    if (createBtn) {
-        createBtn.addEventListener('click', function() {
-            const productId = {{ original.id }};
-            const formData = new FormData(document.getElementById('mpd-form'));
-            const statusMessage = document.getElementById('status-message');
-            statusMessage.className = 'status-message';
-            statusMessage.textContent = 'Tworzenie produktu w MPD...';
-            
-            // Debug: sprawdź CSRF token
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-            console.log('CSRF Token:', csrfToken ? csrfToken.value : 'NOT FOUND');
-            console.log('Product ID:', productId);
-            console.log('Form Data:', Array.from(formData.entries()));
-            
-            fetch(`/admin/matterhorn1/product/mpd-create/${productId}/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrfToken ? csrfToken.value : ''
-                },
-                body: formData
-            })
-            .then(response => {
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                // Sprawdź content-type przed parsowaniem
-                const contentType = response.headers.get('content-type');
-                console.log('Content-Type:', contentType);
-                
-                if (contentType && contentType.includes('application/json')) {
-                    return response.json();
-                } else {
-                    // Jeśli nie jest JSON, przeczytaj jako text
-                    return response.text().then(text => {
-                        console.log('Response text (not JSON):', text);
-                        throw new Error('Server returned non-JSON response: ' + text.substring(0, 100));
-                    });
-                }
-            })
-            .then(data => {
-                console.log('Parsed JSON data:', data);
-                statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
-                statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
-                if (data.success) {
-                    setTimeout(() => { window.location.reload(); }, 1500);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                statusMessage.className = 'status-message error';
-                statusMessage.textContent = 'Wystąpił błąd podczas tworzenia produktu MPD.';
-            });
-        });
+    const bulkCreateContainer = document.getElementById('bulk-create-single-container');
+
+    if (createBtn && bulkCreateContainer) {
+      createBtn.addEventListener('click', function() {
+        bulkCreateContainer.style.display = 'block';
+        createBtn.style.display = 'none';
+      });
     }
-    
-    // Add event listeners for select elements to force text visibility
-    const selectElements = document.querySelectorAll('select');
-    selectElements.forEach(select => {
-        select.addEventListener('change', function() {
-            this.style.color = '#333';
-            this.style.backgroundColor = '#fff';
-            this.style.textShadow = 'none';
-            this.style.webkitTextFillColor = '#333';
-            this.style.mozTextFillColor = '#333';
-            this.style.lineHeight = '1.2';
-            this.style.padding = '8px 12px';
-            this.style.height = 'auto';
-            this.style.minHeight = '36px';
-            this.style.verticalAlign = 'top';
-        });
-        
-        select.addEventListener('focus', function() {
-            this.style.color = '#333';
-            this.style.backgroundColor = '#fff';
-            this.style.textShadow = 'none';
-            this.style.webkitTextFillColor = '#333';
-            this.style.mozTextFillColor = '#333';
-            this.style.lineHeight = '1.2';
-            this.style.padding = '8px 12px';
-            this.style.height = 'auto';
-            this.style.minHeight = '36px';
-            this.style.verticalAlign = 'top';
-        });
-    });
-
-    // Dodaj obsługę przycisków usuwania atrybutów
-    document.querySelectorAll('.remove-attribute-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            const attributeId = this.getAttribute('data-attribute-id');
-            removeAttribute(attributeId);
-        });
-    });
-
-    // Inicjalizuj zaznaczenie atrybutów
-    const attributesSelect = document.getElementById('mpd_attributes');
-    if (attributesSelect) {
-        const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
-        window.lastAttributeSelection = selectedAttributes;
-        
-        // Aktualizuj style wizualne
-        updateAttributeVisualStyles();
-    }
-
-});
-
-function updateField(field, inputId) {
-    const value = document.getElementById(inputId).value;
-    const productId = {{ original.mapped_product_uid|default:'null' }};
-    
-    // Force text visibility for select elements
-    const selectElement = document.getElementById(inputId);
-    if (selectElement && selectElement.tagName === 'SELECT') {
-        selectElement.style.color = '#333';
-        selectElement.style.backgroundColor = '#fff';
-        selectElement.style.textShadow = 'none';
-        selectElement.style.webkitTextFillColor = '#333';
-        selectElement.style.mozTextFillColor = '#333';
-        selectElement.style.lineHeight = '1.2';
-        selectElement.style.padding = '8px 12px';
-        selectElement.style.height = 'auto';
-        selectElement.style.minHeight = '36px';
-        selectElement.style.verticalAlign = 'top';
-    }
-    
-    if (!productId) {
-        // Dla niezmapowanych produktów - użyj mpd-create
-        const matterhornProductId = {{ original.id }};
-        const formData = new FormData(document.getElementById('mpd-form'));
-        
-        fetch(`/admin/matterhorn1/product/mpd-create/${matterhornProductId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showInlineStatus('Produkt utworzony w MPD!', true);
-                // Odśwież stronę żeby pokazać zmapowany produkt
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showInlineStatus('Błąd: ' + data.error, false);
-            }
-        })
-        .catch(error => {
-            showInlineStatus('Błąd: ' + error, false);
-        });
-        return;
-    }
-    
-    // Dla zmapowanych produktów - użyj mpd-update-field
-    const requestData = { value: value };
-    
-    fetch(`/admin/matterhorn1/product/mpd-update-field/${productId}/${field}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        showInlineStatus(data.success ? 'Zaktualizowano!' : 'Błąd: ' + data.error, data.success);
-    })
-    .catch(error => {
-        showInlineStatus('Błąd: ' + error, false);
-    });
-}
-
-function showInlineStatus(msg, success) {
-    const el = document.getElementById('inline-status-message');
-    el.textContent = msg;
-    el.className = 'status-message ' + (success ? 'success' : 'error');
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 2500);
-}
-
-function addPaths() {
-    const formData = new FormData();
-    const select = document.getElementById('mpd_paths');
-    for (const option of select.selectedOptions) {
-        formData.append('mpd_paths', option.value);
-    }
-    const productId = {{ original.id }};
-    fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        showInlineStatus(data.success ? 'Dodano ścieżki!' : (data.error || 'Błąd dodawania ścieżek.'), data.success);
-        if(data.success) window.location.reload();
-    });
-}
-
-function removePath(pathId) {
-    const productId = {{ original.id }};
-    const formData = new FormData();
-    formData.append('remove_path_id', pathId);
-    
-    fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        showInlineStatus(data.success ? 'Usunięto ścieżkę!' : (data.error || 'Błąd usuwania ścieżki.'), data.success);
-        if(data.success) window.location.reload();
-    });
-}
-
-function removeAttribute(attributeId) {
-    const productId = {{ original.id }};
-    const formData = new FormData();
-    formData.append('remove_attribute_id', attributeId);
-    
-    fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        showInlineStatus(data.success ? 'Usunięto atrybut!' : (data.error || 'Błąd usuwania atrybutu.'), data.success);
-        if(data.success) window.location.reload();
-    });
-}
-
-function removeSingleAttribute(attributeId) {
-    removeAttribute(attributeId);
-}
-
-function removeSelectedAttributes() {
-    const attributesSelect = document.getElementById('mpd_attributes');
-    const selectedOptions = Array.from(attributesSelect.selectedOptions);
-    
-    if (selectedOptions.length === 0) {
-        alert('Nie wybrano żadnych atrybutów do usunięcia.');
-        return;
-    }
-    
-    const productId = {{ original.id }};
-    const attributeIds = selectedOptions.map(option => option.value);
-    
-    // Usuń każdy atrybut
-    let completed = 0;
-    let errors = 0;
-    
-    attributeIds.forEach(attributeId => {
-        const formData = new FormData();
-        formData.append('remove_attribute_id', attributeId);
-        
-        fetch(`/admin/matterhorn1/product/mpd-update/${productId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                completed++;
-            } else {
-                errors++;
-            }
-            
-            // Po usunięciu wszystkich atrybutów, odśwież stronę
-            if (completed + errors === attributeIds.length) {
-                if (completed > 0) {
-                    showInlineStatus(`Usunięto ${completed} atrybutów${errors > 0 ? `, ${errors} błędów` : ''}.`, completed > 0);
-                    setTimeout(() => window.location.reload(), 1000);
-                } else {
-                    showInlineStatus('Błąd usuwania atrybutów.', false);
-                }
-            }
-        })
-        .catch(error => {
-            errors++;
-            if (completed + errors === attributeIds.length) {
-                showInlineStatus('Błąd usuwania atrybutów.', false);
-            }
-        });
-    });
-}
-
-
-function saveAttributeSelection() {
-    const attributesSelect = document.getElementById('mpd_attributes');
-    const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
-    window.lastAttributeSelection = selectedAttributes;
-    
-    // Aktualizuj style wizualne
-    updateAttributeVisualStyles();
-}
-
-function updateAttributeVisualStyles() {
-    const attributesSelect = document.getElementById('mpd_attributes');
-    if (attributesSelect) {
-        Array.from(attributesSelect.options).forEach(option => {
-            if (option.selected) {
-                option.style.backgroundColor = '#28a745';
-                option.style.color = 'white';
-                option.style.fontWeight = 'bold';
-            } else {
-                option.style.backgroundColor = '';
-                option.style.color = '';
-                option.style.fontWeight = '';
-            }
-        });
-    }
-}
-
-function restoreAttributeSelection() {
-    if (window.lastAttributeSelection) {
-        const attributesSelect = document.getElementById('mpd_attributes');
-        Array.from(attributesSelect.options).forEach(option => {
-            option.selected = window.lastAttributeSelection.includes(option.value);
-        });
-        
-        // Aktualizuj style wizualne
-        updateAttributeVisualStyles();
-    }
-}
-
-function updateAttributes() {
-    const attributesSelect = document.getElementById('mpd_attributes');
-    const selectedAttributes = Array.from(attributesSelect.selectedOptions).map(option => option.value);
-    const productId = {{ original.mapped_product_uid|default:'null' }};
-    
-    if (!productId) {
-        // Dla niezmapowanych produktów - użyj mpd-create z całym formularzem
-        const matterhornProductId = {{ original.id }};
-        const formData = new FormData(document.getElementById('mpd-form'));
-        
-        fetch(`/admin/matterhorn1/product/mpd-create/${matterhornProductId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showInlineStatus('Produkt utworzony w MPD z atrybutami!', true);
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                showInlineStatus('Błąd: ' + data.error, false);
-            }
-        });
-    } else {
-        // Dla zmapowanych produktów - użyj mpd-update
-        fetch(`/admin/matterhorn1/product/mpd-update/{{ original.id }}/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: new URLSearchParams({
-                'mpd_attributes': selectedAttributes
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            showInlineStatus(data.success ? 'Zaktualizowano atrybuty!' : (data.error || 'Błąd aktualizacji atrybutów.'), data.success);
-            if(data.success) {
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            }
-        });
-    }
-}
-
-
-function addFabricRow() {
-    var row = document.createElement('div');
-    row.className = 'fabric-row';
-    row.style = 'display:flex; gap:10px; align-items:center; margin-bottom:5px;';
-    row.innerHTML = `
-        <select name="fabric_component[]">
-            <option value="">-- wybierz materiał --</option>
-            {% for fabric in fabric_components %}
-                <option value="{{ fabric.id }}">{{ fabric.name }}</option>
-            {% endfor %}
-        </select>
-        <input type="number" name="fabric_percentage[]" min="0" max="100" placeholder="%" style="width:60px;" />
-        <button type="button" onclick="removeFabricRow(this)">Usuń</button>
-    `;
-    document.getElementById('fabric-list').appendChild(row);
-}
-
-function removeFabricRow(btn) {
-    btn.parentElement.remove();
-}
-
-function changeSort() {
-    const sortBy = document.getElementById('sort-select').value;
-    const currentUrl = new URL(window.location);
-    currentUrl.searchParams.set('sort_by', sortBy);
-    window.location.href = currentUrl.toString();
-}
-
-// ===== NOWE ZAAWANSOWANE FUNKCJE =====
-
-function uploadImages() {
-    const productId = {{ original.id }};
-    const statusMessage = document.getElementById('status-message');
-    statusMessage.className = 'status-message';
-    statusMessage.textContent = 'Uploadowanie obrazów...';
-    
-    fetch(`/admin/matterhorn1/product/upload-images/${productId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
-        statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        statusMessage.className = 'status-message error';
-        statusMessage.textContent = 'Wystąpił błąd podczas uploadowania obrazów.';
-    });
-}
-
-function autoMapVariants() {
-    const productId = {{ original.id }};
-    const statusMessage = document.getElementById('status-message');
-    statusMessage.className = 'status-message';
-    statusMessage.textContent = 'Mapowanie wariantów...';
-    
-    fetch(`/admin/matterhorn1/product/auto-map-variants/${productId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
-        statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
-        if (data.success) {
-            setTimeout(() => { window.location.reload(); }, 1500);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        statusMessage.className = 'status-message error';
-        statusMessage.textContent = 'Wystąpił błąd podczas mapowania wariantów.';
-    });
-}
-
-function syncWithMpd() {
-    const productId = {{ original.id }};
-    const statusMessage = document.getElementById('status-message');
-    statusMessage.className = 'status-message';
-    statusMessage.textContent = 'Synchronizacja z MPD...';
-    
-    fetch(`/admin/matterhorn1/product/sync-with-mpd/${productId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        statusMessage.className = 'status-message ' + (data.success ? 'success' : 'error');
-        statusMessage.textContent = data.message || data.error || 'Wystąpił nieznany błąd.';
-        if (data.success) {
-            setTimeout(() => { window.location.reload(); }, 1500);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        statusMessage.className = 'status-message error';
-        statusMessage.textContent = 'Wystąpił błąd podczas synchronizacji.';
-    });
-}
-
-// Inicjalizacja React komponentów
-document.addEventListener('DOMContentLoaded', function() {
-  // SingleProductCreate - dla tworzenia pojedynczego produktu
-  const singleProductCreateContainer = document.getElementById('single-product-create-container');
-  if (singleProductCreateContainer) {
-    // Debug: sprawdź co jest w dataset.variants
-    console.log('dataset.variants:', singleProductCreateContainer.dataset.variants);
-    console.log('typeof dataset.variants:', typeof singleProductCreateContainer.dataset.variants);
-    
-    const productData = {
-      product_id: parseInt(singleProductCreateContainer.dataset.productId),
-      name: singleProductCreateContainer.dataset.productName,
-      description: singleProductCreateContainer.dataset.productDescription,
-      brand: {
-        name: singleProductCreateContainer.dataset.brandName
-      },
-      variants: JSON.parse(singleProductCreateContainer.dataset.variants || '[]').map(v => ({
-        size_name: v.name || '',
-        stock: v.stock || 0,
-        ean: v.ean || '',
-        producer_code: `${singleProductCreateContainer.dataset.productId}_${v.name || ''}`
-      }))
-    };
-    
-    ReactDOM.render(
-      React.createElement(SingleProductCreate, {
-        productId: productData.product_id,
-        productData: productData,
-        onComplete: () => window.location.reload()
-      }),
-      singleProductCreateContainer
-    );
-  }
-
-  // Obsługa przycisku "Utwórz nowy produkt w MPD"
-  const createBtn = document.getElementById('create-mpd-product-btn');
-  const bulkCreateContainer = document.getElementById('bulk-create-single-container');
-  
-  if (createBtn && bulkCreateContainer) {
-    createBtn.addEventListener('click', function() {
-      bulkCreateContainer.style.display = 'block';
-      createBtn.style.display = 'none';
-    });
-  }
-});
+  });
 </script>
 {% endblock %}
-

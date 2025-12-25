@@ -14,7 +14,7 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
 # Explicit import tasków MPD (force registration)
-app.autodiscover_tasks(['MPD', 'matterhorn1'])
+app.autodiscover_tasks(['MPD', 'matterhorn1', 'web_agent'])
 
 # Konfiguracja tasków
 app.conf.update(

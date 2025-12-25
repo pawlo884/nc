@@ -1,6 +1,9 @@
 import os
 from .base import *
 
+# Produkcja używa baz bez przedrostka zzz_ (zdefiniowanych w base.py)
+# Development (dev.py) nadpisuje je na wersje z zzz_
+
 # Usuń debug_toolbar z INSTALLED_APPS w produkcji
 if 'debug_toolbar' in INSTALLED_APPS:
     INSTALLED_APPS.remove('debug_toolbar')

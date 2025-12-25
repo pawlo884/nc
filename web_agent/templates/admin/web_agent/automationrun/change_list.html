@@ -1,0 +1,12 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="{{ run_automation_url }}" class="addlink" style="background-color: #417690; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;">
+            🚀 Uruchom automatyzację
+        </a>
+    </li>
+{% endblock %}
+
