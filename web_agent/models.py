@@ -207,3 +207,86 @@ class ProducerColor(models.Model):
         if not color_name:
             return ""
         return color_name.lower().strip().replace(' ', '').replace('-', '')
+
+
+class AIPrompt(models.Model):
+    """Prompty AI do zarządzania w Django Admin"""
+
+    PROMPT_TYPE_CHOICES = [
+        ('system', 'System'),
+        ('user', 'User'),
+    ]
+
+    CATEGORY_CHOICES = [
+        ('description', 'Opis produktu'),
+        ('name', 'Nazwa produktu'),
+        ('attributes', 'Ekstrakcja atrybutów'),
+        ('legacy', 'Legacy enhancement'),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(
+        max_length=200,
+        unique=True,
+        db_index=True,
+        verbose_name='Nazwa promptu',
+        help_text='Unikalna nazwa promptu (np. "product_description_system", "product_name_user_figi")'
+    )
+    prompt_type = models.CharField(
+        max_length=20,
+        choices=PROMPT_TYPE_CHOICES,
+        verbose_name='Typ promptu',
+        help_text='System prompt (instrukcje) lub User prompt (zadanie)'
+    )
+    category = models.CharField(
+        max_length=50,
+        choices=CATEGORY_CHOICES,
+        verbose_name='Kategoria',
+        help_text='Kategoria promptu (description, name, attributes, legacy)'
+    )
+    content = models.TextField(
+        verbose_name='Treść promptu',
+        help_text='Treść promptu. Możesz użyć zmiennych w formacie {variable_name} (np. {base_type}, {has_top}, {description_sections})'
+    )
+    variables = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Zmienne',
+        help_text='Lista zmiennych używanych w prompcie (np. ["base_type", "has_top", "description_sections"])'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='Aktywny',
+        help_text='Czy prompt jest aktywny (używany w automatyzacji)'
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name='Opis',
+        help_text='Opis promptu i jego przeznaczenia'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, verbose_name='Utworzono')
+    updated_at = models.DateTimeField(
+        auto_now=True, verbose_name='Zaktualizowano')
+
+    class Meta:
+        db_table = 'ai_prompt'
+        verbose_name = 'Prompt AI'
+        verbose_name_plural = 'Prompty AI'
+        ordering = ['category', 'prompt_type', 'name']
+        indexes = [
+            models.Index(fields=['category', 'prompt_type', 'is_active']),
+            models.Index(fields=['name']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_prompt_type_display()}, {self.get_category_display()})"
+
+    def render(self, **kwargs) -> str:
+        """Renderuje prompt z wypełnionymi zmiennymi"""
+        try:
+            content_str = str(self.content) if self.content else ""
+            return content_str.format(**kwargs)
+        except KeyError:
+            # Jeśli brakuje zmiennej, zwróć oryginalny prompt
+            return str(self.content) if self.content else ""

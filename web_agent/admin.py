@@ -8,7 +8,7 @@ from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.utils.html import format_html
 from django.core.management import call_command
-from .models import AutomationRun, ProductProcessingLog, BrandConfig, ProducerColor
+from .models import AutomationRun, ProductProcessingLog, BrandConfig, ProducerColor, AIPrompt
 from matterhorn1.models import Brand, Category
 import threading
 import logging
@@ -674,3 +674,37 @@ class BrandConfigAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+@admin.register(AIPrompt)
+class AIPromptAdmin(admin.ModelAdmin):
+    """Admin dla AIPrompt - zarządzanie promptami AI"""
+    list_display = [
+        'name', 'category', 'prompt_type', 'is_active', 'updated_at'
+    ]
+    list_filter = ['category', 'prompt_type', 'is_active', 'created_at', 'updated_at']
+    search_fields = ['name', 'description', 'content']
+    readonly_fields = ['created_at', 'updated_at']
+    date_hierarchy = 'updated_at'
+
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('name', 'category', 'prompt_type', 'is_active', 'description')
+        }),
+        ('Treść promptu', {
+            'fields': ('content',),
+            'description': 'Treść promptu. Możesz użyć zmiennych w formacie {variable_name} (np. {base_type}, {has_top}, {description_sections}, {original_description}, {original_name}). Zmienne zostaną automatycznie wypełnione podczas użycia promptu.'
+        }),
+        ('Zmienne', {
+            'fields': ('variables',),
+            'description': 'Lista zmiennych używanych w prompcie (np. ["base_type", "has_top", "description_sections"]). To pole jest opcjonalne - służy tylko do dokumentacji.'
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        """Prefetch related objects"""
+        return super().get_queryset(request).select_related()

@@ -330,6 +330,33 @@ class AIProcessor:
         else:
             return 'openai'
 
+    def _get_prompt(self, name: str, **kwargs) -> Optional[str]:
+        """
+        Pobiera prompt z bazy danych i wypełnia zmienne.
+
+        Args:
+            name: Nazwa promptu (np. "product_description_system")
+            **kwargs: Zmienne do wypełnienia w prompcie
+
+        Returns:
+            Wypełniony prompt lub None jeśli nie znaleziono
+        """
+        try:
+            from web_agent.models import AIPrompt
+            prompt = AIPrompt.objects.filter(
+                name=name,
+                is_active=True
+            ).first()
+            
+            if prompt:
+                return prompt.render(**kwargs)
+            else:
+                logger.warning(f"Nie znaleziono aktywnego promptu: {name}")
+                return None
+        except Exception as e:
+            logger.error(f"Błąd podczas pobierania promptu {name}: {e}")
+            return None
+
     def enhance_product_description(self, original_description: str, product_name: str = None, product_config: Dict = None, use_structured: bool = True) -> str:
         """
         Ulepsza opis produktu przez AI z użyciem strukturyzowanej formy (Pydantic).
@@ -432,11 +459,28 @@ class AIProcessor:
         if not has_top:
             product_type_instruction = "To są FIGI KĄPIELOWE - produkt składa się TYLKO z dołu (figi), NIE MA góry (biustonosza). NIE generuj sekcji 'Góra (biustonosz)' - produkt to tylko figi."
             top_features_instruction = "top_features: NIE UŻYWAJ - produkt to tylko figi, nie ma góry. Ustaw jako pustą listę []."
+            prompt_name_suffix = "_figi"
         else:
             product_type_instruction = "To jest KOSTIUM KĄPIELOWY - produkt składa się z góry (biustonosz) i dołu (figi)."
             top_features_instruction = "top_features: Lista cech góry (biustonosz) - WYMAGANE MINIMUM 1 cecha! Każda cecha jako osobny string w formacie \"cecha – elegancki opis korzyści\" (np. \"usztywniane miseczki z dolnymi fiszbinami – zapewniają stabilne podtrzymanie i pięknie modelują biust\"). Max 10 cech, każda max 300 znaków. Jeśli produkt nie ma góry, użyj [\"brak góry\"]."
+            prompt_name_suffix = ""
 
-        system_prompt = f"""Jesteś ekspertem od copywritingu e-commerce specjalizującym się w bieliźnie i kostiumach kąpielowych.
+        # Przygotuj warning dla bottom_features
+        bottom_features_warning = "bottom_features MUSI zawierać przynajmniej 1 element - nie może być pustą listą!" if not has_top else "top_features i bottom_features MUSZĄ zawierać przynajmniej 1 element - nie mogą być pustymi listami!"
+
+        # Próbuj pobrać prompt z bazy danych
+        system_prompt = self._get_prompt(
+            f"product_description_system{prompt_name_suffix}",
+            has_top=has_top,
+            product_type_instruction=product_type_instruction,
+            top_features_instruction=top_features_instruction,
+            description_sections=", ".join([f'"{s}"' for s in description_sections]),
+            bottom_features_warning=bottom_features_warning
+        )
+
+        # Fallback do hardkodowanego promptu
+        if not system_prompt:
+            system_prompt = f"""Jesteś ekspertem od copywritingu e-commerce specjalizującym się w bieliźnie i kostiumach kąpielowych.
 
 {product_type_instruction}
 
@@ -542,10 +586,19 @@ UWAGA: top_features i bottom_features MUSZĄ zawierać przynajmniej 1 element - 
 
 ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
-        if not has_top:
-            user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: To są FIGI KĄPIELOWE - produkt składa się TYLKO z dołu (figi), NIE MA góry. Ustaw top_features jako pustą listę []. Wyodrębnij WSZYSTKIE cechy dołu (figi) do bottom_features. bottom_features MUSI zawierać przynajmniej 1 element. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
-        else:
-            user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: Wyodrębnij WSZYSTKIE cechy góry (biustonosz) do top_features i WSZYSTKIE cechy dołu (figi) do bottom_features. Każda lista MUSI zawierać przynajmniej 1 element. Jeśli nie ma informacji o górze/dole, użyj odpowiednio [\"brak góry\"] lub [\"brak dołu\"]. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
+        # Próbuj pobrać user prompt z bazy danych
+        user_prompt = self._get_prompt(
+            f"product_description_user{prompt_name_suffix}",
+            original_description=original_description,
+            has_top=has_top
+        )
+
+        # Fallback do hardkodowanego promptu
+        if not user_prompt:
+            if not has_top:
+                user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: To są FIGI KĄPIELOWE - produkt składa się TYLKO z dołu (figi), NIE MA góry. Ustaw top_features jako pustą listę []. Wyodrębnij WSZYSTKIE cechy dołu (figi) do bottom_features. bottom_features MUSI zawierać przynajmniej 1 element. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
+            else:
+                user_prompt = f"Przekształć poniższy opis produktu na bardziej profesjonalny, przyciągający i sprzedażowy opis przeznaczony dla sklepu internetowego z bielizną i kostiumami kąpielowymi. Użyj eleganckiego, kobiecego i zmysłowego języka, skup się na cechach funkcjonalnych i estetycznych produktu. WAŻNE: Wyodrębnij WSZYSTKIE cechy góry (biustonosz) do top_features i WSZYSTKIE cechy dołu (figi) do bottom_features. Każda lista MUSI zawierać przynajmniej 1 element. Jeśli nie ma informacji o górze/dole, użyj odpowiednio [\"brak góry\"] lub [\"brak dołu\"]. Wyodrębnij również wykończenie, pakowanie i konkretne wskazówki rozmiarowe dla klienta:\n\n{original_description}"
 
         # Próba użycia structured output (jeśli dostępne)
         try:
@@ -1210,7 +1263,18 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
         example_input = f"{base_type} Model Ada M-803 (1) Lilia - Marko"
         example_output = f'{{"base_type": "{base_type}", "model_name": "Ada", "final_name": "{base_type} Ada"}}'
 
-        system_prompt = f"""Jesteś ekspertem od nazewnictwa produktów tekstylnych i modowych.
+        # Próbuj pobrać prompt z bazy danych
+        system_prompt = self._get_prompt(
+            "product_name_system",
+            base_type=base_type,
+            example_format=example_format,
+            example_input=example_input,
+            example_output=example_output
+        )
+
+        # Fallback do hardkodowanego promptu
+        if not system_prompt:
+            system_prompt = f"""Jesteś ekspertem od nazewnictwa produktów tekstylnych i modowych.
 
 TWOJE ZADANIE:
 Przekształć podaną nazwę produktu w profesjonalną nazwę dla sklepu online.
@@ -1243,7 +1307,15 @@ WYTYCZNE:
 
 ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
-        user_prompt = f"Przekształć tę nazwę produktu w strukturęzowany format JSON:\n\n{original_name}"
+        # Próbuj pobrać user prompt z bazy danych
+        user_prompt = self._get_prompt(
+            "product_name_user",
+            original_name=original_name
+        )
+
+        # Fallback do hardkodowanego promptu
+        if not user_prompt:
+            user_prompt = f"Przekształć tę nazwę produktu w strukturęzowany format JSON:\n\n{original_name}"
 
         try:
             if self.api_type == 'openai':
@@ -2108,41 +2180,52 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
         available_attrs_names = [attr['name'] for attr in available_attributes]
         available_attrs_text = ", ".join(available_attrs_names)
 
-        system_prompt = (
-            "Jesteś ekspertem w ekstrakcji cech produktu tekstylnego. "
-            "Wyodrębnij atrybuty kostiumu kąpielowego z poniższego opisu, "
-            "zwracając wynik wyłącznie w formacie JSON. "
-            "WAŻNE: Wybierz TYLKO atrybuty, które są BEZPOŚREDNIO i WYRAŹNIE wspomniane w opisie produktu. "
-            "NIE wybieraj atrybutów na podstawie domysłów, interpretacji lub podobieństwa słów. "
-            "NIE wybieraj atrybutów, które mogą być tylko implikowane - muszą być wyraźnie wspomniane. "
-            "NIE myl PRZECIWNYCH atrybutów - \"wysoki stan\" to NIE \"niski stan\"!"
+        # Próbuj pobrać prompty z bazy danych
+        system_prompt = self._get_prompt("attributes_extraction_system")
+        user_prompt = self._get_prompt(
+            "attributes_extraction_user",
+            description=description,
+            available_attrs_text=available_attrs_text
         )
 
-        user_prompt = (
-            f"Opis produktu: {description}\n\n"
-            f"Dostępne atrybuty do wyboru: {available_attrs_text}\n\n"
-            "Wyodrębnij listę kluczowych atrybutów, które są BEZPOŚREDNIO i WYRAŹNIE wspomniane w opisie produktu. "
-            "Zwróć wynik w formacie JSON: {{\"attributes\": [\"nazwa atrybutu 1\", \"nazwa atrybutu 2\", ...]}}. "
-            "Używaj dokładnie takich nazw atrybutów, jakie są w liście dostępnych atrybutów. "
-            "\n"
-            "KRYTYCZNE ZASADY - PRZECZYTAJ UWAŻNIE:\n"
-            "1. \"WYSOKI STAN\" i \"NISKI STAN\" to PRZECIWNE atrybuty:\n"
-            "   - Jeśli w opisie jest \"wysoki stan\" lub \"wysokie figi\" - NIE wybieraj \"niski stan\"!\n"
-            "   - Jeśli w opisie jest \"niski stan\" lub \"niskie figi\" - wybierz \"niski stan\"\n"
-            "   - Jeśli w opisie jest \"wysoki stan\" - NIE wybieraj \"niski stan\" (to są PRZECIWNE rzeczy!)\n"
-            "\n"
-            "2. Inne przykłady:\n"
-            "   - Jeśli w opisie jest \"krój midi\" - NIE wybieraj \"niski stan\" (to są różne rzeczy)\n"
-            "   - Jeśli w opisie jest \"gładkie\" - wybierz \"gładkie\"\n"
-            "   - Jeśli w opisie jest \"bezszwowe\" - wybierz \"bezszwowe\"\n"
-            "\n"
-            "3. OGÓLNA ZASADA:\n"
-            "   - Wybierz TYLKO atrybuty, które są WYRAŹNIE i BEZPOŚREDNIO wspomniane w tekście\n"
-            "   - NIE wybieraj atrybutów na podstawie domysłów lub podobieństwa\n"
-            "   - NIE myl przeciwnych atrybutów (wysoki ≠ niski)\n"
-            "\n"
-            "Wybierz tylko te atrybuty, które rzeczywiście są WYRAŹNIE wspomniane w opisie produktu."
-        )
+        # Fallback do hardkodowanych promptów
+        if not system_prompt:
+            system_prompt = (
+                "Jesteś ekspertem w ekstrakcji cech produktu tekstylnego. "
+                "Wyodrębnij atrybuty kostiumu kąpielowego z poniższego opisu, "
+                "zwracając wynik wyłącznie w formacie JSON. "
+                "WAŻNE: Wybierz TYLKO atrybuty, które są BEZPOŚREDNIO i WYRAŹNIE wspomniane w opisie produktu. "
+                "NIE wybieraj atrybutów na podstawie domysłów, interpretacji lub podobieństwa słów. "
+                "NIE wybieraj atrybutów, które mogą być tylko implikowane - muszą być wyraźnie wspomniane. "
+                "NIE myl PRZECIWNYCH atrybutów - \"wysoki stan\" to NIE \"niski stan\"!"
+            )
+
+        if not user_prompt:
+            user_prompt = (
+                f"Opis produktu: {description}\n\n"
+                f"Dostępne atrybuty do wyboru: {available_attrs_text}\n\n"
+                "Wyodrębnij listę kluczowych atrybutów, które są BEZPOŚREDNIO i WYRAŹNIE wspomniane w opisie produktu. "
+                "Zwróć wynik w formacie JSON: {{\"attributes\": [\"nazwa atrybutu 1\", \"nazwa atrybutu 2\", ...]}}. "
+                "Używaj dokładnie takich nazw atrybutów, jakie są w liście dostępnych atrybutów. "
+                "\n"
+                "KRYTYCZNE ZASADY - PRZECZYTAJ UWAŻNIE:\n"
+                "1. \"WYSOKI STAN\" i \"NISKI STAN\" to PRZECIWNE atrybuty:\n"
+                "   - Jeśli w opisie jest \"wysoki stan\" lub \"wysokie figi\" - NIE wybieraj \"niski stan\"!\n"
+                "   - Jeśli w opisie jest \"niski stan\" lub \"niskie figi\" - wybierz \"niski stan\"\n"
+                "   - Jeśli w opisie jest \"wysoki stan\" - NIE wybieraj \"niski stan\" (to są PRZECIWNE rzeczy!)\n"
+                "\n"
+                "2. Inne przykłady:\n"
+                "   - Jeśli w opisie jest \"krój midi\" - NIE wybieraj \"niski stan\" (to są różne rzeczy)\n"
+                "   - Jeśli w opisie jest \"gładkie\" - wybierz \"gładkie\"\n"
+                "   - Jeśli w opisie jest \"bezszwowe\" - wybierz \"bezszwowe\"\n"
+                "\n"
+                "3. OGÓLNA ZASADA:\n"
+                "   - Wybierz TYLKO atrybuty, które są WYRAŹNIE i BEZPOŚREDNIO wspomniane w tekście\n"
+                "   - NIE wybieraj atrybutów na podstawie domysłów lub podobieństwa\n"
+                "   - NIE myl przeciwnych atrybutów (wysoki ≠ niski)\n"
+                "\n"
+                "Wybierz tylko te atrybuty, które rzeczywiście są WYRAŹNIE wspomniane w opisie produktu."
+            )
 
         # Określ model OpenAI
         model_name = "gpt-4o-mini"
