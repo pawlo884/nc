@@ -4,6 +4,11 @@ from .base import *
 # Produkcja używa baz bez przedrostka zzz_ (zdefiniowanych w base.py)
 # Development (dev.py) nadpisuje je na wersje z zzz_
 
+# Usuń bazy z przedrostkiem zzz_ z DATABASES (tylko dla produkcji)
+zzz_databases = [key for key in DATABASES.keys() if key.startswith('zzz_')]
+for zzz_db in zzz_databases:
+    del DATABASES[zzz_db]
+
 # Usuń debug_toolbar z INSTALLED_APPS w produkcji
 if 'debug_toolbar' in INSTALLED_APPS:
     INSTALLED_APPS.remove('debug_toolbar')
