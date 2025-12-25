@@ -74,14 +74,14 @@ jobs:
           export ENVIRONMENT=prod
           
           # Nadaj uprawnienia wykonywania dla skryptu
-          chmod +x deploy-blue-green.sh
+          chmod +x scripts/deploy/deploy-blue-green.sh
           
           # Wykonaj blue-green deployment
-          ./deploy-blue-green.sh deploy
+          ./scripts/deploy/deploy-blue-green.sh deploy
           
           # Pokaż status po deploy
           echo "📊 Deployment status:"
-          ./deploy-blue-green.sh status
+          ./scripts/deploy/deploy-blue-green.sh status
           
           # Czekaj aż kontener się uruchomi
           echo "⏳ Waiting for containers to be ready..."
@@ -95,7 +95,7 @@ jobs:
           docker-compose -f docker-compose.blue-green.yml ps || echo "⚠️ Could not get status!"
           
           # Sprawdź który environment jest aktywny
-          ACTIVE_ENV=$(./deploy-blue-green.sh status | grep "🔀 Active environment:" | awk '{print $4}')
+          ACTIVE_ENV=$(./scripts/deploy/deploy-blue-green.sh status | grep "🔀 Active environment:" | awk '{print $4}')
           echo "🔀 Active environment: ${ACTIVE_ENV}"
           
           # Jeśli nie ma aktywnego environment, sprawdź kontenery

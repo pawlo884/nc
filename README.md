@@ -1,128 +1,87 @@
-# nc_project – dokumentacja
+# NC (nc_project)
 
-## 1. Opis projektu
-Aplikacja Django służąca do zarządzania produktami, wariantami, stanami magazynowymi i cenami detalicznymi, z integracją z zewnętrznymi źródłami (baza MPD). Umożliwia import, eksport, edycję i analizę danych produktowych.
+Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa wyłącznie w trybie blue‑green** (`docker-compose.blue-green.yml`).
 
-## 2. Struktura katalogów
-- `main/` – podstawowa aplikacja, ogólne widoki i modele
-- `matterhorn/` – logika importu/eksportu, integracje, szablony admina
-- `MPD/` – modele i logika powiązana z bazą MPD (produkty, warianty, ceny, stany)
-- `nc/` – konfiguracja projektu, ustawienia, routingi
-- `logs/`, `static/`, `staticfiles/` – logi i pliki statyczne
+## Wymagania
+- **Docker + Docker Compose** (w praktyce: Docker Desktop na Windows).
+- **PostgreSQL** dostępny z kontenerów (w DEV najczęściej `host.docker.internal:5432`).
+- **Git**.
+- (Opcjonalnie) **Python** tylko jeśli chcesz uruchamiać bez Dockera.
 
-## 3. Modele danych (MPD, matterhorn)
-- **MPD**:
-  - **Products** – główny model produktu
-  - **ProductVariants** – warianty produktu (kolor, rozmiar)
-  - **ProductvariantsSources** – powiązania wariantów z dostawcami i EAN
-  - **ProductVariantsRetailPrice** – ceny detaliczne wariantów
-  - **StockAndPrices** – stany magazynowe i ceny zakupu
-  - **Brands, Sizes, Colors, Sources** – słowniki
-- **matterhorn**:
-  - **Products** – produkty z importów (osobna tabela niż w MPD)
-  - **Variants** – warianty produktów (osobna tabela niż w MPD)
-  - **Images** – obrazy produktów
-  - **OtherColors** – powiązania kolorów między produktami
-  - **ProductInSet** – powiązania produktów w zestawach/seriach
-  - **UpdateLog** – logi aktualizacji
-  - **StockHistory** – historia stanów magazynowych
+## Struktura repo (najważniejsze)
+- `nc/` – konfiguracja projektu (settings/urls/celery/db_routers)
+- `matterhorn1/`, `MPD/` – aplikacje Django
+- `docker/` – pliki Docker (m.in. `docker/docker-entrypoint.sh`, postgres config)
+- `scripts/` – skrypty (build/deploy/security/monitoring)
+- `docs/` – dokumentacja
 
-## 4. Bazy danych
-- `default` – domyślna baza Django (np. użytkownicy, sesje)
-- `MPD` – główna baza produktowa (produkty, warianty, stany, ceny)
-  - Modele MPD korzystają z routera baz danych (`db_routers.py`)
-- `matterhorn` – baza importowa (produkty, warianty, obrazy, powiązania, logi)
-  - Modele matterhorn korzystają z routera baz danych (`db_routers.py`)
+## Konfiguracja środowiska (`.env.dev`)
+Plik **`.env.dev` nie jest wersjonowany** (jest ignorowany) – musisz go mieć lokalnie.
 
-## 5. Widoki i logika
-- **Admin Django** – główne zarządzanie produktami, wariantami, cenami
-  - Pola readonly: `show_variants`, `edit_retail_prices`, `show_images`, `show_related_products`
-- **Import/Eksport** – logika w `matterhorn/defs_import.py`, `MPD/export_to_xml.py` itd.
-- **Szablony** – w `templates/`, dedykowane dla admina i użytkownika
+- **Szablon**: `docs/env.sample.md` (skopiuj do `.env.dev` i uzupełnij).
+- **W DEV nazwy baz mają prefiks `zzz_`** (np. `DEFAULT_DB_NAME=zzz_default`, `MPD_DB_NAME=zzz_MPD`, `MATTERHORN1_DB_NAME=zzz_matterhorn1`).
+- Redis w DEV jest w compose i używa hasła `dev_password`.
 
-## 6. Zależności
-- Python 3.8+
-- Django 3.x/4.x
-- PostgreSQL
-- rapidfuzz
-- psycopg2
-
-## 7. Uruchamianie projektu
-
-### Development (lokalnie)
-1. Skonfiguruj bazy danych w `nc/settings/dev.py`
-2. Zainstaluj zależności: `pip install -r requirements.txt`
-3. Uruchom serwer: `python manage.py runserver --settings=nc.settings.dev`
-4. Panel admina: `http://localhost:8000/admin/`
-
-### Docker (zalecane)
-
-#### Pierwszy raz:
+## Uruchomienie DEV (Docker – zalecane)
+### Pierwszy start (Windows)
 ```powershell
-# Windows
-.\build-fast.ps1
-docker-compose -f docker-compose.dev.yml up -d
-
-# Linux/Mac
-./build-fast.sh
+.\scripts\build\build-fast.ps1
 docker-compose -f docker-compose.dev.yml up -d
 ```
 
-#### Kolejne uruchomienia:
-```powershell
-docker-compose -f docker-compose.dev.yml up -d
-```
-
-#### Zero-downtime deployment (production):
-```powershell
-# Windows
-.\deploy-zero-downtime.ps1 -Environment prod
-
-# Linux/Mac
-./deploy-zero-downtime.sh prod
-```
-
-**📚 Szczegóły:** Zobacz [DEPLOYMENT_SCRIPTS.md](DEPLOYMENT_SCRIPTS.md)
-
-## 8. Najczęstsze problemy i rozwiązania
-- **ProgrammingError: relation ... does not exist** – sprawdź, czy zapytanie jest wykonywane na właściwej bazie (np. `connections['MPD']`)
-- **Błędy importu** – sprawdź, czy wszystkie zależności są zainstalowane
-- **Problemy z migracjami** – nie wykonuj migracji na bazie MPD, jeśli nie jest to wymagane
-
-## 9. Deployment i Optymalizacja
-
-### 🚀 Zero-Downtime Deployment
-System orkiestracji z automatycznym rollbackiem:
-- Stary obraz działa podczas budowania nowego
-- Tylko 2-5 sekund downtime
-- Automatyczny backup i rollback
-
-**Dokumentacja:** [ZERO_DOWNTIME_DEPLOYMENT.md](ZERO_DOWNTIME_DEPLOYMENT.md)
-
-### ⚡ Szybkie buildy
-BuildKit cache dla przyśpieszenia budowania:
-- Pierwszy build: ~10 minut
-- Kolejne buildy: ~30-60 sekund (95% szybciej!)
-- Cache dla apt i pip packages
-
-**Dokumentacja:** [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md)
-
-### 📋 Przewodnik po skryptach
-Główne skrypty:
+### Pierwszy start (Linux/Mac)
 ```bash
-# Development (lokalnie)
-.\build-fast.ps1              # Szybki build z cache (Windows)
-./build-fast.sh               # Szybki build z cache (Linux/Mac)
-
-# Production (automatycznie przez GitHub Actions)
-git push origin main          # Automatyczny zero-downtime deploy!
-
-# Rollback (na serwerze)
-bash rollback.sh              # Przywróć poprzednią wersję
+./scripts/build/build-fast.sh
+docker-compose -f docker-compose.dev.yml up -d
 ```
 
-**Pełna dokumentacja:** [SCRIPTS_GUIDE.md](SCRIPTS_GUIDE.md)
+### Dostęp
+- **Aplikacja przez Nginx (zalecane)**: `http://localhost:8080/`
+- **Bezpośrednio (web)**: `http://localhost:8000/`
+- **Flower**: `http://localhost:5555/`
 
-## 10. Kontakt/autorzy
-- Główny programista: [Paweł Sowa]
-- Zgłaszanie błędów: [pawlo884@gmail.com] 
+### DEV z ML workerem (opcjonalnie)
+```bash
+docker-compose -f docker-compose.dev.yml -f docker-compose.dev.ml.yml up -d --build
+```
+
+## Najczęstsze komendy (DEV)
+```bash
+# Logi
+docker-compose -f docker-compose.dev.yml logs -f
+
+# Restart web
+docker-compose -f docker-compose.dev.yml restart web
+
+# Shell w kontenerze web
+docker-compose -f docker-compose.dev.yml exec web bash
+
+# Stop
+docker-compose -f docker-compose.dev.yml down
+```
+
+## Produkcja (tylko blue‑green)
+Deploy robimy przez GitHub Actions (`Release` → `deploy-vps.yml`) albo ręcznie na serwerze:
+
+```bash
+export ENVIRONMENT=prod
+./scripts/deploy/deploy-blue-green.sh deploy
+./scripts/deploy/deploy-blue-green.sh status
+./scripts/deploy/deploy-blue-green.sh rollback
+```
+
+### Migracje na produkcji (blue/green)
+```bash
+./scripts/deploy/run-migrations.sh
+```
+
+### ML worker na produkcji (opcjonalnie)
+```bash
+docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml up -d celery-ml
+```
+
+## Dokumentacja
+- `docs/QUICK_START.md`
+- `docs/DOCKER_QUICK_GUIDE.md`
+- `docs/SCRIPTS_GUIDE.md`
+- `docs/BLUE_GREEN_DEPLOYMENT.md`

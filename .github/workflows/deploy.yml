@@ -129,16 +129,20 @@ jobs:
           echo "Docker Hub username: ${{ env.DOCKERHUB_USERNAME }}"
           
           # Daj uprawnienia wykonania
-          chmod +x deploy-from-registry.sh
+          chmod +x scripts/deploy/deploy-blue-green.sh
           
-          # Uruchom zero-downtime deployment (używa docker-compose.prod.yml)
+          # Blue-Green deploy (repo działa tylko w trybie blue-green)
           export DOCKERHUB_USERNAME=${{ env.DOCKERHUB_USERNAME }}
-          bash deploy-from-registry.sh
+          export DOCKER_BUILDKIT=1
+          export COMPOSE_DOCKER_CLI_BUILD=1
+          export ENVIRONMENT=prod
+          ./scripts/deploy/deploy-blue-green.sh deploy
           
           echo ""
           echo "📊 Final status:"
-          docker-compose -f docker-compose.prod.yml ps
+          docker-compose -f docker-compose.blue-green.yml ps
           
           echo ""
           echo "📋 Ostatnie logi:"
-          docker-compose -f docker-compose.prod.yml logs --tail=50 web 
+          docker logs nc-web-blue --tail 50 || true
+          docker logs nc-web-green --tail 50 || true

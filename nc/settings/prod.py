@@ -189,7 +189,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # Redis Configuration - wspólne dla Celery i Cache
-# W Dockerze nazwa serwisu Redis to 'redis' (z docker-compose.prod.yml)
+# W Dockerze nazwa serwisu Redis to 'redis' (w trybie blue-green: docker-compose.blue-green.yml)
 # Użyj zmiennych środowiskowych CELERY_BROKER_URL jeśli są ustawione (z docker-compose)
 # W przeciwnym razie użyj REDIS_HOST i REDIS_PASSWORD
 if os.getenv('CELERY_BROKER_URL'):
