@@ -247,19 +247,20 @@ class BackgroundAutomation:
             traceback.print_exc()
             return []
 
-    def enhance_product_name(self, original_name: str) -> str:
+    def enhance_product_name(self, original_name: str, product_config: Dict = None) -> str:
         """
         Ulepsza nazwę produktu przez AI.
 
         Args:
             original_name: Oryginalna nazwa produktu
+            product_config: Konfiguracja produktu (opcjonalna)
 
         Returns:
             Ulepszona nazwa produktu
         """
         try:
             enhanced_name = self.ai_processor.enhance_product_name(
-                original_name, use_structured=True
+                original_name, product_config=product_config, use_structured=True
             )
             if not enhanced_name:
                 logger.warning("AI nie zwróciło ulepszonej nazwy, używam oryginalnej")
@@ -269,19 +270,22 @@ class BackgroundAutomation:
             logger.error(f"Błąd podczas ulepszania nazwy: {e}")
             return original_name
 
-    def enhance_product_description(self, description: str, product_name: str = None) -> str:
+    def enhance_product_description(self, description: str, product_name: str = None, product_config: Dict = None) -> str:
         """
         Ulepsza opis produktu przez AI.
 
         Args:
             description: Oryginalny opis produktu
             product_name: Nazwa produktu (opcjonalne, używane do wykrywania typu produktu)
+            product_config: Konfiguracja produktu (opcjonalna)
 
         Returns:
             Ulepszony opis produktu
         """
         try:
-            enhanced_description = self.ai_processor.enhance_product_description(description, product_name=product_name)
+            enhanced_description = self.ai_processor.enhance_product_description(
+                description, product_name=product_name, product_config=product_config
+            )
             if not enhanced_description:
                 return description
             return enhanced_description

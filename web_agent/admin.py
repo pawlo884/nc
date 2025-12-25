@@ -657,6 +657,10 @@ class BrandConfigAdmin(admin.ModelAdmin):
         ('Domyślne filtry', {
             'fields': ('default_active_filter', 'default_is_mapped_filter')
         }),
+        ('Konfiguracja kategorii', {
+            'fields': ('category_config',),
+            'description': 'Konfiguracja dla każdej kategorii produktów. Przykład JSON: {"Kostiumy dwuczęściowe": {"path_value": "5", "base_type": "Kostium kąpielowy", "has_top": true}, "Jednoczęściowe": {"path_value": "7", "base_type": "Jednoczęściowy kostium kąpielowy", "has_top": true}, "Figi kąpielowe": {"path_value": "6", "base_type": "Figi kąpielowe", "has_top": false}}'
+        }),
         ('Mapowanie kolorów', {
             'fields': ('color_mapping',),
             'description': 'Mapowanie kolorów producenta w formacie JSON: {"Dark Brown": "Ciemny Brąz", "Beige": "Beż"}'

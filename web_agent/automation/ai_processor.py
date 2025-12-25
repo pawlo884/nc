@@ -165,11 +165,13 @@ class ProductNameStructure(BaseModel):
     @field_validator('base_type')
     @classmethod
     def validate_base_type(cls, v: str) -> str:
-        """Walidacja base_type - zwraca 'Kostium kąpielowy' lub 'Figi kąpielowe'"""
+        """Walidacja base_type - zwraca 'Kostium kąpielowy', 'Jednoczęściowy kostium kąpielowy' lub 'Figi kąpielowe'"""
         # Normalizuj do dozwolonych wartości
         v_lower = v.lower().strip()
         if 'figi' in v_lower:
             return "Figi kąpielowe"
+        if 'jednoczęściowy' in v_lower or 'jednozesciowy' in v_lower:
+            return "Jednoczęściowy kostium kąpielowy"
         return "Kostium kąpielowy"
 
 
