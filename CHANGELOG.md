@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.5.1 (2025-12-25)</small>
+
+* fix(settings): Usuń bazy z przedrostkiem zzz_ w produkcji i napraw routing ([6057731](https://github.com/pawlo884/nc/commit/6057731))
+
 ## 1.5.0 (2025-12-25)
 
 * Dodatkowe poprawki automatyzacji ([e7d6db0](https://github.com/pawlo884/nc/commit/e7d6db0))
