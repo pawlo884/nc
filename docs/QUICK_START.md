@@ -36,7 +36,7 @@ docker-compose -f docker-compose.dev.yml ps
 
 ### 6️⃣ Otwórz aplikację
 ```
-🌐 Django Admin: http://localhost:8000/admin/
+🌐 Django Admin: http://localhost:8080/admin/
 🌸 Flower (Celery): http://localhost:5555
 📊 API Docs: http://localhost:8000/api/schema/swagger-ui/
 ```

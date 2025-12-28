@@ -60,9 +60,9 @@ docker-compose -f docker-compose.dev.yml up -d
 ```
 
 ### Dostęp
-- 🌐 Django: http://localhost:8000
+- 🌐 Django: http://localhost:8080
 - 🌺 Flower (Celery monitoring): http://localhost:5555
-- 📊 Django Admin: http://localhost:8000/admin
+- 📊 Django Admin: http://localhost:8080/admin
 - 📖 API Docs: http://localhost:8000/api/schema/swagger-ui/
 
 ---
