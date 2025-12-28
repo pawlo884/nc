@@ -1,26 +1,34 @@
-# 🤖 Automatyczny Deployment z GitHub Actions
-
-> ⚠️ **HISTORYCZNE / NIEUŻYWANE (częściowo)**
->
-> Ten dokument powstał dla starszego podejścia „zero‑downtime” i plików/skryptów, które w repo zostały już wycofane.
-> Aktualnie produkcja działa **wyłącznie w trybie blue‑green**.
->
-> **Aktualny proces (obowiązujący):**
-> - Workflow: `.github/workflows/deploy-vps.yml`
-> - Skrypt: `./scripts/deploy/deploy-blue-green.sh deploy`
-> - Sekrety: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
->
-> Reszta dokumentu poniżej jest **archiwalna** i może zawierać nieaktualne nazwy plików i komendy.
+# 🤖 Deployment z GitHub Actions
 
 ## 🎯 Jak to działa?
 
-Po każdym `git push` na branch `main`:
-1. ✅ GitHub Actions automatycznie się uruchamia
-2. 📤 Kopiuje pliki na serwer produkcyjny
-3. 🚀 Uruchamia blue‑green deploy (`./scripts/deploy/deploy-blue-green.sh deploy`)
-4. 🏥 Sprawdza health check
-5. ✅ Deployment zakończony (downtime tylko 2-5s!)
-6. 🔙 W razie błędu - automatyczny rollback
+**Deployment NIE uruchamia się automatycznie przy każdym commicie!**
+
+### Strategia deploymentu:
+
+1. **Automatyczny deployment z tagów** 🏷️
+   - Deployment uruchamia się **tylko** gdy zostanie utworzony tag (np. `v1.0.0`, `v1.1.0`)
+   - Tagi są tworzone automatycznie przez `semantic-release` w workflow `Release`
+   - `semantic-release` tworzy tagi tylko gdy commit spełnia wymagania (np. `feat:`, `fix:`, `BREAKING CHANGE:`)
+
+2. **Ręczny deployment** 🔧
+   - Możesz ręcznie uruchomić deployment z GitHub UI
+   - Możesz wybrać tag lub branch do deployowania
+
+### Proces:
+
+1. ✅ Commity do `main` → **NIE** uruchamiają deploymentu
+2. ✅ `semantic-release` analizuje commity i tworzy tag (np. `v1.0.0`)
+3. ✅ Push tagu → automatyczny deployment
+4. 🚀 Blue-green deployment (`./scripts/deploy/deploy-blue-green.sh deploy`)
+5. 🏥 Health check
+6. ✅ Deployment zakończony (downtime tylko 2-5s!)
+7. 🔙 W razie błędu - automatyczny rollback
+
+**Aktualny proces:**
+- Workflow: `.github/workflows/deploy-vps.yml`
+- Skrypt: `./scripts/deploy/deploy-blue-green.sh deploy`
+- Sekrety: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
 
 ## 📋 Konfiguracja (3 kroki)
 
@@ -56,19 +64,55 @@ cat ~/.ssh/github_deploy
 
 ## 🚀 Użycie
 
-### Automatyczny deployment:
+### Automatyczny deployment (z tagów):
+
 ```bash
-# Zwykły workflow:
+# 1. Zrób commit z conventional commit message:
 git add .
-git commit -m "Dodano nową funkcję"
+git commit -m "feat: dodano nową funkcję"
 git push origin main
 
-# GitHub Actions automatycznie:
-# 1. Wykrywa push na main
-# 2. Kopiuje pliki na serwer
-# 3. Uruchamia zero-downtime deployment
-# 4. Sprawdza czy działa
-# 5. W razie błędu robi rollback
+# 2. semantic-release automatycznie:
+#    - Analizuje commit
+#    - Tworzy tag (np. v1.0.0)
+#    - Push tagu wywołuje deployment
+
+# 3. Deployment automatycznie się uruchamia!
+```
+
+**Typy commitów które tworzą tagi:**
+- `feat:` - nowa funkcja → minor version (v1.1.0)
+- `fix:` - poprawka → patch version (v1.0.1)
+- `BREAKING CHANGE:` - breaking change → major version (v2.0.0)
+- `docs:`, `chore:`, `refactor:` - **NIE** tworzą tagów (tylko aktualizują changelog)
+
+### Ręczny deployment:
+
+1. Idź do: **GitHub → Actions → Deploy to VPS → Run workflow**
+2. Wybierz:
+   - **Tag** (np. `v1.0.0`) - deploy konkretnej wersji
+   - **Branch** (np. `main`) - deploy najnowszego commita z brancha
+3. Kliknij **Run workflow**
+
+### Przykład - deployment paczkami:
+
+```bash
+# Commit 1: Dokumentacja (NIE deployuje)
+git commit -m "docs: aktualizacja README"
+git push origin main
+# ❌ Brak deploymentu
+
+# Commit 2: Nowa funkcja (deployuje!)
+git commit -m "feat: dodano eksport do CSV"
+git push origin main
+# ✅ semantic-release tworzy tag v1.1.0
+# ✅ Deployment automatycznie się uruchamia!
+
+# Commit 3: Poprawka (deployuje!)
+git commit -m "fix: naprawiono błąd w eksporcie"
+git push origin main
+# ✅ semantic-release tworzy tag v1.1.1
+# ✅ Deployment automatycznie się uruchamia!
 ```
 
 ### Zobacz status deployment:

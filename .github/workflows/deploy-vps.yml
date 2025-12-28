@@ -1,19 +1,23 @@
 name: Deploy to VPS
 
 on:
-  # Uruchamiaj po zakończeniu workflow "Release" na gałęzi main
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
-    branches: [main]
-  # Ręczne wywołanie z UI
+  # Deployment tylko gdy zostanie utworzony tag (np. v1.0.0, v1.1.0)
+  # Tagi są tworzone przez semantic-release w workflow Release
+  push:
+    tags:
+      - 'v*'  # Wszystkie tagi zaczynające się od 'v'
+  # Ręczne wywołanie z UI (możesz wybrać tag lub branch)
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag lub branch do deployowania (np. v1.0.0 lub main)'
+        required: false
+        default: 'main'
+        type: string
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Wykonuj tylko, jeśli workflow Release zakończył się sukcesem
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     
     steps:
     - name: Test SSH connection
@@ -59,8 +63,32 @@ jobs:
           # Aktualizuj kod aplikacji
           cd /home/pawel/apps/nc
           echo "📥 Pulling latest code..."
-          git fetch origin
-          git reset --hard origin/main
+          git fetch origin --tags
+          
+          # Określ co deployować
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Ręczne wywołanie - użyj podanego ref (tag lub branch)
+            DEPLOY_REF="${{ github.event.inputs.ref }}"
+            echo "🔧 Manual deployment: ${DEPLOY_REF}"
+          else
+            # Deployment z tagu - użyj tagu który wywołał workflow
+            DEPLOY_REF="${{ github.ref_name }}"
+            echo "🏷️ Tag deployment: ${DEPLOY_REF}"
+          fi
+          
+          # Sprawdź czy ref istnieje
+          if git rev-parse --verify "origin/${DEPLOY_REF}" >/dev/null 2>&1; then
+            echo "✅ Found branch: ${DEPLOY_REF}"
+            git reset --hard "origin/${DEPLOY_REF}"
+          elif git rev-parse --verify "${DEPLOY_REF}" >/dev/null 2>&1; then
+            echo "✅ Found tag: ${DEPLOY_REF}"
+            git reset --hard "${DEPLOY_REF}"
+          else
+            echo "❌ Ref ${DEPLOY_REF} not found!"
+            exit 1
+          fi
+          
+          echo "📌 Deploying: $(git rev-parse HEAD) ($(git log -1 --pretty=format:'%h - %s'))"
           
           # Ustaw uprawnienia dla katalogów migrations (potrzebne dla makemigrations w kontenerze)
           echo "🔐 Ustawianie uprawnień dla katalogów migrations..."
