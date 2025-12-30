@@ -1042,6 +1042,11 @@ class ProductSetAdmin(admin.ModelAdmin):
     search_fields = ('name', 'mapped_product__name')
     list_filter = ('created_at', 'updated_at')
     raw_id_fields = ('mapped_product',)
+    show_full_result_count = False
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('mapped_product')
 
 
 @admin.register(ProductSetItem)
@@ -1178,9 +1183,11 @@ class ProductVariantsAdmin(admin.ModelAdmin):
     readonly_fields = ['variant_id', 'updated_at']
     fields = ['product', 'color', 'producer_color', 'size',
               'producer_code', 'iai_product_id', 'exported_to_iai']
+    show_full_result_count = False
+    list_per_page = 50
 
     def get_queryset(self, request):
-        return super().get_queryset(request).using('MPD')
+        return super().get_queryset(request).using('MPD').select_related('product', 'color', 'producer_color', 'size')
 
 
 @admin.register(ProductvariantsSources)
@@ -1191,9 +1198,13 @@ class ProductVariantsSourcesAdmin(admin.ModelAdmin):
     search_fields = ['ean', 'variant_uid', 'gtin14', 'gtin13',
                      'gtin12', 'isbn10', 'gtin8', 'upce', 'mpn', 'other']
     raw_id_fields = ['variant', 'source']
+    show_full_result_count = False
+    list_per_page = 50
 
     def get_queryset(self, request):
-        return super().get_queryset(request).using('MPD')
+        return super().get_queryset(request).using('MPD').select_related(
+            'variant', 'variant__product', 'variant__color', 'variant__size', 'source'
+        )
 
 
 @admin.register(ProductVariantsRetailPrice)
@@ -1204,9 +1215,13 @@ class ProductVariantsRetailPriceAdmin(admin.ModelAdmin):
     search_fields = ['variant__variant_id', 'variant__product__name']
     raw_id_fields = ['variant']
     readonly_fields = ['updated_at']
+    show_full_result_count = False
+    list_per_page = 50
 
     def get_queryset(self, request):
-        return super().get_queryset(request).using('MPD')
+        return super().get_queryset(request).using('MPD').select_related(
+            'variant', 'variant__product', 'variant__color', 'variant__size'
+        )
 
 
 @admin.register(ProductImage)
@@ -1280,14 +1295,8 @@ class ProductSeriesAdmin(admin.ModelAdmin):
         return super().get_queryset(request).using('MPD')
 
 
-@admin.register(Categories)
-class CategoriesAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name', 'path', 'parent_id']
-    search_fields = ['name', 'path']
-    list_filter = ['name']
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).using('MPD')
+# Model Categories nie jest już rejestrowany w admin (nieużywany)
+# Zostanie wyrejestrowany na końcu pliku jeśli był wcześniej zarejestrowany
 
 
 @admin.register(Vat)
@@ -1331,3 +1340,19 @@ class ProductFabricAdmin(admin.ModelAdmin):
     list_filter = ['component', 'percentage']
     search_fields = ['product__name', 'component__name']
     raw_id_fields = ['product', 'component']
+    show_full_result_count = False
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).using('MPD').select_related('product', 'component')
+
+
+# Wyrejestruj model Categories z admin (nieużywany)
+try:
+    from django.contrib.admin.sites import NotRegistered
+    try:
+        admin.site.unregister(Categories)
+    except NotRegistered:
+        pass
+except ImportError:
+    pass

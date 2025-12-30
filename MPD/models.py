@@ -159,6 +159,9 @@ class Sources(models.Model):
         verbose_name = 'Source'
         verbose_name_plural = 'Sources'
 
+    def __str__(self):
+        return str(self.name) if self.name else f'Source {self.id}'
+
 
 class ProductVariants(models.Model):
     variant_id = models.AutoField(db_column='variant_id', primary_key=True)
@@ -259,10 +262,12 @@ class ProductImage(models.Model):
                 if isinstance(self.product_id, str):
                     # Jeśli to ścieżka, nie używaj jej jako ID
                     if '/' in str(self.product_id) or 'MPD_test' in str(self.product_id) or 'MPD/' in str(self.product_id):
-                        raise ValueError(f"Nieprawidłowe product_id: {self.product_id}. Oczekiwano liczby, otrzymano ścieżkę.")
+                        raise ValueError(
+                            f"Nieprawidłowe product_id: {self.product_id}. Oczekiwano liczby, otrzymano ścieżkę.")
                     self.product_id = int(self.product_id)
             except (ValueError, TypeError) as e:
-                raise ValueError(f"Nieprawidłowe product_id: {self.product_id}. {str(e)}")
+                raise ValueError(
+                    f"Nieprawidłowe product_id: {self.product_id}. {str(e)}")
         return super().save(*args, **kwargs)
 
     def get_image_url(self):
