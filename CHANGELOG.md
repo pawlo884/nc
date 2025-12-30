@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.6.1 (2025-12-30)</small>
+
+* fix: aktualizacja konfiguracji Nginx i Django dla portu 8090 ([e4c4228](https://github.com/pawlo884/nc/commit/e4c4228))
+* fix: celery worker działa jako użytkownik 999:999 zamiast root ([ef43bd2](https://github.com/pawlo884/nc/commit/ef43bd2))
+
 ## 1.6.0 (2025-12-30)
 
 * feat: dodano retry logic dla połączeń z bazami danych ([8c7333c](https://github.com/pawlo884/nc/commit/8c7333c))
