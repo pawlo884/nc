@@ -16,7 +16,7 @@ SECRET_KEY = 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!
 DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1',
-                 '192.168.50.63', '83.168.79.109', '*', '_']
+                 '192.168.50.63', '83.168.79.109', '212.127.93.27', '*', '_']
 
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://83.168.79.109:8000')
@@ -38,6 +38,7 @@ CORS_REPLACE_HTTPS_REFERER = False
 HOST_SCHEME = "http://"
 SECURE_PROXY_SSL_HEADER = None
 SECURE_SSL_REDIRECT = False
+USE_X_FORWARDED_HOST = True  # Wymagane dla nginx reverse proxy
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 SECURE_HSTS_SECONDS = None
@@ -55,12 +56,17 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://localhost:8080',
     'http://127.0.0.1:8080',
+    'http://localhost:8090',
+    'http://127.0.0.1:8090',
     'http://192.168.50.63',
     'http://192.168.50.63:8000',
     'http://83.168.79.109',
     'http://83.168.79.109:8000',
     'http://212.127.93.27',
+    'http://212.127.93.27:8000',
     'http://212.127.93.27:8001',
+    'http://212.127.93.27:8080',
+    'http://212.127.93.27:8090',
 ]
 CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
@@ -90,6 +96,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8080",
     "http://192.168.50.63:8000",
     "http://83.168.79.109:8000",
+    "http://212.127.93.27:8080",
+    "http://212.127.93.27:8090",
 ]
 
 # Celery Configuration for development
@@ -163,18 +171,19 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 # To rozwiązuje problemy z tworzeniem wielu testowych baz jednocześnie
 if 'test' in sys.argv:
     DATABASE_ROUTERS = []  # Wyłącz routing podczas testów - wszystkie modele idą do default
-    
+
     # Wyłącz cache/throttling dla testów - użyj dummy cache zamiast Redis
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
         }
     }
-    
+
     # Wyłącz throttling dla testów (REST_FRAMEWORK jest już zdefiniowany w base.py)
     from .base import REST_FRAMEWORK as BASE_REST_FRAMEWORK
     REST_FRAMEWORK = BASE_REST_FRAMEWORK.copy()
-    REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []  # Wyłącz throttling całkowicie
+    # Wyłącz throttling całkowicie
+    REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {
         'user': '1000000/day',  # Bardzo wysoki limit dla testów
         'anon': '1000000/day',
