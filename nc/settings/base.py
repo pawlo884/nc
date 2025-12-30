@@ -128,7 +128,7 @@ TEMPLATES = [
 # Development (dev.py) nadpisuje na wersje z przedrostkiem zzz_
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'nc.db_backend',
         'NAME': os.getenv('DEFAULT_DB_NAME'),
         'USER': os.getenv('DEFAULT_DB_USER'),
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
@@ -136,7 +136,7 @@ DATABASES = {
         'PORT': os.getenv('DEFAULT_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
-            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
             'keepalives_idle': 60, # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
@@ -145,7 +145,7 @@ DATABASES = {
         }
     },
     'zzz_default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'nc.db_backend',
         'NAME': os.getenv('DEFAULT_DB_NAME'),
         'USER': os.getenv('DEFAULT_DB_USER'),
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
@@ -153,7 +153,7 @@ DATABASES = {
         'PORT': os.getenv('DEFAULT_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
-            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
             'keepalives_idle': 60, # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
@@ -162,7 +162,7 @@ DATABASES = {
         }
     },
     'MPD': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'nc.db_backend',
         'NAME': os.getenv('MPD_DB_NAME'),
         'USER': os.getenv('MPD_DB_USER'),
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
@@ -170,7 +170,7 @@ DATABASES = {
         'PORT': os.getenv('MPD_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
-            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
             'keepalives_idle': 60, # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
@@ -179,7 +179,7 @@ DATABASES = {
         }
     },
     'zzz_MPD': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'nc.db_backend',
         'NAME': os.getenv('MPD_DB_NAME'),
         'USER': os.getenv('MPD_DB_USER'),
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
@@ -187,7 +187,7 @@ DATABASES = {
         'PORT': os.getenv('MPD_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
-            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
             'keepalives_idle': 60, # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
@@ -196,7 +196,7 @@ DATABASES = {
         }
     },
     'matterhorn1': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'nc.db_backend',
         'NAME': os.getenv('MATTERHORN1_DB_NAME'),
         'USER': os.getenv('MATTERHORN1_DB_USER'),
         'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
@@ -204,7 +204,7 @@ DATABASES = {
         'PORT': os.getenv('MATTERHORN1_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
-            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
             'keepalives_idle': 60, # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
@@ -213,7 +213,7 @@ DATABASES = {
         }
     },
     'web_agent': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'nc.db_backend',
         'NAME': os.getenv('WEB_AGENT_DB_NAME'),
         'USER': os.getenv('WEB_AGENT_DB_USER'),
         'PASSWORD': os.getenv('WEB_AGENT_DB_PASSWORD'),
@@ -221,7 +221,7 @@ DATABASES = {
         'PORT': os.getenv('WEB_AGENT_DB_PORT'),
         'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'OPTIONS': {
-            'connect_timeout': 5,  # Zmniejszone z 60s na 5s (szybsze pierwsze połączenie)
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
             'keepalives_idle': 60, # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
@@ -238,6 +238,15 @@ DATABASE_ROUTERS = [
     'nc.db_routers.WebAgentRouter',
     'nc.db_routers.DefaultRouter',
 ]
+
+# Database retry configuration
+# Konfiguracja automatycznego ponawiania połączeń z bazami danych
+DATABASE_RETRY_CONFIG = {
+    'max_retries': 3,              # Maksymalna liczba prób połączenia
+    'retry_delay': 2,              # Bazowe opóźnienie między próbami (w sekundach)
+    'retry_backoff': True,         # Czy używać exponential backoff (2^attempt * delay)
+    'retry_max_delay': 30,         # Maksymalne opóźnienie między próbami (w sekundach)
+}
 
 WSGI_APPLICATION = 'nc.wsgi.application'
 
