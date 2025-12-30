@@ -1,5 +1,27 @@
 # Zmiany
 
+## 1.6.0 (2025-12-30)
+
+* feat: dodano retry logic dla połączeń z bazami danych ([8c7333c](https://github.com/pawlo884/nc/commit/8c7333c))
+* chore: dodanie skryptów pomocniczych do commitowania testów ([83106ff](https://github.com/pawlo884/nc/commit/83106ff))
+* chore: oczyszczenie repo z plikow roboczych ([b01be5a](https://github.com/pawlo884/nc/commit/b01be5a))
+* chore: odchudzenie roota (przeniesienie skryptow) ([4296e7b](https://github.com/pawlo884/nc/commit/4296e7b))
+* chore: prod tylko blue-green (usuniecie prod compose) ([5e51b16](https://github.com/pawlo884/nc/commit/5e51b16))
+* chore: przeniesienie dokumentacji do docs/ ([35cc89e](https://github.com/pawlo884/nc/commit/35cc89e))
+* chore: przeniesienie test_nginx_dev do scripts/ ([4f6bbff](https://github.com/pawlo884/nc/commit/4f6bbff))
+* chore: usunięcie starych plików automatyzacji i poprawa formatowania nginx ([a4bc8de](https://github.com/pawlo884/nc/commit/a4bc8de))
+* chore: zmiana strategii deploymentu - tylko z tagów zamiast przy każdym commicie ([d05c6ef](https://github.com/pawlo884/nc/commit/d05c6ef))
+* docs: aktualizacja README (uruchomienie + wymagania) ([61af575](https://github.com/pawlo884/nc/commit/61af575))
+* docs: dokumentacja napraw testĂłw i skrypty pomocnicze ([cdfc2bb](https://github.com/pawlo884/nc/commit/cdfc2bb))
+* docs: oznaczenie dokumentow legacy (historyczne) ([1225807](https://github.com/pawlo884/nc/commit/1225807))
+* docs: przeniesienie plików dokumentacji do katalogu docs/ ([c0aa5f0](https://github.com/pawlo884/nc/commit/c0aa5f0))
+* fix(matterhorn1,MPD): naprawa mapowania product_id/product_uid i importĂłw ([929e240](https://github.com/pawlo884/nc/commit/929e240))
+* Merge branch 'main' into cleaning - resolved conflicts by keeping documentation files ([0e8853f](https://github.com/pawlo884/nc/commit/0e8853f))
+* Merge pull request #22 from pawlo884/cleaning ([082eaa3](https://github.com/pawlo884/nc/commit/082eaa3)), closes [#22](https://github.com/pawlo884/nc/issues/22)
+* Merge pull request #23 from pawlo884/feature/tests-comprehensive ([6d82e63](https://github.com/pawlo884/nc/commit/6d82e63)), closes [#23](https://github.com/pawlo884/nc/issues/23)
+* test: dodanie kompleksowych testĂłw dla wszystkich aplikacji ([58e898b](https://github.com/pawlo884/nc/commit/58e898b))
+* test(settings): konfiguracja baz danych dla testĂłw ([e82a90b](https://github.com/pawlo884/nc/commit/e82a90b))
+
 ## <small>1.5.1 (2025-12-25)</small>
 
 * fix(settings): Usuń bazy z przedrostkiem zzz_ w produkcji i napraw routing ([6057731](https://github.com/pawlo884/nc/commit/6057731))
