@@ -10,8 +10,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     g++ \
     libpq-dev
 
-# Utwórz użytkownika
-RUN groupadd -r celery && useradd -r -g celery -u 1001 celery
+# Utwórz użytkownika z określonym GID (używamy 999 dla zgodności z SYS_UID_MAX)
+RUN groupadd -r -g 999 celery && useradd -r -g celery -u 999 celery
 
 # Ustaw katalog roboczy
 WORKDIR /app

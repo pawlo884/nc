@@ -23,6 +23,8 @@ app.conf.update(
     result_serializer='json',
     timezone='Europe/Warsaw',
     enable_utc=True,
+    # Wyłącz próby zmiany uprawnień - kontener już działa jako użytkownik 999:999
+    worker_drop_privileges=False,
 )
 
 # Konfiguracja routingu tasków - routing do odpowiednich kolejek
