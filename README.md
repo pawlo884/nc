@@ -36,7 +36,7 @@ docker-compose -f docker-compose.dev.yml up -d
 ```
 
 ### Dostęp
-- **Aplikacja przez Nginx (zalecane)**: `http://localhost:8080/`
+- **Aplikacja przez Nginx (zalecane)**: `http://localhost:8090/`
 - **Bezpośrednio (web)**: `http://localhost:8000/`
 - **Flower**: `http://localhost:5555/`
 
