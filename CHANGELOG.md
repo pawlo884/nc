@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.7.0 (2026-01-01)
+
+* feat(admin): optymalizacja admin i ukrycie nieużywanych modeli ([45a999e](https://github.com/pawlo884/nc/commit/45a999e))
+* Update Nginx application URL from 8080 to 8090 ([9da0561](https://github.com/pawlo884/nc/commit/9da0561))
+
 ## <small>1.6.1 (2025-12-30)</small>
 
 * fix: aktualizacja konfiguracji Nginx i Django dla portu 8090 ([e4c4228](https://github.com/pawlo884/nc/commit/e4c4228))
