@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'MPD',
     'matterhorn1',
     'web_agent',
+    'wega',
 ]
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
@@ -229,6 +230,23 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
+    'wega': {
+        'ENGINE': 'nc.db_backend',
+        'NAME': os.getenv('WEGA_DB_NAME') or os.getenv('DEFAULT_DB_NAME'),
+        'USER': os.getenv('WEGA_DB_USER') or os.getenv('DEFAULT_DB_USER'),
+        'PASSWORD': os.getenv('WEGA_DB_PASSWORD') or os.getenv('DEFAULT_DB_PASSWORD'),
+        'HOST': os.getenv('WEGA_DB_HOST') or os.getenv('DEFAULT_DB_HOST'),
+        'PORT': os.getenv('WEGA_DB_PORT') or os.getenv('DEFAULT_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'OPTIONS': {
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5, # 5 prób
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
+        }
+    },
 }
 
 # Database routers
@@ -236,6 +254,7 @@ DATABASE_ROUTERS = [
     'nc.db_routers.MPDRouter',
     'nc.db_routers.Matterhorn1Router',
     'nc.db_routers.WebAgentRouter',
+    'nc.db_routers.WegaRouter',
     'nc.db_routers.DefaultRouter',
 ]
 

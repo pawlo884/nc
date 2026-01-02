@@ -8,6 +8,7 @@ DATABASES['zzz_default'] = DATABASES['default'].copy()
 DATABASES['zzz_MPD'] = DATABASES['MPD'].copy()
 DATABASES['zzz_matterhorn1'] = DATABASES['matterhorn1'].copy()
 DATABASES['zzz_web_agent'] = DATABASES['web_agent'].copy()
+DATABASES['zzz_wega'] = DATABASES['wega'].copy()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!'
