@@ -17,7 +17,7 @@ SECRET_KEY = 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!
 DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1',
-                 '192.168.50.63', '83.168.79.109', '212.127.93.27', '*', '_']
+                 '192.168.50.63', '83.168.79.109', '212.127.93.27']
 
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://83.168.79.109:8000')

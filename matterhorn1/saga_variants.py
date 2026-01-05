@@ -2,10 +2,28 @@
 Funkcje pomocnicze dla tworzenia wariantów w Sadze
 """
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 from django.db import connections
 
 logger = logging.getLogger(__name__)
+
+
+def get_source_id(source_name: str = 'matterhorn') -> Optional[int]:
+    """Pobierz source_id z bazy MPD na podstawie nazwy źródła"""
+    try:
+        with connections['MPD'].cursor() as cursor:
+            cursor.execute("SELECT id FROM sources WHERE LOWER(name) = LOWER(%s)", [source_name])
+            result = cursor.fetchone()
+            if result:
+                source_id = result[0]
+                logger.info(f"✅ Znaleziono source_id={source_id} dla źródła '{source_name}'")
+                return source_id
+            else:
+                logger.error(f"❌ Nie znaleziono źródła '{source_name}' w tabeli sources")
+                return None
+    except Exception as e:
+        logger.error(f"❌ Błąd podczas pobierania source_id dla '{source_name}': {e}")
+        return None
 
 
 def create_mpd_variants(mpd_product_id: int, matterhorn_product_id: int, size_category: str,
@@ -16,6 +34,12 @@ def create_mpd_variants(mpd_product_id: int, matterhorn_product_id: int, size_ca
         f"🔄 Tworzę warianty w MPD dla produktu {mpd_product_id}, kategoria: {size_category}")
     logger.info(
         f"📋 Parametry: producer_code='{producer_code}', main_color_id={main_color_id}, producer_color_name='{producer_color_name}'")
+
+    # Pobierz source_id dla matterhorn
+    source_id = get_source_id('matterhorn')
+    if not source_id:
+        raise Exception("Nie można pobrać source_id dla matterhorn z bazy MPD")
+    logger.info(f"📌 Używam source_id={source_id} dla matterhorn")
 
     try:
         with connections['MPD'].cursor() as mpd_cursor, connections['matterhorn1'].cursor() as mh_cursor:
@@ -115,7 +139,7 @@ def create_mpd_variants(mpd_product_id: int, matterhorn_product_id: int, size_ca
                 mpd_cursor.execute("""
                     SELECT variant_id FROM product_variants_sources 
                     WHERE variant_uid = %s AND source_id = %s
-                """, [variant_uid, 2])
+                """, [variant_uid, source_id])
                 existing = mpd_cursor.fetchone()
                 if existing:
                     logger.info(
@@ -151,13 +175,13 @@ def create_mpd_variants(mpd_product_id: int, matterhorn_product_id: int, size_ca
                 mpd_cursor.execute("""
                     INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id)
                     VALUES (%s, %s, %s, %s)
-                """, [variant_id, ean, variant_uid, 2])
+                """, [variant_id, ean, variant_uid, source_id])
 
                 # Dodaj stock_and_prices
                 mpd_cursor.execute("""
                     INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
                     VALUES (%s, %s, %s, %s, 'PLN')
-                """, [variant_id, 2, stock, product_price])
+                """, [variant_id, source_id, stock, product_price])
 
                 # Zaktualizuj mapped_variant_uid w matterhorn1
                 mh_cursor.execute("""

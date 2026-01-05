@@ -475,19 +475,35 @@ class ProductAdmin(admin.ModelAdmin):
                 producer_code = request.POST.get('producer_code')
                 producer_color_name = request.POST.get('producer_color_name')
                 main_color_id = request.POST.get('main_color_id')
+                # Konwertuj main_color_id na integer jeśli istnieje
+                if main_color_id:
+                    try:
+                        main_color_id = int(main_color_id)
+                    except (ValueError, TypeError):
+                        logger.warning(f"Nieprawidłowy main_color_id: {main_color_id}")
+                        main_color_id = None
+                else:
+                    main_color_id = None
                 producer_color_id = None
+                
+                logger.info(f"🔄 assign_mapping: product_id={product_id}, mpd_product_id={mpd_product_id}, producer_code={producer_code}, producer_color_name={producer_color_name}, main_color_id={main_color_id}")
 
                 # Obsługa koloru producenta
                 if producer_color_name and main_color_id:
                     with connections['MPD'].cursor() as cursor:
-                        cursor.execute("SELECT id FROM colors WHERE name = %s", [producer_color_name])
+                        # Sprawdź czy kolor o takiej nazwie już istnieje
+                        cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s",
+                                       [producer_color_name, main_color_id])
                         pc_result = cursor.fetchone()
                         if pc_result:
                             producer_color_id = pc_result[0]
+                            logger.info(f"✅ Użyto istniejącego koloru producenta: {producer_color_name} (id={producer_color_id})")
                         else:
+                            # Jeśli nie istnieje, dodaj nowy kolor
                             cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id",
                                            [producer_color_name, main_color_id])
                             producer_color_id = cursor.fetchone()[0]
+                            logger.info(f"✅ Dodano nowy kolor producenta: {producer_color_name} (id={producer_color_id})")
 
                 # Zaktualizuj mapped_product_uid i is_mapped
                 with connections['wega'].cursor() as cursor:
@@ -514,12 +530,14 @@ class ProductAdmin(admin.ModelAdmin):
                     # Dodaj warianty do MPD
                     from wega.saga_variants import create_mpd_variants
                     try:
+                        logger.info(f"🔄 Wywołuję create_mpd_variants: mpd_product_id={mpd_product_id}, product_id={product_id}, size_category={size_category}")
                         mapping_info = create_mpd_variants(
                             mpd_product_id, product_id, size_category,
                             producer_code, main_color_id, producer_color_name
                         )
+                        logger.info(f"✅ create_mpd_variants zwrócił: {mapping_info}")
                     except Exception as e:
-                        logger.error(f"Błąd podczas dodawania wariantów: {e}")
+                        logger.error(f"❌ Błąd podczas dodawania wariantów: {e}", exc_info=True)
                         mapping_info = {'error': f'Błąd wariantów: {str(e)}'}
 
                     # Upload zdjęć do bucketa
@@ -529,10 +547,12 @@ class ProductAdmin(admin.ModelAdmin):
                             mpd_product_id, product_id, producer_color_name
                         )
                         mapping_info['uploaded_images'] = upload_result.get('uploaded_images', 0)
+                        logger.info(f"✅ Upload zdjęć zakończony: {upload_result.get('uploaded_images', 0)} zdjęć")
                     except Exception as e:
-                        logger.error(f"Błąd podczas uploadu zdjęć: {e}")
+                        logger.error(f"❌ Błąd podczas uploadu zdjęć: {e}", exc_info=True)
                         mapping_info['upload_error'] = str(e)
                 else:
+                    logger.warning(f"⚠️ Brak kategorii rozmiarowej dla produktu MPD {mpd_product_id}")
                     mapping_info = {'error': 'Brak kategorii rozmiarowej w MPD'}
 
                 return JsonResponse({

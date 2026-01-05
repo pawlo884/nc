@@ -585,26 +585,65 @@ class SagaService:
         return {}
 
     @staticmethod
-    def _upload_product_images(data: Dict) -> Dict:
-        """Upload zdjęć produktu do bucketa"""
-        mpd_product_id = data.get('mpd_product_id')
-        wega_product_id = data.get('wega_product_id')
-        producer_color_name = data.get('producer_color_name')
-
+    def _upload_product_images(mpd_product_id: int, wega_product_id: int, producer_color_name: str = None) -> Dict:
+        """Upload zdjęć produktu do bucketa i zapisz do MPD"""
         logger.info(f"🔄 Uploaduję zdjęcia dla produktu MPD {mpd_product_id}")
 
         try:
-            from wega.models import Product, ProductImage
-            product = Product.objects.get(id=wega_product_id)
-            
-            uploaded_count = 0
-            for image in product.images.all():
-                # Tutaj logika uploadu do bucketa
-                # Na razie tylko logujemy
-                logger.info(f"Upload obrazu: {image.url}")
-                uploaded_count += 1
+            from matterhorn1.defs_db import upload_image_to_bucket_and_get_url, resolve_image_url
 
-            return {"uploaded_images": uploaded_count}
+            # Pobierz zdjęcia z wega
+            with connections['wega'].cursor() as cursor:
+                cursor.execute("""
+                    SELECT url, "order"
+                    FROM wega_productimage 
+                    WHERE product_id = %s 
+                    AND url IS NOT NULL 
+                    ORDER BY "order", id
+                """, [wega_product_id])
+                images = cursor.fetchall()
+
+            if not images:
+                logger.info("ℹ️ Brak zdjęć do uploadu")
+                return {"uploaded_images": 0}
+
+            uploaded_count = 0
+            uploaded_images = []
+
+            with connections['MPD'].cursor() as mpd_cursor:
+                for idx, (image_url, image_order) in enumerate(images, 1):
+                    if image_url:
+                        # Upload do bucketa
+                        bucket_key = upload_image_to_bucket_and_get_url(
+                            image_path=image_url,
+                            product_id=mpd_product_id,
+                            producer_color_name=producer_color_name,
+                            image_number=idx
+                        )
+
+                        if bucket_key:
+                            bucket_url = resolve_image_url(bucket_key)
+                            # Zapisz do MPD
+                            mpd_cursor.execute("""
+                                INSERT INTO product_images (product_id, file_path)
+                                VALUES (%s, %s)
+                                ON CONFLICT (product_id, file_path) DO NOTHING
+                            """, [mpd_product_id, bucket_key])
+
+                            uploaded_count += 1
+                            uploaded_images.append({
+                                'original_url': image_url,
+                                'uploaded_url': bucket_url,
+                                'storage_key': bucket_key,
+                                'order': image_order or idx
+                            })
+
+            logger.info(f"✅ Zuploadowano {uploaded_count} zdjęć")
+            return {
+                "uploaded_images": uploaded_count,
+                "images": uploaded_images
+            }
+
         except Exception as e:
             logger.error(f"❌ Błąd podczas uploadu zdjęć: {e}")
             return {"uploaded_images": 0, "error": str(e)}

@@ -1432,6 +1432,14 @@ class ProductAdmin(admin.ModelAdmin):
         """Dodaje nowe warianty do MPD z filtrowaniem według kategorii rozmiarów"""
         variant_logger = logging.getLogger('matterhorn1.variants')
 
+        # Pobierz source_id dla matterhorn
+        from .saga_variants import get_source_id
+        source_id = get_source_id('matterhorn')
+        if not source_id:
+            variant_logger.error("❌ Nie można pobrać source_id dla matterhorn z bazy MPD")
+            return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': False, 'total': 0, 'error': 'Nie można pobrać source_id dla matterhorn'}
+        variant_logger.info(f"📌 Używam source_id={source_id} dla matterhorn")
+
         # Użyj nowego systemu logowania transakcji
         with logged_transaction("add_new_variants_to_mpd", "matterhorn1.variants") as tx_logger:
             tx_logger.log_cross_database_operation(
@@ -1566,7 +1574,7 @@ class ProductAdmin(admin.ModelAdmin):
                     # Sprawdź, czy wariant już istnieje w MPD
                     mpd_cursor.execute("""
                         SELECT variant_id FROM product_variants_sources WHERE variant_uid = %s AND source_id = %s
-                    """, [variant_uid, 2])
+                    """, [variant_uid, source_id])
                     variant_result = mpd_cursor.fetchone()
                     if variant_result:
                         variant_logger.info(
@@ -1599,7 +1607,7 @@ class ProductAdmin(admin.ModelAdmin):
                         mpd_cursor.execute("""
                             INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id)
                             VALUES (%s, %s, %s, %s)
-                        """, [variant_id, ean, variant_uid, 2])
+                        """, [variant_id, ean, variant_uid, source_id])
                         variant_logger.info(
                             f"[add_new_variants_to_mpd] Dodano wariant {variant_uid} do product_variants i product_variants_sources")
                     except Exception as e:
@@ -1624,7 +1632,7 @@ class ProductAdmin(admin.ModelAdmin):
                         mpd_cursor.execute("""
                             SELECT variant_id FROM stock_and_prices 
                             WHERE variant_id = %s AND source_id = %s
-                        """, [variant_id, 2])
+                        """, [variant_id, source_id])
                         existing_record = mpd_cursor.fetchone()
 
                         variant_logger.info(
@@ -1638,7 +1646,7 @@ class ProductAdmin(admin.ModelAdmin):
                                 UPDATE stock_and_prices 
                                 SET stock = %s, price = %s, currency = 'PLN'
                                 WHERE variant_id = %s AND source_id = %s
-                            """, [stock, product_price, variant_id, 2])
+                            """, [stock, product_price, variant_id, source_id])
                             variant_logger.info(
                                 "[add_new_variants_to_mpd] Zaktualizowano istniejący rekord w stock_and_prices")
                         else:
@@ -1647,7 +1655,7 @@ class ProductAdmin(admin.ModelAdmin):
                                 INSERT INTO stock_and_prices 
                                 (variant_id, source_id, stock, price, currency)
                                 VALUES (%s, %s, %s, %s, 'PLN')
-                            """, [variant_id, 2, stock, product_price])
+                            """, [variant_id, source_id, stock, product_price])
                             variant_logger.info(
                                 "[add_new_variants_to_mpd] Dodano nowy rekord do stock_and_prices")
                     except Exception as e:
