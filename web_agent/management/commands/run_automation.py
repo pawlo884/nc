@@ -142,7 +142,7 @@ class Command(BaseCommand):
 
         # Konfiguracja
         base_url = os.getenv('WEB_AGENT_BASE_URL',
-                             'http://localhost:8080/admin/')
+                             'http://localhost:8090/admin/')
         admin_username = os.getenv('DJANGO_ADMIN_USERNAME', 'admin')
         admin_password = os.getenv('DJANGO_ADMIN_PASSWORD', '')
 
@@ -694,8 +694,8 @@ class Command(BaseCommand):
             self.stdout.write(
                 "\n[INFO] Przeglądarka pozostanie otwarta. Możesz teraz ręcznie przetwarzać produkty.")
             self.stdout.write(f"\n   AutomationRun ID: {automation_run.id}")
-            # Pobierz port z base_url lub użyj domyślnego 8080
-            port = '8080'
+            # Pobierz port z base_url lub użyj domyślnego 8090
+            port = '8090'
             if base_url:
                 import re
                 match = re.search(r':(\d+)', base_url)

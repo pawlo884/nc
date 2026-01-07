@@ -205,6 +205,7 @@ class BrowserAutomation:
                         # Filtry są w dropdownach (select) w divach z klasą "list-filter-dropdown"
                         # Struktura: <div class="list-filter-dropdown"><h3> po brand </h3><select>...</select></div>
                         brand_found = False
+                        brand_selects = []  # Inicjalizuj przed użyciem
                         try:
                             # Znajdź div z klasą "list-filter-dropdown" który zawiera h3 z tekstem "po brand"
                             brand_dropdowns = filter_panel.find_elements(By.XPATH,
@@ -304,13 +305,14 @@ class BrowserAutomation:
                         print(
                             f"[DEBUG] Znaleziono {len(category_dropdowns)} dropdownów kategorii")
 
+                        category_selects = []  # Inicjalizuj przed użyciem
                         if category_dropdowns:
                             category_selects = category_dropdowns[0].find_elements(
                                 By.TAG_NAME, "select")
                             print(
                                 f"[DEBUG] Znaleziono {len(category_selects)} selectów w dropdownie kategorii")
 
-                            if category_selects:
+                        if category_selects:
                                 from selenium.webdriver.support.ui import Select
                                 select = Select(category_selects[0])
 
@@ -480,14 +482,16 @@ class BrowserAutomation:
                         active_dropdowns = filter_panel.find_elements(By.XPATH,
                                                                       ".//div[@class='list-filter-dropdown'][.//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'active')]]")
 
+                        active_selects = []  # Inicjalizuj przed użyciem
                         if active_dropdowns:
                             active_selects = active_dropdowns[0].find_elements(
                                 By.TAG_NAME, "select")
-                            if active_selects:
-                                from selenium.webdriver.support.ui import Select
-                                select = Select(active_selects[0])
-                        search_text = "Tak" if filters['active'] else "Nie"
-                        select.select_by_visible_text(search_text)
+                        
+                        if active_selects:
+                            from selenium.webdriver.support.ui import Select
+                            select = Select(active_selects[0])
+                            search_text = "Tak" if filters['active'] else "Nie"
+                            select.select_by_visible_text(search_text)
                         logger.info(
                             f"Wybrano active z dropdowna: {search_text}")
                         time.sleep(2)
@@ -506,14 +510,16 @@ class BrowserAutomation:
                         mapped_dropdowns = filter_panel.find_elements(By.XPATH,
                                                                       ".//div[@class='list-filter-dropdown'][.//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'mapped')]]")
 
+                        mapped_selects = []  # Inicjalizuj przed użyciem
                         if mapped_dropdowns:
                             mapped_selects = mapped_dropdowns[0].find_elements(
                                 By.TAG_NAME, "select")
-                            if mapped_selects:
-                                from selenium.webdriver.support.ui import Select
-                                select = Select(mapped_selects[0])
-                        search_text = "Tak" if filters['is_mapped'] else "Nie"
-                        select.select_by_visible_text(search_text)
+                        
+                        if mapped_selects:
+                            from selenium.webdriver.support.ui import Select
+                            select = Select(mapped_selects[0])
+                            search_text = "Tak" if filters['is_mapped'] else "Nie"
+                            select.select_by_visible_text(search_text)
                         logger.info(
                             f"Wybrano is_mapped z dropdowna: {search_text}")
                         time.sleep(2)
@@ -762,8 +768,8 @@ class BrowserAutomation:
                 import re
 
                 # Wzorzec do usunięcia ID produktu z URL
-                # Przykład: http://localhost:8080/admin/matterhorn1/product/12345/change/?params
-                # Wynik: http://localhost:8080/admin/matterhorn1/product/?params
+                # Przykład: http://localhost:8090/admin/matterhorn1/product/12345/change/?params
+                # Wynik: http://localhost:8090/admin/matterhorn1/product/?params
                 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
                 parsed_url = urlparse(current_url)

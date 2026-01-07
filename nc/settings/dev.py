@@ -54,8 +54,6 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
-    'http://localhost:8080',
-    'http://127.0.0.1:8080',
     'http://localhost:8090',
     'http://127.0.0.1:8090',
     'http://192.168.50.63',
@@ -65,7 +63,6 @@ CSRF_TRUSTED_ORIGINS = [
     'http://212.127.93.27',
     'http://212.127.93.27:8000',
     'http://212.127.93.27:8001',
-    'http://212.127.93.27:8080',
     'http://212.127.93.27:8090',
 ]
 CSRF_COOKIE_HTTPONLY = False
@@ -92,11 +89,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
+    "http://localhost:8090",
+    "http://127.0.0.1:8090",
     "http://192.168.50.63:8000",
     "http://83.168.79.109:8000",
-    "http://212.127.93.27:8080",
     "http://212.127.93.27:8090",
 ]
 
