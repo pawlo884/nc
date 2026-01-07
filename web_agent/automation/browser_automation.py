@@ -146,10 +146,18 @@ class BrowserAutomation:
 
             # Zastosuj filtry klikając w panelu po prawej stronie
             if filters:
+                logger.info(f"Otrzymano filtry: {filters}")
+                print(f"[DEBUG] Otrzymano filtry: {filters}")
+                
                 # Filtr marki - kliknij w panel filtrów
-                if filters.get('brand_name'):
-                    brand_name = filters['brand_name']
+                brand_name_value = filters.get('brand_name')
+                logger.info(f"Sprawdzam brand_name: {brand_name_value}")
+                print(f"[DEBUG] Sprawdzam brand_name: {brand_name_value}")
+                
+                if brand_name_value:
+                    brand_name = brand_name_value
                     logger.info(f"Szukanie filtra marki: {brand_name}")
+                    print(f"[DEBUG] Szukanie filtra marki: {brand_name}")
 
                     try:
                         # Znajdź panel filtrów
@@ -210,13 +218,28 @@ class BrowserAutomation:
                             # Znajdź div z klasą "list-filter-dropdown" który zawiera h3 z tekstem "po brand"
                             brand_dropdowns = filter_panel.find_elements(By.XPATH,
                                                                          ".//div[@class='list-filter-dropdown'][.//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'brand')]]")
+                            logger.info(f"Znaleziono {len(brand_dropdowns)} dropdownów brand")
+                            print(f"[DEBUG] Znaleziono {len(brand_dropdowns)} dropdownów brand")
 
                             if brand_dropdowns:
                                 # Znajdź select w tym divie
                                 brand_selects = brand_dropdowns[0].find_elements(
                                     By.TAG_NAME, "select")
+                                logger.info(f"Znaleziono {len(brand_selects)} selectów w dropdownie brand")
                                 print(
                                     f"[DEBUG] Znaleziono {len(brand_selects)} selectów w dropdownie brand")
+                            else:
+                                logger.warning("Nie znaleziono dropdownów brand - sprawdzam wszystkie dropdowny")
+                                print("[DEBUG] Nie znaleziono dropdownów brand - sprawdzam wszystkie dropdowny")
+                                # Spróbuj znaleźć wszystkie dropdowny dla debugowania
+                                all_dropdowns = filter_panel.find_elements(By.CLASS_NAME, "list-filter-dropdown")
+                                logger.info(f"Znaleziono {len(all_dropdowns)} wszystkich dropdownów")
+                                print(f"[DEBUG] Znaleziono {len(all_dropdowns)} wszystkich dropdownów")
+                                for i, dd in enumerate(all_dropdowns):
+                                    h3s = dd.find_elements(By.TAG_NAME, "h3")
+                                    h3_texts = [h3.text for h3 in h3s]
+                                    logger.info(f"Dropdown {i}: h3 teksty: {h3_texts}")
+                                    print(f"[DEBUG] Dropdown {i}: h3 teksty: {h3_texts}")
 
                             if brand_selects:
                                 from selenium.webdriver.support.ui import Select
@@ -241,8 +264,14 @@ class BrowserAutomation:
                                         f"Wybrano markę z dropdowna (dokładne): {brand_name}")
                                     print(
                                         f"[DEBUG] Wybrano markę z dropdowna (dokładne): {brand_name}")
-                                    time.sleep(2)
                                     brand_found = True
+                                    # Czekaj na przeładowanie strony po wyborze marki
+                                    time.sleep(3)
+                                    # Sprawdź czy strona się przeładowała
+                                    self.wait.until(
+                                        EC.presence_of_element_located((By.ID, "changelist-filter"))
+                                    )
+                                    time.sleep(2)
                                 except:
                                     # Spróbuj po częściowym dopasowaniu (ignoruj liczbę w nawiasach)
                                     for option in options:
@@ -255,8 +284,14 @@ class BrowserAutomation:
                                                 option_text)
                                             logger.info(
                                                 f"Wybrano markę z dropdowna: {option_text}")
-                                            time.sleep(2)
                                             brand_found = True
+                                            # Czekaj na przeładowanie strony po wyborze marki
+                                            time.sleep(3)
+                                            # Sprawdź czy strona się przeładowała
+                                            self.wait.until(
+                                                EC.presence_of_element_located((By.ID, "changelist-filter"))
+                                            )
+                                            time.sleep(2)
                                             break
 
                                     if not brand_found:
@@ -271,8 +306,14 @@ class BrowserAutomation:
                                                     option_text)
                                                 logger.info(
                                                     f"Wybrano markę z dropdowna (częściowe): {option_text}")
-                                                time.sleep(2)
                                                 brand_found = True
+                                                # Czekaj na przeładowanie strony po wyborze marki
+                                                time.sleep(3)
+                                                # Sprawdź czy strona się przeładowała
+                                                self.wait.until(
+                                                    EC.presence_of_element_located((By.ID, "changelist-filter"))
+                                                )
+                                                time.sleep(2)
                                                 break
                             else:
                                 logger.warning(
@@ -284,13 +325,24 @@ class BrowserAutomation:
                         if not brand_found:
                             logger.warning(
                                 f"Nie znaleziono filtra dla marki: {brand_name}")
+                            print(f"[DEBUG] Nie znaleziono filtra dla marki: {brand_name}")
                     except Exception as e:
                         logger.warning(
                             f"Błąd podczas klikania filtra marki: {e}")
+                        print(f"[DEBUG] Błąd podczas klikania filtra marki: {e}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    logger.warning("Brak brand_name w filtrach - pomijam filtr marki")
+                    print("[DEBUG] Brak brand_name w filtrach - pomijam filtr marki")
 
                 # Filtr kategorii - użyj dropdowna
-                if filters.get('category_name'):
-                    category_name = filters['category_name']
+                category_name_value = filters.get('category_name')
+                logger.info(f"Sprawdzam category_name: {category_name_value}")
+                print(f"[DEBUG] Sprawdzam category_name: {category_name_value}")
+                
+                if category_name_value:
+                    category_name = category_name_value
                     logger.info(f"Szukanie filtra kategorii: {category_name}")
                     print(
                         f"[DEBUG] Szukanie filtra kategorii: {category_name}")
@@ -309,8 +361,21 @@ class BrowserAutomation:
                         if category_dropdowns:
                             category_selects = category_dropdowns[0].find_elements(
                                 By.TAG_NAME, "select")
+                            logger.info(f"Znaleziono {len(category_selects)} selectów w dropdownie kategorii")
                             print(
                                 f"[DEBUG] Znaleziono {len(category_selects)} selectów w dropdownie kategorii")
+                        else:
+                            logger.warning("Nie znaleziono dropdownów kategorii - sprawdzam wszystkie dropdowny")
+                            print("[DEBUG] Nie znaleziono dropdownów kategorii - sprawdzam wszystkie dropdowny")
+                            # Spróbuj znaleźć wszystkie dropdowny dla debugowania
+                            all_dropdowns = filter_panel.find_elements(By.CLASS_NAME, "list-filter-dropdown")
+                            logger.info(f"Znaleziono {len(all_dropdowns)} wszystkich dropdownów")
+                            print(f"[DEBUG] Znaleziono {len(all_dropdowns)} wszystkich dropdownów")
+                            for i, dd in enumerate(all_dropdowns):
+                                h3s = dd.find_elements(By.TAG_NAME, "h3")
+                                h3_texts = [h3.text for h3 in h3s]
+                                logger.info(f"Dropdown {i}: h3 teksty: {h3_texts}")
+                                print(f"[DEBUG] Dropdown {i}: h3 teksty: {h3_texts}")
 
                         if category_selects:
                                 from selenium.webdriver.support.ui import Select
@@ -452,8 +517,14 @@ class BrowserAutomation:
                                         f"Wybrano kategorię z dropdowna (similarity: {best_similarity:.2f}): {best_match}")
                                     print(
                                         f"[DEBUG] Wybrano kategorię z dropdowna (similarity: {best_similarity:.2f}): {best_match}")
-                                    time.sleep(2)
                                     category_found = True
+                                    # Czekaj na przeładowanie strony po wyborze kategorii
+                                    time.sleep(3)
+                                    # Sprawdź czy strona się przeładowała
+                                    self.wait.until(
+                                        EC.presence_of_element_located((By.ID, "changelist-filter"))
+                                    )
+                                    time.sleep(2)
                                 else:
                                     logger.warning(
                                         f"Nie znaleziono kategorii '{category_name}' w dropdownie (najlepsze podobieństwo: {best_similarity:.2f})")
@@ -471,14 +542,19 @@ class BrowserAutomation:
                             f"[DEBUG] Błąd podczas wyboru kategorii z dropdowna: {e}")
                         import traceback
                         traceback.print_exc()
+                else:
+                    logger.warning("Brak category_name w filtrach - pomijam filtr kategorii")
+                    print("[DEBUG] Brak category_name w filtrach - pomijam filtr kategorii")
 
-                # Filtr active - użyj dropdowna
+                # Filtr active - użyj dropdowna (aplikuj PO wyborze marki/kategorii)
                 if filters.get('active') is not None:
                     logger.info(f"Szukanie filtra active: {filters['active']}")
 
                     try:
-                        filter_panel = self.driver.find_element(
-                            By.ID, "changelist-filter")
+                        # Ponownie znajdź panel filtrów (może się przeładować po wyborze marki/kategorii)
+                        filter_panel = self.wait.until(
+                            EC.presence_of_element_located((By.ID, "changelist-filter"))
+                        )
                         active_dropdowns = filter_panel.find_elements(By.XPATH,
                                                                       ".//div[@class='list-filter-dropdown'][.//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'active')]]")
 
@@ -492,21 +568,30 @@ class BrowserAutomation:
                             select = Select(active_selects[0])
                             search_text = "Tak" if filters['active'] else "Nie"
                             select.select_by_visible_text(search_text)
-                        logger.info(
-                            f"Wybrano active z dropdowna: {search_text}")
-                        time.sleep(2)
+                            logger.info(
+                                f"Wybrano active z dropdowna: {search_text}")
+                            # Czekaj na przeładowanie strony po wyborze active
+                            time.sleep(3)
+                            self.wait.until(
+                                EC.presence_of_element_located((By.ID, "changelist-filter"))
+                            )
+                            time.sleep(2)
+                        else:
+                            logger.warning("Nie znaleziono dropdowna active")
                     except Exception as e:
                         logger.warning(
                             f"Błąd podczas wyboru active z dropdowna: {e}")
 
-                # Filtr is_mapped - użyj dropdowna
+                # Filtr is_mapped - użyj dropdowna (aplikuj PO wyborze marki/kategorii/active)
                 if filters.get('is_mapped') is not None:
                     logger.info(
                         f"Szukanie filtra is_mapped: {filters['is_mapped']}")
 
                     try:
-                        filter_panel = self.driver.find_element(
-                            By.ID, "changelist-filter")
+                        # Ponownie znajdź panel filtrów (może się przeładować po wyborze poprzednich filtrów)
+                        filter_panel = self.wait.until(
+                            EC.presence_of_element_located((By.ID, "changelist-filter"))
+                        )
                         mapped_dropdowns = filter_panel.find_elements(By.XPATH,
                                                                       ".//div[@class='list-filter-dropdown'][.//h3[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'mapped')]]")
 
@@ -520,9 +605,16 @@ class BrowserAutomation:
                             select = Select(mapped_selects[0])
                             search_text = "Tak" if filters['is_mapped'] else "Nie"
                             select.select_by_visible_text(search_text)
-                        logger.info(
-                            f"Wybrano is_mapped z dropdowna: {search_text}")
-                        time.sleep(2)
+                            logger.info(
+                                f"Wybrano is_mapped z dropdowna: {search_text}")
+                            # Czekaj na przeładowanie strony po wyborze is_mapped
+                            time.sleep(3)
+                            self.wait.until(
+                                EC.presence_of_element_located((By.ID, "changelist-filter"))
+                            )
+                            time.sleep(2)
+                        else:
+                            logger.warning("Nie znaleziono dropdowna is_mapped")
                     except Exception as e:
                         logger.warning(
                             f"Błąd podczas wyboru is_mapped z dropdowna: {e}")

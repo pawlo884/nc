@@ -171,21 +171,42 @@ class Command(BaseCommand):
             # Przygotuj filtry tylko jeśli są podane
             automation_filters = {}
 
+            # DEBUG: Sprawdź wartości brand_id, brand, brand_name
+            self.stdout.write(f"\n[DEBUG] brand_name z parametrów: {brand_name}")
+            self.stdout.write(f"[DEBUG] brand_id: {brand_id}")
+            self.stdout.write(f"[DEBUG] brand: {brand}")
+            
             if brand_id and brand:
                 automation_filters['brand_id'] = brand_id
                 automation_filters['brand_name'] = brand.name
                 self.stdout.write(f"\n[INFO] Filtr marki: {brand.name}")
+            elif brand_name:
+                # Jeśli nie znaleziono w bazie, ale podano nazwę, spróbuj użyć oryginalnej nazwy
+                automation_filters['brand_name'] = brand_name
+                self.stdout.write(
+                    f"[INFO] Filtr marki (bez ID): {brand_name}")
+            else:
+                self.stdout.write(
+                    f"[WARNING] Nie dodano filtra marki - brand_id={brand_id}, brand={brand}, brand_name={brand_name}")
 
-            if category_id:
+            # DEBUG: Sprawdź wartości category_id, category, category_name
+            self.stdout.write(f"[DEBUG] category_name z parametrów: {category_name}")
+            self.stdout.write(f"[DEBUG] category_id: {category_id}")
+            self.stdout.write(f"[DEBUG] category: {category}")
+
+            if category_id and category:
                 automation_filters['category_id'] = category_id
-                # Dodaj nazwę kategorii do filtrów
-                automation_filters['category_name'] = category_name
-                self.stdout.write(f"[INFO] Filtr kategorii: {category_name}")
+                # Użyj nazwy kategorii z bazy danych, nie z parametrów
+                automation_filters['category_name'] = category.name
+                self.stdout.write(f"[INFO] Filtr kategorii: {category.name}")
             elif category_name:
                 # Jeśli nie znaleziono w bazie, ale podano nazwę, spróbuj użyć oryginalnej nazwy
                 automation_filters['category_name'] = category_name
                 self.stdout.write(
                     f"[INFO] Filtr kategorii (bez ID): {category_name}")
+            else:
+                self.stdout.write(
+                    f"[WARNING] Nie dodano filtra kategorii - category_id={category_id}, category={category}, category_name={category_name}")
 
             # Dodaj filtry active i is_mapped z utworzonych filtrów (zawierają już domyślne wartości)
             if 'active' in filters:
@@ -197,12 +218,16 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"[INFO] Filtr is_mapped: {filters['is_mapped']}")
 
+            # DEBUG: Wyświetl wszystkie przygotowane filtry
+            self.stdout.write(f"\n[DEBUG] Wszystkie przygotowane filtry: {automation_filters}")
+
             # Przejdź do listy produktów (z filtrami lub bez)
             self.stdout.write(f"\n[INFO] Przechodzenie do listy produktów...")
             if not automation_filters:
                 self.stdout.write(
                     "   Brak filtrów - wyświetlanie wszystkich produktów")
 
+            self.stdout.write(f"[DEBUG] Przekazuję do navigate_to_product_list: {automation_filters if automation_filters else None}")
             browser.navigate_to_product_list(
                 automation_filters if automation_filters else None)
 
