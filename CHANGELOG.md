@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.7.1 (2026-01-07)</small>
+
+* fix(run_automation): poprawka aplikowania filtrów marki i kategorii ([3eee871](https://github.com/pawlo884/nc/commit/3eee871))
+* Fix: Zmiana portów z 8080 na 8090 i naprawa bdów z niezainicjalizowanymi zmiennymi w filtrach dropdo ([c2d450a](https://github.com/pawlo884/nc/commit/c2d450a))
+
 ## 1.7.0 (2026-01-01)
 
 * feat(admin): optymalizacja admin i ukrycie nieużywanych modeli ([45a999e](https://github.com/pawlo884/nc/commit/45a999e))
