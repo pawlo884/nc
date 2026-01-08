@@ -1,6 +1,7 @@
 import socket
 import sys
 from .base import *
+from nc.middleware import get_debug
 
 # Development rozszerza DATABASES z base.py o wersje z zzz_
 # Dodajemy bazy z przedrostkiem zzz_ (routery wybiorą je automatycznie)
@@ -10,13 +11,30 @@ DATABASES['zzz_matterhorn1'] = DATABASES['matterhorn1'].copy()
 DATABASES['zzz_web_agent'] = DATABASES['web_agent'].copy()
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!'
+SECRET_KEY = os.getenv(
+    'DJANGO_SECRET_KEY', 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG można kontrolować przez zmienną środowiskową DJANGO_DEBUG
+# Dla publicznego dostępu ustaw DJANGO_DEBUG=0 w .env.dev
+# Jeśli DJANGO_DEBUG nie jest ustawione, DEBUG będzie dynamicznie kontrolowane przez middleware
+# na podstawie IP klienta (True dla localhost, False dla zewnętrznych IP)
+debug_env = os.getenv('DJANGO_DEBUG', '')
+if debug_env:
+    # Jeśli DJANGO_DEBUG jest ustawione, użyj tej wartości
+    DEBUG = debug_env.lower() in ('1', 'true', 'yes', 'on')
+else:
+    # Domyślnie True - middleware zmieni to dynamicznie na podstawie IP
+    DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1',
-                 '192.168.50.63', '83.168.79.109', '212.127.93.27', '*', '_']
+# ALLOWED_HOSTS - usunięto '*' i '_' dla bezpieczeństwa
+# Dodaj konkretne IP/domeny do .env.dev jako DJANGO_ALLOWED_HOSTS (oddzielone przecinkami)
+allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS', '')
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',')]
+else:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1',
+                     '192.168.50.63', '83.168.79.109', '212.127.93.27']
 
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://83.168.79.109:8000')
@@ -34,6 +52,7 @@ TIME_ZONE = 'Europe/Warsaw'
 DATABASE_CONNECTION_TIMEOUT = 300  # 5 minutes
 
 # Security settings for development
+# Dodatkowe zabezpieczenia nawet w trybie dev dla publicznego dostępu
 CORS_REPLACE_HTTPS_REFERER = False
 HOST_SCHEME = "http://"
 SECURE_PROXY_SSL_HEADER = None
@@ -44,6 +63,12 @@ CSRF_COOKIE_SECURE = False
 SECURE_HSTS_SECONDS = None
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_FRAME_DENY = False
+
+# Dodatkowe zabezpieczenia dla publicznego dostępu
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'  # Zmienione z False dla bezpieczeństwa
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # Cross-Origin-Opener-Policy settings for development
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
@@ -69,20 +94,31 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
 
 # Debug Toolbar Configuration
+# Debug Toolbar jest wyłączony dla publicznego dostępu ze względów bezpieczeństwa
+# Pokazuje się tylko dla IP z INTERNAL_IPS
 hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
 INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.50.63'] + \
     [ip[:-1] + '1' for ip in ips]
 
-# Wyłącz debug toolbar tymczasowo aby sprawdzić czy wpływa na admin interface
-# DEBUG_TOOLBAR_CONFIG = {
-#     'SHOW_TOOLBAR_CALLBACK': lambda request: True,
-#     'SHOW_TEMPLATE_CONTEXT': True,
-#     'ENABLE_STACKTRACES': True,
-#     'SQL_WARNING_THRESHOLD': 500,  # milliseconds
-# }
+# Wyłącz debug toolbar dla publicznego dostępu - pokazuje się tylko dla localhost
+# Używa dynamicznego DEBUG z middleware
+
+
+def show_debug_toolbar(request):
+    """Callback dla debug toolbar - pokazuje się tylko dla localhost."""
+    return get_debug() and request.META.get('REMOTE_ADDR') in INTERNAL_IPS
+
+
+DEBUG_TOOLBAR_CONFIG = {
+    'SHOW_TOOLBAR_CALLBACK': show_debug_toolbar,
+    'SHOW_TEMPLATE_CONTEXT': True,
+    'ENABLE_STACKTRACES': True,
+    'SQL_WARNING_THRESHOLD': 500,  # milliseconds
+}
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True
+# Dla bezpieczeństwa wyłączamy CORS_ALLOW_ALL_ORIGINS i używamy tylko dozwolonych źródeł
+CORS_ALLOW_ALL_ORIGINS = False  # Zmienione z True dla bezpieczeństwa
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -94,7 +130,13 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.50.63:8000",
     "http://83.168.79.109:8000",
     "http://212.127.93.27:8090",
+    "http://212.127.93.27:8000",
 ]
+# Dodatkowe dozwolone źródła z zmiennej środowiskowej
+cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if cors_origins_env:
+    CORS_ALLOWED_ORIGINS.extend([origin.strip()
+                                for origin in cors_origins_env.split(',')])
 
 # Celery Configuration for development
 CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
@@ -145,7 +187,10 @@ CELERY_TASK_SOFT_TIME_LIMIT = 3300  # 55 minut soft limit
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Usuń WhiteNoise z middleware w development - Nginx obsługuje pliki statyczne
+# DynamicDebugMiddleware jest dodawane jako pierwsze, aby kontrolować DEBUG na podstawie IP
 MIDDLEWARE = [
+    # Dodane jako pierwsze dla dynamicznego DEBUG
+    'nc.middleware.DynamicDebugMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
@@ -155,6 +200,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Zawsze dodane - middleware kontroluje widoczność
     'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
