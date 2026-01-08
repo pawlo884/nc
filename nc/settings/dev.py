@@ -188,9 +188,12 @@ STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Usuń WhiteNoise z middleware w development - Nginx obsługuje pliki statyczne
 # DynamicDebugMiddleware jest dodawane jako pierwsze, aby kontrolować DEBUG na podstawie IP
+# BotBlockerMiddleware blokuje znane boty i crawlery
 MIDDLEWARE = [
     # Dodane jako pierwsze dla dynamicznego DEBUG
     'nc.middleware.DynamicDebugMiddleware',
+    # Blokowanie botów i crawlerów
+    'nc.middleware.BotBlockerMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',

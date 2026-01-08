@@ -35,6 +35,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '212.127.93.27',  # VPS IP
+    '192.168.50.31',  # IP serwera w sieci lokalnej
     'app-web-1',  # Nazwa kontenera Docker
     'web',  # Alias kontenera w sieci Docker
     # Dodaj konkretne domeny zamiast '*'
@@ -139,9 +140,12 @@ STATICFILES_FINDERS = [
 
 # Dodaj WhiteNoise do middleware dla serwowania plików statycznych
 # WhiteNoise działa jako fallback gdy nginx nie jest dostępny
+# BotBlockerMiddleware blokuje znane boty i crawlery
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Dodane dla serwowania plików statycznych
+    # Blokowanie botów i crawlerów
+    'nc.middleware.BotBlockerMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -173,6 +177,10 @@ CSRF_TRUSTED_ORIGINS = [
     'http://212.127.93.27:8000',
     'http://212.127.93.27:8001',
     'https://212.127.93.27',
+    'http://192.168.50.31',
+    'http://192.168.50.31:8000',
+    'http://192.168.50.31:8001',
+    'http://172.24.0.1:8001',  # Adres bramy sieci Docker dla NPM
 ]
 CSRF_COOKIE_SECURE = False  # Wyłączone dla logowania po HTTP (bez HTTPS)
 CSRF_COOKIE_HTTPONLY = False
