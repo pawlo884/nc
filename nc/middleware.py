@@ -1,7 +1,10 @@
 """
-Middleware do dynamicznego kontrolowania DEBUG na podstawie IP klienta.
+Middleware do dynamicznego kontrolowania DEBUG na podstawie IP klienta
+oraz blokowania botów i crawlerów.
 """
 import threading
+import re
+from django.http import HttpResponseForbidden
 
 # Thread-local storage dla DEBUG
 _thread_locals = threading.local()
@@ -60,3 +63,72 @@ class DynamicDebugMiddleware:
         
         response = self.get_response(request)
         return response
+
+
+class BotBlockerMiddleware:
+    """
+    Middleware do blokowania znanych botów i crawlerów.
+    Można skonfigurować przez zmienne środowiskowe:
+    - BOT_BLOCKER_ENABLED=True/False (domyślnie True)
+    - BOT_BLOCKER_ALLOWED_BOTS=Googlebot,Bingbot (oddzielone przecinkami)
+    """
+    
+    # Lista znanych botów/crawlerów do blokowania
+    BLOCKED_USER_AGENTS = [
+        r'bot', r'crawler', r'spider', r'scraper',
+        r'curl', r'wget', r'python-requests', r'python-urllib',
+        r'http', r'libwww', r'fetch', r'getright',
+        r'go-http-client', r'java', r'perl', r'ruby',
+        r'scrapy', r'mechanize', r'phantomjs', r'selenium',
+        r'headless', r'postman', r'insomnia', r'httpie',
+    ]
+    
+    # Dozwolone boty (np. Googlebot, Bingbot dla SEO)
+    ALLOWED_BOTS = [
+        'googlebot', 'bingbot', 'slurp', 'duckduckbot',
+        'baiduspider', 'yandexbot', 'facebookexternalhit',
+    ]
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+        import os
+        # Sprawdź czy blokowanie jest włączone
+        self.enabled = os.getenv('BOT_BLOCKER_ENABLED', 'True').lower() in ('true', '1', 'yes', 'on')
+        
+        # Pobierz dozwolone boty z zmiennej środowiskowej
+        allowed_bots_env = os.getenv('BOT_BLOCKER_ALLOWED_BOTS', '')
+        if allowed_bots_env:
+            self.allowed_bots = [bot.strip().lower() for bot in allowed_bots_env.split(',')]
+        else:
+            self.allowed_bots = [bot.lower() for bot in self.ALLOWED_BOTS]
+        
+        # Kompiluj regex dla lepszej wydajności
+        self.blocked_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self.BLOCKED_USER_AGENTS]
+    
+    def __call__(self, request):
+        if not self.enabled:
+            return self.get_response(request)
+        
+        # Sprawdź User-Agent
+        user_agent = request.META.get('HTTP_USER_AGENT', '').lower()
+        
+        if not user_agent:
+            # Brak User-Agent - podejrzane, ale nie blokujemy (może być normalny klient)
+            return self.get_response(request)
+        
+        # Sprawdź czy to dozwolony bot
+        for allowed_bot in self.allowed_bots:
+            if allowed_bot in user_agent:
+                return self.get_response(request)
+        
+        # Sprawdź czy User-Agent pasuje do zablokowanych wzorców
+        for pattern in self.blocked_patterns:
+            if pattern.search(user_agent):
+                # Zablokuj request
+                return HttpResponseForbidden(
+                    '<h1>403 Forbidden</h1>'
+                    '<p>Access denied. Automated crawling is not allowed.</p>',
+                    content_type='text/html'
+                )
+        
+        return self.get_response(request)
