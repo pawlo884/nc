@@ -41,6 +41,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    ports:
+      - "8000:8000"  # Port dla blue (można zmienić na inny jeśli potrzebny)
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/admin/ || exit 1"]
       interval: 10s
@@ -92,6 +94,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    ports:
+      - "8001:8000"  # Port dla green (aktywny)
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/admin/ || exit 1"]
       interval: 10s
@@ -109,27 +113,32 @@ services:
   nginx-router:
     image: nginx:alpine
     container_name: nc-nginx-router
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8001:8001"
+    # Porty usunięte - nginx-router dostępny tylko wewnętrznie przez sieć Docker
+    # Nginx Proxy Manager wskazuje na niego przez sieć nginx_proxy_manager_network
     volumes:
-      - ./nginx-blue-green.conf:/etc/nginx/conf.d/default.conf
-      - /mnt/data2tb/docker/volumes/nc_static_volume:/app/staticfiles
+      - ./nginx-blue-green.conf:/etc/nginx/conf.d/default.conf:ro
+      - /mnt/data2tb/docker/volumes/nc_static_volume:/app/staticfiles:ro
       - /mnt/data2tb/docker/volumes/nc_nginx_logs:/var/log/nginx
       - /mnt/data2tb/docker/volumes/nc_nginx_state:/etc/nginx/state
     environment:
       - TZ=Europe/Warsaw
     depends_on:
       web-blue:
-        condition: service_started
+        condition: service_healthy
       web-green:
-        condition: service_started
+        condition: service_healthy
     restart: always
     networks:
       - nc_network
+      - nginx_proxy_manager_network  # Połącz z siecią NPM
     labels:
       - "nc.type=router"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/nginx-health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ==========================================
   # SHARED SERVICES (nie są duplikowane)
@@ -327,4 +336,7 @@ services:
 networks:
   nc_network:
     driver: bridge
+  nginx_proxy_manager_network:
+    name: nginx_proxy_manager_network
+    external: true
 
