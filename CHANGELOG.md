@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.1 (2026-01-10)</small>
+
+* fix(settings): add nc.sowa.ch to ALLOWED_HOSTS and fix health checks ([15ff764](https://github.com/pawlo884/nc/commit/15ff764))
+
 ## 1.9.0 (2026-01-10)
 
 * Dodanie adresów IP do CORS_ALLOWED_ORIGINS dla produkcji ([39a3fd8](https://github.com/pawlo884/nc/commit/39a3fd8))
