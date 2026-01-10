@@ -1,5 +1,15 @@
 # Zmiany
 
+## 1.9.0 (2026-01-10)
+
+* Dodanie adresów IP do CORS_ALLOWED_ORIGINS dla produkcji ([39a3fd8](https://github.com/pawlo884/nc/commit/39a3fd8))
+* Dodano SSH tunnel dla połączenia z bazą danych przez Docker ([143050e](https://github.com/pawlo884/nc/commit/143050e))
+* Konfiguracja dostępu przez IP serwera dla produkcji - dodanie 192.168.50.31 do ALLOWED_HOSTS i CSRF_ ([ddda1c1](https://github.com/pawlo884/nc/commit/ddda1c1))
+* Merge branch 'main' into somesecurity ([061121c](https://github.com/pawlo884/nc/commit/061121c))
+* Merge pull request #24 from pawlo884/somesecurity ([dea5185](https://github.com/pawlo884/nc/commit/dea5185)), closes [#24](https://github.com/pawlo884/nc/issues/24)
+* feat: dynamiczne kontrolowanie DEBUG na podstawie IP klienta ([491b0e1](https://github.com/pawlo884/nc/commit/491b0e1))
+* refactor: przeniesienie strony głównej z lambda view do template index.html ([a1abb5a](https://github.com/pawlo884/nc/commit/a1abb5a))
+
 ## 1.8.0 (2026-01-09)
 
 * Implementacja automatycznego blue-green deployment ([71664ea](https://github.com/pawlo884/nc/commit/71664ea))
