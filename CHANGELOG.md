@@ -1,5 +1,12 @@
 # Zmiany
 
+## 1.8.0 (2026-01-09)
+
+* Implementacja automatycznego blue-green deployment ([71664ea](https://github.com/pawlo884/nc/commit/71664ea))
+* Konfiguracja dostępu przez IP serwera dla produkcji - dodanie 192.168.50.31 do ALLOWED_HOSTS i CSRF_ ([f0c3d27](https://github.com/pawlo884/nc/commit/f0c3d27))
+* feat: dynamiczne kontrolowanie DEBUG na podstawie IP klienta ([7919d53](https://github.com/pawlo884/nc/commit/7919d53))
+* refactor: przeniesienie strony głównej z lambda view do template index.html ([6e87b44](https://github.com/pawlo884/nc/commit/6e87b44))
+
 ## <small>1.7.1 (2026-01-07)</small>
 
 * fix(run_automation): poprawka aplikowania filtrów marki i kategorii ([3eee871](https://github.com/pawlo884/nc/commit/3eee871))
