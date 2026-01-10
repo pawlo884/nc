@@ -44,7 +44,7 @@ services:
     ports:
       - "8000:8000"  # Port dla blue (można zmienić na inny jeśli potrzebny)
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/admin/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -97,7 +97,7 @@ services:
     ports:
       - "8001:8000"  # Port dla green (aktywny)
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/admin/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

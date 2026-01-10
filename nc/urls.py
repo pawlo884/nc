@@ -20,7 +20,7 @@ from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
-from nc.views import index
+from nc.views import index, health_check
 
 # Import drf_spectacular tylko jeśli jest dostępny
 try:
@@ -31,6 +31,7 @@ except ImportError:
 
 urlpatterns = [
     path('i18n/', include('django.conf.urls.i18n')),
+    path('health/', health_check, name='health_check'),  # Health check dla Docker
     path('robots.txt', TemplateView.as_view(
         template_name='robots.txt',
         content_type='text/plain'

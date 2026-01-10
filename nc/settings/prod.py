@@ -38,6 +38,8 @@ ALLOWED_HOSTS = [
     '192.168.50.31',  # IP serwera w sieci lokalnej
     'app-web-1',  # Nazwa kontenera Docker
     'web',  # Alias kontenera w sieci Docker
+    'nc.sowa.ch',  # Główna domena aplikacji
+    'sowa.ch',  # Domena główna (bez poddomeny)
     # Dodaj konkretne domeny zamiast '*'
     # 'twoja-domena.com',
     # 'www.twoja-domena.com',

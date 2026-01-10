@@ -109,6 +109,10 @@ class BotBlockerMiddleware:
         if not self.enabled:
             return self.get_response(request)
         
+        # Pomijaj health check endpoint - musi być dostępny dla Docker health checks
+        if request.path == '/health/' or request.path == '/health':
+            return self.get_response(request)
+        
         # Sprawdź User-Agent
         user_agent = request.META.get('HTTP_USER_AGENT', '').lower()
         
