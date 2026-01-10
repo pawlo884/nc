@@ -34,7 +34,7 @@ if allowed_hosts_env:
     ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',')]
 else:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1',
-                     '192.168.50.63', '83.168.79.109', '212.127.93.27']
+                     '192.168.50.63', '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch']
 
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://83.168.79.109:8000')
@@ -89,6 +89,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://212.127.93.27:8000',
     'http://212.127.93.27:8001',
     'http://212.127.93.27:8090',
+    'https://nc-dev.sowa.ch',
 ]
 CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
@@ -131,6 +132,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://83.168.79.109:8000",
     "http://212.127.93.27:8090",
     "http://212.127.93.27:8000",
+    'https://nc-dev.sowa.ch',
 ]
 # Dodatkowe dozwolone źródła z zmiennej środowiskowej
 cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
