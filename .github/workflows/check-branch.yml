@@ -213,12 +213,23 @@ jobs:
           if [ -f package.json ]; then
             echo "🎨 Sprawdzam formatowanie Prettier (tylko pliki kodu JS/TS/CSS)..."
             # Sprawdzamy tylko pliki kodu JS/TS/CSS, pomijamy JSON i markdown
-            npx prettier --check "**/*.{js,jsx,ts,tsx,css,scss}" --ignore-path .gitignore || {
+            set +e
+            PRETTIER_OUTPUT=$(npx prettier --check "**/*.{js,jsx,ts,tsx,css,scss}" --ignore-path .gitignore 2>&1)
+            PRETTIER_EXIT=$?
+            set -e
+            
+            if echo "$PRETTIER_OUTPUT" | grep -q "No files matching the pattern were found"; then
+              echo "ℹ️ Brak plików JS/TS/CSS do sprawdzenia (wszystkie są ignorowane lub nie ma plików)"
+              echo "✅ Formatowanie pominięte - brak plików do sprawdzenia"
+            elif [ $PRETTIER_EXIT -ne 0 ]; then
+              echo "$PRETTIER_OUTPUT"
               echo "❌ Formatowanie nie jest poprawne!"
               echo "Uruchom: npx prettier --write \"**/*.{js,jsx,ts,tsx,css,scss}\""
               exit 1
-            }
-            echo "✅ Formatowanie kodu poprawne!"
+            else
+              echo "$PRETTIER_OUTPUT"
+              echo "✅ Formatowanie kodu poprawne!"
+            fi
           else
             echo "ℹ️ Brak package.json, pomijam sprawdzenie formatowania"
           fi
