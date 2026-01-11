@@ -103,14 +103,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('src/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r src/requirements.txt
 
       - name: Sprawdź migracje Django
         # ⚠️ WYŁĄCZONE: Wymaga konfiguracji MinIO/S3
@@ -140,9 +140,10 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci
         run: |
           echo "🔄 Sprawdzam migracje Django..."
-          python manage.py makemigrations --check --dry-run --settings=nc.settings.dev || {
+          cd src
+          python manage.py makemigrations --check --dry-run --settings=core.settings.dev || {
             echo "❌ Wykryto niezapisane migracje!"
-            echo "Uruchom: python manage.py makemigrations --settings=nc.settings.dev"
+            echo "Uruchom: python manage.py makemigrations --settings=core.settings.dev"
             exit 1
           }
           echo "✅ Wszystkie migracje są zapisane!"
@@ -173,13 +174,14 @@ jobs:
           WEB_AGENT_DB_PORT: 5432
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: test-secret-key-for-ci
-          DJANGO_SETTINGS_MODULE: nc.settings.dev
+          DJANGO_SETTINGS_MODULE: core.settings.dev
         run: |
           echo "🧪 Uruchamiam testy Django..."
+          cd src
           # Django test automatycznie tworzy testową bazę danych z prefiksem test_
           # i uruchamia migracje dla wszystkich baz danych
           # Używamy --noinput aby pominąć pytania interaktywne
-          python manage.py test --settings=nc.settings.dev --verbosity=2 --noinput || {
+          python manage.py test --settings=core.settings.dev --verbosity=2 --noinput || {
             echo "❌ Testy nie przeszły!"
             echo "ℹ️ Jeśli problem dotyczy wielu baz danych, sprawdź konfigurację DATABASES w settings"
             exit 1
