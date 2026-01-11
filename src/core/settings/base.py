@@ -129,7 +129,7 @@ TEMPLATES = [
 # Development (dev.py) nadpisuje na wersje z przedrostkiem zzz_
 DATABASES = {
     'default': {
-        'ENGINE': 'nc.db_backend',
+        'ENGINE': 'core.db_backend',
         'NAME': os.getenv('DEFAULT_DB_NAME'),
         'USER': os.getenv('DEFAULT_DB_USER'),
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
@@ -146,7 +146,7 @@ DATABASES = {
         }
     },
     'zzz_default': {
-        'ENGINE': 'nc.db_backend',
+        'ENGINE': 'core.db_backend',
         'NAME': os.getenv('DEFAULT_DB_NAME'),
         'USER': os.getenv('DEFAULT_DB_USER'),
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
@@ -163,7 +163,7 @@ DATABASES = {
         }
     },
     'MPD': {
-        'ENGINE': 'nc.db_backend',
+        'ENGINE': 'core.db_backend',
         'NAME': os.getenv('MPD_DB_NAME'),
         'USER': os.getenv('MPD_DB_USER'),
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
@@ -180,7 +180,7 @@ DATABASES = {
         }
     },
     'zzz_MPD': {
-        'ENGINE': 'nc.db_backend',
+        'ENGINE': 'core.db_backend',
         'NAME': os.getenv('MPD_DB_NAME'),
         'USER': os.getenv('MPD_DB_USER'),
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
@@ -197,7 +197,7 @@ DATABASES = {
         }
     },
     'matterhorn1': {
-        'ENGINE': 'nc.db_backend',
+        'ENGINE': 'core.db_backend',
         'NAME': os.getenv('MATTERHORN1_DB_NAME'),
         'USER': os.getenv('MATTERHORN1_DB_USER'),
         'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
@@ -214,7 +214,7 @@ DATABASES = {
         }
     },
     'web_agent': {
-        'ENGINE': 'nc.db_backend',
+        'ENGINE': 'core.db_backend',
         'NAME': os.getenv('WEB_AGENT_DB_NAME'),
         'USER': os.getenv('WEB_AGENT_DB_USER'),
         'PASSWORD': os.getenv('WEB_AGENT_DB_PASSWORD'),

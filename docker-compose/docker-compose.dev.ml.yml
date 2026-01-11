@@ -12,7 +12,7 @@ services:
       - celery_data:/var/lib/celery
       - ml_models:/app/ml_models  # Cache dla pobranych modeli ML
     env_file:
-      - .env.dev
+      - ../.env.dev
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings.dev
       - CELERY_STATE_DB=/var/lib/celery/worker_state_ml
