@@ -43,12 +43,12 @@ DO_SPACES_BUCKET=
 DO_SPACES_ACCESS_KEY_ID=
 
 # MinIO / S3 Storage
-MINIO_ENDPOINT=http://minio:9000
+MINIO_ENDPOINT=https://minio-api.sowa.ch
 MINIO_BUCKET_NAME=nc-media
 MINIO_ACCESS_KEY=
 MINIO_SECRET_KEY=
 MINIO_REGION=us-east-1
-MINIO_PUBLIC_URL=http://localhost:9100/nc-media
+MINIO_PUBLIC_URL=https://minio-api.sowa.ch/nc-media
 MINIO_VERIFY_SSL=false
 AWS_DEFAULT_ACL=
 AWS_QUERYSTRING_AUTH=false

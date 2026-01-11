@@ -97,20 +97,20 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('src/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r src/requirements.txt
 
       - name: Sprawdź migracje Django
         # ⚠️ WYŁĄCZONE: Wymaga konfiguracji MinIO/S3
@@ -140,9 +140,10 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci
         run: |
           echo "🔄 Sprawdzam migracje Django..."
-          python manage.py makemigrations --check --dry-run --settings=nc.settings.dev || {
+          cd src
+          python manage.py makemigrations --check --dry-run --settings=core.settings.dev || {
             echo "❌ Wykryto niezapisane migracje!"
-            echo "Uruchom: python manage.py makemigrations --settings=nc.settings.dev"
+            echo "Uruchom: python manage.py makemigrations --settings=core.settings.dev"
             exit 1
           }
           echo "✅ Wszystkie migracje są zapisane!"
@@ -173,13 +174,14 @@ jobs:
           WEB_AGENT_DB_PORT: 5432
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: test-secret-key-for-ci
-          DJANGO_SETTINGS_MODULE: nc.settings.dev
+          DJANGO_SETTINGS_MODULE: core.settings.dev
         run: |
           echo "🧪 Uruchamiam testy Django..."
+          cd src
           # Django test automatycznie tworzy testową bazę danych z prefiksem test_
           # i uruchamia migracje dla wszystkich baz danych
           # Używamy --noinput aby pominąć pytania interaktywne
-          python manage.py test --settings=nc.settings.dev --verbosity=2 --noinput || {
+          python manage.py test --settings=core.settings.dev --verbosity=2 --noinput || {
             echo "❌ Testy nie przeszły!"
             echo "ℹ️ Jeśli problem dotyczy wielu baz danych, sprawdź konfigurację DATABASES w settings"
             exit 1
@@ -211,12 +213,23 @@ jobs:
           if [ -f package.json ]; then
             echo "🎨 Sprawdzam formatowanie Prettier (tylko pliki kodu JS/TS/CSS)..."
             # Sprawdzamy tylko pliki kodu JS/TS/CSS, pomijamy JSON i markdown
-            npx prettier --check "**/*.{js,jsx,ts,tsx,css,scss}" --ignore-path .gitignore || {
+            set +e
+            PRETTIER_OUTPUT=$(npx prettier --check "**/*.{js,jsx,ts,tsx,css,scss}" --ignore-path .gitignore 2>&1)
+            PRETTIER_EXIT=$?
+            set -e
+            
+            if echo "$PRETTIER_OUTPUT" | grep -q "No files matching the pattern were found"; then
+              echo "ℹ️ Brak plików JS/TS/CSS do sprawdzenia (wszystkie są ignorowane lub nie ma plików)"
+              echo "✅ Formatowanie pominięte - brak plików do sprawdzenia"
+            elif [ $PRETTIER_EXIT -ne 0 ]; then
+              echo "$PRETTIER_OUTPUT"
               echo "❌ Formatowanie nie jest poprawne!"
               echo "Uruchom: npx prettier --write \"**/*.{js,jsx,ts,tsx,css,scss}\""
               exit 1
-            }
-            echo "✅ Formatowanie kodu poprawne!"
+            else
+              echo "$PRETTIER_OUTPUT"
+              echo "✅ Formatowanie kodu poprawne!"
+            fi
           else
             echo "ℹ️ Brak package.json, pomijam sprawdzenie formatowania"
           fi

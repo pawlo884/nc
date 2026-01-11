@@ -34,8 +34,8 @@ echo "=========================================="
 echo ""
 
 # 1. Sprawdź czy jesteśmy w katalogu projektu
-if [ ! -f "docker-compose.blue-green.yml" ]; then
-    log_error "Nie znaleziono docker-compose.blue-green.yml"
+if [ ! -f "docker-compose/docker-compose.blue-green.yml" ]; then
+    log_error "Nie znaleziono docker-compose/docker-compose.blue-green.yml"
     exit 1
 fi
 
@@ -130,7 +130,7 @@ if [ "$WEB_BLUE_EXISTS" = false ] && [ "$WEB_GREEN_EXISTS" = false ]; then
     log_error "PROBLEM: Brak kontenerów web-blue i web-green!"
     echo ""
     log_info "Rozwiązanie: Uruchom kontenery blue-green:"
-    echo "  docker-compose -f docker-compose.blue-green.yml up -d web-blue web-green"
+    echo "  docker-compose -f docker-compose/docker-compose.blue-green.yml up -d web-blue web-green"
     echo ""
     
     if [ "$WEB_SINGLE_EXISTS" = true ]; then
@@ -139,7 +139,7 @@ if [ "$WEB_BLUE_EXISTS" = false ] && [ "$WEB_GREEN_EXISTS" = false ]; then
         log_info "Musisz przełączyć się na blue-green deployment:"
         echo "  1. Zatrzymaj obecny nginx i web"
         echo "  2. Uruchom web-blue i web-green"
-        echo "  3. Uruchom nginx-router z docker-compose.blue-green.yml"
+        echo "  3. Uruchom nginx-router z docker-compose/docker-compose.blue-green.yml"
     fi
     
     echo ""
@@ -147,7 +147,7 @@ if [ "$WEB_BLUE_EXISTS" = false ] && [ "$WEB_GREEN_EXISTS" = false ]; then
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         log_info "Uruchamiam web-blue i web-green..."
-        docker-compose -f docker-compose.blue-green.yml up -d web-blue web-green
+        docker-compose -f docker-compose/docker-compose.blue-green.yml up -d web-blue web-green
         log_success "Kontenery uruchomione"
         echo ""
         log_info "Czekam 10 sekund na start kontenerów..."
@@ -174,7 +174,7 @@ if [ "$WEB_BLUE_EXISTS" = true ] || [ "$WEB_GREEN_EXISTS" = true ]; then
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 log_info "Restartowanie nginx..."
-                docker-compose -f docker-compose.blue-green.yml restart nginx-router
+                docker-compose -f docker-compose/docker-compose.blue-green.yml restart nginx-router
                 log_success "Nginx zrestartowany"
             fi
         fi
@@ -185,7 +185,7 @@ if [ "$WEB_BLUE_EXISTS" = true ] || [ "$WEB_GREEN_EXISTS" = true ]; then
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             log_info "Uruchamiam nginx-router..."
-            docker-compose -f docker-compose.blue-green.yml up -d nginx-router
+            docker-compose -f docker-compose/docker-compose.blue-green.yml up -d nginx-router
             log_success "Nginx uruchomiony"
         fi
     fi
@@ -197,7 +197,7 @@ echo "✅ Diagnoza zakończona"
 echo "=========================================="
 echo ""
 log_info "Przydatne komendy:"
-echo "  - Status: docker-compose -f docker-compose.blue-green.yml ps"
+echo "  - Status: docker-compose -f docker-compose/docker-compose.blue-green.yml ps"
 echo "  - Logi nginx: docker logs $NGINX_CONTAINER -f"
 echo "  - Logi web-blue: docker logs nc-web-blue -f"
 echo "  - Logi web-green: docker logs nc-web-green -f"

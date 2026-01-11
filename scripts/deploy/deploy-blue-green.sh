@@ -153,7 +153,7 @@ switch_nginx() {
     log_info "🔄 Przełączanie NGINX na ${target}..."
     
     # Backup aktualnej konfiguracji
-    cp nginx-blue-green.conf nginx-blue-green.conf.backup
+    cp deployments/nginx/nginx-blue-green.conf deployments/nginx/nginx-blue-green.conf.backup
     
     # Określ aktualny aktywny environment (blue lub green)
     if [ "$target" = "blue" ]; then
@@ -176,24 +176,24 @@ switch_nginx() {
     
     # 1. Najpierw zakomentuj STARY upstream (zapobiega błędom DNS podczas restart)
     log_info "📝 Komentowanie upstream ${inactive_upstream} (stary kontener)..."
-    sed -i.bak "/^upstream ${inactive_upstream} {/,/^}/s/^/#/" nginx-blue-green.conf
+    sed -i.bak "/^upstream ${inactive_upstream} {/,/^}/s/^/#/" deployments/nginx/nginx-blue-green.conf
     
     # 2. Odkomentuj NOWY upstream (usuń # na początku linii)
     log_info "📝 Odkomentowywanie upstream ${target_upstream} (nowy kontener)..."
-    sed -i.bak "/^#upstream ${target_upstream} {/,/^#}/s/^#//" nginx-blue-green.conf
+    sed -i.bak "/^#upstream ${target_upstream} {/,/^#}/s/^#//" deployments/nginx/nginx-blue-green.conf
     
     # 3. Zmień backend_active
     log_info "📝 Zmiana backend_active na ${target}..."
-    sed -i.bak "/^upstream backend_active {/,/^}/ s/server web-${current}:8000/server web-${target}:8000/" nginx-blue-green.conf
+    sed -i.bak "/^upstream backend_active {/,/^}/ s/server web-${current}:8000/server web-${target}:8000/" deployments/nginx/nginx-blue-green.conf
     
     # 4. Zmień X-Deployment-Color header
-    sed -i.bak "s/X-Deployment-Color \"${current}\"/X-Deployment-Color \"${target}\"/g" nginx-blue-green.conf
+    sed -i.bak "s/X-Deployment-Color \"${current}\"/X-Deployment-Color \"${target}\"/g" deployments/nginx/nginx-blue-green.conf
     
     # 5. Zmień deployment-status endpoint
-    sed -i.bak "s/\"active\":\"${current}\"/\"active\":\"${target}\"/g" nginx-blue-green.conf
+    sed -i.bak "s/\"active\":\"${current}\"/\"active\":\"${target}\"/g" deployments/nginx/nginx-blue-green.conf
     
     # Usuń pliki .bak utworzone przez sed (są już w .gitignore)
-    rm -f nginx-blue-green.conf.bak
+    rm -f deployments/nginx/nginx-blue-green.conf.bak
     
     # 6. Test konfiguracji przed restartem (sprawdza tylko składnię, nie DNS)
     # Plik jest mountowany jako volume, więc zmiany są automatycznie widoczne
@@ -202,7 +202,7 @@ switch_nginx() {
     # 7. Restart NGINX (nie reload, bo reload może używać starego DNS cache)
     # Plik jest mountowany jako volume, więc zmiany są automatycznie widoczne
     log_info "🔄 Restartowanie nginx-router aby załadować nową konfigurację..."
-    docker-compose -f docker-compose.blue-green.yml restart nginx-router
+    docker-compose -f docker-compose/docker-compose.blue-green.yml restart nginx-router
     
     # Poczekaj na start nginx
     log_info "⏳ Czekam 5 sekund na start nginx..."
@@ -214,9 +214,9 @@ switch_nginx() {
         log_error "📋 Szczegóły błędów:"
         docker exec nc-nginx-router nginx -t
         # Rollback
-        mv nginx-blue-green.conf.backup nginx-blue-green.conf
+        mv deployments/nginx/nginx-blue-green.conf.backup deployments/nginx/nginx-blue-green.conf
         log_error "❌ Przywracanie poprzedniej konfiguracji..."
-        docker-compose -f docker-compose.blue-green.yml restart nginx-router
+        docker-compose -f docker-compose/docker-compose.blue-green.yml restart nginx-router
         sleep 3
         return 1
     fi
@@ -267,7 +267,7 @@ deploy() {
         # Zapisz timestamp PostgreSQL przed operacją
         POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
         
-        if ! docker-compose -f docker-compose.blue-green.yml up -d nginx-router; then
+        if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d nginx-router; then
             log_error "❌ Nie udało się uruchomić NGINX router"
             exit 1
         fi
@@ -306,7 +306,7 @@ deploy() {
     POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
     
     # ✅ Bezpieczne - buduje web-${TARGET} i kontenery Celery (używają tego samego obrazu), nie dotyka nietykalnych kontenerów
-    if ! docker-compose -f docker-compose.blue-green.yml build --no-cache web-${TARGET} celery-default celery-import celery-beat flower; then
+    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml build --no-cache web-${TARGET} celery-default celery-import celery-beat flower; then
         log_error "❌ Nie udało się zbudować obrazu"
         exit 1
     fi
@@ -323,7 +323,7 @@ deploy() {
     # 3.5. Restart kontenerów Celery z nowym obrazem
     log_info "🔄 Restartowanie kontenerów Celery z nowym obrazem..."
     # ✅ Bezpieczne - restartuje tylko kontenery Celery, nie dotyka nietykalnych kontenerów
-    docker-compose -f docker-compose.blue-green.yml up -d --force-recreate --no-deps celery-default celery-import celery-beat flower 2>/dev/null || {
+    docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --force-recreate --no-deps celery-default celery-import celery-beat flower 2>/dev/null || {
         log_warning "⚠️ Nie udało się zrestartować kontenerów Celery, kontynuuję..."
     }
     log_success "✅ Kontenery Celery zrestartowane"
@@ -331,12 +331,12 @@ deploy() {
     # 4. Zatrzymaj stary kontener target (jeśli istnieje)
     log_info "🛑 Zatrzymywanie starego kontenera ${TARGET}..."
     # ✅ Bezpieczne - dotyka tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
-    docker-compose -f docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || true
+    docker-compose -f docker-compose/docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || true
     
     # 5. Uruchom nowy kontener
     log_info "▶️  Uruchamianie nowego kontenera ${TARGET}..."
     # ✅ Bezpieczne - uruchamia tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
-    if ! docker-compose -f docker-compose.blue-green.yml up -d web-${TARGET}; then
+    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d web-${TARGET}; then
         log_error "❌ Nie udało się uruchomić kontenera ${TARGET}"
         exit 1
     fi
@@ -349,7 +349,7 @@ deploy() {
         log_error "❌ Deployment failed - health check nie przeszedł"
         log_warning "🔙 Rollback: ${TARGET} nie zostanie aktywowany"
         # ✅ Bezpieczne - zatrzymuje tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
-        docker-compose -f docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${TARGET}"
+        docker-compose -f docker-compose/docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${TARGET}"
         exit 1
     fi
     
@@ -360,13 +360,13 @@ deploy() {
     fi
     
     # 8.1. Commit zmian w konfiguracji nginx (jeśli są zmiany)
-    if git diff --quiet nginx-blue-green.conf; then
-        log_info "ℹ️  Brak zmian w nginx-blue-green.conf do commitowania"
+    if git diff --quiet deployments/nginx/nginx-blue-green.conf; then
+        log_info "ℹ️  Brak zmian w deployments/nginx/nginx-blue-green.conf do commitowania"
     else
-        log_info "📝 Commitowanie zmian w nginx-blue-green.conf..."
-        git add nginx-blue-green.conf
+        log_info "📝 Commitowanie zmian w deployments/nginx/nginx-blue-green.conf..."
+        git add deployments/nginx/nginx-blue-green.conf
         git commit -m "chore(deploy): przełączenie nginx na ${TARGET} environment" || log_warning "⚠️  Nie udało się commitować zmian (może nie być w repo?)"
-        log_success "✅ Zmiany w nginx-blue-green.conf zacommitowane"
+        log_success "✅ Zmiany w deployments/nginx/nginx-blue-green.conf zacommitowane"
     fi
     
     # 9. Opcjonalnie: poczekaj chwilę i zatrzymaj stary environment
@@ -375,7 +375,7 @@ deploy() {
     
     log_info "🛑 Zatrzymywanie starego środowiska ${ACTIVE}..."
     # ✅ Bezpieczne - zatrzymuje tylko web-${ACTIVE}, nie dotyka nietykalnych kontenerów
-    docker-compose -f docker-compose.blue-green.yml stop web-${ACTIVE} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${ACTIVE}"
+    docker-compose -f docker-compose/docker-compose.blue-green.yml stop web-${ACTIVE} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${ACTIVE}"
     
     # 10. Finalna weryfikacja - sprawdź czy PostgreSQL nie został odtworzony
     POSTGRES_STARTED_AFTER_DEPLOY=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
@@ -422,7 +422,7 @@ rollback() {
     
     # Uruchom stary environment
     # ✅ Bezpieczne - uruchamia tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
-    if ! docker-compose -f docker-compose.blue-green.yml up -d web-${TARGET}; then
+    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d web-${TARGET}; then
         log_error "❌ Nie udało się uruchomić kontenera ${TARGET} podczas rollback"
         exit 1
     fi

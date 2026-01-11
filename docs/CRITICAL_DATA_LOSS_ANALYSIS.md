@@ -41,7 +41,7 @@ rm -rf /mnt/data2tb/docker/volumes/nc_postgres_data
 - Utworzył nową bazę w innym miejscu
 
 ### Scenariusz 4: Initdb.d nadpisał bazę
-- Skrypty w `docker/postgres/initdb.d/` nadpisały dane
+- Skrypty w `deployments/docker/postgres/initdb.d/` nadpisały dane
 - **ALE:** katalog jest pusty, więc to NIE TO
 
 ## Weryfikacja

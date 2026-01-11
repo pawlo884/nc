@@ -120,7 +120,7 @@ jobs:
           
           # Sprawdź status kontenerów blue-green
           echo "📊 Container status (Blue-Green):"
-          docker-compose -f docker-compose.blue-green.yml ps || echo "⚠️ Could not get status!"
+          docker-compose -f docker-compose/docker-compose.blue-green.yml ps || echo "⚠️ Could not get status!"
           
           # Sprawdź który environment jest aktywny
           ACTIVE_ENV=$(./scripts/deploy/deploy-blue-green.sh status | grep "🔀 Active environment:" | awk '{print $4}')
@@ -141,11 +141,11 @@ jobs:
           
           # Sprawdź migracje i bazę danych na aktywnym kontenerze
           echo "🗄️ Checking database migrations..."
-          docker exec nc-web-${ACTIVE_ENV} python manage.py showmigrations --settings=nc.settings.prod || echo "⚠️ Could not check migrations"
+          docker exec nc-web-${ACTIVE_ENV} python manage.py showmigrations --settings=core.settings.prod || echo "⚠️ Could not check migrations"
           
           # Sprawdź czy baza jest pusta (czy są tabele)
           echo "📋 Checking if database is initialized..."
-          docker exec nc-web-${ACTIVE_ENV} python manage.py shell --settings=nc.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
+          docker exec nc-web-${ACTIVE_ENV} python manage.py shell --settings=core.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
           
           echo "📋 Recent logs (active web):"
           docker logs nc-web-${ACTIVE_ENV} --tail 50 || echo "⚠️ Could not get logs"

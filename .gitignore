@@ -33,7 +33,7 @@ Thumbs.db
 *.rej
 
 # pliki .xml
-MPD_test/*
+misc/MPD_test/*
 
 # statyczne pliki Django
 staticfiles/

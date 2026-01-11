@@ -52,5 +52,5 @@ Write-Host "[OK] Klucz SSH zostal dodany do $envFile (zakodowany w base64)" -For
 Write-Host ""
 Write-Host "Nastepne kroki:"
 Write-Host "1. Sprawdz czy dane sa poprawne w $envFile"
-Write-Host "2. Uruchom: docker-compose -f docker-compose.dev.yml up -d postgres-ssh-tunnel"
-Write-Host "3. Sprawdz logi: docker-compose -f docker-compose.dev.yml logs -f postgres-ssh-tunnel"
+Write-Host "2. Uruchom: docker-compose -f docker-compose/docker-compose.dev.yml up -d postgres-ssh-tunnel"
+Write-Host "3. Sprawdz logi: docker-compose -f docker-compose/docker-compose.dev.yml logs -f postgres-ssh-tunnel"

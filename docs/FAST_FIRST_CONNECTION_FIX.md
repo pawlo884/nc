@@ -13,7 +13,7 @@
 
 ## Rozwiązanie
 
-### 1. PostgreSQL Configuration (`docker/postgres/postgresql.conf`)
+### 1. PostgreSQL Configuration (`deployments/docker/postgres/postgresql.conf`)
 
 ```ini
 # TCP Keepalive - utrzymuj połączenia żywe
@@ -58,7 +58,7 @@ postgres:
     - config_file=/etc/postgresql/postgresql.conf
   volumes:
     - /mnt/data2tb/docker/volumes/nc_postgres_data:/var/lib/postgresql/data
-    - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    - ./deployments/docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
 ```
 
 ## Wdrożenie

@@ -1,0 +1,44 @@
+# docker-compose.dev.ml.yml - ML Container dla DEV
+# Użycie: docker-compose -f docker-compose.dev.yml -f docker-compose.dev.ml.yml up -d --build
+
+services:
+  celery-ml:
+    build:
+      context: .
+      dockerfile: deployments/docker/Dockerfile.ml
+    command: [ "/bin/bash", "-c", "sleep 10 && celery -A core.celery worker -Q ml --loglevel=info --concurrency=2" ]
+    volumes:
+      - ./src:/app
+      - celery_data:/var/lib/celery
+      - ml_models:/app/ml_models  # Cache dla pobranych modeli ML
+    env_file:
+      - ../.env.dev
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.dev
+      - CELERY_STATE_DB=/var/lib/celery/worker_state_ml
+      - TZ=Europe/Warsaw
+      - REDIS_PASSWORD=dev_password
+      - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
+      - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
+      - CELERY_WORKER_SEND_TASK_EVENTS=true
+      - CELERY_TASK_SEND_SENT_EVENT=true
+      # Dla Sentence Transformers - cache modeli
+      - TRANSFORMERS_CACHE=/app/ml_models/transformers
+      - TORCH_HOME=/app/ml_models/torch
+    depends_on:
+      - web
+      - redis
+    restart: always
+    networks:
+      - app_network
+    user: "1001:1001"
+
+volumes:
+  ml_models:
+    driver: local
+
+networks:
+  app_network:
+    external: true
+
