@@ -328,16 +328,18 @@ deploy() {
     }
     log_success "✅ Kontenery Celery zrestartowane"
     
-    # 4. Zatrzymaj stary kontener target (jeśli istnieje)
-    log_info "🛑 Zatrzymywanie starego kontenera ${TARGET}..."
+    # 4. Zatrzymaj i usuń stary kontener target (jeśli istnieje)
+    log_info "🛑 Zatrzymywanie i usuwanie starego kontenera ${TARGET}..."
     # ✅ Bezpieczne - dotyka tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
     docker-compose -f docker-compose/docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || true
+    docker-compose -f docker-compose/docker-compose.blue-green.yml rm -f web-${TARGET} 2>/dev/null || true
     
     # 5. Uruchom nowy kontener
     log_info "▶️  Uruchamianie nowego kontenera ${TARGET}..."
     # ✅ Bezpieczne - uruchamia tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
     # --no-deps: Nie tworzy zależności (postgres, redis) - są nietykalne i już działają
-    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps web-${TARGET}; then
+    # --force-recreate: Wymusza odtworzenie kontenera (w razie gdyby poprzedni nie został usunięty)
+    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps --force-recreate web-${TARGET}; then
         log_error "❌ Nie udało się uruchomić kontenera ${TARGET}"
         exit 1
     fi
