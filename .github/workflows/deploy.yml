@@ -34,7 +34,7 @@ jobs:
       uses: docker/build-push-action@v4
       with:
         context: .
-        file: ./Dockerfile.prod  # ← PRODUCTION Dockerfile
+        file: ./deployments/docker/Dockerfile.prod  # ← PRODUCTION Dockerfile
         push: true
         tags: ${{ env.DOCKERHUB_USERNAME }}/django-app:latest
         cache-from: type=registry,ref=${{ env.DOCKERHUB_USERNAME }}/django-app:buildcache
@@ -59,7 +59,7 @@ jobs:
       uses: docker/build-push-action@v4
       with:
         context: .
-        file: ./Dockerfile.ml  # ← ML Dockerfile z PyTorch
+        file: ./deployments/docker/Dockerfile.ml  # ← ML Dockerfile z PyTorch
         push: true
         tags: ${{ env.DOCKERHUB_USERNAME }}/django-app-ml:latest
         cache-from: type=registry,ref=${{ env.DOCKERHUB_USERNAME }}/django-app-ml:buildcache

@@ -9,7 +9,7 @@ $env:COMPOSE_DOCKER_CLI_BUILD = "1"
 
 # Build z cache'owaniem
 Write-Host "📦 Buduję obraz z cache'owaniem pakietów..." -ForegroundColor Cyan
-docker-compose -f docker-compose.dev.yml build --parallel
+docker-compose -f docker-compose/docker-compose.dev.yml build --parallel
 
 Write-Host "✅ Build zakończony!" -ForegroundColor Green
 Write-Host ""
@@ -19,5 +19,5 @@ Write-Host "   - Pakiety Python (pip) są cache'owane"
 Write-Host "   - Rebuild będzie szybki jeśli zmienisz tylko kod aplikacji"
 Write-Host ""
 Write-Host "🔄 Aby uruchomić kontenery użyj:" -ForegroundColor Cyan
-Write-Host "   docker-compose -f docker-compose.dev.yml up -d"
+Write-Host "   docker-compose -f docker-compose/docker-compose.dev.yml up -d"
 

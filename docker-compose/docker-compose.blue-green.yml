@@ -1,0 +1,342 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # BLUE ENVIRONMENT (Production A)
+  # ==========================================
+  web-blue:
+    build:
+      context: .
+      dockerfile: deployments/docker/Dockerfile.prod
+    image: nc-django-app:latest
+    container_name: nc-web-blue
+    command:
+      - /bin/bash
+      - -c
+      - >
+        find /app -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true &&
+        find /app -type f -path '*/migrations/*.py' -exec chmod 644 {} \; 2>/dev/null || true &&
+        echo "🔵 BLUE: Uruchamianie aplikacji (migracje należy wykonać ręcznie przed deploymentem)..." &&
+        gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class sync
+        --timeout 300 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100
+        --preload --access-logfile - --error-logfile - --log-level warning
+        --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30
+        --limit-request-line 8190 --limit-request-fields 100 --limit-request-field_size 8190
+    volumes:
+      - ./src:/app
+      - /mnt/data2tb/docker/volumes/nc_static_volume:/app/staticfiles
+      - /mnt/data2tb/docker/volumes/nc_media_volume:/app/media
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.prod
+      - TZ=Europe/Warsaw
+      - DJANGO_ENV=prod
+      - DEPLOYMENT_COLOR=blue
+    restart: always
+    networks:
+      - nc_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"  # Port dla blue (można zmienić na inny jeśli potrzebny)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    user: 1001:1001
+    labels:
+      - "nc.deployment=blue"
+      - "nc.type=web"
+
+  # ==========================================
+  # GREEN ENVIRONMENT (Production B)
+  # ==========================================
+  web-green:
+    build:
+      context: .
+      dockerfile: deployments/docker/Dockerfile.prod
+    image: nc-django-app:latest
+    container_name: nc-web-green
+    command:
+      - /bin/bash
+      - -c
+      - >
+        find /app -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true &&
+        find /app -type f -path '*/migrations/*.py' -exec chmod 644 {} \; 2>/dev/null || true &&
+        echo "🟢 GREEN: Uruchamianie aplikacji (migracje należy wykonać ręcznie przed deploymentem)..." &&
+        gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class sync
+        --timeout 300 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100
+        --preload --access-logfile - --error-logfile - --log-level warning
+        --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30
+        --limit-request-line 8190 --limit-request-fields 100 --limit-request-field_size 8190
+    volumes:
+      - ./src:/app
+      - /mnt/data2tb/docker/volumes/nc_static_volume:/app/staticfiles
+      - /mnt/data2tb/docker/volumes/nc_media_volume:/app/media
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.prod
+      - TZ=Europe/Warsaw
+      - DJANGO_ENV=prod
+      - DEPLOYMENT_COLOR=green
+    restart: always
+    networks:
+      - nc_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8001:8000"  # Port dla green (aktywny)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    user: 1001:1001
+    labels:
+      - "nc.deployment=green"
+      - "nc.type=web"
+
+  # ==========================================
+  # NGINX - Blue/Green Router
+  # ==========================================
+  nginx-router:
+    image: nginx:alpine
+    container_name: nc-nginx-router
+    # Porty usunięte - nginx-router dostępny tylko wewnętrznie przez sieć Docker
+    # Nginx Proxy Manager wskazuje na niego przez sieć nginx_proxy_manager_network
+    volumes:
+      - ./nginx-blue-green.conf:/etc/nginx/conf.d/default.conf:ro
+      - /mnt/data2tb/docker/volumes/nc_static_volume:/app/staticfiles:ro
+      - /mnt/data2tb/docker/volumes/nc_nginx_logs:/var/log/nginx
+      - /mnt/data2tb/docker/volumes/nc_nginx_state:/etc/nginx/state
+    environment:
+      - TZ=Europe/Warsaw
+    depends_on:
+      web-blue:
+        condition: service_healthy
+      web-green:
+        condition: service_healthy
+    restart: always
+    networks:
+      - nc_network
+      - nginx_proxy_manager_network  # Połącz z siecią NPM
+    labels:
+      - "nc.type=router"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/nginx-health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ==========================================
+  # SHARED SERVICES (nie są duplikowane)
+  # ==========================================
+  # ⚠️⚠️⚠️  NIETYKALNE KONTENERY - NIGDY NIE DOTYKAĆ!  ⚠️⚠️⚠️
+  # Te kontenery są używane tylko do sprawdzenia konfiguracji w docker-compose
+  # NIGDY nie uruchamiaj dla nich: docker-compose up/stop/restart
+  # Kontenery te są zarządzane osobno i zawierają dane produkcyjne!
+  # ==========================================
+  # ⚠️ NIETYKALNY: PostgreSQL - baza danych z wszystkimi danymi produkcyjnymi
+  postgres:
+    image: postgres:18-alpine
+    container_name: nc-postgres-1
+    restart: unless-stopped
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      POSTGRES_USER: ${DEFAULT_DB_USER:-nc}
+      POSTGRES_PASSWORD: ${DEFAULT_DB_PASSWORD:-prod_password}
+      POSTGRES_DB: ${DEFAULT_DB_NAME:-zzz_default}
+      TZ: Europe/Warsaw
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DEFAULT_DB_USER:-nc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5432:5432"
+    volumes:
+      - /mnt/data2tb/docker/volumes/nc_postgres_data:/var/lib/postgresql/data
+      - ./deployments/docker/postgres/initdb.d:/docker-entrypoint-initdb.d:ro
+      - ./deployments/docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    networks:
+      - nc_network
+    labels:
+      - "nc.protected=true"
+
+  # ⚠️ NIETYKALNY: Redis - cache i sesje, dane produkcyjne
+  redis:
+    image: redis:7.2-alpine
+    container_name: nc-redis-1
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-prod_password}
+    volumes:
+      - /mnt/data2tb/docker/volumes/nc_redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - nc_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-prod_password}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      - "nc.protected=true"
+
+  # ==========================================
+  # CELERY WORKERS (wspólne dla obu środowisk)
+  # ==========================================
+  celery-default:
+    build:
+      context: .
+      dockerfile: deployments/docker/Dockerfile.prod
+    image: nc-django-app:latest
+    container_name: nc-celery-default
+    command:
+      - /bin/bash
+      - -c
+      - >
+        sleep 20 && celery -A core.celery worker -Q default --loglevel=info --concurrency=1
+        --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
+    volumes:
+      - ./src:/app
+      - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.prod
+      - CELERY_STATE_DB=/var/lib/celery/worker_state_default
+      - TZ=Europe/Warsaw
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - nc_network
+    user: 1001:1001
+
+  celery-import:
+    build:
+      context: .
+      dockerfile: deployments/docker/Dockerfile.prod
+    image: nc-django-app:latest
+    container_name: nc-celery-import
+    command:
+      - /bin/bash
+      - -c
+      - >
+        sleep 20 && celery -A core.celery worker -Q import --loglevel=info --concurrency=1
+        --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
+    volumes:
+      - ./src:/app
+      - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.prod
+      - CELERY_STATE_DB=/var/lib/celery/worker_state_import
+      - TZ=Europe/Warsaw
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - nc_network
+    user: 1001:1001
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: deployments/docker/Dockerfile.prod
+    image: nc-django-app:latest
+    container_name: nc-celery-beat
+    command:
+      - /bin/bash
+      - -c
+      - sleep 20 && celery -A core.celery beat --loglevel=info
+    volumes:
+      - ./src:/app
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.prod
+      - TZ=Europe/Warsaw
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - nc_network
+    user: 1001:1001
+
+  flower:
+    build:
+      context: .
+      dockerfile: deployments/docker/Dockerfile.prod
+    image: nc-django-app:latest
+    container_name: nc-flower
+    command:
+      - /bin/bash
+      - -c
+      - >
+        sleep 20 && celery -A core.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+        flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True
+        --db=/var/lib/flower/flower.db --inspect_timeout=30
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./src:/app
+      - /mnt/data2tb/docker/volumes/nc_flower_data:/var/lib/flower
+    env_file:
+      - .env.${ENVIRONMENT:-prod}
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.prod
+      - TZ=Europe/Warsaw
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+      - celery-default
+      - celery-import
+    networks:
+      - nc_network
+    user: 1001:1001
+
+networks:
+  nc_network:
+    driver: bridge
+  nginx_proxy_manager_network:
+    name: nginx_proxy_manager_network
+    external: true
+

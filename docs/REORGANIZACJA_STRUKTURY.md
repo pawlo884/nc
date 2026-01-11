@@ -17,13 +17,16 @@
 ## 📊 Przegląd zmian
 
 ### Cel reorganizacji
+
 Uporządkowanie struktury projektu zgodnie z najlepszymi praktykami:
+
 - **Infrastruktura i deployment** → `deployments/`
 - **Kod źródłowy Django** → `src/`
 - **Skrypty pomocnicze** → `scripts/` (z podfolderami)
 - **Dokumentacja** → `docs/` (już istnieje)
 
 ### Główne zmiany
+
 - `nc/` → `src/core/` (ustawienia, urls, celery, middleware)
 - Aplikacje Django → `src/apps/` (MPD, matterhorn1, web_agent, tabu)
 - Dockerfiles → `deployments/docker/`
@@ -125,58 +128,58 @@ NC_PROJECT/
 
 ### Infrastruktura (deployments/)
 
-| Stara lokalizacja | Nowa lokalizacja |
-|-------------------|------------------|
-| `Dockerfile.dev` | `deployments/docker/Dockerfile.dev` |
-| `Dockerfile.prod` | `deployments/docker/Dockerfile.prod` |
-| `Dockerfile.ml` | `deployments/docker/Dockerfile.ml` |
+| Stara lokalizacja             | Nowa lokalizacja                          |
+| ----------------------------- | ----------------------------------------- |
+| `Dockerfile.dev`              | `deployments/docker/Dockerfile.dev`       |
+| `Dockerfile.prod`             | `deployments/docker/Dockerfile.prod`      |
+| `Dockerfile.ml`               | `deployments/docker/Dockerfile.ml`        |
 | `docker/docker-entrypoint.sh` | `deployments/docker/docker-entrypoint.sh` |
-| `nginx.conf` | `deployments/nginx/nginx.conf` |
-| `nginx-blue-green.conf` | `deployments/nginx/nginx-blue-green.conf` |
-| `redis.conf` | `deployments/redis.conf` |
+| `nginx.conf`                  | `deployments/nginx/nginx.conf`            |
+| `nginx-blue-green.conf`       | `deployments/nginx/nginx-blue-green.conf` |
+| `redis.conf`                  | `deployments/redis.conf`                  |
 
 ### Docker Compose (docker-compose/)
 
-| Stara lokalizacja | Nowa lokalizacja |
-|-------------------|------------------|
-| `docker-compose.dev.yml` | `docker-compose/docker-compose.dev.yml` |
-| `docker-compose.dev.ml.yml` | `docker-compose/docker-compose.dev.ml.yml` |
-| `docker-compose.blue-green.yml` | `docker-compose/docker-compose.blue-green.yml` |
+| Stara lokalizacja                  | Nowa lokalizacja                                  |
+| ---------------------------------- | ------------------------------------------------- |
+| `docker-compose.dev.yml`           | `docker-compose/docker-compose.dev.yml`           |
+| `docker-compose.dev.ml.yml`        | `docker-compose/docker-compose.dev.ml.yml`        |
+| `docker-compose.blue-green.yml`    | `docker-compose/docker-compose.blue-green.yml`    |
 | `docker-compose.blue-green.ml.yml` | `docker-compose/docker-compose.blue-green.ml.yml` |
 
 ### Skrypty (scripts/)
 
-| Stara lokalizacja | Nowa lokalizacja |
-|-------------------|------------------|
-| `clean_test_databases.py` | `scripts/db/clean_test_databases.py` |
-| `clean-test-databases.ps1` | `scripts/db/clean-test-databases.ps1` |
-| `commit-test-fixes.sh` | `scripts/git/commit-test-fixes.sh` |
-| `commit-test-fixes.ps1` | `scripts/git/commit-test-fixes.ps1` |
-| `run-migrations-dev.sh` | `scripts/migrations/run-migrations-dev.sh` |
-| `run-migrations-dev.ps1` | `scripts/migrations/run-migrations-dev.ps1` |
-| `deploy-blue-green.sh` | `scripts/ops/deploy-blue-green.sh` |
-| `switch-blue-green.sh` | `scripts/ops/switch-blue-green.sh` |
+| Stara lokalizacja          | Nowa lokalizacja                            |
+| -------------------------- | ------------------------------------------- |
+| `clean_test_databases.py`  | `scripts/db/clean_test_databases.py`        |
+| `clean-test-databases.ps1` | `scripts/db/clean-test-databases.ps1`       |
+| `commit-test-fixes.sh`     | `scripts/git/commit-test-fixes.sh`          |
+| `commit-test-fixes.ps1`    | `scripts/git/commit-test-fixes.ps1`         |
+| `run-migrations-dev.sh`    | `scripts/migrations/run-migrations-dev.sh`  |
+| `run-migrations-dev.ps1`   | `scripts/migrations/run-migrations-dev.ps1` |
+| `deploy-blue-green.sh`     | `scripts/ops/deploy-blue-green.sh`          |
+| `switch-blue-green.sh`     | `scripts/ops/switch-blue-green.sh`          |
 
 ### Kod źródłowy (src/)
 
-| Stara lokalizacja | Nowa lokalizacja |
-|-------------------|------------------|
-| `nc/` | `src/core/` |
-| `MPD/` | `src/apps/MPD/` |
-| `matterhorn1/` | `src/apps/matterhorn1/` |
-| `web_agent/` | `src/apps/web_agent/` |
-| `tabu/` | `src/apps/tabu/` |
-| `manage.py` | `src/manage.py` |
-| `requirements.txt` | `src/requirements.txt` |
+| Stara lokalizacja     | Nowa lokalizacja          |
+| --------------------- | ------------------------- |
+| `nc/`                 | `src/core/`               |
+| `MPD/`                | `src/apps/MPD/`           |
+| `matterhorn1/`        | `src/apps/matterhorn1/`   |
+| `web_agent/`          | `src/apps/web_agent/`     |
+| `tabu/`               | `src/apps/tabu/`          |
+| `manage.py`           | `src/manage.py`           |
+| `requirements.txt`    | `src/requirements.txt`    |
 | `requirements.ml.txt` | `src/requirements.ml.txt` |
-| `templates/` | `src/templates/` |
+| `templates/`          | `src/templates/`          |
 
 ### Dokumentacja (docs/)
 
-| Stara lokalizacja | Nowa lokalizacja |
-|-------------------|------------------|
+| Stara lokalizacja          | Nowa lokalizacja                          |
+| -------------------------- | ----------------------------------------- |
 | `BLUE_GREEN_DEPLOYMENT.md` | `docs/BLUE_GREEN_DEPLOYMENT.md` (już tam) |
-| `CHANGELOG.md` | `docs/CHANGELOG.md` (już tam) |
+| `CHANGELOG.md`             | `docs/CHANGELOG.md` (już tam)             |
 
 ---
 
@@ -187,17 +190,20 @@ NC_PROJECT/
 **Plik:** `src/core/settings/base.py`
 
 **Przed:**
+
 ```python
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ```
 
 **Po:**
+
 ```python
 # BASE_DIR wskazuje na root projektu (tam gdzie jest manage.py, .env.dev, etc.)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 ```
 
 **Wyjaśnienie:**
+
 - Przed: `nc/settings/base.py` → `parent.parent.parent` = root
 - Po: `src/core/settings/base.py` → `parent.parent.parent.parent` = root
 
@@ -234,11 +240,13 @@ LOCALE_PATHS = [os.path.join(BASE_DIR, 'locale')]  # Zostaje w root jeśli istni
 **Plik:** `src/core/settings/base.py`
 
 **Przed:**
+
 ```python
 ROOT_URLCONF = 'nc.urls'
 ```
 
 **Po:**
+
 ```python
 ROOT_URLCONF = 'core.urls'
 ```
@@ -248,11 +256,13 @@ ROOT_URLCONF = 'core.urls'
 **Plik:** `src/core/settings/base.py`
 
 **Przed:**
+
 ```python
 WSGI_APPLICATION = 'nc.wsgi.application'
 ```
 
 **Po:**
+
 ```python
 WSGI_APPLICATION = 'core.wsgi.application'
 ```
@@ -279,11 +289,13 @@ INSTALLED_APPS = [
 **Plik:** `src/core/settings/dev.py`
 
 **Przed:**
+
 ```python
 from nc.middleware import get_debug
 ```
 
 **Po:**
+
 ```python
 from core.middleware import get_debug
 ```
@@ -293,12 +305,14 @@ from core.middleware import get_debug
 **Plik:** `src/core/celery.py`
 
 **Przed:**
+
 ```python
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', os.getenv('DJANGO_SETTINGS_MODULE', 'nc.settings.dev'))
 app = Celery('nc')
 ```
 
 **Po:**
+
 ```python
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', os.getenv('DJANGO_SETTINGS_MODULE', 'core.settings.dev'))
 app = Celery('core')  # Opcjonalnie: może pozostać 'nc' dla kompatybilności
@@ -309,11 +323,13 @@ app = Celery('core')  # Opcjonalnie: może pozostać 'nc' dla kompatybilności
 **Plik:** `src/core/urls.py`
 
 **Przed:**
+
 ```python
 from nc.views import index, health_check
 ```
 
 **Po:**
+
 ```python
 from core.views import index, health_check
 ```
@@ -329,11 +345,13 @@ Jeśli są importy z `nc.*`, zmienić na `core.*`.
 **Plik:** `src/core/wsgi.py`, `src/core/asgi.py`
 
 **Przed:**
+
 ```python
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nc.settings')
 ```
 
 **Po:**
+
 ```python
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 ```
@@ -343,11 +361,13 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 **Plik:** `src/manage.py`
 
 **Przed:**
+
 ```python
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nc.settings')
 ```
 
 **Po:**
+
 ```python
 #!/usr/bin/env python
 """Django's command-line utility for administrative tasks."""
@@ -387,6 +407,7 @@ if __name__ == '__main__':
 **Plik:** `deployments/docker/Dockerfile.dev`
 
 **Główne zmiany:**
+
 - `WORKDIR /app` → zmienić na `WORKDIR /app/src` LUB pozostawić `/app` i kopiować z `src/`
 - `COPY requirements.txt .` → `COPY src/requirements.txt .`
 - `COPY . .` → `COPY src/ .` (lub inna strategia)
@@ -464,34 +485,35 @@ services:
   static-init:
     build:
       context: .
-      dockerfile: deployments/docker/Dockerfile.dev  # Zmiana ścieżki
+      dockerfile: deployments/docker/Dockerfile.dev # Zmiana ścieżki
     environment:
-      - DJANGO_SETTINGS_MODULE=core.settings.dev  # Zmiana
+      - DJANGO_SETTINGS_MODULE=core.settings.dev # Zmiana
     volumes:
-      - ./src:/app  # Zmiana z .:/app na ./src:/app
+      - ./src:/app # Zmiana z .:/app na ./src:/app
 
   web:
     build:
       context: .
-      dockerfile: deployments/docker/Dockerfile.dev  # Zmiana ścieżki
+      dockerfile: deployments/docker/Dockerfile.dev # Zmiana ścieżki
     environment:
-      - DJANGO_SETTINGS_MODULE=core.settings.dev  # Zmiana
+      - DJANGO_SETTINGS_MODULE=core.settings.dev # Zmiana
     volumes:
-      - ./src:/app  # Zmiana
+      - ./src:/app # Zmiana
       - static_volume:/app/staticfiles
     command:
       - '/bin/bash'
       - '-c'
-      - 'python manage.py makemigrations && python manage.py migrate --database=zzz_default && gunicorn core.wsgi:application --bind 0.0.0.0:8000 ...'  # core.wsgi
+      - 'python manage.py makemigrations && python manage.py migrate --database=zzz_default && gunicorn core.wsgi:application --bind 0.0.0.0:8000 ...' # core.wsgi
 
   nginx:
     volumes:
-      - ./deployments/nginx/nginx.conf:/etc/nginx/conf.d/default.conf  # Zmiana ścieżki
+      - ./deployments/nginx/nginx.conf:/etc/nginx/conf.d/default.conf # Zmiana ścieżki
       - static_volume:/app/staticfiles
 
   redis:
     volumes:
-      - ./deployments/redis.conf:/usr/local/etc/redis/redis.conf:ro  # Zmiana ścieżki
+      - ./deployments/redis.conf:/usr/local/etc/redis/redis.conf:ro # Zmiana ścieżki
+
 
   # ... wszystkie inne serwisy z podobnymi zmianami ...
 ```
@@ -501,6 +523,7 @@ services:
 **Plik:** `docker-compose/docker-compose.blue-green.yml`
 
 Podobne zmiany:
+
 - `dockerfile: Dockerfile.prod` → `dockerfile: deployments/docker/Dockerfile.prod`
 - `gunicorn nc.wsgi:application` → `gunicorn core.wsgi:application`
 - `DJANGO_SETTINGS_MODULE=nc.settings.prod` → `DJANGO_SETTINGS_MODULE=core.settings.prod`
@@ -583,14 +606,14 @@ dockerfile: ./deployments/docker/Dockerfile.dev
   uses: docker/build-push-action@v4
   with:
     context: .
-    file: ./deployments/docker/Dockerfile.prod  # Zmiana ścieżki
+    file: ./deployments/docker/Dockerfile.prod # Zmiana ścieżki
     # ...
-    
+
 - name: Build and push ML app
   uses: docker/build-push-action@v4
   with:
     context: .
-    file: ./deployments/docker/Dockerfile.ml  # Zmiana ścieżki
+    file: ./deployments/docker/Dockerfile.ml # Zmiana ścieżki
 ```
 
 ### 2. .github/workflows/deploy-vps.yml
@@ -602,6 +625,7 @@ Sprawdzić wszystkie ścieżki do docker-compose i Dockerfile.
 ## 🔧 Rozwiązanie dla aplikacji Django
 
 ### Problem
+
 Aplikacje Django (`MPD`, `matterhorn1`, `web_agent`, `tabu`) będą w folderze `src/apps/`, ale Django domyślnie szuka aplikacji w `sys.path` lub w katalogu projektu.
 
 ### Rozwiązanie
@@ -655,10 +679,12 @@ INSTALLED_APPS = [
 ### ✅ Rekomendowane rozwiązanie
 
 **Użyć Opcji 1 + Opcji 2 razem:**
+
 - Opcja 1 (manage.py) - działa lokalnie
 - Opcja 2 (PYTHONPATH w Docker) - działa w kontenerach
 
 **INSTALLED_APPS pozostaje bez zmian:**
+
 ```python
 INSTALLED_APPS = [
     # ...
@@ -676,6 +702,7 @@ INSTALLED_APPS = [
 ### ⚠️ UWAGA: To duża zmiana!
 
 **Zalecane kroki:**
+
 1. ✅ Utwórz branch: `git checkout -b reorganizacja-struktury`
 2. ✅ Zrób backup: `git tag backup-przed-reorganizacja`
 3. ✅ Przetestuj na środowisku dev
@@ -782,6 +809,7 @@ Zaktualizuj workflow zgodnie z sekcją [Zmiany w GitHub Actions](#zmiany-w-githu
 ### Krok 9: Aktualizacja dokumentacji
 
 Zaktualizuj:
+
 - `README.md` - ścieżki do plików
 - `docs/HOW_TO_CREATE_NEW_APP.md` - ścieżki do settings
 - Inne pliki dokumentacji z ścieżkami
@@ -817,7 +845,7 @@ docker-compose -f docker-compose/docker-compose.dev.yml up -d
 - [ ] Zaktualizowano ROOT_URLCONF
 - [ ] Zaktualizowano WSGI_APPLICATION
 - [ ] Zaktualizowano DJANGO_SETTINGS_MODULE (wszędzie)
-- [ ] Zaktualizowano importy (nc.* → core.*)
+- [ ] Zaktualizowano importy (nc._ → core._)
 - [ ] Zaktualizowano manage.py (dodano sys.path)
 - [ ] Zaktualizowano Dockerfiles
 - [ ] Zaktualizowano docker-compose files
@@ -859,6 +887,7 @@ docker-compose -f docker-compose/docker-compose.dev.yml up -d
 ### Dokumentacja Django
 
 Django nie wymusza konkretnej struktury folderów. Aplikacje mogą być:
+
 - W root projektu (jak było)
 - W folderze `apps/` (jak będzie)
 - W folderze `src/apps/` (jak będzie)
@@ -877,6 +906,7 @@ Kluczowe jest, żeby Python mógł je znaleźć przez `sys.path` lub `PYTHONPATH
 ## 📞 Wsparcie
 
 Jeśli masz pytania lub problemy podczas reorganizacji:
+
 1. Sprawdź ten dokument
 2. Sprawdź logi Django/Docker
 3. Sprawdź czy wszystkie ścieżki są poprawne

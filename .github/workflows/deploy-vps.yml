@@ -120,7 +120,7 @@ jobs:
           
           # Sprawdź status kontenerów blue-green
           echo "📊 Container status (Blue-Green):"
-          docker-compose -f docker-compose.blue-green.yml ps || echo "⚠️ Could not get status!"
+          docker-compose -f docker-compose/docker-compose.blue-green.yml ps || echo "⚠️ Could not get status!"
           
           # Sprawdź który environment jest aktywny
           ACTIVE_ENV=$(./scripts/deploy/deploy-blue-green.sh status | grep "🔀 Active environment:" | awk '{print $4}')
