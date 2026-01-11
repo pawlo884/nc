@@ -6,7 +6,7 @@ services:
   # ==========================================
   web-blue:
     build:
-      context: .
+      context: ..
       dockerfile: deployments/docker/Dockerfile.prod
     image: nc-django-app:latest
     container_name: nc-web-blue
@@ -59,7 +59,7 @@ services:
   # ==========================================
   web-green:
     build:
-      context: .
+      context: ..
       dockerfile: deployments/docker/Dockerfile.prod
     image: nc-django-app:latest
     container_name: nc-web-green
@@ -206,7 +206,7 @@ services:
   # ==========================================
   celery-default:
     build:
-      context: .
+      context: ..
       dockerfile: deployments/docker/Dockerfile.prod
     image: nc-django-app:latest
     container_name: nc-celery-default
@@ -239,7 +239,7 @@ services:
 
   celery-import:
     build:
-      context: .
+      context: ..
       dockerfile: deployments/docker/Dockerfile.prod
     image: nc-django-app:latest
     container_name: nc-celery-import
@@ -272,7 +272,7 @@ services:
 
   celery-beat:
     build:
-      context: .
+      context: ..
       dockerfile: deployments/docker/Dockerfile.prod
     image: nc-django-app:latest
     container_name: nc-celery-beat
@@ -301,7 +301,7 @@ services:
 
   flower:
     build:
-      context: .
+      context: ..
       dockerfile: deployments/docker/Dockerfile.prod
     image: nc-django-app:latest
     container_name: nc-flower
