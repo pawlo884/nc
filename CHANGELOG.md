@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.3 (2026-01-11)</small>
+
+* fix: poprawa ścieżek env_file w docker-compose.blue-green.yml ([c4a506e](https://github.com/pawlo884/nc/commit/c4a506e))
+
 ## <small>1.9.2 (2026-01-11)</small>
 
 * Merge pull request #25 from pawlo884/refactor/project-structure ([d163eb6](https://github.com/pawlo884/nc/commit/d163eb6)), closes [#25](https://github.com/pawlo884/nc/issues/25)
