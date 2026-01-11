@@ -3,6 +3,7 @@ import os
 from urllib.parse import urlsplit
 from dotenv import load_dotenv
 import boto3
+from botocore.exceptions import ClientError, EndpointConnectionError, NoCredentialsError
 import logging
 import requests
 
@@ -238,6 +239,16 @@ def delete_product_folder_from_bucket(product_id):
                     Bucket=S3_BUCKET, Key=obj['Key'])
         logger.info(f"Usunięto folder {prefix} z bucketa.")
 
+    except (EndpointConnectionError, ClientError) as e:
+        # Błąd połączenia z MinIO/S3 - loguj jako warning, nie error
+        logger.warning(
+            f"Nie można połączyć się z MinIO/S3 podczas usuwania folderu {prefix}: {str(e)}. "
+            "Sprawdź czy MinIO jest dostępne i czy konfiguracja jest poprawna."
+        )
+    except NoCredentialsError as e:
+        logger.warning(
+            f"Brak poświadczeń do MinIO/S3 podczas usuwania folderu {prefix}: {str(e)}"
+        )
     except Exception as e:
         logger.error(
             f"Błąd podczas usuwania folderu {prefix} z bucketa: {str(e)}")

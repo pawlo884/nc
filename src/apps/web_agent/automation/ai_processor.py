@@ -1287,7 +1287,7 @@ WYTYCZNE:
 - final_name: Finalna nazwa w formacie "{example_format}" - 5-100 znaków, MAKSYMALNIE 100 znaków!
 
 2. FORMAT FINALNEJ NAZWY:
-- Format: "{example_format}" (np. "{example_format.replace('[model_name]', 'Ada')}")
+- Format: "{example_format}" (np. użyj "{example_format}" i zastąp "[model_name]" nazwą modelu jak "Ada")
 - ZAWSZE zaczynaj od "{base_type}"
 - NIE dodawaj koloru, kodu produktu, numerów w nawiasach, marki
 - NIE dodawaj niczego poza "{base_type}" i nazwą modelu

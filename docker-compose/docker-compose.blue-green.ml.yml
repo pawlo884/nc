@@ -12,7 +12,7 @@ services:
         reservations:
           memory: 1G
     volumes:
-      - .:/app
+      - ./src:/app
       - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
       - ml_models:/app/ml_models  # Cache dla pobranych modeli
     env_file:
