@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.4 (2026-01-11)</small>
+
+* fix: poprawa build context w docker-compose.blue-green.yml ([6e69fc3](https://github.com/pawlo884/nc/commit/6e69fc3))
+
 ## <small>1.9.3 (2026-01-11)</small>
 
 * fix: poprawa ścieżek env_file w docker-compose.blue-green.yml ([c4a506e](https://github.com/pawlo884/nc/commit/c4a506e))
