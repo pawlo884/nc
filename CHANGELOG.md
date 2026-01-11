@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.6 (2026-01-11)</small>
+
+* fix: usunięcie COPY tabu/ z Dockerfile.prod ([0a51763](https://github.com/pawlo884/nc/commit/0a51763))
+
 ## <small>1.9.5 (2026-01-11)</small>
 
 * fix: usunięcie nieprawidłowej składni shell z komend COPY w Dockerfile ([5aa8d15](https://github.com/pawlo884/nc/commit/5aa8d15))
