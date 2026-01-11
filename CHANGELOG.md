@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.5 (2026-01-11)</small>
+
+* fix: usunięcie nieprawidłowej składni shell z komend COPY w Dockerfile ([5aa8d15](https://github.com/pawlo884/nc/commit/5aa8d15))
+
 ## <small>1.9.4 (2026-01-11)</small>
 
 * fix: poprawa build context w docker-compose.blue-green.yml ([6e69fc3](https://github.com/pawlo884/nc/commit/6e69fc3))
