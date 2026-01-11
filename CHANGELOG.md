@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.7 (2026-01-11)</small>
+
+* fix: dodanie --no-deps przy uruchamianiu web-${TARGET} w blue-green deploy ([aa54078](https://github.com/pawlo884/nc/commit/aa54078))
+
 ## <small>1.9.6 (2026-01-11)</small>
 
 * fix: usunięcie COPY tabu/ z Dockerfile.prod ([0a51763](https://github.com/pawlo884/nc/commit/0a51763))
