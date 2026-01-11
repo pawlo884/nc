@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.8 (2026-01-11)</small>
+
+* fix: dodanie --no-deps również w funkcji rollback ([d692ac4](https://github.com/pawlo884/nc/commit/d692ac4))
+
 ## <small>1.9.7 (2026-01-11)</small>
 
 * fix: dodanie --no-deps przy uruchamianiu web-${TARGET} w blue-green deploy ([aa54078](https://github.com/pawlo884/nc/commit/aa54078))
