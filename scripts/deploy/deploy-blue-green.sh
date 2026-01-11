@@ -336,7 +336,8 @@ deploy() {
     # 5. Uruchom nowy kontener
     log_info "▶️  Uruchamianie nowego kontenera ${TARGET}..."
     # ✅ Bezpieczne - uruchamia tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
-    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d web-${TARGET}; then
+    # --no-deps: Nie tworzy zależności (postgres, redis) - są nietykalne i już działają
+    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps web-${TARGET}; then
         log_error "❌ Nie udało się uruchomić kontenera ${TARGET}"
         exit 1
     fi
