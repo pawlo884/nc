@@ -16,7 +16,7 @@ services:
       - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
       - ml_models:/app/ml_models  # Cache dla pobranych modeli
     env_file:
-      - .env.${ENVIRONMENT:-prod}
+      - ../.env.${ENVIRONMENT:-prod}
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings.prod
       - CELERY_STATE_DB=/var/lib/celery/worker_state_ml
