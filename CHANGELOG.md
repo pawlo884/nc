@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.9 (2026-01-11)</small>
+
+* fix: usuwanie starego kontenera przed uruchomieniem nowego w blue-green deploy ([9a0f9bc](https://github.com/pawlo884/nc/commit/9a0f9bc))
+
 ## <small>1.9.8 (2026-01-11)</small>
 
 * fix: dodanie --no-deps również w funkcji rollback ([d692ac4](https://github.com/pawlo884/nc/commit/d692ac4))
