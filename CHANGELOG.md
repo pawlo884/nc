@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.9.12 (2026-01-12)</small>
+
+* fix: zmiana health check z /admin/ na /health/ również w funkcji status() ([245d58c](https://github.com/pawlo884/nc/commit/245d58c))
+* fix: zmiana health check z /admin/ na /health/ w blue-green deploy ([1f81821](https://github.com/pawlo884/nc/commit/1f81821))
+
 ## <small>1.9.11 (2026-01-12)</small>
 
 * fix: poprawka ścieżki volume mount w docker-compose.blue-green.yml ([dbdab69](https://github.com/pawlo884/nc/commit/dbdab69))
