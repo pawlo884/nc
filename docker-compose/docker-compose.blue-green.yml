@@ -23,7 +23,7 @@ services:
         --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30
         --limit-request-line 8190 --limit-request-fields 100 --limit-request-field_size 8190
     volumes:
-      - ./src:/app
+      - ../src:/app
       - /mnt/data2tb/docker/volumes/nc_static_volume:/app/staticfiles
       - /mnt/data2tb/docker/volumes/nc_media_volume:/app/media
     env_file:
@@ -76,7 +76,7 @@ services:
         --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30
         --limit-request-line 8190 --limit-request-fields 100 --limit-request-field_size 8190
     volumes:
-      - ./src:/app
+      - ../src:/app
       - /mnt/data2tb/docker/volumes/nc_static_volume:/app/staticfiles
       - /mnt/data2tb/docker/volumes/nc_media_volume:/app/media
     env_file:
