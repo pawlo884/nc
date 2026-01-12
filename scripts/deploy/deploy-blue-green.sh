@@ -332,7 +332,7 @@ deploy() {
     log_info "🛑 Zatrzymywanie i usuwanie starego kontenera ${TARGET}..."
     # ✅ Bezpieczne - dotyka tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
     docker-compose -f docker-compose/docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || true
-    docker-compose -f docker-compose/docker-compose.blue-green.yml rm -f web-${TARGET} 2>/dev/null || true
+    docker rm -f nc-web-${TARGET} 2>/dev/null || true
     
     # 5. Uruchom nowy kontener
     log_info "▶️  Uruchamianie nowego kontenera ${TARGET}..."
