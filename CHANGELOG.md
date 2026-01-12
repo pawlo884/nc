@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.10 (2026-01-12)</small>
+
+* fix: użycie docker rm -f zamiast docker-compose rm dla usuwania kontenera ([47c3f33](https://github.com/pawlo884/nc/commit/47c3f33))
+
 ## <small>1.9.9 (2026-01-11)</small>
 
 * fix: usuwanie starego kontenera przed uruchomieniem nowego w blue-green deploy ([9a0f9bc](https://github.com/pawlo884/nc/commit/9a0f9bc))
