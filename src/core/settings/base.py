@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'MPD',
     'matterhorn1',
     'web_agent',
+    'tabu',
 ]
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
@@ -230,6 +231,23 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
+    'tabu': {
+        'ENGINE': 'core.db_backend',
+        'NAME': os.getenv('TABU_DB_NAME'),
+        'USER': os.getenv('TABU_DB_USER'),
+        'PASSWORD': os.getenv('TABU_DB_PASSWORD'),
+        'HOST': os.getenv('TABU_DB_HOST'),
+        'PORT': os.getenv('TABU_DB_PORT'),
+        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'OPTIONS': {
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5, # 5 prób
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
+        }
+    },
 }
 
 # Database routers
@@ -237,6 +255,7 @@ DATABASE_ROUTERS = [
     'core.db_routers.MPDRouter',
     'core.db_routers.Matterhorn1Router',
     'core.db_routers.WebAgentRouter',
+    'core.db_routers.TabuRouter',
     'core.db_routers.DefaultRouter',
 ]
 
