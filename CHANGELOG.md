@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.14 (2026-01-12)</small>
+
+* fix(deploy): zmieniono nazwy upstream w nginx z web-blue/web-green na nc-web-blue/nc-web-green ([a84fa65](https://github.com/pawlo884/nc/commit/a84fa65))
+
 ## <small>1.9.13 (2026-01-12)</small>
 
 * fix(deploy): dodano brakujący plik nginx-blue-green.conf i naprawiono sieć Docker ([62765bb](https://github.com/pawlo884/nc/commit/62765bb))
