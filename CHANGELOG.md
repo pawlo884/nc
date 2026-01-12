@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.9.13 (2026-01-12)</small>
+
+* fix(deploy): dodano brakujący plik nginx-blue-green.conf i naprawiono sieć Docker ([62765bb](https://github.com/pawlo884/nc/commit/62765bb))
+
 ## <small>1.9.12 (2026-01-12)</small>
 
 * fix: zmiana health check z /admin/ na /health/ również w funkcji status() ([245d58c](https://github.com/pawlo884/nc/commit/245d58c))
