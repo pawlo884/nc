@@ -217,7 +217,7 @@ services:
         sleep 20 && celery -A core.celery worker -Q default --loglevel=info --concurrency=1
         --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
     volumes:
-      - ./src:/app
+      - ../src:/app
       - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
     env_file:
       - ../.env.${ENVIRONMENT:-prod}
@@ -250,7 +250,7 @@ services:
         sleep 20 && celery -A core.celery worker -Q import --loglevel=info --concurrency=1
         --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
     volumes:
-      - ./src:/app
+      - ../src:/app
       - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
     env_file:
       - ../.env.${ENVIRONMENT:-prod}
@@ -281,7 +281,7 @@ services:
       - -c
       - sleep 20 && celery -A core.celery beat --loglevel=info
     volumes:
-      - ./src:/app
+      - ../src:/app
     env_file:
       - ../.env.${ENVIRONMENT:-prod}
     environment:
@@ -315,7 +315,7 @@ services:
     ports:
       - "5555:5555"
     volumes:
-      - ./src:/app
+      - ../src:/app
       - /mnt/data2tb/docker/volumes/nc_flower_data:/var/lib/flower
     env_file:
       - ../.env.${ENVIRONMENT:-prod}
