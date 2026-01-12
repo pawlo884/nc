@@ -457,7 +457,7 @@ status() {
     echo "🔵 BLUE environment:"
     if docker inspect nc-web-blue 2>/dev/null | grep -q '"Status": "running"'; then
         echo "  Status: ✅ RUNNING"
-        if docker exec nc-web-blue curl -sf http://localhost:8000/admin/ > /dev/null 2>&1; then
+        if docker exec nc-web-blue curl -sf http://localhost:8000/health/ > /dev/null 2>&1; then
             echo "  Health: ✅ HEALTHY"
         else
             echo "  Health: ❌ UNHEALTHY"
@@ -470,7 +470,7 @@ status() {
     echo "🟢 GREEN environment:"
     if docker inspect nc-web-green 2>/dev/null | grep -q '"Status": "running"'; then
         echo "  Status: ✅ RUNNING"
-        if docker exec nc-web-green curl -sf http://localhost:8000/admin/ > /dev/null 2>&1; then
+        if docker exec nc-web-green curl -sf http://localhost:8000/health/ > /dev/null 2>&1; then
             echo "  Health: ✅ HEALTHY"
         else
             echo "  Health: ❌ UNHEALTHY"
