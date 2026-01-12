@@ -116,7 +116,7 @@ services:
     # Porty usunięte - nginx-router dostępny tylko wewnętrznie przez sieć Docker
     # Nginx Proxy Manager wskazuje na niego przez sieć nginx_proxy_manager_network
     volumes:
-      - ./nginx-blue-green.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../deployments/nginx/nginx-blue-green.conf:/etc/nginx/conf.d/default.conf:ro
       - /mnt/data2tb/docker/volumes/nc_static_volume:/app/staticfiles:ro
       - /mnt/data2tb/docker/volumes/nc_nginx_logs:/var/log/nginx
       - /mnt/data2tb/docker/volumes/nc_nginx_state:/etc/nginx/state
@@ -335,7 +335,8 @@ services:
 
 networks:
   nc_network:
-    driver: bridge
+    name: nc_nc_network
+    external: true
   nginx_proxy_manager_network:
     name: nginx_proxy_manager_network
     external: true
