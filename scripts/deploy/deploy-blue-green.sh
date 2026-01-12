@@ -184,7 +184,7 @@ switch_nginx() {
     
     # 3. Zmień backend_active
     log_info "📝 Zmiana backend_active na ${target}..."
-    sed -i.bak "/^upstream backend_active {/,/^}/ s/server web-${current}:8000/server web-${target}:8000/" deployments/nginx/nginx-blue-green.conf
+    sed -i.bak "/^upstream backend_active {/,/^}/ s/server nc-web-${current}:8000/server nc-web-${target}:8000/" deployments/nginx/nginx-blue-green.conf
     
     # 4. Zmień X-Deployment-Color header
     sed -i.bak "s/X-Deployment-Color \"${current}\"/X-Deployment-Color \"${target}\"/g" deployments/nginx/nginx-blue-green.conf
