@@ -91,15 +91,15 @@ verify_no_protected_containers() {
 
 # Sprawdź który environment jest aktywny
 get_active_environment() {
-    # Sprawdź który kontener odpowiada (prosty health check)
-    if docker exec nc-web-blue curl -sf http://localhost:8000/admin/ > /dev/null 2>&1; then
+    # Sprawdź który kontener odpowiada (prosty health check przez /health/)
+    if docker exec nc-web-blue curl -sf http://localhost:8000/health/ > /dev/null 2>&1; then
         if docker inspect nc-web-blue 2>/dev/null | grep -q '"Status": "running"'; then
             echo "blue"
             return
         fi
     fi
     
-    if docker exec nc-web-green curl -sf http://localhost:8000/admin/ > /dev/null 2>&1; then
+    if docker exec nc-web-green curl -sf http://localhost:8000/health/ > /dev/null 2>&1; then
         if docker inspect nc-web-green 2>/dev/null | grep -q '"Status": "running"'; then
             echo "green"
             return
@@ -126,8 +126,8 @@ health_check() {
             return 1
         fi
         
-        # Sprawdź czy Django odpowiada
-        if docker exec nc-web-${environment} curl -sf http://localhost:8000/admin/ > /dev/null 2>&1; then
+        # Sprawdź czy Django odpowiada przez endpoint /health/
+        if docker exec nc-web-${environment} curl -sf http://localhost:8000/health/ > /dev/null 2>&1; then
             log_success "✅ ${environment} jest zdrowy!"
             return 0
         fi
