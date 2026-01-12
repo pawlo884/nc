@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.9.11 (2026-01-12)</small>
+
+* fix: poprawka ścieżki volume mount w docker-compose.blue-green.yml ([dbdab69](https://github.com/pawlo884/nc/commit/dbdab69))
+* fix: poprawka wszystkich ścieżek volume mount w docker-compose.blue-green.yml ([01e9aae](https://github.com/pawlo884/nc/commit/01e9aae))
+
 ## <small>1.9.10 (2026-01-12)</small>
 
 * fix: użycie docker rm -f zamiast docker-compose rm dla usuwania kontenera ([47c3f33](https://github.com/pawlo884/nc/commit/47c3f33))
