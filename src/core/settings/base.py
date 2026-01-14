@@ -10,7 +10,16 @@ import logging
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # BASE_DIR wskazuje na root projektu (tam gdzie jest manage.py, .env.dev, etc.)
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+# W kontenerze Docker: /app/core/settings/base.py -> parent.parent.parent = /app
+# Lokalnie: src/core/settings/base.py -> parent.parent.parent.parent = root projektu
+# Sprawdzamy czy jesteśmy w kontenerze (struktura /app/core/) czy lokalnie (src/core/)
+_file_path = Path(__file__).resolve()
+if _file_path.parts[1] == 'app' and _file_path.parts[2] == 'core':
+    # W kontenerze Docker: /app/core/settings/base.py
+    BASE_DIR = _file_path.parent.parent.parent  # /app
+else:
+    # Lokalnie: src/core/settings/base.py lub c:/.../src/core/settings/base.py
+    BASE_DIR = _file_path.parent.parent.parent.parent  # root projektu
 
 # Load environment variables
 # Sprawdź czy używamy ustawień dev i załaduj odpowiedni plik .env

@@ -67,7 +67,14 @@ if settings.DEBUG:
         path('__debug__/', include('debug_toolbar.urls')),
     ]
 
-# Serwuj pliki statyczne w produkcji jeśli nie ma nginx (fallback)
-# To jest potrzebne gdy aplikacja działa bezpośrednio na porcie 8001
-# Używamy zawsze (nie tylko gdy DEBUG=False), bo na VPS może nie być nginx
-urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+# Serwuj pliki statyczne tylko gdy DEBUG=True i NIE jesteśmy w Dockerze (lokalny dev bez nginx)
+# W Dockerze nginx zawsze obsługuje pliki statyczne, więc Django nie powinno ich serwować
+# W produkcji zawsze dodaj jako fallback (na wypadek gdyby nginx nie działał)
+import os
+is_docker = os.path.exists('/.dockerenv') or os.environ.get('DJANGO_SETTINGS_MODULE', '').endswith('.dev')
+if settings.DEBUG and not is_docker:
+    # Tylko lokalny development bez Docker (nginx nie jest dostępny)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+elif not settings.DEBUG:
+    # W produkcji zawsze dodaj jako fallback (na wypadek gdyby nginx nie działał)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
