@@ -144,13 +144,14 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'CONN_MAX_AGE': 0,
         'OPTIONS': {
             'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_idle': 60,  # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5, # 5 prób
+            'keepalives_count': 5,  # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -161,13 +162,14 @@ DATABASES = {
         'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
         'HOST': os.getenv('DEFAULT_DB_HOST'),
         'PORT': os.getenv('DEFAULT_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'CONN_MAX_AGE': 0,
         'OPTIONS': {
             'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_idle': 60,  # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5, # 5 prób
+            'keepalives_count': 5,  # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -178,13 +180,14 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'CONN_MAX_AGE': 0,
         'OPTIONS': {
             'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_idle': 60,  # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5, # 5 prób
+            'keepalives_count': 5,  # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -195,13 +198,14 @@ DATABASES = {
         'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
         'HOST': os.getenv('MPD_DB_HOST'),
         'PORT': os.getenv('MPD_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'CONN_MAX_AGE': 0,
         'OPTIONS': {
             'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_idle': 60,  # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5, # 5 prób
+            'keepalives_count': 5,  # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -212,13 +216,14 @@ DATABASES = {
         'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
         'HOST': os.getenv('MATTERHORN1_DB_HOST'),
         'PORT': os.getenv('MATTERHORN1_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'CONN_MAX_AGE': 0,
         'OPTIONS': {
             'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_idle': 60,  # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5, # 5 prób
+            'keepalives_count': 5,  # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -229,13 +234,14 @@ DATABASES = {
         'PASSWORD': os.getenv('WEB_AGENT_DB_PASSWORD'),
         'HOST': os.getenv('WEB_AGENT_DB_HOST'),
         'PORT': os.getenv('WEB_AGENT_DB_PORT'),
-        'CONN_MAX_AGE': 0,  # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'CONN_MAX_AGE': 0,
         'OPTIONS': {
             'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
             'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60, # Keepalive co 60s
+            'keepalives_idle': 60,  # Keepalive co 60s
             'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5, # 5 prób
+            'keepalives_count': 5,  # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
@@ -253,9 +259,12 @@ DATABASE_ROUTERS = [
 # Konfiguracja automatycznego ponawiania połączeń z bazami danych
 DATABASE_RETRY_CONFIG = {
     'max_retries': 3,              # Maksymalna liczba prób połączenia
-    'retry_delay': 2,              # Bazowe opóźnienie między próbami (w sekundach)
-    'retry_backoff': True,         # Czy używać exponential backoff (2^attempt * delay)
-    'retry_max_delay': 30,         # Maksymalne opóźnienie między próbami (w sekundach)
+    # Bazowe opóźnienie między próbami (w sekundach)
+    'retry_delay': 2,
+    # Czy używać exponential backoff (2^attempt * delay)
+    'retry_backoff': True,
+    # Maksymalne opóźnienie między próbami (w sekundach)
+    'retry_max_delay': 30,
 }
 
 WSGI_APPLICATION = 'core.wsgi.application'
