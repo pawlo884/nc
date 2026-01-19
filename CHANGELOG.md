@@ -1,5 +1,12 @@
 # Zmiany
 
+## <small>1.9.15 (2026-01-19)</small>
+
+* fix: naprawa automatycznego restartu SSH tunnel w postgres-ssh-tunnel ([3b5e0d8](https://github.com/pawlo884/nc/commit/3b5e0d8))
+* Formatowanie kodu - poprawa spacji w komentarzach w settings/base.py ([fc1b26b](https://github.com/pawlo884/nc/commit/fc1b26b))
+* Naprawa konfiguracji nginx dla plików statycznych - dodano nagłówki CORS i poprawiono typy MIME ([0f84c51](https://github.com/pawlo884/nc/commit/0f84c51))
+* Naprawa plików statycznych - konfiguracja dla Cloudflare i NPM ([252e3e3](https://github.com/pawlo884/nc/commit/252e3e3))
+
 ## <small>1.9.14 (2026-01-12)</small>
 
 * fix(deploy): zmieniono nazwy upstream w nginx z web-blue/web-green na nc-web-blue/nc-web-green ([a84fa65](https://github.com/pawlo884/nc/commit/a84fa65))
