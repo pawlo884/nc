@@ -225,8 +225,8 @@ services:
       - DJANGO_SETTINGS_MODULE=core.settings.prod
       - CELERY_STATE_DB=/var/lib/celery/worker_state_default
       - TZ=Europe/Warsaw
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
@@ -235,6 +235,7 @@ services:
     restart: always
     networks:
       - nc_network
+      - nc_dbnet
     user: 1001:1001
 
   celery-import:
@@ -258,8 +259,8 @@ services:
       - DJANGO_SETTINGS_MODULE=core.settings.prod
       - CELERY_STATE_DB=/var/lib/celery/worker_state_import
       - TZ=Europe/Warsaw
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
@@ -268,6 +269,7 @@ services:
     restart: always
     networks:
       - nc_network
+      - nc_dbnet
     user: 1001:1001
 
   celery-beat:
@@ -287,8 +289,8 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings.prod
       - TZ=Europe/Warsaw
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
@@ -297,6 +299,7 @@ services:
     restart: always
     networks:
       - nc_network
+      - nc_dbnet
     user: 1001:1001
 
   flower:
@@ -322,8 +325,8 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings.prod
       - TZ=Europe/Warsaw
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
     depends_on:
       - postgres
       - redis
@@ -331,6 +334,7 @@ services:
       - celery-import
     networks:
       - nc_network
+      - nc_dbnet
     user: 1001:1001
 
 networks:
@@ -339,5 +343,8 @@ networks:
     external: true
   nginx_proxy_manager_network:
     name: nginx_proxy_manager_network
+    external: true
+  nc_dbnet:
+    name: nc_dbnet
     external: true
 

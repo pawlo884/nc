@@ -183,6 +183,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://192.168.50.31:8000',
     'http://192.168.50.31:8001',
     'http://172.24.0.1:8001',  # Adres bramy sieci Docker dla NPM
+    'https://nc.sowa.ch',
+    'https://sowa.ch',
 ]
 CSRF_COOKIE_SECURE = False  # Wyłączone dla logowania po HTTP (bez HTTPS)
 CSRF_COOKIE_HTTPONLY = False
