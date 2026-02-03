@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.10.6 (2026-02-03)</small>
+
+* fix(celery): depends_on bez condition: service_healthy – nie blokują w created; doc 502 + cert SSL ([6d2a581](https://github.com/pawlo884/nc/commit/6d2a581))
+
 ## <small>1.10.5 (2026-02-03)</small>
 
 * fix(nginx-router): depends_on tylko redis – nie wymaga obu web (po deployu jeden stopped) ([2bd34eb](https://github.com/pawlo884/nc/commit/2bd34eb))
