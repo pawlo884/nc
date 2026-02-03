@@ -8,6 +8,9 @@
 
 set -e  # Exit on error
 
+# Jednolity stack w Portainer/Docker – wszystkie serwisy z tego compose w stacku "docker-compose"
+export COMPOSE_PROJECT_NAME=docker-compose
+
 ################################################################################
 # ⚠️ NIETYKALNE: tylko PostgreSQL - NIGDY nie uruchamiać z tego compose!
 # Redis, web, celery, nginx = w jednym stacku (ten plik).
@@ -250,9 +253,15 @@ deploy() {
         
         POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
         
-        # 1. Redis w tym samym stacku – uruchom jeśli nie działa
+        # 1. Redis w tym samym stacku (docker-compose) – migracja ze stacku "nc" lub uruchom jeśli nie działa
+        REDIS_PROJECT=$(docker inspect nc-redis-1 --format='{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "")
+        if [ "$REDIS_PROJECT" = "nc" ]; then
+            log_info "Przenoszenie Redis ze stacku 'nc' do 'docker-compose' (jednorazowa migracja)..."
+            docker stop nc-redis-1 2>/dev/null || true
+            docker rm nc-redis-1 2>/dev/null || true
+        fi
         if ! docker ps --format '{{.Names}}' | grep -q "^nc-redis-1$"; then
-            log_info "Uruchamianie Redis w głównym stacku..."
+            log_info "Uruchamianie Redis w stacku docker-compose..."
             docker-compose -f docker-compose/docker-compose.blue-green.yml up -d redis
             sleep 5
         fi
