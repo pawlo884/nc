@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.10.2 (2026-02-03)</small>
+
+* fix: dodanie nc_dbnet do web-blue i web-green dla połączenia z postgres ([ccd961c](https://github.com/pawlo884/nc/commit/ccd961c))
+
 ## <small>1.10.1 (2026-02-03)</small>
 
 * fix(blue-green): usunięcie depends_on postgres (no such service przy profile shared) ([c5dc02b](https://github.com/pawlo884/nc/commit/c5dc02b))
