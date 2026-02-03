@@ -37,8 +37,6 @@ services:
     networks:
       - nc_network
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     ports:
@@ -90,8 +88,6 @@ services:
     networks:
       - nc_network
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     ports:
@@ -230,8 +226,6 @@ services:
       - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: always
@@ -264,8 +258,6 @@ services:
       - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: always
@@ -294,8 +286,6 @@ services:
       - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: always
@@ -330,7 +320,6 @@ services:
       - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
     depends_on:
-      - postgres
       - redis
       - celery-default
       - celery-import
