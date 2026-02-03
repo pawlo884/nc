@@ -2,6 +2,10 @@
 
 Gdy Cloudflare pokazuje 502, błąd jest po stronie hosta: **NPM → nc-nginx-router → web**.
 
+## 0. Certyfikat SSL (częsta przyczyna)
+
+**Jeśli 502 pojawia się nagle przy działającej wcześniej stronie:** sprawdź w Nginx Proxy Manager certyfikat dla domeny (np. nc.sowa.ch). Wygasły lub nieprawidłowy certyfikat może powodować 502. **Odśwież / przedłuż certyfikat** w NPM (SSL tab w Proxy Host) – często to rozwiązuje problem.
+
 ## 1. Diagnostyka na serwerze
 
 Uruchom w katalogu projektu (`/home/pawel/apps/nc`):
