@@ -122,11 +122,9 @@ services:
       - /mnt/data2tb/docker/volumes/nc_nginx_state:/etc/nginx/state
     environment:
       - TZ=Europe/Warsaw
+    # Nie wymagaj obu web – po deployu jeden jest zatrzymany; nginx ma backup w upstream
     depends_on:
-      web-blue:
-        condition: service_healthy
-      web-green:
-        condition: service_healthy
+      - redis
     restart: always
     networks:
       - nc_network
