@@ -36,6 +36,7 @@ services:
     restart: always
     networks:
       - nc_network
+      - nc_dbnet
     depends_on:
       redis:
         condition: service_healthy
@@ -87,6 +88,7 @@ services:
     restart: always
     networks:
       - nc_network
+      - nc_dbnet
     depends_on:
       redis:
         condition: service_healthy
