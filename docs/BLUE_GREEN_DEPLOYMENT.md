@@ -52,7 +52,9 @@ W każdym momencie **tylko jedno** środowisko obsługuje ruch produkcyjny.
 - `celery-*` - workery (jedna instancja)
 - `flower` - monitoring
 
-**Postgres/Redis w innym stacku:** W `docker-compose.blue-green.yml` serwisy `postgres` i `redis` mają `profiles: ["shared"]`. Dzięki temu Compose **nie** uruchamia ani nie tworzy tych kontenerów przy zwykłym deployu – zakłada się, że działają już (np. w innym stacku). Skrypt deploy tylko sprawdza, że `nc-postgres-1` i `nc-redis-1` działają. Jeśli chcesz uruchomić postgres/redis z tego pliku: `docker-compose -f docker-compose.blue-green.yml --profile shared up -d postgres redis`.
+**Wszystko w jednym stacku oprócz postgresów:** Redis, web-blue, web-green, nginx-router, celery, flower są w jednym stacku (ten plik). **Postgres** jest w osobnym stacku – w compose ma `profiles: ["shared"]`, więc przy zwykłym `up` nie jest uruchamiany. Skrypt deploy wymaga, żeby `nc-postgres-1` (i `nc-redis-1`) już działały; redis można uruchomić z tego pliku (`up -d redis`). Postgres tylko z profile: `docker-compose -f docker-compose.blue-green.yml --profile shared up -d postgres`.
+
+**Jeśli Redis był w stacku „nc”:** zatrzymaj redis w stacku nc (np. wyłącz tylko redis w tym stacku), potem uruchom główny stack – redis wystartuje w tym samym stacku co web/celery/nginx. Dane Redis (volume) pozostają; kontener `nc-redis-1` będzie w głównym stacku.
 
 **Router:**
 - `nginx-router` - przełącza ruch między blue/green

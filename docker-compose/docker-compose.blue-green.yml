@@ -183,10 +183,8 @@ services:
     labels:
       - "nc.protected=true"
 
-  # ⚠️ NIETYKALNY: Redis - cache i sesje, dane produkcyjne
-  # profile: shared = NIE uruchamiaj z blue-green (postgres/redis często w innym stacku)
+  # Redis - w tym samym stacku co web/celery/nginx (wszystko oprócz postgresów)
   redis:
-    profiles: ["shared"]
     image: redis:7.2-alpine
     container_name: nc-redis-1
     command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-prod_password}
