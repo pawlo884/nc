@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.10.5 (2026-02-03)</small>
+
+* fix(nginx-router): depends_on tylko redis – nie wymaga obu web (po deployu jeden stopped) ([2bd34eb](https://github.com/pawlo884/nc/commit/2bd34eb))
+
 ## <small>1.10.4 (2026-02-03)</small>
 
 * fix(502): BotBlocker pomija też requesty z X-Forwarded-For (proxy chain) ([4ebdfb1](https://github.com/pawlo884/nc/commit/4ebdfb1))
