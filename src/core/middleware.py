@@ -113,6 +113,15 @@ class BotBlockerMiddleware:
         if request.path == '/health/' or request.path == '/health':
             return self.get_response(request)
         
+        # Requesty z zaufanego proxy (nc-nginx-router, NPM itd.) – nie blokuj po User-Agent,
+        # bo łańcuch proxy mógł go zmienić (np. Wget/curl), a prawdziwy klient to przeglądarka
+        remote_addr = request.META.get('REMOTE_ADDR', '')
+        if remote_addr:
+            if remote_addr == '127.0.0.1' or remote_addr == '::1':
+                return self.get_response(request)
+            if remote_addr.startswith('10.') or remote_addr.startswith('172.') or remote_addr.startswith('192.168.'):
+                return self.get_response(request)
+        
         # Sprawdź User-Agent
         user_agent = request.META.get('HTTP_USER_AGENT', '').lower()
         
