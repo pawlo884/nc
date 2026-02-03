@@ -149,7 +149,9 @@ services:
   # Kontenery te są zarządzane osobno i zawierają dane produkcyjne!
   # ==========================================
   # ⚠️ NIETYKALNY: PostgreSQL - baza danych z wszystkimi danymi produkcyjnymi
+  # profile: shared = NIE uruchamiaj z blue-green (postgres/redis często w innym stacku)
   postgres:
+    profiles: ["shared"]
     image: postgres:18-alpine
     container_name: nc-postgres-1
     restart: unless-stopped
@@ -182,7 +184,9 @@ services:
       - "nc.protected=true"
 
   # ⚠️ NIETYKALNY: Redis - cache i sesje, dane produkcyjne
+  # profile: shared = NIE uruchamiaj z blue-green (postgres/redis często w innym stacku)
   redis:
+    profiles: ["shared"]
     image: redis:7.2-alpine
     container_name: nc-redis-1
     command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-prod_password}
@@ -313,7 +317,7 @@ services:
       - -c
       - >
         sleep 20 && celery -A core.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
-        flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD} --persistent=True
+        flower --port=5555 --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower} --persistent=True
         --db=/var/lib/flower/flower.db --inspect_timeout=30
     ports:
       - "5555:5555"

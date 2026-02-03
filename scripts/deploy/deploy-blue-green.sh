@@ -255,19 +255,25 @@ deploy() {
     # ⚠️⚠️⚠️ NIETYKALNE KONTENERY - tylko sprawdzenie, nigdy nie dotykać! ⚠️⚠️⚠️
     check_protected_containers
     
-    # Uruchom tylko nginx-router
-    # ⚠️ UWAGA: NIE dodawaj postgres ani redis do tej komendy - są nietykalne!
+    # Uruchom tylko nginx-router (i ewentualnie web-blue/web-green gdy nic nie działa)
+    # ⚠️ UWAGA: Używamy --no-deps żeby NIGDY nie uruchamiać postgres/redis z compose (są nietykalne, już działają).
     if ! docker ps --format '{{.Names}}' | grep -q "nc-nginx-router"; then
         log_warning "⚠️ NGINX router nie działa, uruchamiam..."
         
         # Bezpieczeństwo: weryfikuj że nie próbujemy dotknąć nietykalnych
         verify_no_protected_containers "nginx-router"
         
-        # ⚠️ WAŻNE: Tylko nginx-router, bez postgres i redis!
         # Zapisz timestamp PostgreSQL przed operacją
         POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
         
-        if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d nginx-router; then
+        # 1. Uruchom web-blue i web-green z --no-deps (bez postgres/redis - używają już działających)
+        log_info "Uruchamianie web-blue i web-green (--no-deps)..."
+        if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps web-blue web-green 2>/dev/null; then
+            log_warning "⚠️ Nie uruchomiono obu web - możliwy pierwszy start, próbuję tylko nginx-router..."
+        fi
+        
+        # 2. Uruchom nginx-router z --no-deps (bez ciągnienia postgres/redis)
+        if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps nginx-router; then
             log_error "❌ Nie udało się uruchomić NGINX router"
             exit 1
         fi
