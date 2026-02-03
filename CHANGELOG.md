@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.9.16 (2026-02-03)</small>
+
+* fix(blue-green): profile shared dla postgres/redis, --no-deps przy nginx-router, domyślne FLOWER ([47f7243](https://github.com/pawlo884/nc/commit/47f7243))
+* Naprawa konfiguracji blue-green deployment i Celery ([585c17a](https://github.com/pawlo884/nc/commit/585c17a))
+
 ## <small>1.9.15 (2026-01-19)</small>
 
 * fix: naprawa automatycznego restartu SSH tunnel w postgres-ssh-tunnel ([3b5e0d8](https://github.com/pawlo884/nc/commit/3b5e0d8))
