@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.10.3 (2026-02-03)</small>
+
+* fix(502): BotBlocker pomija requesty z proxy (172.x), ALLOWED_HOSTS web-blue/green, doc TROUBLESHOOT ([81bf102](https://github.com/pawlo884/nc/commit/81bf102))
+* chore(deploy): COMPOSE_PROJECT_NAME=docker-compose + migracja Redis ze stacku nc ([fcedf4c](https://github.com/pawlo884/nc/commit/fcedf4c))
+
 ## <small>1.10.2 (2026-02-03)</small>
 
 * fix: dodanie nc_dbnet do web-blue i web-green dla połączenia z postgres ([ccd961c](https://github.com/pawlo884/nc/commit/ccd961c))
