@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.10.4 (2026-02-03)</small>
+
+* fix(502): BotBlocker pomija też requesty z X-Forwarded-For (proxy chain) ([4ebdfb1](https://github.com/pawlo884/nc/commit/4ebdfb1))
+
 ## <small>1.10.3 (2026-02-03)</small>
 
 * fix(502): BotBlocker pomija requesty z proxy (172.x), ALLOWED_HOSTS web-blue/green, doc TROUBLESHOOT ([81bf102](https://github.com/pawlo884/nc/commit/81bf102))
