@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.10.1 (2026-02-03)</small>
+
+* fix(blue-green): usunięcie depends_on postgres (no such service przy profile shared) ([c5dc02b](https://github.com/pawlo884/nc/commit/c5dc02b))
+
 ## 1.10.0 (2026-02-03)
 
 * feat(blue-green): wszystko w jednym stacku oprócz postgresów (redis w głównym stacku) ([fdae767](https://github.com/pawlo884/nc/commit/fdae767))
