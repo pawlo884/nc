@@ -1,5 +1,9 @@
 # Zmiany
 
+## 1.10.0 (2026-02-03)
+
+* feat(blue-green): wszystko w jednym stacku oprócz postgresów (redis w głównym stacku) ([fdae767](https://github.com/pawlo884/nc/commit/fdae767))
+
 ## <small>1.9.16 (2026-02-03)</small>
 
 * fix(blue-green): profile shared dla postgres/redis, --no-deps przy nginx-router, domyślne FLOWER ([47f7243](https://github.com/pawlo884/nc/commit/47f7243))
