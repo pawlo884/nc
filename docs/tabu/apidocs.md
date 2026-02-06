@@ -2,6 +2,8 @@
 
 **Dokumentacja oficjalna:** [https://b2b.tabu.com.pl/api/v1](https://b2b.tabu.com.pl/api/v1)
 
+**Baza danych i migracje (dev: alias `zzz_tabu`):** [database.md](database.md)
+
 ## Podstawy
 
 - **URL bazowy:** `https://b2b.tabu.com.pl/api/v1`

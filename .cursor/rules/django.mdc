@@ -73,6 +73,7 @@ alwaysApply: true
   - `python manage.py migrate --database=zzz_matterhorn --settings=nc.settings.dev`
   - `python manage.py migrate --database=zzz_MPD --settings=nc.settings.dev`
   - `python manage.py migrate --database=zzz_web_agent --settings=nc.settings.dev`
+  - **Tabu (dev):** tylko alias `zzz_tabu` – `python manage.py migrate tabu --database=zzz_tabu`. Szczegóły: docs/tabu/database.md
 
 ## Testy
 - **TestCase** zamiast SimpleTestCase
