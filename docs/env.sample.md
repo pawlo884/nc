@@ -25,6 +25,10 @@ WEB_AGENT_DB_NAME=
 WEB_AGENT_DB_USER=
 WEB_AGENT_DB_PASSWORD=
 
+# Tabu API (test: python manage.py test_tabu_connection --settings=nc.settings.dev)
+TABU_API_BASE_URL=
+TABU_API_KEY=
+
 api_key = "" # API key pawlo884
 
 # headersMatterhorn = {

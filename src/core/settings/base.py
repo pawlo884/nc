@@ -14,11 +14,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 # Load environment variables
 # Sprawdź czy używamy ustawień dev i załaduj odpowiedni plik .env
+# Ścieżka względem BASE_DIR, żeby .env działał niezależnie od CWD (np. przy uruchomieniu z src/).
 if os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.dev'):
-    load_dotenv('.env.dev')
+    load_dotenv(BASE_DIR / '.env.dev')
 elif os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.prod'):
     # W produkcji Docker ładuje .env.prod przez env_file, ale na wszelki wypadek
-    load_dotenv('.env.prod')
+    load_dotenv(BASE_DIR / '.env.prod')
     load_dotenv()  # Fallback do .env jeśli .env.prod nie istnieje
 else:
     load_dotenv()
@@ -32,6 +33,10 @@ MATTERHORN_API_URL = os.getenv(
 MATTERHORN_API_USERNAME = os.getenv('MATTERHORN_API_USERNAME', '')
 MATTERHORN_API_PASSWORD = os.getenv('MATTERHORN_API_PASSWORD', '')
 MATTERHORN_API_KEY = os.getenv('MATTERHORN_API_KEY', '')
+
+# Tabu API configuration (dokumentacja: https://b2b.tabu.com.pl/api/v1)
+TABU_API_BASE_URL = (os.getenv('TABU_API_BASE_URL') or 'https://b2b.tabu.com.pl/api/v1').strip().rstrip('/')
+TABU_API_KEY = os.getenv('TABU_API_KEY', '')
 
 # Konfiguracja logowania - tylko console logging
 LOGGING = {
