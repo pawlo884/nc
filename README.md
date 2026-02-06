@@ -6,7 +6,10 @@ Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa wyłącznie w tr
 - **Docker + Docker Compose** (w praktyce: Docker Desktop na Windows).
 - **PostgreSQL** dostępny z kontenerów (w DEV najczęściej `host.docker.internal:5432`).
 - **Git**.
-- (Opcjonalnie) **Python** tylko jeśli chcesz uruchamiać bez Dockera.
+- (Opcjonalnie) **Python 3.13** tylko jeśli chcesz uruchamiać bez Dockera.
+  - Zalecane: **pyenv** do zarządzania wersjami Pythona (projekt ma plik `.python-version`).
+  - Po wejściu do katalogu projektu pyenv automatycznie aktywuje odpowiednią wersję.
+  - **Konfiguracja pyenv**: Zobacz `docs/PYENV_SETUP.md` jeśli masz problemy z konfiguracją.
 
 ## Struktura repo (najważniejsze)
 - `nc/` – konfiguracja projektu (settings/urls/celery/db_routers)
@@ -85,3 +88,4 @@ docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.
 - `docs/DOCKER_QUICK_GUIDE.md`
 - `docs/SCRIPTS_GUIDE.md`
 - `docs/BLUE_GREEN_DEPLOYMENT.md`
+- **Zewnętrzne API:** `docs/IDOSELL_API.md` (linki do IdoSell: [Getting Started](https://idosell.readme.io/docs/getting-started), [developers](https://www.idosell.com/developers))
