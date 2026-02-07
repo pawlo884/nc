@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 # Ustaw settings przed importem Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nc.settings.dev')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.dev')
 
 import django
 django.setup()

@@ -41,7 +41,8 @@ class Category(models.Model):
         verbose_name = 'Kategoria'
         verbose_name_plural = 'Kategorie'
         indexes = [
-            models.Index(fields=['category_id'], name='tabu_category_category_id_idx'),
+            models.Index(fields=['category_id'],
+                         name='tabu_category_category_id_idx'),
             models.Index(fields=['name'], name='tabu_category_name_idx'),
             models.Index(fields=['parent'], name='tabu_category_parent_idx'),
         ]
@@ -54,49 +55,60 @@ class Product(models.Model):
     """Główny model produktu z API Tabu"""
     # Identyfikatory
     product_id = models.CharField(max_length=50, unique=True, db_index=True)
-    external_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
-    
+    external_id = models.CharField(
+        max_length=100, blank=True, null=True, db_index=True)
+
     # Podstawowe informacje
     active = models.BooleanField(default=True, db_index=True)
     name = models.CharField(max_length=500)
     description = models.TextField(blank=True, null=True)
     short_description = models.CharField(max_length=500, blank=True, null=True)
-    
+
     # Daty
     creation_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     last_api_sync = models.DateTimeField(null=True, blank=True)
-    
+
     # Relacje
     category = models.ForeignKey(
         Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     brand = models.ForeignKey(
         Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
-    
+
     # Ceny i dostępność
-    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    price_net = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    price_gross = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    price_net = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    price_gross = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=10, default='PLN')
-    vat_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    
+    vat_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True)
+
     # URL i linki
     url = models.URLField(max_length=1000, blank=True, null=True)
-    slug = models.SlugField(max_length=500, blank=True, null=True, db_index=True)
-    
+    slug = models.SlugField(max_length=500, blank=True,
+                            null=True, db_index=True)
+
     # Statusy i flagi
     new_collection = models.BooleanField(default=False)
     featured = models.BooleanField(default=False)
     on_sale = models.BooleanField(default=False)
-    
+
     # Pola JSON dla złożonych danych z API
-    raw_data = models.JSONField(default=dict, blank=True, help_text="Pełne dane z API")
-    attributes = models.JSONField(default=dict, blank=True, help_text="Atrybuty produktu")
-    prices = models.JSONField(default=dict, blank=True, help_text="Ceny w różnych walutach")
-    other_colors = models.JSONField(default=list, blank=True, help_text="Inne kolory produktu")
-    products_in_set = models.JSONField(default=list, blank=True, help_text="Produkty w zestawie")
-    
+    raw_data = models.JSONField(
+        default=dict, blank=True, help_text="Pełne dane z API")
+    attributes = models.JSONField(
+        default=dict, blank=True, help_text="Atrybuty produktu")
+    prices = models.JSONField(default=dict, blank=True,
+                              help_text="Ceny w różnych walutach")
+    other_colors = models.JSONField(
+        default=list, blank=True, help_text="Inne kolory produktu")
+    products_in_set = models.JSONField(
+        default=list, blank=True, help_text="Produkty w zestawie")
+
     class Meta:
         db_table = 'tabu_product'
         verbose_name = 'Produkt'
@@ -109,7 +121,8 @@ class Product(models.Model):
             models.Index(fields=['slug'], name='tabu_prod_slug_idx'),
             models.Index(fields=['external_id'], name='tabu_prod_ext_id_idx'),
             models.Index(fields=['created_at'], name='tabu_prod_created_idx'),
-            models.Index(fields=['last_api_sync'], name='tabu_prod_last_sync_idx'),
+            models.Index(fields=['last_api_sync'],
+                         name='tabu_prod_last_sync_idx'),
         ]
 
     def __str__(self):
@@ -138,7 +151,8 @@ class ProductImage(models.Model):
         verbose_name_plural = 'Obrazy produktów'
         ordering = ['order', 'id']
         indexes = [
-            models.Index(fields=['product', 'order'], name='tabu_pimg_prod_ord_idx'),
+            models.Index(fields=['product', 'order'],
+                         name='tabu_pimg_prod_ord_idx'),
             models.Index(fields=['is_main'], name='tabu_pimg_is_main_idx'),
         ]
         unique_together = [['product', 'image_url']]
@@ -150,37 +164,45 @@ class ProductImage(models.Model):
 class ProductVariant(models.Model):
     """Model dla wariantów produktów (rozmiary, kolory)"""
     variant_id = models.CharField(max_length=50, unique=True, db_index=True)
-    external_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    external_id = models.CharField(
+        max_length=100, blank=True, null=True, db_index=True)
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name='variants')
-    
+
     # Informacje o wariancie
     name = models.CharField(max_length=200, blank=True, null=True)
-    sku = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    sku = models.CharField(max_length=100, blank=True,
+                           null=True, db_index=True)
     ean = models.CharField(max_length=20, blank=True, null=True, db_index=True)
-    
+
     # Rozmiar i kolor
     size = models.CharField(max_length=50, blank=True, null=True)
     color = models.CharField(max_length=100, blank=True, null=True)
     color_code = models.CharField(max_length=20, blank=True, null=True)
-    
+
     # Stan magazynowy
     stock = models.PositiveIntegerField(default=0, db_index=True)
     stock_reserved = models.PositiveIntegerField(default=0)
     available = models.BooleanField(default=True, db_index=True)
-    
+
     # Ceny wariantu
-    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    price_net = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    price_gross = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    
+    price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    price_net = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    price_gross = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+
     # Czas realizacji
-    max_processing_time = models.PositiveIntegerField(default=0, help_text="Czas realizacji w dniach")
-    
+    max_processing_time = models.PositiveIntegerField(
+        default=0, help_text="Czas realizacji w dniach")
+
     # Pola JSON
-    raw_data = models.JSONField(default=dict, blank=True, help_text="Pełne dane z API")
-    attributes = models.JSONField(default=dict, blank=True, help_text="Atrybuty wariantu")
-    
+    raw_data = models.JSONField(
+        default=dict, blank=True, help_text="Pełne dane z API")
+    attributes = models.JSONField(
+        default=dict, blank=True, help_text="Atrybuty wariantu")
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -191,7 +213,8 @@ class ProductVariant(models.Model):
         verbose_name = 'Wariant produktu'
         verbose_name_plural = 'Warianty produktów'
         indexes = [
-            models.Index(fields=['variant_id'], name='tabu_pvar_variant_id_idx'),
+            models.Index(fields=['variant_id'],
+                         name='tabu_pvar_variant_id_idx'),
             models.Index(fields=['product'], name='tabu_pvar_product_idx'),
             models.Index(fields=['sku'], name='tabu_pvar_sku_idx'),
             models.Index(fields=['ean'], name='tabu_pvar_ean_idx'),
@@ -212,9 +235,10 @@ class ApiSyncLog(models.Model):
         ('completed', 'Zakończone'),
         ('failed', 'Błąd'),
     ]
-    
+
     sync_type = models.CharField(max_length=50, db_index=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     products_processed = models.IntegerField(default=0)
@@ -245,7 +269,8 @@ class TabuProduct(models.Model):
     """
 
     # Identyfikatory
-    api_id = models.IntegerField(unique=True, db_index=True, help_text="Pole 'id' z API Tabu")
+    api_id = models.IntegerField(
+        unique=True, db_index=True, help_text="Pole 'id' z API Tabu")
     symbol = models.CharField(max_length=100, db_index=True)
     ean = models.CharField(max_length=50, blank=True, db_index=True)
 
@@ -277,13 +302,16 @@ class TabuProduct(models.Model):
         help_text="1 - cena netto, 2 - cena brutto (zgodnie z dokumentacją API)",
     )
 
-    vat_label = models.CharField(max_length=20, help_text="Etykieta VAT, np. '23%'")
+    vat_label = models.CharField(
+        max_length=20, help_text="Etykieta VAT, np. '23%'")
     vat_id = models.IntegerField()
     vat_value = models.DecimalField(max_digits=5, decimal_places=2)
 
     # Stan / jednostka
-    store_total = models.IntegerField(help_text="Łączny stan magazynowy 'store'")
-    unit_label = models.CharField(max_length=50, help_text="Nazwa jednostki, np. 'par', 'szt'")
+    store_total = models.IntegerField(
+        help_text="Łączny stan magazynowy 'store'")
+    unit_label = models.CharField(
+        max_length=50, help_text="Nazwa jednostki, np. 'par', 'szt'")
     unit_id = models.IntegerField()
     weight = models.DecimalField(max_digits=8, decimal_places=3, default=0)
 
@@ -329,7 +357,8 @@ class TabuProductVariant(models.Model):
     Powiązany z TabuProduct, bez mieszania z istniejącym ProductVariant.
     """
 
-    api_id = models.IntegerField(unique=True, db_index=True, help_text="Pole 'id' wariantu z API")
+    api_id = models.IntegerField(
+        unique=True, db_index=True, help_text="Pole 'id' wariantu z API")
     product = models.ForeignKey(
         TabuProduct,
         on_delete=models.CASCADE,
@@ -351,8 +380,10 @@ class TabuProductVariant(models.Model):
     weight = models.DecimalField(max_digits=8, decimal_places=3, default=0)
 
     # Wyciągnięte z items (dla wygodnego filtrowania)
-    color = models.CharField(max_length=100, blank=True, help_text="Wartość parametru 'Kolor'")
-    size = models.CharField(max_length=50, blank=True, help_text="Wartość parametru 'Rozmiar'")
+    color = models.CharField(max_length=100, blank=True,
+                             help_text="Wartość parametru 'Kolor'")
+    size = models.CharField(max_length=50, blank=True,
+                            help_text="Wartość parametru 'Rozmiar'")
 
     # Pełna struktura items z API (lista parametrów wariantu)
     items = models.JSONField(default=list, blank=True)

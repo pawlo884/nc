@@ -69,3 +69,33 @@ Stronicowanie: parametry `page`, `limit`, `lang` dla list.
 - **500** – błąd serwera  
 
 Pełna lista endpointów i parametrów: [https://b2b.tabu.com.pl/api/v1](https://b2b.tabu.com.pl/api/v1).
+
+## Import i synchronizacja produktów
+
+### Pełny import (pierwszy raz)
+
+```bash
+cd src
+python manage.py sync_tabu_products --settings=core.settings.dev
+```
+
+### Aktualizacja (tylko produkty zmienione od daty)
+
+```bash
+python manage.py sync_tabu_products --update-from "2026-01-01 00:00:00" --settings=core.settings.dev
+```
+
+### Periodic task (aktualizacja co 10 minut)
+
+```bash
+# Skonfiguruj task (tworzy/aktualizuje wpis w django_celery_beat)
+python manage.py setup_tabu_sync_task --settings=core.settings.dev
+
+# Z interwałem 10 minut (domyślnie)
+python manage.py setup_tabu_sync_task --interval 10 --settings=core.settings.dev
+
+# Wyłączenie
+python manage.py setup_tabu_sync_task --disable --settings=core.settings.dev
+```
+
+Wymaga uruchomionego Celery Beat i workera. Task `tabu.tasks.sync_tabu_products_update` pobiera produkty z parametrem `update_from` (ostatnia synchronizacja).

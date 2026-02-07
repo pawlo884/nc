@@ -4,7 +4,8 @@
 
 W środowisku **development** (`core.settings.dev`) router `TabuRouter` kieruje aplikację `tabu` wyłącznie na bazę o **aliasie `zzz_tabu`** (nie `tabu`).
 
-- **Połączenie:** host `postgres-ssh-tunnel`, port `5434` (tunel SSH), baza PostgreSQL: `zzz_tabu` (nazwa z `.env.dev`: `TABU_DB_NAME`).
+- **Połączenie:** host `postgres-ssh-tunnel` (Docker) lub `localhost` (lokalnie), port `5434`.
+- **Konfiguracja:** Szczegóły w [docs/LOCAL_DEV_DATABASE.md](../LOCAL_DEV_DATABASE.md) – rekomendowane: `TABU_DB_HOST=localhost` w `.env.dev` dla lokalnego uruchomienia.
 - **Alias do migracji i skryptów:** w dev zawsze używaj **`zzz_tabu`**.
 
 ## Migracje
