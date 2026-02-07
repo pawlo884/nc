@@ -9,17 +9,23 @@ import tempfile
 import logging
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-# BASE_DIR wskazuje na root projektu (tam gdzie jest manage.py, .env.dev, etc.)
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+# BASE_DIR wskazuje na katalog Django (gdzie jest manage.py) - 3 parenty od core/settings/base.py
+# Lokalnie: nc_project/src, w Docker: /app
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Load environment variables
-# Sprawdź czy używamy ustawień dev i załaduj odpowiedni plik .env
-# Ścieżka względem BASE_DIR, żeby .env działał niezależnie od CWD (np. przy uruchomieniu z src/).
+# .env.dev może być w BASE_DIR (Docker) lub BASE_DIR.parent (lokalnie, repo root)
+def _find_dotenv(name: str) -> Path:
+    p = BASE_DIR / name
+    if p.exists():
+        return p
+    return BASE_DIR.parent / name
+
 if os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.dev'):
-    load_dotenv(BASE_DIR / '.env.dev')
+    load_dotenv(_find_dotenv('.env.dev'))
 elif os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.prod'):
     # W produkcji Docker ładuje .env.prod przez env_file, ale na wszelki wypadek
-    load_dotenv(BASE_DIR / '.env.prod')
+    load_dotenv(_find_dotenv('.env.prod'))
     load_dotenv()  # Fallback do .env jeśli .env.prod nie istnieje
 else:
     load_dotenv()
@@ -116,7 +122,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'src' / 'templates'],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -323,8 +329,8 @@ LOCALE_PATHS = [
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
-    BASE_DIR / 'src' / 'static',
-] if os.path.exists(BASE_DIR / 'src' / 'static') else []
+    BASE_DIR / 'static',
+] if os.path.exists(BASE_DIR / 'static') else []
 # STATICFILES_STORAGE - konfigurowany w settings.dev.py i settings.prod.py
 
 # Default primary key field type
