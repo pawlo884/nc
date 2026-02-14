@@ -54,8 +54,8 @@ class BaseTabuAPICommand(BaseCommand):
         parser.add_argument(
             '--limit',
             type=int,
-            help='Limit elementów na stronę API (max 100 dla products/details)',
-            default=100,
+            help='Limit elementów na stronę API (max 1000 dla products)',
+            default=1000,
         )
         parser.add_argument(
             '--dry-run',
@@ -152,12 +152,39 @@ class BaseTabuAPICommand(BaseCommand):
 
         raise CommandError('Przekroczono liczbę prób połączenia z API')
 
+    def fetch_product_by_id(self, api_id, timeout=30):
+        """
+        GET products/{id}. Zwraca dict z danymi lub None przy 404 (brak produktu).
+        """
+        url = f"{self.api_base_url}/products/{api_id}"
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-API-KEY': self.api_key,
+        }
+        try:
+            resp = requests.get(url, headers=headers, timeout=timeout)
+            if resp.status_code == 404:
+                return None
+            if resp.status_code == 429:
+                time.sleep(120)
+                return self.fetch_product_by_id(api_id, timeout)
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, dict) and 'id' in data:
+                return data
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.warning(f'API Tabu products/{api_id}: {e}')
+            return None
+
     def fetch_paginated_products(
-        self, path='products', limit=100, update_from=None, update_to=None
+        self, path='products', limit=100, update_from=None, update_to=None, max_products=None
     ):
         """
         Pobierz produkty z paginacją.
         API zwraca: { code, count, limit, total, page, products: [...] }
+        max_products: ogranicza liczbę produktów (do testów).
         """
         all_products = []
         page = 1
@@ -178,10 +205,13 @@ class BaseTabuAPICommand(BaseCommand):
             all_products.extend(products)
             total = data.get('total', 0)
 
+            if max_products and len(all_products) >= max_products:
+                all_products = all_products[:max_products]
+                break
             if len(all_products) >= total or len(products) < limit:
                 break
 
             page += 1
-            time.sleep(0.7)  # ~85 req/min - bezpiecznie poniżej 100/min
+            time.sleep(1)  # ~60 req/min - poniżej limitu 100/min API Tabu
 
         return all_products

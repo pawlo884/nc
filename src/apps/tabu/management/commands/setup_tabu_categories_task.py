@@ -1,8 +1,9 @@
 """
-Konfiguruje periodic task dla sprawdzania nowych produktów Tabu (co kilka godzin).
-Użycie:
-  python manage.py setup_tabu_sync_task --settings=core.settings.dev
-  python manage.py setup_tabu_sync_task --interval 60 --settings=core.settings.dev
+Konfiguruje periodic task dla synchronizacji kategorii Tabu (co tydzień).
+Używa GET products/categories – sprawdza czy są nowe kategorie.
+Użycie (manage.py jest w src/):
+  python src/manage.py setup_tabu_categories_task --settings=core.settings.dev
+  python src/manage.py setup_tabu_categories_task --interval 7 --settings=core.settings.dev
 """
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -10,14 +11,14 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
 
 class Command(BaseCommand):
-    help = 'Konfiguruje periodic task dla sprawdzania nowych produktów Tabu (co kilka godzin)'
+    help = 'Konfiguruje periodic task dla synchronizacji kategorii Tabu (co tydzień)'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--interval',
             type=int,
-            default=60,
-            help='Interwał w minutach (domyślnie: 60 = 1h)',
+            default=7,
+            help='Interwał w dniach (domyślnie: 7 = tydzień)',
         )
         parser.add_argument(
             '--disable',
@@ -31,9 +32,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        interval_minutes = options['interval']
-        task_name = 'Synchronizacja produktów Tabu'
-        task_path = 'tabu.tasks.sync_tabu_products_update'
+        interval_days = options['interval']
+        task_name = 'Synchronizacja kategorii Tabu'
+        task_path = 'tabu.tasks.sync_tabu_categories'
 
         try:
             existing_task = PeriodicTask.objects.get(name=task_name)
@@ -46,8 +47,8 @@ class Command(BaseCommand):
                 return
 
             schedule, _ = IntervalSchedule.objects.get_or_create(
-                every=interval_minutes,
-                period=IntervalSchedule.MINUTES,
+                every=interval_days,
+                period=IntervalSchedule.DAYS,
             )
             existing_task.interval = schedule
             existing_task.enabled = not options['disable']
@@ -59,7 +60,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(
                     f'✅ Zaktualizowano periodic task: {task_name}\n'
-                    f'   - Interwał: co {interval_minutes} minut\n'
+                    f'   - Interwał: co {interval_days} dni\n'
                     f'   - Queue: {existing_task.queue or "default"}\n'
                     f'   - Status: {status}'
                 )
@@ -73,8 +74,8 @@ class Command(BaseCommand):
                 return
 
             schedule, _ = IntervalSchedule.objects.get_or_create(
-                every=interval_minutes,
-                period=IntervalSchedule.MINUTES,
+                every=interval_days,
+                period=IntervalSchedule.DAYS,
             )
             PeriodicTask.objects.create(
                 interval=schedule,
@@ -83,50 +84,24 @@ class Command(BaseCommand):
                 queue='default',
                 enabled=not options['disable'],
                 start_time=timezone.now(),
-                description='Sprawdza nowe produkty: max(api_id)+1, 404=brak',
+                description='Sprawdza czy są nowe kategorie w API Tabu (GET products/categories)',
             )
 
             status = 'wyłączony' if options['disable'] else 'włączony'
             self.stdout.write(
                 self.style.SUCCESS(
                     f'✅ Utworzono periodic task: {task_name}\n'
-                    f'   - Interwał: co {interval_minutes} minut\n'
+                    f'   - Interwał: co {interval_days} dni\n'
                     f'   - Status: {status}'
                 )
             )
 
-        self.stdout.write('\n' + '=' * 60)
-        self.stdout.write(
-            self.style.HTTP_INFO('📋 Wszystkie periodic taski Tabu:')
-        )
-        self.stdout.write('=' * 60)
-
-        tabu_tasks = PeriodicTask.objects.filter(task__startswith='tabu.tasks.')
-        if not tabu_tasks.exists():
-            self.stdout.write(self.style.WARNING('   Brak tasków'))
-        else:
-            for task in tabu_tasks:
-                icon = '✅' if task.enabled else '❌'
-                info = (
-                    f'co {task.interval.every} {task.interval.period}'
-                    if task.interval
-                    else str(task.crontab or '')
-                )
-                queue_info = task.queue or '(pusta – używa default)'
-                self.stdout.write(
-                    f'\n{icon} {task.name}\n'
-                    f'   Task: {task.task}\n'
-                    f'   Queue: {queue_info}\n'
-                    f'   Schedule: {info}\n'
-                    f'   Ostatnie uruchomienie: {task.last_run_at or "Nigdy"}'
-                )
-
         self.stdout.write(
             self.style.HTTP_INFO(
-                '\n💡 Wskazówki:\n'
-                '   - Pełny import: python manage.py sync_tabu_products\n'
-                '   - Zmiana interwału: python manage.py setup_tabu_sync_task --interval 60\n'
-                '   - Wyłączenie: python manage.py setup_tabu_sync_task --disable\n'
+                '\n💡 Wskazówki (z katalogu projektu):\n'
+                '   - Ręczna synchronizacja: python src/manage.py sync_tabu_categories --settings=core.settings.dev\n'
+                '   - Zmiana interwału: python src/manage.py setup_tabu_categories_task --interval 7 --settings=core.settings.dev\n'
+                '   - Wyłączenie: python src/manage.py setup_tabu_categories_task --disable --settings=core.settings.dev\n'
                 '   - Admin: /admin/django_celery_beat/periodictask/\n'
             )
         )

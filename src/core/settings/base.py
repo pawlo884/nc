@@ -280,9 +280,9 @@ DATABASE_ROUTERS = [
 # Database retry configuration
 # Konfiguracja automatycznego ponawiania połączeń z bazami danych
 DATABASE_RETRY_CONFIG = {
-    'max_retries': 3,              # Maksymalna liczba prób połączenia
+    'max_retries': 8,              # Maksymalna liczba prób (po restarcie Dockera tunel SSH potrzebuje czasu)
     # Bazowe opóźnienie między próbami (w sekundach)
-    'retry_delay': 2,
+    'retry_delay': 3,
     # Czy używać exponential backoff (2^attempt * delay)
     'retry_backoff': True,
     # Maksymalne opóźnienie między próbami (w sekundach)
