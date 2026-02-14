@@ -9,9 +9,17 @@ import tempfile
 import logging
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-# BASE_DIR wskazuje na katalog Django (gdzie jest manage.py) - 3 parenty od core/settings/base.py
-# Lokalnie: nc_project/src, w Docker: /app
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# BASE_DIR wskazuje na root projektu (tam gdzie jest manage.py, .env.dev, etc.)
+# W kontenerze Docker: /app/core/settings/base.py -> parent.parent.parent = /app
+# Lokalnie: src/core/settings/base.py -> parent.parent.parent.parent = root projektu
+# Sprawdzamy czy jesteśmy w kontenerze (struktura /app/core/) czy lokalnie (src/core/)
+_file_path = Path(__file__).resolve()
+if len(_file_path.parts) >= 3 and _file_path.parts[1] == 'app' and _file_path.parts[2] == 'core':
+    # W kontenerze Docker: /app/core/settings/base.py
+    BASE_DIR = _file_path.parent.parent.parent  # /app
+else:
+    # Lokalnie: src/core/settings/base.py lub c:/.../src/core/settings/base.py
+    BASE_DIR = _file_path.parent.parent.parent.parent  # root projektu
 
 # Load environment variables
 # .env.dev może być w BASE_DIR (Docker) lub BASE_DIR.parent (lokalnie, repo root)

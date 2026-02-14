@@ -189,6 +189,11 @@ CELERY_TASK_SOFT_TIME_LIMIT = 3300  # 55 minut soft limit
 # Nginx obsługuje pliki statyczne, nie WhiteNoise
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
+# STATICFILES_FINDERS - używamy domyślnych z base.py
+# Ostrzeżenia o duplikatach (np. admin/js/cancel.js) są normalne - 
+# Django używa pierwszego znalezionego pliku zgodnie z kolejnością w INSTALLED_APPS
+# admin_interface jest przed django.contrib.admin, więc jego pliki mają priorytet
+
 # Usuń WhiteNoise z middleware w development - Nginx obsługuje pliki statyczne
 # DynamicDebugMiddleware jest dodawane jako pierwsze, aby kontrolować DEBUG na podstawie IP
 # BotBlockerMiddleware blokuje znane boty i crawlery

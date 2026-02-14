@@ -1,5 +1,46 @@
 # Zmiany
 
+## <small>1.10.6 (2026-02-03)</small>
+
+* fix(celery): depends_on bez condition: service_healthy – nie blokują w created; doc 502 + cert SSL ([6d2a581](https://github.com/pawlo884/nc/commit/6d2a581))
+
+## <small>1.10.5 (2026-02-03)</small>
+
+* fix(nginx-router): depends_on tylko redis – nie wymaga obu web (po deployu jeden stopped) ([2bd34eb](https://github.com/pawlo884/nc/commit/2bd34eb))
+
+## <small>1.10.4 (2026-02-03)</small>
+
+* fix(502): BotBlocker pomija też requesty z X-Forwarded-For (proxy chain) ([4ebdfb1](https://github.com/pawlo884/nc/commit/4ebdfb1))
+
+## <small>1.10.3 (2026-02-03)</small>
+
+* fix(502): BotBlocker pomija requesty z proxy (172.x), ALLOWED_HOSTS web-blue/green, doc TROUBLESHOOT ([81bf102](https://github.com/pawlo884/nc/commit/81bf102))
+* chore(deploy): COMPOSE_PROJECT_NAME=docker-compose + migracja Redis ze stacku nc ([fcedf4c](https://github.com/pawlo884/nc/commit/fcedf4c))
+
+## <small>1.10.2 (2026-02-03)</small>
+
+* fix: dodanie nc_dbnet do web-blue i web-green dla połączenia z postgres ([ccd961c](https://github.com/pawlo884/nc/commit/ccd961c))
+
+## <small>1.10.1 (2026-02-03)</small>
+
+* fix(blue-green): usunięcie depends_on postgres (no such service przy profile shared) ([c5dc02b](https://github.com/pawlo884/nc/commit/c5dc02b))
+
+## 1.10.0 (2026-02-03)
+
+* feat(blue-green): wszystko w jednym stacku oprócz postgresów (redis w głównym stacku) ([fdae767](https://github.com/pawlo884/nc/commit/fdae767))
+
+## <small>1.9.16 (2026-02-03)</small>
+
+* fix(blue-green): profile shared dla postgres/redis, --no-deps przy nginx-router, domyślne FLOWER ([47f7243](https://github.com/pawlo884/nc/commit/47f7243))
+* Naprawa konfiguracji blue-green deployment i Celery ([585c17a](https://github.com/pawlo884/nc/commit/585c17a))
+
+## <small>1.9.15 (2026-01-19)</small>
+
+* fix: naprawa automatycznego restartu SSH tunnel w postgres-ssh-tunnel ([3b5e0d8](https://github.com/pawlo884/nc/commit/3b5e0d8))
+* Formatowanie kodu - poprawa spacji w komentarzach w settings/base.py ([fc1b26b](https://github.com/pawlo884/nc/commit/fc1b26b))
+* Naprawa konfiguracji nginx dla plików statycznych - dodano nagłówki CORS i poprawiono typy MIME ([0f84c51](https://github.com/pawlo884/nc/commit/0f84c51))
+* Naprawa plików statycznych - konfiguracja dla Cloudflare i NPM ([252e3e3](https://github.com/pawlo884/nc/commit/252e3e3))
+
 ## <small>1.9.14 (2026-01-12)</small>
 
 * fix(deploy): zmieniono nazwy upstream w nginx z web-blue/web-green na nc-web-blue/nc-web-green ([a84fa65](https://github.com/pawlo884/nc/commit/a84fa65))

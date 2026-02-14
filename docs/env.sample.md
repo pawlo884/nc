@@ -44,6 +44,7 @@ api_key = "" # API key pawlo884
 #     "Authorization": api_key}
 
 
+# Flower (monitoring Celery). W blue-green domyślnie admin/flower jeśli nie ustawione.
 FLOWER_USER=
 FLOWER_PASSWORD=
 FLOWER_UNAUTHENTICATED_API=

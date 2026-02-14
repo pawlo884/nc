@@ -3,7 +3,8 @@ services:
     build:
       context: ..
       dockerfile: deployments/docker/Dockerfile.dev
-    command: ['/bin/bash', '-c', 'python manage.py collectstatic --noinput --skip-checks']
+    # Usuwamy cały katalog i tworzymy na nowo, potem collectstatic bez --clear
+    command: ['/bin/bash', '-c', 'rm -rf /app/staticfiles/* /app/staticfiles/.*[!.]* 2>/dev/null || true && mkdir -p /app/staticfiles && python manage.py collectstatic --noinput --skip-checks && chown -R 999:999 /app/staticfiles && chmod -R 755 /app/staticfiles']
     volumes:
       - static_volume:/app/staticfiles
     env_file:
@@ -14,7 +15,7 @@ services:
       - DJANGO_DEBUG=1
     networks:
       - app_network
-    user: '999:999'
+    # Nie ustawiamy user, aby móc naprawić uprawnienia jako root
 
   web:
     build:
@@ -332,93 +333,101 @@ services:
         # Sprawdź czy katalog .ssh istnieje
         mkdir -p /root/.ssh
         
-        # Najpierw sprawdź czy klucz SSH jest zamontowany jako volume
-        if [ -f /root/.ssh/id_ed25519 ]; then
-          echo "[OK] Znaleziono klucz SSH zamontowany jako volume"
-          # Skopiuj klucz do /tmp i ustaw uprawnienia (volume jest read-only)
-          cp /root/.ssh/id_ed25519 /tmp/id_ed25519
-          chmod 600 /tmp/id_ed25519
-          # Ustaw zmienną środowiskową, żeby SSH ignorował config file (volume jest read-only)
-          export SSH_CONFIG_FILE=/dev/null
-          echo "Laczenie przez SSH tunnel z kluczem z volume..."
-          # Uruchom SSH tunnel w tle na localhost:15434 (port wewnętrzny)
-          ssh -F /dev/null -i /tmp/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -N -L 127.0.0.1:15434:localhost:5433 -p "$$PORT" "$$SSH_USER@$$SSH_HOST" &
-          SSH_PID=$$!
+        # Funkcja do uruchomienia SSH tunelu
+        start_ssh_tunnel() {
+          if [ -f /root/.ssh/id_ed25519 ]; then
+            echo "[OK] Uzywam klucza SSH z volume"
+            cp /root/.ssh/id_ed25519 /tmp/id_ed25519
+            chmod 600 /tmp/id_ed25519
+            export SSH_CONFIG_FILE=/dev/null
+            ssh -F /dev/null -i /tmp/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o ConnectTimeout=10 -N -L 127.0.0.1:15434:localhost:5433 -p "$$PORT" "$$SSH_USER@$$SSH_HOST" &
+            echo $$! > /tmp/ssh_tunnel.pid
+          elif [ -n "$$SSH_KEY" ]; then
+            echo "[OK] Uzywam klucza SSH z zmiennej srodowiskowej"
+            if echo "$$SSH_KEY" | head -c 30 | grep -q "BEGIN"; then
+              echo "$$SSH_KEY" > /tmp/id_ed25519
+            else
+              echo "$$SSH_KEY" | openssl base64 -d > /tmp/id_ed25519
+              if [ $$? -ne 0 ]; then
+                echo "[ERROR] Nie udalo sie zdekodowac klucza z base64"
+                return 1
+              fi
+            fi
+            chmod 600 /tmp/id_ed25519
+            export SSH_CONFIG_FILE=/dev/null
+            ssh -F /dev/null -i /tmp/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o ConnectTimeout=10 -N -L 127.0.0.1:15434:localhost:5433 -p "$$PORT" "$$SSH_USER@$$SSH_HOST" &
+            echo $$! > /tmp/ssh_tunnel.pid
+          elif [ -n "$$SSH_PASSWORD" ]; then
+            echo "[OK] Uzywam hasla SSH"
+            export SSHPASS="$$SSH_PASSWORD"
+            sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o ConnectTimeout=10 -N -L 127.0.0.1:15434:localhost:5433 -p "$$PORT" "$$SSH_USER@$$SSH_HOST" &
+            echo $$! > /tmp/ssh_tunnel.pid
+          else
+            echo "[ERROR] Nie znaleziono zadnego sposobu autentykacji SSH"
+            return 1
+          fi
+          
           # Poczekaj aż tunnel się nawiąże (po restarcie Dockera SSH może potrzebować więcej czasu)
           for i in 1 2 3 4 5 6 7 8 9 10; do
             sleep 3
-            if nc -z 127.0.0.1 15434; then break; fi
-            echo "Czekam na SSH tunnel... ($$i/10)"
-          done
-          if ! nc -z 127.0.0.1 15434; then
-            echo "[ERROR] SSH tunnel nie dziala na localhost:15434"
-            kill $$SSH_PID 2>/dev/null || true
-            exit 1
-          fi
-          echo "[OK] SSH tunnel dziala na localhost:15434"
-          # Uruchom socat proxy, które nasłuchuje na 0.0.0.0:5434 (dostępne dla innych kontenerów)
-          # i przekierowuje do localhost:15434 (gdzie działa SSH tunnel)
-          echo "[OK] Uruchamianie socat proxy na 0.0.0.0:5434 -> localhost:15434..."
-          exec socat TCP-LISTEN:5434,fork,reuseaddr TCP:127.0.0.1:15434
-        # Jeśli jest klucz SSH jako zmienna środowiskowa, użyj go
-        elif [ -n "$$SSH_KEY" ]; then
-          echo "[OK] Znaleziono SSH_KEY w zmiennej srodowiskowej (dlugosc: $$(echo -n $$SSH_KEY | wc -c) znakow)"
-          # Jeśli klucz zaczyna się od "BEGIN", to jest tekstowy, w przeciwnym razie jest base64
-          if echo "$$SSH_KEY" | head -c 30 | grep -q "BEGIN"; then
-            echo "[OK] Wykryto klucz w formacie tekstowym"
-            echo "$$SSH_KEY" > /tmp/id_ed25519
-          else
-            echo "[OK] Wykryto klucz w formacie base64, dekodowanie..."
-            echo "$$SSH_KEY" | openssl base64 -d > /tmp/id_ed25519
-            if [ $$? -ne 0 ]; then
-              echo "[ERROR] Nie udalo sie zdekodowac klucza z base64"
-              exit 1
+            if nc -z 127.0.0.1 15434 2>/dev/null; then
+              echo "[OK] SSH tunnel dziala na localhost:15434"
+              return 0
             fi
+            echo "[INFO] Oczekiwanie na SSH tunnel... ($$i/10)"
+          done
+          
+          echo "[ERROR] SSH tunnel nie dziala po 30 sekundach"
+          if [ -f /tmp/ssh_tunnel.pid ]; then
+            kill $$(cat /tmp/ssh_tunnel.pid) 2>/dev/null || true
+            rm -f /tmp/ssh_tunnel.pid
           fi
-          chmod 600 /tmp/id_ed25519
-          # Ustaw zmienną środowiskową, żeby SSH ignorował config file (volume jest read-only)
-          export SSH_CONFIG_FILE=/dev/null
-          echo "Laczenie przez SSH tunnel z kluczem z zmiennej..."
-          # Uruchom SSH tunnel w tle na localhost:15434
-          ssh -F /dev/null -i /tmp/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -N -L 127.0.0.1:15434:localhost:5433 -p "$$PORT" "$$SSH_USER@$$SSH_HOST" &
-          SSH_PID=$$!
-          for i in 1 2 3 4 5 6 7 8 9 10; do sleep 3; if nc -z 127.0.0.1 15434; then break; fi; echo "Czekam na SSH tunnel... ($$i/10)"; done
-          if ! nc -z 127.0.0.1 15434; then
-            echo "[ERROR] SSH tunnel nie dziala na localhost:15434"
-            kill $$SSH_PID 2>/dev/null || true
-            exit 1
-          fi
-          echo "[OK] SSH tunnel dziala na localhost:15434, uruchamianie socat proxy..."
-          exec socat TCP-LISTEN:5434,fork,reuseaddr TCP:127.0.0.1:15434
-        # W przeciwnym razie użyj hasła przez sshpass
-        elif [ -n "$$SSH_PASSWORD" ]; then
-          echo "[OK] Uzywam hasla SSH"
-          export SSHPASS="$$SSH_PASSWORD"
-          echo "Laczenie przez SSH tunnel z haslem..."
-          # Uruchom SSH tunnel w tle na localhost:15434
-          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -N -L 127.0.0.1:15434:localhost:5433 -p "$$PORT" "$$SSH_USER@$$SSH_HOST" &
-          SSH_PID=$$!
-          for i in 1 2 3 4 5 6 7 8 9 10; do sleep 3; if nc -z 127.0.0.1 15434; then break; fi; echo "Czekam na SSH tunnel... ($$i/10)"; done
-          if ! nc -z 127.0.0.1 15434; then
-            echo "[ERROR] SSH tunnel nie dziala na localhost:15434"
-            kill $$SSH_PID 2>/dev/null || true
-            exit 1
-          fi
-          echo "[OK] SSH tunnel dziala na localhost:15434, uruchamianie socat proxy..."
-          exec socat TCP-LISTEN:5434,fork,reuseaddr TCP:127.0.0.1:15434
-        else
-          echo "[ERROR] Nie znaleziono zadnego sposobu autentykacji SSH"
-          echo "Sprawdzam:"
-          echo "  - Plik /root/.ssh/id_ed25519: $$([ -f /root/.ssh/id_ed25519 ] && echo 'ISTNIEJE' || echo 'BRAK')"
-          echo "  - Zmienna SSH_KEY: $$([ -n "$$SSH_KEY" ] && echo 'USTAWIONA' || echo 'BRAK')"
-          echo "  - Zmienna SSH_PASSWORD: $$([ -n "$$SSH_PASSWORD" ] && echo 'USTAWIONA' || echo 'BRAK')"
-          echo ""
-          echo "Rozwiazania:"
-          echo "1. Ustaw SSH_KEY w .env.dev (base64): uruchom .\scripts\setup-ssh-key.ps1"
-          echo "2. Ustaw SSH_PASSWORD w .env.dev"
-          echo "3. Zamontuj klucz SSH jako volume (sprawdz czy Docker Desktop ma dostep do ~/.ssh)"
+          return 1
+        }
+        
+        # Uruchom SSH tunnel po raz pierwszy (przed socat)
+        if ! start_ssh_tunnel; then
+          echo "[ERROR] Nie udalo sie uruchomic SSH tunnel"
           exit 1
         fi
+        
+        # Uruchom socat w tle (po uruchomieniu SSH tunnel)
+        echo "[OK] Uruchamianie socat proxy na 0.0.0.0:5434 -> localhost:15434..."
+        socat TCP-LISTEN:5434,fork,reuseaddr TCP:127.0.0.1:15434 &
+        SOCAT_PID=$$!
+        echo $$SOCAT_PID > /tmp/socat.pid
+        
+        # Poczekaj aż socat się uruchomi
+        sleep 2
+        
+        # Monitoruj i restartuj SSH tunnel
+        while true; do
+          sleep 10
+          
+          # Sprawdź czy SSH tunnel nadal działa
+          if [ -f /tmp/ssh_tunnel.pid ]; then
+            SSH_PID=$$(cat /tmp/ssh_tunnel.pid)
+            if ! kill -0 $$SSH_PID 2>/dev/null; then
+              echo "[WARNING] Proces SSH tunnel ($$SSH_PID) nie dziala, restartowanie..."
+              rm -f /tmp/ssh_tunnel.pid
+              start_ssh_tunnel || echo "[ERROR] Nie udalo sie zrestartowac SSH tunnel"
+            elif ! nc -z 127.0.0.1 15434 2>/dev/null; then
+              echo "[WARNING] Port 15434 nie odpowiada, restartowanie SSH tunnel..."
+              kill $$SSH_PID 2>/dev/null || true
+              rm -f /tmp/ssh_tunnel.pid
+              start_ssh_tunnel || echo "[ERROR] Nie udalo sie zrestartowac SSH tunnel"
+            fi
+          else
+            echo "[WARNING] Brak pliku PID SSH tunnel, uruchamianie..."
+            start_ssh_tunnel || echo "[ERROR] Nie udalo sie uruchomic SSH tunnel"
+          fi
+          
+          # Sprawdź czy socat nadal działa (sprawdzamy port zamiast PID, bo fork tworzy wiele procesów)
+          if ! nc -z localhost 5434 2>/dev/null; then
+            echo "[ERROR] Port 5434 nie odpowiada, socat nie dziala - restartowanie kontenera..."
+            exit 1
+          fi
+        done
     env_file:
       - ../.env.dev
     environment:
@@ -438,11 +447,11 @@ services:
         aliases:
           - postgres-ssh-tunnel
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 5434 || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 5434 && nc -z localhost 15434 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 20s
     deploy:
       resources:
         limits:

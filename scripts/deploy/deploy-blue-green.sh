@@ -8,23 +8,18 @@
 
 set -e  # Exit on error
 
-################################################################################
-# ⚠️⚠️⚠️  NIETYKALNE KONTENERY - NIGDY NIE DOTYKAĆ!  ⚠️⚠️⚠️
-################################################################################
-# Te kontenery zawierają dane produkcyjne i są całkowicie nietykalne:
-# - nc-postgres-1  - Baza danych PostgreSQL z wszystkimi danymi
-# - nc-redis-1     - Redis z cache i sesjami
-#
-# ❌ NIGDY nie uruchamiaj dla nich: docker-compose up/stop/restart/rebuild
-# ❌ NIGDY nie dodawaj ich do komend docker-compose w tym skrypcie
-# ✅ Tylko sprawdzaj czy działają (docker ps)
-# ✅ Tylko sprawdzaj ich zdrowie (health check)
-#
-# Jeśli któryś z tych kontenerów nie działa - deployment MUSI się zatrzymać!
-################################################################################
+# Jednolity stack w Portainer/Docker – wszystkie serwisy z tego compose w stacku "docker-compose"
+export COMPOSE_PROJECT_NAME=docker-compose
 
-# Lista nietykalnych kontenerów (używana do weryfikacji)
-PROTECTED_CONTAINERS=("nc-postgres-1" "nc-redis-1")
+################################################################################
+# ⚠️ NIETYKALNE: tylko PostgreSQL - NIGDY nie uruchamiać z tego compose!
+# Redis, web, celery, nginx = w jednym stacku (ten plik).
+# Postgres = osobny stack (nc-postgres-1); skrypt tylko sprawdza że działa.
+################################################################################
+# Nietykalny (nigdy nie startować z blue-green compose):
+PROTECTED_NEVER_START=("nc-postgres-1")
+# Wymagane do deploy (muszą działać przed startem):
+REQUIRED_CONTAINERS=("nc-postgres-1" "nc-redis-1")
 
 # Kolory do outputu
 RED='\033[0;31m'
@@ -50,11 +45,11 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Sprawdź czy nietykalne kontenery działają
+# Sprawdź czy wymagane kontenery działają (postgres + redis)
 check_protected_containers() {
-    log_info "🔒 Sprawdzanie nietykalnych kontenerów (PostgreSQL, Redis)..."
+    log_info "🔒 Sprawdzanie wymaganych kontenerów (PostgreSQL, Redis)..."
     
-    for container in "${PROTECTED_CONTAINERS[@]}"; do
+    for container in "${REQUIRED_CONTAINERS[@]}"; do
         if ! docker ps --format '{{.Names}}' | grep -q "^${container}$"; then
             log_error "❌ KRYTYCZNE: Nietykalny kontener ${container} nie działa!"
             log_error "❌ Deployment zatrzymany - nie można kontynuować bez bazy danych!"
@@ -75,18 +70,13 @@ check_protected_containers() {
     log_success "✅ Wszystkie nietykalne kontenery działają poprawnie"
 }
 
-# Funkcja bezpieczna dla docker-compose - sprawdza czy nie próbujemy dotknąć nietykalnych
+# Funkcja bezpieczna - blokuje tylko postgres (nigdy nie startować z tego compose)
 verify_no_protected_containers() {
     local services="$1"
-    
-    for container in "${PROTECTED_CONTAINERS[@]}"; do
-        container_name=$(echo "$container" | sed 's/nc-//')
-        if echo "$services" | grep -qE "\b${container_name}\b"; then
-            log_error "❌ BŁĄD BEZPIECZEŃSTWA: Próba manipulacji nietykalnym kontenerem ${container}!"
-            log_error "❌ Usługa '${container_name}' jest na liście nietykalnych i nie może być dotknięta!"
-            exit 1
-        fi
-    done
+    if echo "$services" | grep -qE "\bpostgres\b"; then
+        log_error "❌ BŁĄD BEZPIECZEŃSTWA: Postgres jest w osobnym stacku - nie uruchamiaj z blue-green!"
+        exit 1
+    fi
 }
 
 # Sprawdź który environment jest aktywny
@@ -255,19 +245,35 @@ deploy() {
     # ⚠️⚠️⚠️ NIETYKALNE KONTENERY - tylko sprawdzenie, nigdy nie dotykać! ⚠️⚠️⚠️
     check_protected_containers
     
-    # Uruchom tylko nginx-router
-    # ⚠️ UWAGA: NIE dodawaj postgres ani redis do tej komendy - są nietykalne!
+    # Uruchom nginx-router (i redis/web jeśli nie działają) – wszystko w jednym stacku, bez postgres
     if ! docker ps --format '{{.Names}}' | grep -q "nc-nginx-router"; then
         log_warning "⚠️ NGINX router nie działa, uruchamiam..."
         
-        # Bezpieczeństwo: weryfikuj że nie próbujemy dotknąć nietykalnych
         verify_no_protected_containers "nginx-router"
         
-        # ⚠️ WAŻNE: Tylko nginx-router, bez postgres i redis!
-        # Zapisz timestamp PostgreSQL przed operacją
         POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
         
-        if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d nginx-router; then
+        # 1. Redis w tym samym stacku (docker-compose) – migracja ze stacku "nc" lub uruchom jeśli nie działa
+        REDIS_PROJECT=$(docker inspect nc-redis-1 --format='{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "")
+        if [ "$REDIS_PROJECT" = "nc" ]; then
+            log_info "Przenoszenie Redis ze stacku 'nc' do 'docker-compose' (jednorazowa migracja)..."
+            docker stop nc-redis-1 2>/dev/null || true
+            docker rm nc-redis-1 2>/dev/null || true
+        fi
+        if ! docker ps --format '{{.Names}}' | grep -q "^nc-redis-1$"; then
+            log_info "Uruchamianie Redis w stacku docker-compose..."
+            docker-compose -f docker-compose/docker-compose.blue-green.yml up -d redis
+            sleep 5
+        fi
+        
+        # 2. web-blue, web-green z --no-deps (nie ciągniemy postgres)
+        log_info "Uruchamianie web-blue i web-green (--no-deps)..."
+        if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps web-blue web-green 2>/dev/null; then
+            log_warning "⚠️ Nie uruchomiono obu web - próbuję tylko nginx-router..."
+        fi
+        
+        # 3. nginx-router z --no-deps
+        if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps nginx-router; then
             log_error "❌ Nie udało się uruchomić NGINX router"
             exit 1
         fi
