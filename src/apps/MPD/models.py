@@ -65,6 +65,23 @@ class Colors(models.Model):
         return str(self.name) if self.name else 'Brak nazwy'
 
 
+class Seasons(models.Model):
+    """Sezon produktu: lato, wiosna, jesień, zima, całoroczny itp."""
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        managed = True
+        db_table = 'seasons'
+        app_label = 'MPD'
+        verbose_name = 'Sezon'
+        verbose_name_plural = 'Sezony'
+        ordering = ['name']
+
+    def __str__(self):
+        return str(self.name) if self.name else f'Sezon {self.id}'
+
+
 class Products(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
@@ -78,6 +95,9 @@ class Products(models.Model):
                                on_delete=models.DO_NOTHING, blank=True, null=True)
     unit = models.ForeignKey(
         'Units', on_delete=models.CASCADE, db_column='unit', to_field='unit_id', null=True, blank=True)
+    season = models.ForeignKey(
+        'Seasons', on_delete=models.SET_NULL, db_column='season_id', null=True, blank=True,
+        related_name='products', verbose_name='Sezon')
     visibility = models.BooleanField(
         default=True, verbose_name='Widoczność w sklepie')
     objects = models.Manager()
