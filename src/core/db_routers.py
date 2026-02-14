@@ -129,6 +129,45 @@ class WebAgentRouter:
         return None
 
 
+class TabuRouter:
+    """
+    Router dla aplikacji tabu - dedykowana baza danych
+    """
+
+    def db_for_read(self, model, **hints):
+        if model._meta.app_label == 'tabu':
+            from django.conf import settings
+            # Development używa zzz_tabu, produkcja tabu
+            if 'zzz_tabu' in settings.DATABASES:
+                return 'zzz_tabu'
+            return 'tabu'
+        return None
+
+    def db_for_write(self, model, **hints):
+        if model._meta.app_label == 'tabu':
+            from django.conf import settings
+            # Development używa zzz_tabu, produkcja tabu
+            if 'zzz_tabu' in settings.DATABASES:
+                return 'zzz_tabu'
+            return 'tabu'
+        return None
+
+    def allow_relation(self, obj1, obj2, **hints):
+        # Zezwalamy na relacje między obiektami z różnych baz danych
+        if obj1._meta.app_label == 'tabu' or obj2._meta.app_label == 'tabu':
+            return True
+        return None
+
+    def allow_migrate(self, db, app_label, model_name=None, **hints):
+        if app_label == 'tabu':
+            from django.conf import settings
+            # Development używa zzz_tabu, produkcja tabu
+            if 'zzz_tabu' in settings.DATABASES:
+                return db == 'zzz_tabu'
+            return db == 'tabu'
+        return None
+
+
 class DefaultRouter:
     """
     Router dla aplikacji systemowych Django (bez web_agent)

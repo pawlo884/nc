@@ -40,6 +40,12 @@ services:
       - PYTHONUNBUFFERED=1
       - DJANGO_DEBUG=1
       - REDIS_PASSWORD=dev_password
+      # Override DB hosts - w Docker łączymy się przez postgres-ssh-tunnel
+      - DEFAULT_DB_HOST=postgres-ssh-tunnel
+      - MPD_DB_HOST=postgres-ssh-tunnel
+      - MATTERHORN1_DB_HOST=postgres-ssh-tunnel
+      - WEB_AGENT_DB_HOST=postgres-ssh-tunnel
+      - TABU_DB_HOST=postgres-ssh-tunnel
     restart: always
     networks:
       - app_network
@@ -102,6 +108,11 @@ services:
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
+      - DEFAULT_DB_HOST=postgres-ssh-tunnel
+      - MPD_DB_HOST=postgres-ssh-tunnel
+      - MATTERHORN1_DB_HOST=postgres-ssh-tunnel
+      - WEB_AGENT_DB_HOST=postgres-ssh-tunnel
+      - TABU_DB_HOST=postgres-ssh-tunnel
     depends_on:
       web:
         condition: service_started
@@ -151,6 +162,11 @@ services:
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
+      - DEFAULT_DB_HOST=postgres-ssh-tunnel
+      - MPD_DB_HOST=postgres-ssh-tunnel
+      - MATTERHORN1_DB_HOST=postgres-ssh-tunnel
+      - WEB_AGENT_DB_HOST=postgres-ssh-tunnel
+      - TABU_DB_HOST=postgres-ssh-tunnel
     depends_on:
       web:
         condition: service_started
@@ -178,7 +194,7 @@ services:
     build:
       context: ..
       dockerfile: deployments/docker/Dockerfile.dev
-    command: ['/bin/bash', '-c', 'celery -A core.celery beat --loglevel=info']
+    command: ['/bin/bash', '-c', 'sleep 30 && celery -A core.celery beat --loglevel=info']
     volumes:
       - ../src:/app
     env_file:
@@ -189,6 +205,11 @@ services:
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
+      - DEFAULT_DB_HOST=postgres-ssh-tunnel
+      - MPD_DB_HOST=postgres-ssh-tunnel
+      - MATTERHORN1_DB_HOST=postgres-ssh-tunnel
+      - WEB_AGENT_DB_HOST=postgres-ssh-tunnel
+      - TABU_DB_HOST=postgres-ssh-tunnel
     depends_on:
       web:
         condition: service_started
@@ -346,20 +367,17 @@ services:
             return 1
           fi
           
-          # Poczekaj aż tunnel się nawiąże
-          sleep 5
-          
-          # Sprawdź czy tunnel działa
-          for i in 1 2 3 4 5; do
+          # Poczekaj aż tunnel się nawiąże (po restarcie Dockera SSH może potrzebować więcej czasu)
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            sleep 3
             if nc -z 127.0.0.1 15434 2>/dev/null; then
               echo "[OK] SSH tunnel dziala na localhost:15434"
               return 0
             fi
-            echo "[INFO] Oczekiwanie na SSH tunnel... ($$i/5)"
-            sleep 2
+            echo "[INFO] Oczekiwanie na SSH tunnel... ($$i/10)"
           done
           
-          echo "[ERROR] SSH tunnel nie dziala po 10 sekundach"
+          echo "[ERROR] SSH tunnel nie dziala po 30 sekundach"
           if [ -f /tmp/ssh_tunnel.pid ]; then
             kill $$(cat /tmp/ssh_tunnel.pid) 2>/dev/null || true
             rm -f /tmp/ssh_tunnel.pid
@@ -420,10 +438,10 @@ services:
       # Zamontuj katalog .ssh z hosta (Windows path - Docker Desktop automatycznie konwertuje)
       # Jeśli nie działa, użyj bezwzględnej ścieżki: /c/Users/pawlo/.ssh:/root/.ssh:ro
       - ${HOME}/.ssh:/root/.ssh:ro
-    # Port nie jest mapowany na hosta - aplikacja w Dockerze łączy się bezpośrednio przez sieć Docker
-    # Jeśli potrzebujesz dostępu z hosta, odkomentuj poniższą linię:
-    # ports:
-    #   - "127.0.0.1:5434:5434"
+    # Port mapowany na hosta - przy lokalnym uruchamianiu (poza Dockerem) użyj localhost:5434
+    # W .env.dev ustaw TABU_DB_HOST=localhost, MPD_DB_HOST=localhost itd. dla lokalnego dostępu
+    ports:
+      - "127.0.0.1:5434:5434"
     networks:
       app_network:
         aliases:

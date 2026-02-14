@@ -14,7 +14,7 @@ import logging
 # Lokalnie: src/core/settings/base.py -> parent.parent.parent.parent = root projektu
 # Sprawdzamy czy jesteśmy w kontenerze (struktura /app/core/) czy lokalnie (src/core/)
 _file_path = Path(__file__).resolve()
-if _file_path.parts[1] == 'app' and _file_path.parts[2] == 'core':
+if len(_file_path.parts) >= 3 and _file_path.parts[1] == 'app' and _file_path.parts[2] == 'core':
     # W kontenerze Docker: /app/core/settings/base.py
     BASE_DIR = _file_path.parent.parent.parent  # /app
 else:
@@ -22,12 +22,18 @@ else:
     BASE_DIR = _file_path.parent.parent.parent.parent  # root projektu
 
 # Load environment variables
-# Sprawdź czy używamy ustawień dev i załaduj odpowiedni plik .env
+# .env.dev może być w BASE_DIR (Docker) lub BASE_DIR.parent (lokalnie, repo root)
+def _find_dotenv(name: str) -> Path:
+    p = BASE_DIR / name
+    if p.exists():
+        return p
+    return BASE_DIR.parent / name
+
 if os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.dev'):
-    load_dotenv('.env.dev')
+    load_dotenv(_find_dotenv('.env.dev'))
 elif os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.prod'):
     # W produkcji Docker ładuje .env.prod przez env_file, ale na wszelki wypadek
-    load_dotenv('.env.prod')
+    load_dotenv(_find_dotenv('.env.prod'))
     load_dotenv()  # Fallback do .env jeśli .env.prod nie istnieje
 else:
     load_dotenv()
@@ -41,6 +47,10 @@ MATTERHORN_API_URL = os.getenv(
 MATTERHORN_API_USERNAME = os.getenv('MATTERHORN_API_USERNAME', '')
 MATTERHORN_API_PASSWORD = os.getenv('MATTERHORN_API_PASSWORD', '')
 MATTERHORN_API_KEY = os.getenv('MATTERHORN_API_KEY', '')
+
+# Tabu API configuration (dokumentacja: https://b2b.tabu.com.pl/api/v1)
+TABU_API_BASE_URL = (os.getenv('TABU_API_BASE_URL') or 'https://b2b.tabu.com.pl/api/v1').strip().rstrip('/')
+TABU_API_KEY = os.getenv('TABU_API_KEY', '')
 
 # Konfiguracja logowania - tylko console logging
 LOGGING = {
@@ -92,6 +102,7 @@ INSTALLED_APPS = [
     'MPD',
     'matterhorn1',
     'web_agent',
+    'tabu',
 ]
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
@@ -119,7 +130,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'src' / 'templates'],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -245,6 +256,24 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
+    'tabu': {
+        'ENGINE': 'core.db_backend',
+        'NAME': os.getenv('TABU_DB_NAME'),
+        'USER': os.getenv('TABU_DB_USER'),
+        'PASSWORD': os.getenv('TABU_DB_PASSWORD'),
+        'HOST': os.getenv('TABU_DB_HOST'),
+        'PORT': os.getenv('TABU_DB_PORT'),
+        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'CONN_MAX_AGE': 0,
+        'OPTIONS': {
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60,  # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5,  # 5 prób
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
+        }
+    },
 }
 
 # Database routers
@@ -252,15 +281,16 @@ DATABASE_ROUTERS = [
     'core.db_routers.MPDRouter',
     'core.db_routers.Matterhorn1Router',
     'core.db_routers.WebAgentRouter',
+    'core.db_routers.TabuRouter',
     'core.db_routers.DefaultRouter',
 ]
 
 # Database retry configuration
 # Konfiguracja automatycznego ponawiania połączeń z bazami danych
 DATABASE_RETRY_CONFIG = {
-    'max_retries': 3,              # Maksymalna liczba prób połączenia
+    'max_retries': 8,              # Maksymalna liczba prób (po restarcie Dockera tunel SSH potrzebuje czasu)
     # Bazowe opóźnienie między próbami (w sekundach)
-    'retry_delay': 2,
+    'retry_delay': 3,
     # Czy używać exponential backoff (2^attempt * delay)
     'retry_backoff': True,
     # Maksymalne opóźnienie między próbami (w sekundach)
@@ -307,8 +337,8 @@ LOCALE_PATHS = [
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
-    BASE_DIR / 'src' / 'static',
-] if os.path.exists(BASE_DIR / 'src' / 'static') else []
+    BASE_DIR / 'static',
+] if os.path.exists(BASE_DIR / 'static') else []
 # STATICFILES_STORAGE - konfigurowany w settings.dev.py i settings.prod.py
 
 # Default primary key field type

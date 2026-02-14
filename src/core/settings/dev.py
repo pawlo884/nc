@@ -9,6 +9,7 @@ DATABASES['zzz_default'] = DATABASES['default'].copy()
 DATABASES['zzz_MPD'] = DATABASES['MPD'].copy()
 DATABASES['zzz_matterhorn1'] = DATABASES['matterhorn1'].copy()
 DATABASES['zzz_web_agent'] = DATABASES['web_agent'].copy()
+DATABASES['zzz_tabu'] = DATABASES['tabu'].copy()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv(
@@ -269,5 +270,11 @@ DATABASES['web_agent']['TEST'] = {
     'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
 }
 DATABASES['zzz_web_agent']['TEST'] = {
+    'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
+}
+DATABASES['tabu']['TEST'] = {
+    'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
+}
+DATABASES['zzz_tabu']['TEST'] = {
     'MIRROR': 'default',  # Użyj tej samej bazy co default dla testów
 }
