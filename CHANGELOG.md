@@ -1,5 +1,17 @@
 # Zmiany
 
+## 1.11.0 (2026-02-14)
+
+* Merge main into feature/tabu - resolve conflicts ([c51f403](https://github.com/pawlo884/nc/commit/c51f403))
+* Merge pull request #26 from pawlo884/feature/tabu ([df5d34a](https://github.com/pawlo884/nc/commit/df5d34a)), closes [#26](https://github.com/pawlo884/nc/issues/26)
+* Tabu: import, sync, periodic tasks, Docker restart resilience ([6e540ba](https://github.com/pawlo884/nc/commit/6e540ba))
+* feat(tabu): add new tabu application with models, admin, serializers and database routing ([d8ef8af](https://github.com/pawlo884/nc/commit/d8ef8af))
+* feat(tabu): import API, sync task, komendy, docs ([c6e7da7](https://github.com/pawlo884/nc/commit/c6e7da7))
+* fix: BASE_DIR dla Docker - poprawne ścieżki plików statycznych ([f1fab87](https://github.com/pawlo884/nc/commit/f1fab87))
+* docs(tabu): baza zzz_tabu, migracje i reguła w django.mdc ([b992a63](https://github.com/pawlo884/nc/commit/b992a63))
+* tabu: komenda test_tabu_connection, ładowanie .env z BASE_DIR, modele i migracje ([8749ebd](https://github.com/pawlo884/nc/commit/8749ebd))
+* style(settings): fix code formatting in base.py ([98d5501](https://github.com/pawlo884/nc/commit/98d5501))
+
 ## <small>1.10.6 (2026-02-03)</small>
 
 * fix(celery): depends_on bez condition: service_healthy – nie blokują w created; doc 502 + cert SSL ([6d2a581](https://github.com/pawlo884/nc/commit/6d2a581))
