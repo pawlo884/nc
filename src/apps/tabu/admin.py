@@ -3,12 +3,15 @@ from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
 from django.http import JsonResponse
 from django.urls import path
+from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db import connections
+from django.utils import timezone
 from django.utils.html import format_html
 
 from .models import Brand, Category, ApiSyncLog, TabuProduct, TabuProductImage, TabuProductVariant, StockHistory
+
 
 logger = logging.getLogger(__name__)
 
@@ -288,8 +291,8 @@ class TabuProductAdmin(admin.ModelAdmin):
 
         return super().change_view(request, object_id, form_url, extra_context)
 
-    @csrf_exempt
-    @require_http_methods(["POST"])
+    @method_decorator(csrf_exempt)
+    @method_decorator(require_http_methods(["POST"]))
     def mpd_create(self, request, product_id):
         """Tworzy nowy produkt w MPD na podstawie danych Tabu i formularza."""
         try:
@@ -301,9 +304,13 @@ class TabuProductAdmin(admin.ModelAdmin):
             return JsonResponse({'success': False, 'error': 'Produkt jest już zmapowany do MPD'}, status=400)
 
         try:
+            from decimal import Decimal
+            from django.utils import timezone
+
             from MPD.models import (
-                Products, Brands, ProductVariants, Colors, ProductPaths,
-                ProductAttribute, ProductFabric, ProductSeries
+                Products, Brands, ProductVariants, Colors, Sizes, Sources,
+                ProductPaths, ProductAttribute, ProductFabric, ProductSeries,
+                ProductvariantsSources, StockAndPrices
             )
 
             # Dane z formularza (fallback na Tabu)
@@ -398,7 +405,13 @@ class TabuProductAdmin(admin.ModelAdmin):
                     defaults={'name': producer_color_name[:50]}
                 )
 
-            # Warianty z Tabu
+            # Źródło Tabu dla ProductvariantsSources (source_id jest wymagane w DB)
+            tabu_source, _ = Sources.objects.using('MPD').get_or_create(
+                name='Tabu API',
+                defaults={'type': 'api', 'location': 'https://b2b.tabu.com.pl'}
+            )
+
+            # Warianty z Tabu (rozmiar, EAN, stan, ceny hurtowe)
             variants = tabu_product.api_variants.all()
             for v in variants:
                 color_obj = main_color if main_color else None
@@ -411,23 +424,69 @@ class TabuProductAdmin(admin.ModelAdmin):
                 if not pc and v.symbol:
                     pc = (v.symbol or '')[:255]
 
-                ProductVariants.objects.using('MPD').create(
+                # Rozmiar z Tabu -> MPD Sizes
+                size_obj = None
+                if v.size:
+                    size_obj, _ = Sizes.objects.using('MPD').get_or_create(
+                        name=v.size[:255],
+                        defaults={'name': v.size[:255]}
+                    )
+
+                pv = ProductVariants.objects.using('MPD').create(
                     product=mpd_product,
                     color=color_obj,
                     producer_color=producer_color,
+                    size=size_obj,
                     producer_code=pc,
                     iai_product_id=v.api_id,
                 )
 
+                # ProductvariantsSources (wymagane dla StockAndPrices - FK variant_id+source_id)
+                pvs, _ = ProductvariantsSources.objects.using('MPD').get_or_create(
+                    variant=pv,
+                    source=tabu_source,
+                    defaults={'ean': v.ean[:50] if v.ean else ''}
+                )
+
+                # Stan magazynowy + ceny hurtowe z Tabu (StockAndPrices)
+                stock_val = v.store if v.store is not None else 0
+                StockAndPrices.objects.using('MPD').get_or_create(
+                    variant=pv,
+                    source=tabu_source,
+                    defaults={
+                        'stock': stock_val,
+                        'price': v.price_net or Decimal('0'),
+                        'currency': 'PLN',
+                        'last_updated': timezone.now(),
+                    }
+                )
+                # Cena detaliczna = moja cena - użytkownik ustawia ręcznie w MPD
+
             # Jeśli brak wariantów - utwórz jeden domyślny
             if not variants:
-                ProductVariants.objects.using('MPD').create(
+                pv = ProductVariants.objects.using('MPD').create(
                     product=mpd_product,
                     color=main_color,
                     producer_color=producer_color,
-                    producer_code=producer_code[:255] or tabu_product.symbol[:255] if tabu_product.symbol else '',
+                    producer_code=producer_code[:255] or (tabu_product.symbol[:255] if tabu_product.symbol else ''),
                     iai_product_id=tabu_product.api_id,
                 )
+                ProductvariantsSources.objects.using('MPD').get_or_create(
+                    variant=pv,
+                    source=tabu_source,
+                    defaults={'ean': tabu_product.ean[:50] if tabu_product.ean else ''}
+                )
+                StockAndPrices.objects.using('MPD').get_or_create(
+                    variant=pv,
+                    source=tabu_source,
+                    defaults={
+                        'stock': tabu_product.store_total or 0,
+                        'price': tabu_product.price_net or Decimal('0'),
+                        'currency': 'PLN',
+                        'last_updated': timezone.now(),
+                    }
+                )
+                # Cena detaliczna = moja cena - użytkownik ustawia ręcznie w MPD
 
             # Zapisz mapowanie w Tabu
             tabu_product.mapped_product_uid = mpd_product.id
