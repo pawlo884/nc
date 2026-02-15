@@ -310,8 +310,9 @@ class TabuProductAdmin(admin.ModelAdmin):
             from MPD.models import (
                 Products, Brands, ProductVariants, Colors, Sizes, Sources,
                 ProductPaths, ProductAttribute, ProductFabric, ProductSeries,
-                ProductvariantsSources, StockAndPrices
+                ProductvariantsSources, StockAndPrices, ProductImage
             )
+            from matterhorn1.defs_db import upload_image_to_bucket_and_get_url
 
             # Dane z formularza (fallback na Tabu)
             name = request.POST.get('mpd_name') or tabu_product.name or 'Produkt z Tabu'
@@ -487,6 +488,29 @@ class TabuProductAdmin(admin.ModelAdmin):
                     }
                 )
                 # Cena detaliczna = moja cena - użytkownik ustawia ręcznie w MPD
+
+            # Zdjęcia z Tabu → MPD (upload do bucketa + ProductImage)
+            images_to_upload = []
+            if tabu_product.image_url and tabu_product.image_url.strip():
+                images_to_upload.append((tabu_product.image_url.strip(), 1))
+            seen_urls = {u for u, _ in images_to_upload}
+            for img in tabu_product.gallery_images.order_by('order', 'api_image_id'):
+                if img.image_url and img.image_url.strip() and img.image_url.strip() not in seen_urls:
+                    images_to_upload.append((img.image_url.strip(), len(images_to_upload) + 1))
+                    seen_urls.add(img.image_url.strip())
+            for idx, (img_url, order_num) in enumerate(images_to_upload, 1):
+                bucket_key = upload_image_to_bucket_and_get_url(
+                    image_path=img_url,
+                    product_id=mpd_product.id,
+                    producer_color_name=producer_color_name or '',
+                    image_number=order_num,
+                )
+                if bucket_key:
+                    ProductImage.objects.using('MPD').get_or_create(
+                        product=mpd_product,
+                        file_path=bucket_key,
+                        defaults={'product': mpd_product, 'file_path': bucket_key}
+                    )
 
             # Zapisz mapowanie w Tabu
             tabu_product.mapped_product_uid = mpd_product.id
