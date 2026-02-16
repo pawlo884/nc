@@ -1,0 +1,234 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+  .tabu-mpd-container { display: flex; width: 100%; height: calc(100vh - 200px); margin-top: 20px; position: relative; }
+  .tabu-mpd-column { padding: 20px; overflow: auto; }
+  .tabu-mpd-left { flex: 1; border-right: 1px solid #ccc; }
+  .tabu-mpd-right { flex: 1; background-color: #f8f8f8; transition: all 0.3s ease; }
+  .tabu-mpd-right.collapsed { flex: 0; padding: 0; overflow: hidden; }
+  .tabu-mpd-toggle { position: absolute; right: -40px; top: 50%; transform: translateY(-50%); background-color: #417690; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; z-index: 1000; font-size: 16px; }
+  .tabu-mpd-toggle:hover { background-color: #295270; }
+  .tabu-mpd-form h2 { margin-bottom: 12px; color: #417690; font-size: 14px; }
+  .tabu-mpd-form .form-row { margin-bottom: 10px; }
+  .tabu-mpd-form label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px; color: #555; }
+  .tabu-mpd-form input, .tabu-mpd-form textarea, .tabu-mpd-form select { width: 100%; padding: 4px; border: 1px solid #ccc; border-radius: 2px; font-size: 11px; }
+  .tabu-mpd-form textarea { height: 60px; resize: vertical; }
+  .tabu-mpd-form .btn-save { margin-top: 3px; background: #28a745; color: white; border: none; padding: 3px 6px; border-radius: 2px; cursor: pointer; font-size: 10px; }
+  .tabu-mpd-status { margin-top: 15px; padding: 10px; border-radius: 4px; }
+  .tabu-mpd-status.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+  .tabu-mpd-status.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  .tabu-mpd-btn { margin-top: 20px; background: #417690; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+  .tabu-mpd-btn:hover { background: #295270; }
+  .tabu-mpd-link { color: #417690; font-weight: bold; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tabu-mpd-container">
+  <div class="tabu-mpd-column tabu-mpd-left">{{ block.super }}</div>
+  <div class="tabu-mpd-column tabu-mpd-right">
+    <div class="tabu-mpd-form">
+      <h2>Dane MPD</h2>
+      <div id="tabu-mpd-status" class="tabu-mpd-status" style="display: none;"></div>
+
+      <form id="tabu-mpd-form">
+        {% csrf_token %}
+        <input type="hidden" name="product_id" value="{{ original.id }}" />
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px">
+          <div class="form-row">
+            <label for="mpd_name">Nazwa:</label>
+            <input type="text" id="mpd_name" name="mpd_name" value="{{ original.name|default:'' }}" />
+          </div>
+          <div class="form-row">
+            <label for="mpd_short_description">Krótki opis:</label>
+            <textarea id="mpd_short_description" name="mpd_short_description" style="height:35px">{{ mpd_data.short_description|default:original.desc_short|default:'' }}</textarea>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="mpd_description">Opis:</label>
+          <textarea id="mpd_description" name="mpd_description">{{ mpd_data.description|default:original.desc_long|default:'' }}</textarea>
+        </div>
+
+        <div class="form-row">
+          <label for="mpd_attributes">Atrybuty:</label>
+          <select multiple name="mpd_attributes" id="mpd_attributes" size="8" style="font-size:10px">
+            {% for attr in mpd_attributes %}
+            <option value="{{ attr.id }}" {% if attr.id in selected_attributes %}selected{% endif %}>{{ attr.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px">
+          <div class="form-row">
+            <label for="mpd_brand">Marka:</label>
+            <select id="mpd_brand" name="mpd_brand">
+              <option value="">-- wybierz markę --</option>
+              {% for brand in mpd_brands %}
+              <option value="{{ brand.name }}" {% if brand.name == original.brand.name %}selected{% endif %}>{{ brand.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="mpd_size_category">Grupa rozmiarowa:</label>
+            <select id="mpd_size_category" name="mpd_size_category">
+              <option value="">-- wybierz grupę --</option>
+              {% for cat in size_categories %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px">
+          <div class="form-row">
+            <label for="main_color_id">Główny kolor:</label>
+            <select id="main_color_id" name="main_color_id">
+              <option value="">-- wybierz kolor --</option>
+              {% for color in main_colors %}
+              <option value="{{ color.id }}">{{ color.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="producer_color_name">Kolor producenta:</label>
+            <input type="text" id="producer_color_name" name="producer_color_name" value="{{ producer_color_name|default:'' }}" list="producer_colors_list" placeholder="Kolor prod." />
+            <datalist id="producer_colors_list">
+              {% for color in producer_colors %}
+              <option value="{{ color.name }}">{{ color.name }}</option>
+              {% endfor %}
+            </datalist>
+          </div>
+          <div class="form-row">
+            <label for="producer_code">Kod producenta:</label>
+            <input type="text" id="producer_code" name="producer_code" value="{{ producer_code|default:'' }}" placeholder="Kod" />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; margin-bottom: 10px">
+          <div class="form-row">
+            <label for="series_name">Nazwa serii:</label>
+            <input type="text" id="series_name" name="series_name" value="{{ series_name|default:'' }}" placeholder="Nazwa serii" />
+          </div>
+          <div class="form-row">
+            <label for="mpd_paths">Ścieżki produktu:</label>
+            <select id="mpd_paths" name="mpd_paths" multiple size="8" style="font-size:10px">
+              {% for path in mpd_paths %}
+              <option value="{{ path.id }}" {% if path.id in selected_paths %}selected{% endif %}>{{ path.name }} ({{ path.path }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="unit_id">Jednostka:</label>
+            <select id="unit_id" name="unit_id">
+              <option value="">-- wybierz jednostkę --</option>
+              {% for unit in units %}
+              <option value="{{ unit.id }}" {% if unit.id == selected_unit_id %}selected{% endif %}>{{ unit.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row" id="fabric-section">
+          <label>Skład (materiały):</label>
+          <div id="fabric-list">
+            <div class="fabric-row" style="display:flex;gap:10px;align-items:center;margin-bottom:5px">
+              <select name="fabric_component[]">
+                <option value="">-- wybierz materiał --</option>
+                {% for fabric in fabric_components %}
+                <option value="{{ fabric.id }}">{{ fabric.name }}</option>
+                {% endfor %}
+              </select>
+              <input type="number" name="fabric_percentage[]" min="0" max="100" placeholder="%" style="width:60px" />
+              <button type="button" onclick="this.closest('.fabric-row').remove()">Usuń</button>
+            </div>
+          </div>
+          <button type="button" onclick="addFabricRow()" style="margin-top:5px;font-size:11px">Dodaj materiał</button>
+        </div>
+
+        {% if is_mapped %}
+        <div class="form-row" style="margin-top:15px">
+          <b>ID w MPD:</b> {{ original.mapped_product_uid }}
+          <br><a href="/admin/MPD/products/{{ original.mapped_product_uid }}/change/" target="_blank" class="tabu-mpd-link">Otwórz produkt w MPD →</a>
+        </div>
+        {% endif %}
+      </form>
+
+      {% if not is_mapped %}
+      <button type="button" id="tabu-create-mpd-btn" class="tabu-mpd-btn">Utwórz nowy produkt w MPD</button>
+      {% endif %}
+    </div>
+  </div>
+  <button class="tabu-mpd-toggle" type="button">{% if is_mapped %}◀{% else %}▶{% endif %}</button>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const toggleBtn = document.querySelector('.tabu-mpd-toggle');
+  const rightCol = document.querySelector('.tabu-mpd-right');
+  if (toggleBtn && rightCol) {
+    toggleBtn.addEventListener('click', function() {
+      rightCol.classList.toggle('collapsed');
+      toggleBtn.textContent = rightCol.classList.contains('collapsed') ? '▶' : '◀';
+    });
+  }
+
+  function addFabricRow() {
+    const list = document.getElementById('fabric-list');
+    const first = list.querySelector('.fabric-row');
+    const tpl = first ? first.cloneNode(true) : null;
+    if (tpl) {
+      tpl.querySelectorAll('select, input').forEach(function(el) { el.value = ''; });
+      list.appendChild(tpl);
+    }
+  }
+
+  window.addFabricRow = addFabricRow;
+
+  const createBtn = document.getElementById('tabu-create-mpd-btn');
+  if (createBtn) {
+    createBtn.addEventListener('click', function() {
+      const form = document.getElementById('tabu-mpd-form');
+      const formData = new FormData(form);
+      formData.append('mpd_name', document.getElementById('mpd_name').value);
+      formData.append('mpd_short_description', document.getElementById('mpd_short_description').value);
+      formData.append('mpd_description', document.getElementById('mpd_description').value);
+      formData.append('mpd_brand', document.getElementById('mpd_brand').value);
+      formData.append('mpd_size_category', document.getElementById('mpd_size_category').value);
+      formData.append('main_color_id', document.getElementById('main_color_id').value);
+      formData.append('producer_color_name', document.getElementById('producer_color_name').value);
+      formData.append('producer_code', document.getElementById('producer_code').value);
+      formData.append('series_name', document.getElementById('series_name').value);
+      formData.append('unit_id', document.getElementById('unit_id').value);
+      Array.from(document.getElementById('mpd_paths').selectedOptions).forEach(function(o) { formData.append('mpd_paths', o.value); });
+      Array.from(document.getElementById('mpd_attributes').selectedOptions).forEach(function(o) { formData.append('mpd_attributes', o.value); });
+
+      const statusEl = document.getElementById('tabu-mpd-status');
+      statusEl.style.display = 'block';
+      statusEl.className = 'tabu-mpd-status';
+      statusEl.textContent = 'Tworzenie produktu w MPD...';
+
+      fetch('/admin/tabu/tabuproduct/mpd-create/{{ original.id }}/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value },
+        body: formData
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        statusEl.className = 'tabu-mpd-status ' + (data.success ? 'success' : 'error');
+        statusEl.textContent = data.message || data.error || 'Wystąpił błąd.';
+        if (data.success) setTimeout(function() { window.location.reload(); }, 1500);
+      })
+      .catch(function(err) {
+        statusEl.className = 'tabu-mpd-status error';
+        statusEl.textContent = 'Błąd: ' + (err.message || 'Nie udało się utworzyć produktu.');
+      });
+    });
+  }
+});
+</script>
+{% endblock %}

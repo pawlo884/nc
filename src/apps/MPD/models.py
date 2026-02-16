@@ -365,7 +365,7 @@ class ProductSeries(models.Model):
 
 
 class StockAndPrices(models.Model):
-    id = models.BigIntegerField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)
     variant = models.ForeignKey(
         ProductVariants, on_delete=models.CASCADE, db_column='variant_id', to_field='variant_id')
     source = models.ForeignKey(

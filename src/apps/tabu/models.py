@@ -177,6 +177,13 @@ class TabuProduct(models.Model):
 
     raw_data = models.JSONField(default=dict, blank=True)
 
+    # Mapowanie do MPD
+    mapped_product_uid = models.IntegerField(
+        null=True, blank=True,
+        help_text='ID produktu w bazie MPD',
+        db_index=True
+    )
+
     class Meta:
         db_table = 'tabu_product_detail'
         verbose_name = 'Tabu produkt (szczegóły)'
