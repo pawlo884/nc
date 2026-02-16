@@ -688,7 +688,6 @@ class ProductsAdmin(admin.ModelAdmin):
             color = v.color.name if v.color else "-"
             producer_color = v.producer_color.name if v.producer_color else "-"
             size = v.size.name if v.size else "-"
-            producer_code = v.producer_code or "-"
             sources = sources_map.get(v.variant_id, [])
             sources_names = []
             eans = []
@@ -704,14 +703,21 @@ class ProductsAdmin(admin.ModelAdmin):
             sources_display = "<br>".join(
                 sources_names) if sources_names else "-"
             eans_display = "<br>".join(eans) if eans else "-"
-            key = (color, producer_color, size, producer_code,
-                   sources_display, eans_display)
+            # Grupowanie po EAN – ten sam EAN = ten sam produkt (bez sources_display)
+            canonical_ean = "|".join(sorted(set(e for e in eans if e and e != '-'))) or "-"
+            key = (color, producer_color, size, canonical_ean)
             if key not in grouped:
                 grouped[key] = []
-            grouped[key].append(v.variant_id)
+            grouped[key].append((v.variant_id, sources_display, eans_display))
+        cell_style = "border:1px solid #ccc;padding:2px 6px;vertical-align:middle;"
         html = "<table style='border-collapse:collapse;'>"
-        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kod producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Ceny</th><th style='border:1px solid #ccc;padding:2px 6px;'>Cena detaliczna</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
-        for (color, producer_color, size, producer_code, sources_display, eans_display), variant_ids in grouped.items():
+        html += f"<tr><th style='{cell_style}'>Kolor</th><th style='{cell_style}'>Kolor producenta</th><th style='{cell_style}'>Rozmiar</th><th style='{cell_style}'>Kod producenta</th><th style='{cell_style}'>Stan (suma)</th><th style='{cell_style}'>Ceny</th><th style='{cell_style}'>Cena detaliczna</th><th style='{cell_style}'>Źródła</th><th style='{cell_style}'>EAN</th></tr>"
+        for (color, producer_color, size, canonical_ean), group_items in grouped.items():
+            variant_ids = [item[0] for item in group_items]
+            sources_display = "<br>".join(
+                item[1] for item in group_items if item[1] and item[1] != "-"
+            ) or "-"
+            eans_display = group_items[0][2] if group_items else "-"
             # Zsumuj stock i pobierz ceny dla wszystkich variant_id
             total_stock = 0
             prices = []
@@ -739,9 +745,9 @@ class ProductsAdmin(admin.ModelAdmin):
                         f'<input type="text" value="{current_code}" data-variant-id="{variant_id}" class="producer-code-input" style="width:100%;border:1px solid #ccc;padding:2px;" onchange="updateProducerCode({variant_id}, this.value)">')
 
             producer_code_cell = "<br>".join(
-                producer_code_inputs) if producer_code_inputs else producer_code
+                producer_code_inputs) if producer_code_inputs else "-"
 
-            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_code_cell}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{prices_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{retail_price_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_display}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{eans_display}</td></tr>"
+            html += f"<tr><td style='{cell_style}'>{color}</td><td style='{cell_style}'>{producer_color}</td><td style='{cell_style}'>{size}</td><td style='{cell_style}'>{producer_code_cell}</td><td style='{cell_style}'>{total_stock}</td><td style='{cell_style}'>{prices_str}</td><td style='{cell_style}'>{retail_price_str}</td><td style='{cell_style}'>{sources_display}</td><td style='{cell_style}'>{eans_display}</td></tr>"
         html += "</table>"
 
         # Dodaj JavaScript do obsługi aktualizacji kodów producenta
