@@ -97,6 +97,14 @@ def create_mpd_variants(mpd_product_id: int, matterhorn_product_id: int, size_ca
                     f"Brak wariantów dla produktu {matterhorn_product_id}")
                 return {"created_variants": 0, "iai_product_id": iai_product_id}
 
+            # Pobierz source_id dla Matterhorn
+            mpd_cursor.execute(
+                "SELECT id FROM sources WHERE name ILIKE %s LIMIT 1",
+                ['%matterhorn%']
+            )
+            mh_source_row = mpd_cursor.fetchone()
+            mh_source_id = mh_source_row[0] if mh_source_row else 2
+
             created_count = 0
             variant_ids = []
 
@@ -111,53 +119,78 @@ def create_mpd_variants(mpd_product_id: int, matterhorn_product_id: int, size_ca
                     continue
                 size_id = size_result[0]
 
-                # Sprawdź czy wariant już istnieje
+                # Sprawdź czy wariant już istnieje (variant_uid + source)
                 mpd_cursor.execute("""
                     SELECT variant_id FROM product_variants_sources 
                     WHERE variant_uid = %s AND source_id = %s
-                """, [variant_uid, 2])
+                """, [variant_uid, mh_source_id])
                 existing = mpd_cursor.fetchone()
                 if existing:
                     logger.info(
                         f"Wariant {variant_uid} już istnieje - pomijam")
                     continue
 
-                # Wygeneruj nowy variant_id
-                mpd_cursor.execute(
-                    "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
-                row = mpd_cursor.fetchone()
-                variant_id = row[0] if row else 1
-
-                # Utwórz wariant
-                logger.info(
-                    f"🔧 Tworzę wariant {variant_id}: producer_color_id={producer_color_id}, producer_code='{producer_code}'")
-                if producer_color_id:
+                # Sprawdź czy istnieje wariant z tym EAN (z innej hurtowni) - dopnij zamiast tworzyć
+                variant_id = None
+                if ean and str(ean).strip():
                     mpd_cursor.execute("""
-                        INSERT INTO product_variants 
-                        (variant_id, product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-                    """, [variant_id, mpd_product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id])
+                        SELECT pvs.variant_id FROM product_variants_sources pvs
+                        JOIN product_variants pv ON pv.variant_id = pvs.variant_id
+                        WHERE pvs.ean = %s AND pv.product_id = %s AND pvs.source_id != %s
+                    """, [str(ean).strip(), mpd_product_id, mh_source_id])
+                    existing_by_ean = mpd_cursor.fetchone()
+                    if existing_by_ean:
+                        variant_id = existing_by_ean[0]
+                        logger.info(
+                            f"Znaleziono wariant po EAN {ean} (variant_id={variant_id}) - dopinam Matterhorn"
+                        )
+
+                if variant_id is None:
+                    # Wygeneruj nowy variant_id
+                    mpd_cursor.execute(
+                        "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
+                    row = mpd_cursor.fetchone()
+                    variant_id = row[0] if row else 1
+
+                    # Utwórz wariant
                     logger.info(
-                        f"✅ Utworzono wariant z producer_color_id={producer_color_id}")
-                else:
+                        f"🔧 Tworzę wariant {variant_id}: producer_color_id={producer_color_id}, producer_code='{producer_code}'")
+                    if producer_color_id:
+                        mpd_cursor.execute("""
+                            INSERT INTO product_variants 
+                            (variant_id, product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                        """, [variant_id, mpd_product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id])
+                        logger.info(
+                            f"✅ Utworzono wariant z producer_color_id={producer_color_id}")
+                    else:
+                        mpd_cursor.execute("""
+                            INSERT INTO product_variants 
+                            (variant_id, product_id, color_id, size_id, producer_code, iai_product_id, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                        """, [variant_id, mpd_product_id, color_id, size_id, producer_code, iai_product_id])
+                        logger.info(f"⚠️ Utworzono wariant BEZ producer_color_id")
+
+                # Dodaj do product_variants_sources (jeśli nie istnieje)
+                mpd_cursor.execute("""
+                    SELECT 1 FROM product_variants_sources 
+                    WHERE variant_id = %s AND source_id = %s
+                """, [variant_id, mh_source_id])
+                if not mpd_cursor.fetchone():
                     mpd_cursor.execute("""
-                        INSERT INTO product_variants 
-                        (variant_id, product_id, color_id, size_id, producer_code, iai_product_id, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                    """, [variant_id, mpd_product_id, color_id, size_id, producer_code, iai_product_id])
-                    logger.info(f"⚠️ Utworzono wariant BEZ producer_color_id")
+                        INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id)
+                        VALUES (%s, %s, %s, %s)
+                    """, [variant_id, ean, variant_uid, mh_source_id])
 
-                # Dodaj do product_variants_sources
+                # Dodaj stock_and_prices (jeśli nie istnieje)
                 mpd_cursor.execute("""
-                    INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id)
-                    VALUES (%s, %s, %s, %s)
-                """, [variant_id, ean, variant_uid, 2])
-
-                # Dodaj stock_and_prices
-                mpd_cursor.execute("""
-                    INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
-                    VALUES (%s, %s, %s, %s, 'PLN')
-                """, [variant_id, 2, stock, product_price])
+                    SELECT 1 FROM stock_and_prices WHERE variant_id = %s AND source_id = %s
+                """, [variant_id, mh_source_id])
+                if not mpd_cursor.fetchone():
+                    mpd_cursor.execute("""
+                        INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
+                        VALUES (%s, %s, %s, %s, 'PLN')
+                    """, [variant_id, mh_source_id, stock, product_price])
 
                 # Zaktualizuj mapped_variant_uid w matterhorn1
                 mh_cursor.execute("""

@@ -89,6 +89,31 @@ def export_full_change_xml_full(self):
         }
 
 
+@shared_task(name='MPD.tasks.link_variants_from_other_sources')
+def link_variants_from_other_sources_task(mpd_product_id: int, current_source_id: int):
+    """
+    Asynchroniczne dopinanie wariantów z innych hurtowni po EAN.
+    Uruchamiane po dodaniu produktu do MPD (Tabu/Matterhorn) - nie blokuje głównego flow.
+    """
+    from MPD.source_adapters import link_variants_from_other_sources
+
+    logger.info(
+        "🚀 Task link_variants_from_other_sources: mpd_product_id=%s, current_source_id=%s",
+        mpd_product_id, current_source_id
+    )
+    try:
+        stats = link_variants_from_other_sources(mpd_product_id, current_source_id)
+        if stats.get('linked_count'):
+            logger.info(
+                "✅ Dopięto %s wariantów z innych hurtowni do produktu MPD %s",
+                stats['linked_count'], mpd_product_id
+            )
+        return {'status': 'success', 'stats': stats}
+    except Exception as e:
+        logger.exception("Błąd link_variants_from_other_sources: %s", e)
+        raise
+
+
 @shared_task(bind=True, name='MPD.tasks.track_recent_stock_changes')
 def track_recent_stock_changes(self):
     """

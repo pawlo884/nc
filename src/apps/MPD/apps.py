@@ -7,3 +7,5 @@ class MdpConfig(AppConfig):
 
     def ready(self):
         import MPD.signals  # noqa
+        from MPD.source_adapters.registry import register_default_adapters
+        register_default_adapters()

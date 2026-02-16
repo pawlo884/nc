@@ -923,6 +923,26 @@ class ProductAdmin(admin.ModelAdmin):
                     except Exception as e:
                         logger.error(f"Błąd podczas uploadu zdjęć: {e}")
                         mapping_info['upload_error'] = str(e)
+
+                    # Dopnij warianty z pozostałych hurtowni (po EAN) - asynchronicznie (Celery)
+                    try:
+                        from django.conf import settings
+                        from MPD.tasks import link_variants_from_other_sources_task
+                        from MPD.models import Sources
+                        mpd_db = 'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD'
+                        mh_source = Sources.objects.using(mpd_db).filter(
+                            name__icontains='matterhorn'
+                        ).first()
+                        if mh_source:
+                            link_variants_from_other_sources_task.delay(
+                                mpd_product_id, mh_source.id
+                            )
+                            logger.info(
+                                "Zadanie dopinania wariantów (EAN) do produktu MPD %s wysłane do kolejki",
+                                mpd_product_id
+                            )
+                    except Exception as link_err:
+                        logger.warning("Wysłanie tasku linkowania wariantów: %s", link_err)
                 else:
                     mapping_info = {
                         'error': 'Brak kategorii rozmiarowej w MPD'}

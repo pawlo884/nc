@@ -516,6 +516,19 @@ class TabuProductAdmin(admin.ModelAdmin):
             tabu_product.mapped_product_uid = mpd_product.id
             tabu_product.save(update_fields=['mapped_product_uid'])
 
+            # Dopnij warianty z pozostałych hurtowni (po EAN) - asynchronicznie (Celery)
+            try:
+                from MPD.tasks import link_variants_from_other_sources_task
+                link_variants_from_other_sources_task.delay(
+                    mpd_product.id, tabu_source.id
+                )
+                logger.info(
+                    "Zadanie dopinania wariantów (EAN) do produktu MPD %s wysłane do kolejki",
+                    mpd_product.id
+                )
+            except Exception as link_err:
+                logger.warning("Wysłanie tasku linkowania wariantów: %s", link_err)
+
             logger.info("Utworzono produkt MPD %s z Tabu produktu %s", mpd_product.id, product_id)
             return JsonResponse({
                 'success': True,
