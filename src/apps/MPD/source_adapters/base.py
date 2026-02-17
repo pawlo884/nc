@@ -7,6 +7,12 @@ from decimal import Decimal
 from typing import List, Optional
 
 
+def normalize_ean(ean: str) -> str:
+    """Normalizuje EAN do porównań (strip + lowercase)."""
+    e = (ean or '').strip()
+    return e.lower() if e else ''
+
+
 @dataclass
 class VariantMatch:
     """Dopasowany wariant z hurtowni do dodania do MPD."""
@@ -17,6 +23,7 @@ class VariantMatch:
     currency: str = 'PLN'
     size: Optional[str] = None
     color: Optional[str] = None
+    source_product_id: Optional[int] = None  # ID produktu w hurtowni (do ustawienia mapped_product_uid)
 
 
 class SourceAdapter(ABC):

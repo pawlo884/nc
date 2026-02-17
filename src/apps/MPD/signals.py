@@ -1,12 +1,22 @@
 from django.dispatch import receiver
-from django.db.models.signals import post_delete, pre_delete, pre_save
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.db import connections
-from .models import Products, ProductVariants, ProductVariantsRetailPrice
+from .models import Products, ProductVariants, ProductVariantsRetailPrice, ProductvariantsSources, Sources
 import logging
 import traceback
 from matterhorn1.defs_db import delete_product_folder_from_bucket
 
 logger = logging.getLogger('MPD')
+
+
+def _get_connections_db():
+    """Aliasy połączeń - dev używa zzz_, prod nie."""
+    from django.conf import settings
+    return (
+        'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD',
+        'zzz_matterhorn1' if 'zzz_matterhorn1' in settings.DATABASES else 'matterhorn1',
+        'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu',
+    )
 
 
 '''
@@ -45,19 +55,18 @@ def remove_variants_mapping_in_matterhorn(sender, instance, using, **kwargs):
 
 @receiver(pre_delete, sender=Products)
 def capture_variant_ids(sender, instance, using=None, **kwargs):
-    # Sprawdź czy to produkt z bazy MPD
+    mpd_db = _get_connections_db()[0]
     db = using or getattr(instance, '_state', {}).db or 'default'
-    if db != 'MPD' and 'MPD' not in str(db):
+    if db != mpd_db and 'MPD' not in str(db):
         try:
-            # Sprawdź czy produkt istnieje w bazie MPD
-            Products.objects.using('MPD').get(id=instance.id)
-            db = 'MPD'
+            Products.objects.using(mpd_db).get(id=instance.id)
+            db = mpd_db
         except (Products.DoesNotExist, Exception):
             return
     
     try:
         # Pobranie variant_id PRZED usunięciem produktu
-        with connections['MPD'].cursor() as master_cursor:
+        with connections[mpd_db].cursor() as master_cursor:
             master_cursor.execute(
                 """
                 SELECT variant_id FROM product_variants
@@ -78,12 +87,12 @@ def capture_variant_ids(sender, instance, using=None, **kwargs):
 def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
     # Sprawdź czy to produkt z bazy MPD - sprawdź using lub _state.db
     db = using or getattr(instance, '_state', {}).db or 'default'
-    if db != 'MPD' and 'MPD' not in str(db):
-        # Sprawdź czy instancja pochodzi z bazy MPD przez sprawdzenie czy istnieje w MPD
+    mpd_db, mh_db, tabu_db = _get_connections_db()
+    if db != mpd_db and 'MPD' not in str(db):
+        # Sprawdź czy instancja pochodzi z bazy MPD
         try:
-            # Próbuj znaleźć produkt w bazie MPD
-            Products.objects.using('MPD').get(id=instance.id)
-            db = 'MPD'
+            Products.objects.using(mpd_db).get(id=instance.id)
+            db = mpd_db
         except (Products.DoesNotExist, Exception):
             logger.debug(f"Produkt {instance.id} nie jest z bazy MPD, pomijam signal")
             return
@@ -96,7 +105,7 @@ def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
         variant_ids = []
         if not hasattr(instance, 'variant_ids') or not instance.variant_ids:
             try:
-                with connections['MPD'].cursor() as cursor:
+                with connections[mpd_db].cursor() as cursor:
                     cursor.execute(
                         """
                         SELECT variant_id FROM product_variants
@@ -110,7 +119,7 @@ def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
             variant_ids = instance.variant_ids
 
         # Usunięcie produktu z tabeli products w matterhorn1
-        with connections['matterhorn1'].cursor() as cursor:
+        with connections[mh_db].cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE product 
@@ -126,7 +135,7 @@ def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
 
         # Usunięcie wartości variant_id z mapped_variant_uid w tabeli product_variants w matterhorn1
         if variant_ids:
-            with connections['matterhorn1'].cursor() as cursor:
+            with connections[mh_db].cursor() as cursor:
                 placeholders = ', '.join(['%s'] * len(variant_ids))
                 cursor.execute(f"""
                     UPDATE productvariant
@@ -143,7 +152,6 @@ def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
 
         # Usunięcie mapped_product_uid w Tabu (tabu_product_detail)
         from django.conf import settings
-        tabu_db = 'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu'
         if tabu_db in settings.DATABASES:
             try:
                 with connections[tabu_db].cursor() as cursor:
@@ -173,13 +181,12 @@ def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
 
 @receiver(pre_delete, sender=Products)
 def product_pre_delete(sender, instance, using=None, **kwargs):
-    # Sprawdź czy to produkt z bazy MPD
+    mpd_db = _get_connections_db()[0]
     db = using or getattr(instance, '_state', {}).db or 'default'
-    if db != 'MPD' and 'MPD' not in str(db):
+    if db != mpd_db and 'MPD' not in str(db):
         try:
-            # Sprawdź czy produkt istnieje w bazie MPD
-            Products.objects.using('MPD').get(id=instance.id)
-            db = 'MPD'
+            Products.objects.using(mpd_db).get(id=instance.id)
+            db = mpd_db
         except (Products.DoesNotExist, Exception):
             return
     
@@ -189,15 +196,13 @@ def product_pre_delete(sender, instance, using=None, **kwargs):
 
 @receiver(post_delete, sender=Products)
 def product_post_delete(sender, instance, using=None, **kwargs):
-    # Sprawdź czy to produkt z bazy MPD
+    mpd_db = _get_connections_db()[0]
     db = using or getattr(instance, '_state', {}).db or 'default'
-    if db != 'MPD' and 'MPD' not in str(db):
+    if db != mpd_db and 'MPD' not in str(db):
         try:
-            # Sprawdź czy produkt istnieje w bazie MPD (jeśli jeszcze istnieje)
-            Products.objects.using('MPD').get(id=instance.id)
-            db = 'MPD'
+            Products.objects.using(mpd_db).get(id=instance.id)
+            db = mpd_db
         except (Products.DoesNotExist, Exception):
-            # Produkt już usunięty lub nie z bazy MPD
             return
     
     message = f"Po usunięciu produktu MPD: {instance.id} - {instance.name}"
@@ -213,7 +218,8 @@ def product_post_delete(sender, instance, using=None, **kwargs):
 @receiver(pre_save, sender=Products)
 def update_product_timestamp(sender, instance, using, **kwargs):
     """Automatycznie aktualizuje updated_at przy każdym zapisie produktu"""
-    if using == 'MPD':
+    mpd_db = _get_connections_db()[0]
+    if using == mpd_db:
         from django.utils import timezone
         instance.updated_at = timezone.now()
 
@@ -221,7 +227,8 @@ def update_product_timestamp(sender, instance, using, **kwargs):
 @receiver(pre_save, sender=ProductVariants)
 def update_product_variant_timestamp(sender, instance, using, **kwargs):
     """Automatycznie aktualizuje updated_at przy każdym zapisie wariantu produktu"""
-    if using == 'MPD':
+    mpd_db = _get_connections_db()[0]
+    if using == mpd_db:
         from django.utils import timezone
         instance.updated_at = timezone.now()
 
@@ -229,6 +236,60 @@ def update_product_variant_timestamp(sender, instance, using, **kwargs):
 @receiver(pre_save, sender=ProductVariantsRetailPrice)
 def update_retail_price_timestamp(sender, instance, using, **kwargs):
     """Automatycznie aktualizuje updated_at przy każdym zapisie ceny detalicznej"""
-    if using == 'MPD':
+    mpd_db = _get_connections_db()[0]
+    if using == mpd_db:
         from django.utils import timezone
         instance.updated_at = timezone.now()
+
+
+@receiver(post_save, sender=ProductvariantsSources)
+def on_productvariants_sources_created(sender, instance, created, using=None, **kwargs):
+    """
+    Centralne wywołanie tasku linkowania wariantów po EAN.
+    Przy dodaniu źródła do wariantu (ProductvariantsSources) - dopnij warianty z innych hurtowni.
+    Działa dla wszystkich hurtowni (Tabu, Matterhorn, przyszłe) - jedno miejsce w MPD.
+    """
+    if not created:
+        return
+    mpd_db = _get_connections_db()[0]
+    db = using or getattr(instance, '_state', {}).db or 'default'
+    if db != mpd_db and 'MPD' not in str(db):
+        return
+    if not instance.source_id:
+        return
+    try:
+        mpd_product_id = instance.variant.product_id
+        current_source_id = instance.source_id
+        from MPD.tasks import link_variants_from_other_sources_task
+        link_variants_from_other_sources_task.delay(mpd_product_id, current_source_id)
+        logger.info(
+            "ProductvariantsSources utworzony - task linkowania MPD %s (exclude source %s)",
+            mpd_product_id, current_source_id
+        )
+    except Exception as e:
+        logger.warning("Błąd uruchomienia tasku linkowania dla MPD %s: %s", getattr(instance.variant, 'product_id', '?'), e)
+
+
+@receiver(post_save, sender=Sources)
+def on_new_source_created(sender, instance, created, using=None, **kwargs):
+    """
+    Automatyczne dopinanie wariantów z nowej hurtowni do MPD (po EAN).
+    Uruchamiane przy dodaniu nowego źródła (Sources) - tylko gdy istnieje adapter.
+    """
+    if not created:
+        return
+    mpd_db = _get_connections_db()[0]
+    db = using or getattr(instance, '_state', {}).db or 'default'
+    if db != mpd_db and 'MPD' not in str(db):
+        return
+    try:
+        from MPD.source_adapters.registry import get_adapter_for_source
+        from MPD.tasks import link_all_products_to_new_source_task
+        if get_adapter_for_source(instance.id):
+            link_all_products_to_new_source_task.delay(instance.id)
+            logger.info(
+                "Nowe źródło %s (id=%s) - wysłano task dopinania wariantów po EAN",
+                instance.name, instance.id
+            )
+    except Exception as e:
+        logger.warning("Błąd uruchomienia tasku dla nowego źródła %s: %s", instance.id, e)

@@ -116,6 +116,7 @@ DEBUG_TOOLBAR_CONFIG = {
     'SHOW_TEMPLATE_CONTEXT': True,
     'ENABLE_STACKTRACES': True,
     'SQL_WARNING_THRESHOLD': 500,  # milliseconds
+    'IS_RUNNING_TESTS': False,  # bypass debug toolbar check during manage.py test
 }
 
 # CORS Configuration

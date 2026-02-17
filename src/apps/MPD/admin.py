@@ -1038,9 +1038,24 @@ class SourceAdmin(admin.ModelAdmin):
               'email', 'tel', 'fax', 'www', 'street', 'zipcode', 'city', 'country', 'province']
     list_display = ['id', 'name', 'location', 'type']
     search_fields = ['name']
+    actions = ['link_products_from_source']
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
+
+    @admin.action(description='Linkuj produkty z tej hurtowni (po EAN)')
+    def link_products_from_source(self, request, queryset):
+        from .tasks import link_all_products_to_new_source_task
+        from .source_adapters.registry import get_adapter_for_source
+        queued = 0
+        for source in queryset:
+            if get_adapter_for_source(source.id):
+                link_all_products_to_new_source_task.delay(source.id)
+                queued += 1
+        self.message_user(
+            request,
+            f'Wysłano {queued} zadań do kolejki (dopinanie wariantów po EAN).'
+        )
 
 
 @admin.register(ProductSet)

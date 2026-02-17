@@ -1,265 +1,291 @@
 """
 Funkcje pomocnicze dla tworzenia wariantów w Sadze
 """
+import json
 import logging
+from decimal import Decimal
 from typing import Dict, List
+
+from django.conf import settings
 from django.db import connections
 
 logger = logging.getLogger(__name__)
 
 
-def create_mpd_variants(mpd_product_id: int, matterhorn_product_id: int, size_category: str,
-                        producer_code: str = None, main_color_id: int = None,
-                        producer_color_name: str = None) -> Dict:
-    """Utwórz warianty w MPD razem z produktem"""
+def _get_mpd_db() -> str:
+    return 'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD'
+
+
+def _get_mh_db() -> str:
+    return 'zzz_matterhorn1' if 'zzz_matterhorn1' in settings.DATABASES else 'matterhorn1'
+
+
+def create_mpd_variants(
+    mpd_product_id: int,
+    matterhorn_product_id: int,
+    size_category: str,
+    producer_code: str = None,
+    main_color_id: int = None,
+    producer_color_name: str = None,
+) -> Dict:
+    """Utwórz warianty w MPD - ORM (sygnał ProductvariantsSources uruchomi task linkowania)"""
+    from matterhorn1.models import Product as MhProduct, ProductVariant as MhProductVariant
+    from MPD.models import (
+        Colors,
+        ProductVariants,
+        ProductvariantsSources,
+        Sizes,
+        Sources,
+        StockAndPrices,
+    )
+    from django.utils import timezone
+
+    mpd_db = _get_mpd_db()
+    mh_db = _get_mh_db()
+
     logger.info(
-        f"🔄 Tworzę warianty w MPD dla produktu {mpd_product_id}, kategoria: {size_category}")
+        "Tworzę warianty w MPD dla produktu %s, kategoria: %s",
+        mpd_product_id,
+        size_category,
+    )
     logger.info(
-        f"📋 Parametry: producer_code='{producer_code}', main_color_id={main_color_id}, producer_color_name='{producer_color_name}'")
+        "Parametry: producer_code='%s', main_color_id=%s, producer_color_name='%s'",
+        producer_code,
+        main_color_id,
+        producer_color_name,
+    )
 
     try:
-        with connections['MPD'].cursor() as mpd_cursor, connections['matterhorn1'].cursor() as mh_cursor:
-            # Pobierz kolor i cenę produktu z matterhorn1
-            mh_cursor.execute("""
-                SELECT color, prices FROM product WHERE id = %s
-            """, [matterhorn_product_id])
-            color_result = mh_cursor.fetchone()
-            if not color_result:
-                raise Exception(
-                    f"Product {matterhorn_product_id} not found in matterhorn1")
+        # Pobierz produkt z matterhorn1
+        mh_product = MhProduct.objects.using(mh_db).get(id=matterhorn_product_id)
+        product_color = mh_product.color or 'Brak koloru'
+        product_prices = mh_product.prices or {}
+        if isinstance(product_prices, str):
+            product_prices = json.loads(product_prices) if product_prices else {}
+        product_price = product_prices.get('PLN', 0) if isinstance(product_prices, dict) else 0
+        if isinstance(product_price, str):
+            product_price = float(product_price)
 
-            product_color, product_prices = color_result
+        logger.info("Produkt: kolor=%s, cena=%s", product_color, product_price)
 
-            # Wyciągnij cenę PLN z JSON
-            if isinstance(product_prices, str):
-                import json
-                product_prices = json.loads(product_prices)
-            product_price = product_prices.get(
-                'PLN', 0) if isinstance(product_prices, dict) else 0
-            if isinstance(product_price, str):
-                product_price = float(product_price)
+        # Kolor w MPD
+        color = Colors.objects.using(mpd_db).filter(name=product_color).first()
+        if not color:
+            raise ValueError("Color %s not found in MPD" % product_color)
+        color_id = color.id
 
-            logger.info(
-                f"Produkt: kolor={product_color}, cena={product_price}")
+        # Producer color
+        producer_color_id = None
+        if producer_color_name and main_color_id:
+            producer_color, created = Colors.objects.using(mpd_db).get_or_create(
+                name=producer_color_name,
+                parent_id=main_color_id,
+                defaults={'hex_code': ''},
+            )
+            producer_color_id = producer_color.id
+            if created:
+                logger.info("Utworzono kolor producenta: %s", producer_color_name)
+        else:
+            logger.warning(
+                "Brak producer_color_name lub main_color_id - producer_color_id będzie None"
+            )
 
-            # Pobierz ID koloru w MPD
-            mpd_cursor.execute(
-                "SELECT id FROM colors WHERE name = %s", [product_color])
-            color_row = mpd_cursor.fetchone()
-            if not color_row:
-                raise Exception(f"Color {product_color} not found in MPD")
-            color_id = color_row[0]
-
-            # Pobierz lub utwórz producer_color_id
-            producer_color_id = None
-            logger.info(
-                f"🔍 Sprawdzam producer_color_name='{producer_color_name}', main_color_id={main_color_id}")
-            if producer_color_name and main_color_id:
-                mpd_cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s",
-                                   [producer_color_name, main_color_id])
-                pc_row = mpd_cursor.fetchone()
-                if pc_row:
-                    producer_color_id = pc_row[0]
-                    logger.info(
-                        f"✅ Znaleziono istniejący kolor producenta: {producer_color_name} (ID: {producer_color_id})")
-                else:
-                    mpd_cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id",
-                                       [producer_color_name, main_color_id])
-                    row = mpd_cursor.fetchone()
-                    if row:
-                        producer_color_id = row[0]
-                        logger.info(
-                            f"✅ Utworzono kolor producenta: {producer_color_name} (ID: {producer_color_id})")
-            else:
-                logger.warning(
-                    f"⚠️ Brak producer_color_name lub main_color_id - producer_color_id będzie None")
-
-            # Generuj iai_product_id
-            mpd_cursor.execute("""
-                INSERT INTO iai_product_counter (counter_value) 
-                VALUES (1) 
-                ON CONFLICT (id) 
-                DO UPDATE SET counter_value = iai_product_counter.counter_value + 1 
+        # IaiProductCounter - atomic increment (raw SQL dla ON CONFLICT)
+        with connections[mpd_db].cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO iai_product_counter (id, counter_value)
+                VALUES (1, 1)
+                ON CONFLICT (id)
+                DO UPDATE SET counter_value = iai_product_counter.counter_value + 1
                 RETURNING counter_value
             """)
-            iai_product_id_result = mpd_cursor.fetchone()
-            iai_product_id = iai_product_id_result[0] if iai_product_id_result else 1
-            logger.info(f"Wygenerowano iai_product_id: {iai_product_id}")
+            row = cursor.fetchone()
+            iai_product_id = row[0] if row else 1
+        logger.info("Wygenerowano iai_product_id: %s", iai_product_id)
 
-            # Pobierz warianty z matterhorn1
-            mh_cursor.execute("""
-                SELECT name, stock, ean, variant_uid FROM productvariant WHERE product_id = %s
-            """, [matterhorn_product_id])
-            variants = mh_cursor.fetchall()
+        # Źródło Matterhorn
+        mh_source = Sources.objects.using(mpd_db).filter(
+            name__icontains='matterhorn'
+        ).first()
+        if not mh_source:
+            raise ValueError("Brak źródła Matterhorn w MPD")
 
-            if not variants:
-                logger.warning(
-                    f"Brak wariantów dla produktu {matterhorn_product_id}")
-                return {"created_variants": 0, "iai_product_id": iai_product_id}
-
-            # Pobierz source_id dla Matterhorn
-            mpd_cursor.execute(
-                "SELECT id FROM sources WHERE name ILIKE %s LIMIT 1",
-                ['%matterhorn%']
-            )
-            mh_source_row = mpd_cursor.fetchone()
-            mh_source_id = mh_source_row[0] if mh_source_row else 2
-
-            created_count = 0
-            variant_ids = []
-
-            for size_name, stock, ean, variant_uid in variants:
-                # Pobierz ID rozmiaru z wybranej kategorii
-                mpd_cursor.execute("SELECT id FROM sizes WHERE UPPER(name) = UPPER(%s) AND category = %s",
-                                   [size_name, size_category])
-                size_result = mpd_cursor.fetchone()
-                if not size_result:
-                    logger.warning(
-                        f"Rozmiar {size_name} nie znaleziony w kategorii {size_category}")
-                    continue
-                size_id = size_result[0]
-
-                # Sprawdź czy wariant już istnieje (variant_uid + source)
-                mpd_cursor.execute("""
-                    SELECT variant_id FROM product_variants_sources 
-                    WHERE variant_uid = %s AND source_id = %s
-                """, [variant_uid, mh_source_id])
-                existing = mpd_cursor.fetchone()
-                if existing:
-                    logger.info(
-                        f"Wariant {variant_uid} już istnieje - pomijam")
-                    continue
-
-                # Sprawdź czy istnieje wariant z tym EAN (z innej hurtowni) - dopnij zamiast tworzyć
-                variant_id = None
-                if ean and str(ean).strip():
-                    mpd_cursor.execute("""
-                        SELECT pvs.variant_id FROM product_variants_sources pvs
-                        JOIN product_variants pv ON pv.variant_id = pvs.variant_id
-                        WHERE pvs.ean = %s AND pv.product_id = %s AND pvs.source_id != %s
-                    """, [str(ean).strip(), mpd_product_id, mh_source_id])
-                    existing_by_ean = mpd_cursor.fetchone()
-                    if existing_by_ean:
-                        variant_id = existing_by_ean[0]
-                        logger.info(
-                            f"Znaleziono wariant po EAN {ean} (variant_id={variant_id}) - dopinam Matterhorn"
-                        )
-
-                if variant_id is None:
-                    # Wygeneruj nowy variant_id
-                    mpd_cursor.execute(
-                        "SELECT COALESCE(MAX(variant_id), 0) + 1 FROM product_variants")
-                    row = mpd_cursor.fetchone()
-                    variant_id = row[0] if row else 1
-
-                    # Utwórz wariant
-                    logger.info(
-                        f"🔧 Tworzę wariant {variant_id}: producer_color_id={producer_color_id}, producer_code='{producer_code}'")
-                    if producer_color_id:
-                        mpd_cursor.execute("""
-                            INSERT INTO product_variants 
-                            (variant_id, product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id, updated_at)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-                        """, [variant_id, mpd_product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id])
-                        logger.info(
-                            f"✅ Utworzono wariant z producer_color_id={producer_color_id}")
-                    else:
-                        mpd_cursor.execute("""
-                            INSERT INTO product_variants 
-                            (variant_id, product_id, color_id, size_id, producer_code, iai_product_id, updated_at)
-                            VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                        """, [variant_id, mpd_product_id, color_id, size_id, producer_code, iai_product_id])
-                        logger.info(f"⚠️ Utworzono wariant BEZ producer_color_id")
-
-                # Dodaj do product_variants_sources (jeśli nie istnieje)
-                mpd_cursor.execute("""
-                    SELECT 1 FROM product_variants_sources 
-                    WHERE variant_id = %s AND source_id = %s
-                """, [variant_id, mh_source_id])
-                if not mpd_cursor.fetchone():
-                    mpd_cursor.execute("""
-                        INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id)
-                        VALUES (%s, %s, %s, %s)
-                    """, [variant_id, ean, variant_uid, mh_source_id])
-
-                # Dodaj stock_and_prices (jeśli nie istnieje)
-                mpd_cursor.execute("""
-                    SELECT 1 FROM stock_and_prices WHERE variant_id = %s AND source_id = %s
-                """, [variant_id, mh_source_id])
-                if not mpd_cursor.fetchone():
-                    mpd_cursor.execute("""
-                        INSERT INTO stock_and_prices (variant_id, source_id, stock, price, currency)
-                        VALUES (%s, %s, %s, %s, 'PLN')
-                    """, [variant_id, mh_source_id, stock, product_price])
-
-                # Zaktualizuj mapped_variant_uid w matterhorn1
-                mh_cursor.execute("""
-                    UPDATE productvariant 
-                    SET mapped_variant_uid = %s, is_mapped = true, updated_at = NOW() 
-                    WHERE variant_uid = %s
-                """, [variant_id, variant_uid])
-
-                variant_ids.append(variant_id)
-                created_count += 1
-                logger.info(f"Utworzono wariant {variant_uid} -> {variant_id}")
-
-            logger.info(f"✅ Utworzono {created_count} wariantów w MPD")
+        # Warianty z matterhorn1
+        mh_variants = list(
+            MhProductVariant.objects.using(mh_db).filter(product_id=matterhorn_product_id)
+        )
+        if not mh_variants:
+            logger.warning("Brak wariantów dla produktu %s", matterhorn_product_id)
             return {
-                "created_variants": created_count,
+                "created_variants": 0,
                 "iai_product_id": iai_product_id,
-                "variant_ids": variant_ids
+                "variant_ids": [],
             }
 
+        created_count = 0
+        variant_ids = []
+
+        for mh_var in mh_variants:
+            size_name = mh_var.name
+            stock = mh_var.stock
+            ean = (mh_var.ean or '').strip() if mh_var.ean else ''
+            variant_uid_raw = mh_var.variant_uid
+            try:
+                variant_uid_int = int(variant_uid_raw) if variant_uid_raw and str(variant_uid_raw).isdigit() else None
+            except (ValueError, TypeError):
+                variant_uid_int = None
+
+            # Rozmiar
+            size = (
+                Sizes.objects.using(mpd_db)
+                .filter(name__iexact=size_name, category=size_category)
+                .first()
+            )
+            if not size:
+                logger.warning(
+                    "Rozmiar %s nie znaleziony w kategorii %s", size_name, size_category
+                )
+                continue
+
+            # Już istnieje?
+            if ProductvariantsSources.objects.using(mpd_db).filter(
+                variant_uid=variant_uid_int, source=mh_source
+            ).exists():
+                logger.info("Wariant %s już istnieje - pomijam", variant_uid_raw)
+                continue
+
+            # Wariant po EAN z innej hurtowni?
+            variant = None
+            if ean:
+                pvs = (
+                    ProductvariantsSources.objects.using(mpd_db)
+                    .filter(
+                        ean=ean,
+                        variant__product_id=mpd_product_id,
+                    )
+                    .exclude(source=mh_source)
+                    .select_related('variant')
+                    .first()
+                )
+                if pvs:
+                    variant = pvs.variant
+                    logger.info(
+                        "Znaleziono wariant po EAN %s (variant_id=%s) - dopinam Matterhorn",
+                        ean,
+                        variant.variant_id,
+                    )
+
+            # Utwórz nowy wariant jeśli nie znaleziono
+            if variant is None:
+                variant = ProductVariants.objects.using(mpd_db).create(
+                    product_id=mpd_product_id,
+                    color_id=color_id,
+                    producer_color_id=producer_color_id,
+                    size=size,
+                    producer_code=producer_code or '',
+                    iai_product_id=iai_product_id,
+                )
+                logger.info(
+                    "Utworzono wariant %s (producer_color_id=%s)",
+                    variant.variant_id,
+                    producer_color_id,
+                )
+
+            # ProductvariantsSources - ORM wywoła sygnał post_save -> task linkowania
+            pvs, pvs_created = ProductvariantsSources.objects.using(mpd_db).get_or_create(
+                variant=variant,
+                source=mh_source,
+                defaults={
+                    'ean': (ean or '')[:50] if ean else '',
+                    'variant_uid': variant_uid_int,
+                },
+            )
+
+            # StockAndPrices
+            StockAndPrices.objects.using(mpd_db).get_or_create(
+                variant=variant,
+                source=mh_source,
+                defaults={
+                    'stock': stock,
+                    'price': Decimal(str(product_price)),
+                    'currency': 'PLN',
+                    'last_updated': timezone.now(),
+                },
+            )
+
+            # Aktualizacja mapped_variant_uid w matterhorn1
+            MhProductVariant.objects.using(mh_db).filter(
+                variant_uid=variant_uid_raw
+            ).update(
+                mapped_variant_uid=variant.variant_id,
+                is_mapped=True,
+                updated_at=timezone.now(),
+            )
+
+            variant_ids.append(variant.variant_id)
+            created_count += 1
+            logger.info("Utworzono wariant %s -> %s", variant_uid_raw, variant.variant_id)
+
+        logger.info("Utworzono %s wariantów w MPD", created_count)
+
+        return {
+            "created_variants": created_count,
+            "iai_product_id": iai_product_id,
+            "variant_ids": variant_ids,
+        }
+
+    except MhProduct.DoesNotExist:
+        raise ValueError("Product %s not found in matterhorn1" % matterhorn_product_id)
     except Exception as e:
-        raise Exception(f"Failed to create MPD variants: {e}")
+        raise Exception("Failed to create MPD variants: %s" % e) from e
 
 
-def delete_mpd_variants(mpd_product_id: int, matterhorn_product_id: int = None,
-                        variant_ids: List[int] = None, **kwargs) -> Dict:
+def delete_mpd_variants(
+    mpd_product_id: int,
+    matterhorn_product_id: int = None,
+    variant_ids: List[int] = None,
+    **kwargs,
+) -> Dict:
     """Usuń warianty z MPD (kompensacja)"""
-    logger.info(f"🔄 Usuwam warianty z MPD dla produktu {mpd_product_id}")
+    from matterhorn1.models import ProductVariant as MhProductVariant
+    from MPD.models import ProductVariants, ProductvariantsSources, StockAndPrices
+
+    mpd_db = _get_mpd_db()
+    mh_db = _get_mh_db()
+
+    logger.info("Usuwam warianty z MPD dla produktu %s", mpd_product_id)
 
     try:
-        with connections['MPD'].cursor() as mpd_cursor:
-            if variant_ids:
-                # Usuń konkretne warianty
-                for variant_id in variant_ids:
-                    # Usuń z stock_and_prices
-                    mpd_cursor.execute(
-                        "DELETE FROM stock_and_prices WHERE variant_id = %s", [variant_id])
-                    # Usuń z product_variants_sources
-                    mpd_cursor.execute(
-                        "DELETE FROM product_variants_sources WHERE variant_id = %s", [variant_id])
-                    # Usuń z product_variants
-                    mpd_cursor.execute(
-                        "DELETE FROM product_variants WHERE variant_id = %s", [variant_id])
-                logger.info(f"✅ Usunięto {len(variant_ids)} wariantów")
-            else:
-                # Usuń wszystkie warianty produktu
-                mpd_cursor.execute(
-                    "SELECT variant_id FROM product_variants WHERE product_id = %s", [mpd_product_id])
-                variant_ids = [row[0] for row in mpd_cursor.fetchall()]
+        if variant_ids is None:
+            variant_ids = list(
+                ProductVariants.objects.using(mpd_db)
+                .filter(product_id=mpd_product_id)
+                .values_list('variant_id', flat=True)
+            )
 
-                for variant_id in variant_ids:
-                    mpd_cursor.execute(
-                        "DELETE FROM stock_and_prices WHERE variant_id = %s", [variant_id])
-                    mpd_cursor.execute(
-                        "DELETE FROM product_variants_sources WHERE variant_id = %s", [variant_id])
-                    mpd_cursor.execute(
-                        "DELETE FROM product_variants WHERE variant_id = %s", [variant_id])
-                logger.info(
-                    f"✅ Usunięto wszystkie warianty produktu {mpd_product_id}")
+        for variant_id in variant_ids:
+            StockAndPrices.objects.using(mpd_db).filter(variant_id=variant_id).delete()
+            ProductvariantsSources.objects.using(mpd_db).filter(
+                variant_id=variant_id
+            ).delete()
+            ProductVariants.objects.using(mpd_db).filter(variant_id=variant_id).delete()
 
-        # Cofnij mapping w matterhorn1
+        if variant_ids:
+            logger.info("Usunięto %s wariantów", len(variant_ids))
+        else:
+            logger.info("Usunięto wszystkie warianty produktu %s", mpd_product_id)
+
         if matterhorn_product_id:
-            with connections['matterhorn1'].cursor() as mh_cursor:
-                mh_cursor.execute("""
-                    UPDATE productvariant 
-                    SET mapped_variant_uid = NULL, is_mapped = false, updated_at = NOW() 
-                    WHERE product_id = %s
-                """, [matterhorn_product_id])
+            from django.utils import timezone
+            MhProductVariant.objects.using(mh_db).filter(
+                product_id=matterhorn_product_id
+            ).update(
+                mapped_variant_uid=None,
+                is_mapped=False,
+                updated_at=timezone.now(),
+            )
 
     except Exception as e:
-        logger.error(f"❌ Błąd podczas usuwania wariantów: {e}")
+        logger.error("Błąd podczas usuwania wariantów: %s", e)
 
     return {}

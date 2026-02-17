@@ -704,6 +704,7 @@ class ProductAdmin(admin.ModelAdmin):
                     return JsonResponse({'success': False, 'error': 'Nie udało się pobrać ID produktu MPD'})
 
                 logger.info(f"MPD product created with ID: {mpd_product_id}")
+                # Task linkowania uruchamiany przez sygnał MPD (ProductvariantsSources post_save)
 
                 # Warianty zostały utworzone przez Sagę (krok 4)
                 # Pobierz informacje o wariantach z wyniku Sagi
@@ -924,25 +925,7 @@ class ProductAdmin(admin.ModelAdmin):
                         logger.error(f"Błąd podczas uploadu zdjęć: {e}")
                         mapping_info['upload_error'] = str(e)
 
-                    # Dopnij warianty z pozostałych hurtowni (po EAN) - asynchronicznie (Celery)
-                    try:
-                        from django.conf import settings
-                        from MPD.tasks import link_variants_from_other_sources_task
-                        from MPD.models import Sources
-                        mpd_db = 'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD'
-                        mh_source = Sources.objects.using(mpd_db).filter(
-                            name__icontains='matterhorn'
-                        ).first()
-                        if mh_source:
-                            link_variants_from_other_sources_task.delay(
-                                mpd_product_id, mh_source.id
-                            )
-                            logger.info(
-                                "Zadanie dopinania wariantów (EAN) do produktu MPD %s wysłane do kolejki",
-                                mpd_product_id
-                            )
-                    except Exception as link_err:
-                        logger.warning("Wysłanie tasku linkowania wariantów: %s", link_err)
+                    # Task linkowania uruchamiany przez sygnał MPD (ProductvariantsSources post_save)
                 else:
                     mapping_info = {
                         'error': 'Brak kategorii rozmiarowej w MPD'}
@@ -1110,7 +1093,7 @@ class ProductAdmin(admin.ModelAdmin):
                             product.is_mapped = True
                             product.save()
 
-                            # Automatycznie zmapuj warianty
+                            # Automatycznie zmapuj warianty (sygnał MPD uruchomi task linkowania)
                             self._auto_map_variants(product, mpd_product_id)
 
                             success_count += 1
@@ -1155,12 +1138,16 @@ class ProductAdmin(admin.ModelAdmin):
                         for created_product in result.get('created_products', []):
                             try:
                                 product = Product.objects.get(
-                                    product_id=created_product['matterhorn_product_id']
+                                    product_uid=created_product['matterhorn_product_id']
                                 )
-                                product.mapped_product_uid = created_product['mpd_product_id']
+                                mpd_product_id = created_product.get(
+                                    'mpd_product_id', created_product.get('id')
+                                )
+                                product.mapped_product_uid = mpd_product_id
                                 product.is_mapped = True
                                 product.save()
                                 created_products.append(created_product)
+                                # Task linkowania - gdy bulk_create doda ProductvariantsSources
                             except Product.DoesNotExist:
                                 errors.append(
                                     f"Nie znaleziono produktu {created_product['matterhorn_product_id']}")
@@ -1340,8 +1327,15 @@ class ProductAdmin(admin.ModelAdmin):
         return variants
 
     def _auto_map_variants(self, product, mpd_product_id):
-        """Automatyczne mapowanie wariantów"""
+        """Automatyczne mapowanie wariantów + ProductvariantsSources (sygnał MPD uruchomi task linkowania)"""
+        from django.conf import settings
+        from MPD.models import ProductvariantsSources, Sources
+
         mapped_variants = []
+        mpd_db = 'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD'
+        mh_source = Sources.objects.using(mpd_db).filter(
+            name__icontains='matterhorn'
+        ).first()
 
         with connections['MPD'].cursor() as cursor:
             for variant in product.variants.all():
@@ -1361,6 +1355,21 @@ class ProductAdmin(admin.ModelAdmin):
 
                 variant_id = cursor.fetchone()[0]
                 mapped_variants.append(variant_id)
+
+                # ProductvariantsSources - sygnał MPD uruchomi task linkowania z innych hurtowni
+                if mh_source and (variant.ean or variant.variant_uid):
+                    try:
+                        uid = int(variant.variant_uid) if variant.variant_uid and str(variant.variant_uid).isdigit() else None
+                    except (ValueError, TypeError):
+                        uid = None
+                    ProductvariantsSources.objects.using(mpd_db).get_or_create(
+                        variant_id=variant_id,
+                        source=mh_source,
+                        defaults={
+                            'ean': (variant.ean or '')[:50] if variant.ean else '',
+                            'variant_uid': uid,
+                        }
+                    )
 
         return mapped_variants
 

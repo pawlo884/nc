@@ -916,6 +916,7 @@ def create_product(request):
                 attribute_id=attribute_id
             )
 
+        # Task linkowania - sygnał MPD (ProductvariantsSources post_save) gdy dodano źródła
         logger.info("Utworzono produkt MPD: %s (ID: %s)",
                     product.name, product.id)
 
@@ -1159,6 +1160,7 @@ def bulk_create_products(request):
 
                 # Wymagane pola
                 name = product_data.get('name')
+                matterhorn_product_id = product_data.get('matterhorn_product_id')
                 if not name:
                     logger.warning(
                         f"⚠️ MPD bulk_create_products: Brak nazwy produktu {i}")
@@ -1219,6 +1221,8 @@ def bulk_create_products(request):
 
                 created_products.append({
                     'id': product.id,
+                    'mpd_product_id': product.id,
+                    'matterhorn_product_id': matterhorn_product_id,
                     'name': product.name,
                     'variants': created_variants
                 })
@@ -1281,7 +1285,7 @@ def bulk_map_from_matterhorn1(request):
                     # Pobierz produkt z matterhorn1
                     try:
                         matterhorn_product = MatterhornProduct.objects.get(
-                            product_id=matterhorn_product_id)
+                            product_uid=matterhorn_product_id)
                     except MatterhornProduct.DoesNotExist:
                         errors.append(
                             {'error': f'Produkt matterhorn1 o ID {matterhorn_product_id} nie istnieje', 'data': product_data})
@@ -1380,6 +1384,7 @@ def bulk_map_from_matterhorn1(request):
                         'name': mpd_product.name,
                         'variants_created': len(created_variants)
                     })
+                    # Task linkowania - sygnał MPD gdy bulk_map doda ProductvariantsSources
 
                 except Exception as e:
                     errors.append({

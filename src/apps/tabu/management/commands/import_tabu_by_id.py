@@ -1,4 +1,4 @@
-"""
+wa"""
 Import produktów Tabu pojedynczo: GET products/1, products/2, ... do 404.
 Użycie po clear_tabu_data.
 API: https://tabu.com.pl/api/v1/products/{id}

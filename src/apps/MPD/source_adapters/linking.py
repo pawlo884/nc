@@ -14,6 +14,7 @@ from MPD.models import (
     StockAndPrices,
 )
 
+from .base import normalize_ean
 from .registry import get_adapters_for_source, get_adapter_for_source
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,25 @@ logger = logging.getLogger(__name__)
 def _get_mpd_db() -> str:
     from django.conf import settings
     return 'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD'
+
+
+def _update_source_product_mapped(source, source_product_id: int, mpd_product_id: int) -> None:
+    """Ustawia mapped_product_uid w hurtowni źródłowej (Tabu/Matterhorn)."""
+    from django.conf import settings
+    name = (source.name or '').lower()
+    if 'tabu' in name:
+        from tabu.models import TabuProduct
+        tabu_db = 'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu'
+        TabuProduct.objects.using(tabu_db).filter(id=source_product_id).update(
+            mapped_product_uid=mpd_product_id
+        )
+    elif 'matterhorn' in name:
+        from matterhorn1.models import Product
+        mh_db = 'zzz_matterhorn1' if 'zzz_matterhorn1' in settings.DATABASES else 'matterhorn1'
+        Product.objects.using(mh_db).filter(id=source_product_id).update(
+            mapped_product_uid=mpd_product_id,
+            is_mapped=True
+        )
 
 
 def link_variants_from_other_sources(
@@ -54,25 +74,49 @@ def link_variants_from_other_sources(
         )
         ean_by_variant: Dict[int, str] = {}
         for s in sources_qs:
-            if s.ean and str(s.ean).strip():
-                ean_by_variant[s.variant_id] = str(s.ean).strip()
+            ean_norm = normalize_ean(s.ean)
+            if ean_norm:
+                ean_by_variant[s.variant_id] = ean_norm
 
         if not ean_by_variant:
+            logger.info(
+                "link_variants_from_other_sources: brak EAN dla produktu MPD %s",
+                mpd_product_id
+            )
             return stats
 
         ean_list = list(set(ean_by_variant.values()))
         variant_by_ean = {ean: vid for vid, ean in ean_by_variant.items()}
+        adapters = list(get_adapters_for_source(exclude_source_id=current_source_id))
+        logger.info(
+            "link_variants_from_other_sources: mpd_product_id=%s ean_list=%s (exclude source %s), adapters=%s",
+            mpd_product_id, ean_list[:10], current_source_id, len(adapters)
+        )
+        if not adapters:
+            logger.warning(
+                "link_variants_from_other_sources: brak adapterów dla innych źródeł (tylko 1 źródło?)"
+            )
+            return stats
 
-        for source_id, adapter in get_adapters_for_source(exclude_source_id=current_source_id):
+        for source_id, adapter in adapters:
             try:
                 matches = adapter.get_variants_by_eans(
-                    ean_list, mpd_product_id=mpd_product_id
+                    ean_list, mpd_product_id=None
                 )
                 source = Sources.objects.using(db).get(id=source_id)
 
+                logger.info(
+                    "link_variants_from_other_sources: źródło %s zwróciło %s dopasowań",
+                    source.name, len(matches)
+                )
+                updated_source_products = set()  # unikalne produkty w hurtowni (mapped_product_uid)
                 for m in matches:
                     mpd_variant_id = variant_by_ean.get(m.ean)
                     if not mpd_variant_id:
+                        logger.debug(
+                            "Pominięto match ean=%s - brak w variant_by_ean",
+                            m.ean
+                        )
                         continue
 
                     pvs, created = ProductvariantsSources.objects.using(db).get_or_create(
@@ -105,6 +149,23 @@ def link_variants_from_other_sources(
                             "Dopięto StockAndPrices: variant=%s source=%s stock=%s price=%s",
                             mpd_variant_id, source.name, m.stock, m.price
                         )
+
+                    # Ustaw mapped_product_uid w hurtowni źródłowej (jak przy ręcznym mapowaniu)
+                    if m.source_product_id and m.source_product_id not in updated_source_products:
+                        try:
+                            _update_source_product_mapped(
+                                source, m.source_product_id, mpd_product_id
+                            )
+                            updated_source_products.add(m.source_product_id)
+                            logger.info(
+                                "Ustawiono mapped_product_uid=%s dla produktu %s w %s",
+                                mpd_product_id, m.source_product_id, source.name
+                            )
+                        except Exception as upd_err:
+                            logger.warning(
+                                "Błąd ustawiania mapped_product_uid dla %s: %s",
+                                m.source_product_id, upd_err
+                            )
 
                 stats['sources_processed'] += 1
             except Exception as e:
@@ -143,21 +204,22 @@ def link_all_products_to_new_source(new_source_id: int) -> Dict:
     for pvs in ProductvariantsSources.objects.using(db).select_related('variant').filter(
         ean__isnull=False
     ).exclude(ean=''):
-        ean = str(pvs.ean).strip()
-        if ean:
-            ean_to_variant[ean] = (pvs.variant_id, pvs.variant.product_id)
+        ean_norm = normalize_ean(pvs.ean)
+        if ean_norm:
+            ean_to_variant[ean_norm] = (pvs.variant_id, pvs.variant.product_id)
 
     ean_list = list(ean_to_variant.keys())
     if not ean_list:
         return stats
 
     matches = adapter.get_variants_by_eans(ean_list, mpd_product_id=None)
+    updated_source_products = set()
 
     for m in matches:
         key = ean_to_variant.get(m.ean)
         if not key:
             continue
-        mpd_variant_id, _ = key
+        mpd_variant_id, mpd_product_id = key
 
         try:
             pvs, created = ProductvariantsSources.objects.using(db).get_or_create(
@@ -187,6 +249,21 @@ def link_all_products_to_new_source(new_source_id: int) -> Dict:
             )
             if created:
                 stats['products_processed'] += 1
+
+            # Ustaw mapped_product_uid w nowej hurtowni
+            if m.source_product_id and m.source_product_id not in updated_source_products:
+                try:
+                    _update_source_product_mapped(source, m.source_product_id, mpd_product_id)
+                    updated_source_products.add(m.source_product_id)
+                    logger.info(
+                        "Ustawiono mapped_product_uid=%s dla produktu %s w nowej hurtowni %s",
+                        mpd_product_id, m.source_product_id, source.name
+                    )
+                except Exception as upd_err:
+                    logger.warning(
+                        "Błąd ustawiania mapped_product_uid dla %s: %s",
+                        m.source_product_id, upd_err
+                    )
         except Exception as e:
             logger.exception("Błąd dopinania variant=%s: %s", mpd_variant_id, e)
             stats['errors'].append(str(e))
