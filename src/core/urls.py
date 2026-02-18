@@ -49,13 +49,25 @@ if DRF_SPECTACULAR_AVAILABLE:
         path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     ]
 
-urlpatterns += i18n_patterns(
+# PyDash – tylko gdy pakiety zainstalowane (requirements-pydash.txt)
+try:
+    from django_plotly_dash import urls as django_plotly_dash_urls
+    urlpatterns += [path('django_plotly_dash/', include(django_plotly_dash_urls))]
+except ImportError:
+    django_plotly_dash_urls = None
+
+_i18n_paths = [
     path('admin/', admin.site.urls),
     # path('matterhorn/', include('matterhorn.urls')),  # stara aplikacja usunięta
     path('mpd/', include('MPD.urls')),
     path('matterhorn1/', include('matterhorn1.urls')),
-    prefix_default_language=False
-)
+]
+# PyDash – tylko gdy aplikacja jest w INSTALLED_APPS (pakiety z requirements-pydash.txt)
+if 'dashboard_pydash' in settings.INSTALLED_APPS:
+    from dashboard_pydash import urls as dashboard_pydash_urls
+    _i18n_paths.append(path('pydash/', include(dashboard_pydash_urls)))
+
+urlpatterns += i18n_patterns(*_i18n_paths, prefix_default_language=False)
 
 # API URLs (bez i18n)
 urlpatterns += [

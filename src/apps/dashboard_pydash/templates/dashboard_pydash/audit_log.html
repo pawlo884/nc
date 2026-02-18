@@ -1,0 +1,30 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Audit log – Dashboard PyDash{% endblock %}
+
+{% block content %}
+<h1>Audit log (ostatnie 100)</h1>
+<p><a href="{% url 'dashboard_pydash:dashboard' %}">← Powrót do dashboardu</a></p>
+<table class="table" style="width:100%; border-collapse: collapse;">
+  <thead>
+    <tr style="background: #f8f9fa;">
+      <th style="padding: 8px; border: 1px solid #dee2e6;">Data</th>
+      <th style="padding: 8px; border: 1px solid #dee2e6;">Użytkownik</th>
+      <th style="padding: 8px; border: 1px solid #dee2e6;">Akcja</th>
+      <th style="padding: 8px; border: 1px solid #dee2e6;">Szczegóły</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in entries %}
+    <tr>
+      <td style="padding: 8px; border: 1px solid #dee2e6;">{{ e.created_at|date:"Y-m-d H:i:s" }}</td>
+      <td style="padding: 8px; border: 1px solid #dee2e6;">{{ e.user.get_username|default:"—" }}</td>
+      <td style="padding: 8px; border: 1px solid #dee2e6;">{{ e.action }}</td>
+      <td style="padding: 8px; border: 1px solid #dee2e6;">{{ e.details }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" style="padding: 8px;">Brak wpisów.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

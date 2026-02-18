@@ -80,6 +80,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': True,
         },
+        'MPD': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 
@@ -104,6 +109,15 @@ INSTALLED_APPS = [
     'web_agent',
     'tabu',
 ]
+
+# PyDash (dash, plotly, django-plotly-dash) – opcjonalne; wymaga pip install -r requirements-pydash.txt
+try:
+    import django_plotly_dash  # noqa: F401
+    INSTALLED_APPS.append('django_plotly_dash.apps.DjangoPlotlyDashConfig')
+    import dashboard_pydash  # noqa: F401
+    INSTALLED_APPS.append('dashboard_pydash')
+except ImportError:
+    pass
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
 try:
@@ -344,6 +358,17 @@ STATICFILES_DIRS = [
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# django-plotly-dash: RBAC i konfiguracja (tylko gdy pakiet zainstalowany)
+try:
+    import django_plotly_dash  # noqa: F401
+    PLOTLY_DASH = {
+        'view_decorator': 'django_plotly_dash.access.login_required',
+        'serve_locally': True,
+    }
+    # Middleware wymagane, żeby iframe z Dashem się ładował
+    MIDDLEWARE.append('django_plotly_dash.middleware.BaseMiddleware')
+except ImportError:
+    PLOTLY_DASH = {}
 
 # Celery Configuration
 CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'

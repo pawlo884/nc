@@ -1,0 +1,6 @@
+# Opcjonalne zależności dla Dashboard PyDash (branch feature/pydash-dashboard).
+# Instalacja: pip install -r src/requirements-pydash.txt
+# Nie są w głównym requirements.txt, żeby build Docker (web) nie wymagał tych pakietów.
+dash==2.18.2
+plotly==5.24.1
+django-plotly-dash==2.5.0

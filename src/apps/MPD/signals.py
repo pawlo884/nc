@@ -249,13 +249,21 @@ def on_productvariants_sources_created(sender, instance, created, using=None, **
     Przy dodaniu źródła do wariantu (ProductvariantsSources) - dopnij warianty z innych hurtowni.
     Działa dla wszystkich hurtowni (Tabu, Matterhorn, przyszłe) - jedno miejsce w MPD.
     """
+    logger.info(
+        "[PVS] post_save ProductvariantsSources: pk=%s variant_id=%s source_id=%s created=%s using=%s _state.db=%s",
+        instance.pk, getattr(instance, 'variant_id', None), instance.source_id, created,
+        using, getattr(instance._state, 'db', None)
+    )
     if not created:
+        logger.info("[PVS] Pominięto - created=False (get_or_create zwrócił istniejący)")
         return
     mpd_db = _get_connections_db()[0]
     db = using or getattr(instance, '_state', {}).db or 'default'
     if db != mpd_db and 'MPD' not in str(db):
+        logger.info("[PVS] Pominięto - db=%s != mpd_db=%s, 'MPD' not in db", db, mpd_db)
         return
     if not instance.source_id:
+        logger.info("[PVS] Pominięto - brak source_id")
         return
     try:
         mpd_product_id = instance.variant.product_id
@@ -263,11 +271,14 @@ def on_productvariants_sources_created(sender, instance, created, using=None, **
         from MPD.tasks import link_variants_from_other_sources_task
         link_variants_from_other_sources_task.delay(mpd_product_id, current_source_id)
         logger.info(
-            "ProductvariantsSources utworzony - task linkowania MPD %s (exclude source %s)",
+            "[PVS] Task linkowania wysłany: mpd_product_id=%s current_source_id=%s",
             mpd_product_id, current_source_id
         )
     except Exception as e:
-        logger.warning("Błąd uruchomienia tasku linkowania dla MPD %s: %s", getattr(instance.variant, 'product_id', '?'), e)
+        logger.warning(
+            "[PVS] Błąd uruchomienia tasku linkowania mpd_product_id=%s: %s",
+            getattr(instance.variant, 'product_id', '?'), e
+        )
 
 
 @receiver(post_save, sender=Sources)

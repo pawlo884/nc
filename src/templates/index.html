@@ -10,6 +10,9 @@
     <p>Application is running successfully!</p>
     <ul>
         <li><a href="/admin/">Admin Panel</a></li>
+        {% if has_pydash %}
+        <li><a href="/pydash/">Dashboard PyDash</a> (wymagane logowanie)</li>
+        {% endif %}
     </ul>
 </body>
 </html>

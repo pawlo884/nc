@@ -1,0 +1,31 @@
+{% extends "admin/base_site.html" %}
+{% load plotly_dash %}
+
+{% block title %}Dashboard PyDash{% endblock %}
+
+{% block content %}
+<style>
+  .dashboard-pydash { min-height: 800px; }
+  .dashboard-pydash iframe { min-height: 1200px; width: 100%; display: block; }
+</style>
+<div class="dashboard-pydash">
+  <p>
+    Zalogowany: <strong>{{ user.get_username }}</strong>
+    {% if is_staff %}(staff){% endif %}
+    | <a href="{% url 'dashboard_pydash:audit_log' %}">Audit log (staff)</a>
+    | <a href="{% url 'admin:index' %}">Admin</a>
+  </p>
+  <p>
+    <form action="{% url 'dashboard_pydash:trigger_simulation' %}" method="post" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit">Uruchom task Celery (symulacja)</button>
+    </form>
+  </p>
+  <p style="color:#666; margin-bottom:8px;">
+    Poniżej ładuje się dashboard (wykresy, KPI).
+    Jeśli widzisz pusty obszar: <strong>odśwież (Ctrl+F5)</strong> lub
+    <a href="/django_plotly_dash/app/NCDashboard/" target="_blank" rel="noopener">otwórz w nowej karcie</a>.
+  </p>
+  {% plotly_app name="NCDashboard" %}
+</div>
+{% endblock %}

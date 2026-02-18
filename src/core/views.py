@@ -7,7 +7,12 @@ from django.http import HttpResponse, JsonResponse
 
 def index(request):
     """Strona główna projektu."""
-    return render(request, 'index.html')
+    try:
+        import dashboard_pydash  # noqa: F401
+        has_pydash = True
+    except ImportError:
+        has_pydash = False
+    return render(request, 'index.html', {'has_pydash': has_pydash})
 
 
 def health_check(request):

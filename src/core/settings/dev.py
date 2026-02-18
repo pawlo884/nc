@@ -34,8 +34,11 @@ allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS', '')
 if allowed_hosts_env:
     ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',')]
 else:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1',
-                     '192.168.50.63', '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch']
+    ALLOWED_HOSTS = [
+        'localhost', '127.0.0.1',
+        '192.168.50.63', '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch',
+        'web', 'web:8000',  # Docker: nginx proxy do web (Host bywa ustawiony na upstream)
+    ]
 
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://83.168.79.109:8000')
@@ -68,7 +71,7 @@ SECURE_FRAME_DENY = False
 # Dodatkowe zabezpieczenia dla publicznego dostępu
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'  # Zmienione z False dla bezpieczeństwa
+X_FRAME_OPTIONS = 'SAMEORIGIN'  # Wymagane dla django-plotly-dash (embed iframe)
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # Cross-Origin-Opener-Policy settings for development
@@ -215,6 +218,12 @@ MIDDLEWARE = [
     # Zawsze dodane - middleware kontroluje widoczność
     'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
+# PyDash – BaseMiddleware ustawia request.dpd_content_handler (wymagane dla {% plotly_app %})
+try:
+    import django_plotly_dash  # noqa: F401
+    MIDDLEWARE.append('django_plotly_dash.middleware.BaseMiddleware')
+except ImportError:
+    pass
 
 # Konfiguracja testów - określa które bazy mają być używane podczas testów
 # Django automatycznie tworzy testowe bazy z prefiksem test_
