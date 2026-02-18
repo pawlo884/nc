@@ -28,7 +28,7 @@ def create_mpd_variants(
     main_color_id: int = None,
     producer_color_name: str = None,
 ) -> Dict:
-    """Utwórz warianty w MPD - ORM (sygnał ProductvariantsSources uruchomi task linkowania)"""
+    """Utwórz warianty w MPD - na koniec wysyłany jest 1 task linkowania po EAN (product_id + source_id)."""
     from matterhorn1.models import Product as MhProduct, ProductVariant as MhProductVariant
     from MPD.models import (
         Colors,
@@ -191,7 +191,7 @@ def create_mpd_variants(
                     producer_color_id,
                 )
 
-            # ProductvariantsSources - ORM wywoła sygnał post_save -> task linkowania
+            # ProductvariantsSources (task linkowania wyślemy raz na koniec dla produktu)
             pvs, pvs_created = ProductvariantsSources.objects.using(mpd_db).get_or_create(
                 variant=variant,
                 source=mh_source,
@@ -227,6 +227,15 @@ def create_mpd_variants(
             logger.info("Utworzono wariant %s -> %s", variant_uid_raw, variant.variant_id)
 
         logger.info("Utworzono %s wariantów w MPD", created_count)
+
+        # Jeden task linkowania wariantów po EAN na produkt (nie per wariant)
+        if created_count > 0:
+            from MPD.tasks import link_variants_from_other_sources_task
+            link_variants_from_other_sources_task.apply_async(
+                args=(mpd_product_id, mh_source.id),
+                queue='default',
+            )
+            logger.info("Wysłano task linkowania po EAN dla produktu MPD %s (source %s)", mpd_product_id, mh_source.id)
 
         return {
             "created_variants": created_count,

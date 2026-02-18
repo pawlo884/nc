@@ -290,8 +290,10 @@ CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 CELERY_TASK_ROUTES = {
     # Task importu trafia do kolejki 'import'
     'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
-    # Pozostałe taski używają domyślnej kolejki
+    # Pozostałe taski używają kolejki 'default'
     'matterhorn1.tasks.*': {'queue': 'default'},
+    'MPD.tasks.*': {'queue': 'default'},
+    'tabu.tasks.*': {'queue': 'default'},
 }
 
 # Cache Configuration - Redis dla blokad między workerami

@@ -1,6 +1,6 @@
 from django.dispatch import receiver
 from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
-from django.db import connections
+from django.db import connections, transaction
 from .models import Products, ProductVariants, ProductVariantsRetailPrice, ProductvariantsSources, Sources
 import logging
 import traceback
@@ -242,12 +242,15 @@ def update_retail_price_timestamp(sender, instance, using, **kwargs):
         instance.updated_at = timezone.now()
 
 
-@receiver(post_save, sender=ProductvariantsSources)
-def on_productvariants_sources_created(sender, instance, created, using=None, **kwargs):
+# Task linkowania wariantów po EAN: sygnał na Products (created=True) + on_commit; Matterhorn jawnie na koniec create_mpd_variants.
+
+
+@receiver(post_save, sender=Products)
+def on_product_created_schedule_link_task(sender, instance, created, using=None, **kwargs):
     """
-    Centralne wywołanie tasku linkowania wariantów po EAN.
-    Przy dodaniu źródła do wariantu (ProductvariantsSources) - dopnij warianty z innych hurtowni.
-    Działa dla wszystkich hurtowni (Tabu, Matterhorn, przyszłe) - jedno miejsce w MPD.
+    Przy utworzeniu nowego produktu MPD: po commicie transakcji wyślij task linkowania
+    (po EAN) dla każdego źródła, które ma warianty tego produktu. Działa z Tabu (product
+    + warianty w jednej transakcji); Matterhorn wywołuje task jawnie w create_mpd_variants.
     """
     if not created:
         return
@@ -255,19 +258,27 @@ def on_productvariants_sources_created(sender, instance, created, using=None, **
     db = using or getattr(instance, '_state', {}).db or 'default'
     if db != mpd_db and 'MPD' not in str(db):
         return
-    if not instance.source_id:
-        return
-    try:
-        mpd_product_id = instance.variant.product_id
-        current_source_id = instance.source_id
+    product_id = instance.id
+
+    def _send_link_tasks():
         from MPD.tasks import link_variants_from_other_sources_task
-        link_variants_from_other_sources_task.delay(mpd_product_id, current_source_id)
-        logger.info(
-            "ProductvariantsSources utworzony - task linkowania MPD %s (exclude source %s)",
-            mpd_product_id, current_source_id
+        source_ids = list(
+            ProductvariantsSources.objects.using(mpd_db)
+            .filter(variant__product_id=product_id)
+            .values_list('source_id', flat=True)
+            .distinct()
         )
-    except Exception as e:
-        logger.warning("Błąd uruchomienia tasku linkowania dla MPD %s: %s", getattr(instance.variant, 'product_id', '?'), e)
+        for source_id in source_ids:
+            link_variants_from_other_sources_task.apply_async(
+                args=(product_id, source_id),
+                queue='default',
+            )
+            logger.info(
+                "Produkt MPD %s utworzony - wysłano task linkowania (exclude source %s)",
+                product_id, source_id,
+            )
+
+    transaction.on_commit(_send_link_tasks, using=mpd_db)
 
 
 @receiver(post_save, sender=Sources)
@@ -286,7 +297,10 @@ def on_new_source_created(sender, instance, created, using=None, **kwargs):
         from MPD.source_adapters.registry import get_adapter_for_source
         from MPD.tasks import link_all_products_to_new_source_task
         if get_adapter_for_source(instance.id):
-            link_all_products_to_new_source_task.delay(instance.id)
+            link_all_products_to_new_source_task.apply_async(
+                args=(instance.id,),
+                queue='default',
+            )
             logger.info(
                 "Nowe źródło %s (id=%s) - wysłano task dopinania wariantów po EAN",
                 instance.name, instance.id

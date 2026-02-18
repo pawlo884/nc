@@ -403,11 +403,14 @@ CELERY_TIMEZONE = 'Europe/Warsaw'
 CELERY_ENABLE_UTC = True
 
 # Celery Task Routes - routing do odpowiednich kolejek
+# Musi być zsynchronizowane z app.conf.task_routes w core/celery.py
 CELERY_TASK_ROUTES = {
     # Task importu trafia do kolejki 'import'
     'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
-    # Pozostałe taski używają domyślnej kolejki
+    # Pozostałe taski używają kolejki 'default' (worker celery-default z -Q default)
     'matterhorn1.tasks.*': {'queue': 'default'},
+    'MPD.tasks.*': {'queue': 'default'},
+    'tabu.tasks.*': {'queue': 'default'},
 }
 
 # Celery Beat Schedule - używaj Django periodic tasks zamiast tego

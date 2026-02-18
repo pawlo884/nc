@@ -31,7 +31,7 @@ def _mh_db():
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class CreateMpdVariantsTest(TestCase):
-    """Testy create_mpd_variants - ORM, ProductvariantsSources, sygnał"""
+    """Testy create_mpd_variants - ORM, ProductvariantsSources, task linkowania na koniec"""
 
     databases = '__all__'
 
@@ -94,7 +94,7 @@ class CreateMpdVariantsTest(TestCase):
         self.assertEqual(pv_count, 2)
 
     def test_create_mpd_variants_creates_productvariants_sources(self):
-        """create_mpd_variants tworzy ProductvariantsSources (dzięki czemu sygnał uruchomi task)"""
+        """create_mpd_variants tworzy ProductvariantsSources (task linkowania wysyłany na koniec)"""
         result = create_mpd_variants(
             mpd_product_id=self.mpd_product.id,
             matterhorn_product_id=self.mh_product.id,
@@ -178,19 +178,18 @@ class CreateMpdVariantsTest(TestCase):
         ).count()
         self.assertEqual(pv_count, 2)
 
-    def test_create_mpd_variants_signal_triggers_link_task(self):
-        """Sygnał post_save na ProductvariantsSources wywołuje task linkowania"""
+    def test_create_mpd_variants_sends_one_link_task_at_end(self):
+        """create_mpd_variants wysyła jeden task linkowania po EAN na koniec (1 na produkt)."""
         with patch('MPD.tasks.link_variants_from_other_sources_task') as mock_task:
             create_mpd_variants(
                 mpd_product_id=self.mpd_product.id,
                 matterhorn_product_id=self.mh_product.id,
                 size_category='test_category',
             )
-            self.assertGreaterEqual(
-                mock_task.delay.call_count,
-                1,
-                "Task linkowania powinien być wywołany przy tworzeniu ProductvariantsSources",
-            )
+            mock_task.apply_async.assert_called_once()
+            call_kw = mock_task.apply_async.call_args
+            self.assertEqual(call_kw[1]['args'], (self.mpd_product.id, self.mpd_source.id))
+            self.assertEqual(call_kw[1].get('queue'), 'default')
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
