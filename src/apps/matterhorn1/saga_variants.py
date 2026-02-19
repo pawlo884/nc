@@ -175,14 +175,13 @@ def create_mpd_variants(
                         variant.variant_id,
                     )
 
-            # Utwórz nowy wariant jeśli nie znaleziono
+            # Utwórz nowy wariant jeśli nie znaleziono (producer_code tylko w ProductvariantsSources)
             if variant is None:
                 variant = ProductVariants.objects.using(mpd_db).create(
                     product_id=mpd_product_id,
                     color_id=color_id,
                     producer_color_id=producer_color_id,
                     size=size,
-                    producer_code=producer_code or '',
                     iai_product_id=iai_product_id,
                 )
                 logger.info(

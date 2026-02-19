@@ -530,8 +530,8 @@ class SagaService:
         return {"matterhorn_product_id": matterhorn_data['product_id']}
 
     @staticmethod
-    def _delete_matterhorn_product_mapping(matterhorn_data: Dict) -> Dict:
-        """Usuń mapping produktu w matterhorn1 (kompensacja)"""
+    def _delete_matterhorn_product_mapping(matterhorn_data: Dict, **kwargs) -> Dict:
+        """Usuń mapping produktu w matterhorn1 (kompensacja). kwargs (np. mpd_product_id) ignorowane."""
         from matterhorn1.models import Product
 
         logger.info(
