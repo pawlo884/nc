@@ -38,12 +38,13 @@ def admin_update_producer_code(request):
         except ProductVariants.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Wariant nie istnieje'}, status=404)
 
-        # Aktualizuj kod producenta
-        variant.producer_code = producer_code
-        variant.save(using='MPD')
+        # Aktualizuj kod producenta w product_variants_sources (wszystkie źródła tego wariantu)
+        updated = ProductvariantsSources.objects.using('MPD').filter(
+            variant_id=variant_id
+        ).update(producer_code=producer_code[:255] if producer_code else None)
 
         logger.info(
-            f"Zaktualizowano kod producenta dla wariantu {variant_id}: {producer_code}")
+            f"Zaktualizowano kod producenta dla wariantu {variant_id} ({updated} źródeł): {producer_code}")
 
         return JsonResponse({
             'status': 'success',
@@ -718,7 +719,8 @@ class ProductsAdmin(admin.ModelAdmin):
             sources_display = "<br>".join(
                 item[1] for item in group_items if item[1] and item[1] != "-"
             ) or "-"
-            eans_display = group_items[0][2] if group_items else "-"
+            # EAN: jedna wartość (wspólna dla wiersza), z klucza grupy
+            eans_display = canonical_ean if canonical_ean != "-" else "-"
             # Zsumuj stock i pobierz ceny dla wszystkich variant_id
             total_stock = 0
             prices = []
@@ -734,17 +736,15 @@ class ProductsAdmin(admin.ModelAdmin):
             prices_str = "<br>".join(prices) if prices else "-"
             retail_price_str = f"{retail_map.get(variant_ids[0], '-')} PLN" if retail_map.get(
                 variant_ids[0]) is not None else "-"
-            # Kod producenta z product_variants_sources.producer_code (fallback: other, variant_uid)
+            # Kod producenta wyłącznie z product_variants_sources.producer_code (bez other/mpn/variant_uid)
             producer_codes_lines = []
             for variant_id in variant_ids:
                 for s in sources_map.get(variant_id, []):
-                    code = (getattr(s, 'producer_code', None) or s.other or getattr(s, 'mpn', None) or '').strip()
-                    if not code and s.variant_uid is not None:
-                        code = str(s.variant_uid)
-                    code = code or '-'
-                    producer_codes_lines.append(
-                        f"{escape(s.source.name if s.source else '-')}: {escape(code)}"
-                    )
+                    code = (getattr(s, 'producer_code', None) or '').strip() or None
+                    if code:
+                        producer_codes_lines.append(
+                            f"{escape(s.source.name if s.source else '-')}: {escape(code)}"
+                        )
             producer_code_cell = "<br>".join(producer_codes_lines) if producer_codes_lines else "-"
 
             html += f"<tr><td style='{cell_style}'>{color}</td><td style='{cell_style}'>{producer_color}</td><td style='{cell_style}'>{size}</td><td style='{cell_style}'>{producer_code_cell}</td><td style='{cell_style}'>{total_stock}</td><td style='{cell_style}'>{prices_str}</td><td style='{cell_style}'>{retail_price_str}</td><td style='{cell_style}'>{sources_display}</td><td style='{cell_style}'>{eans_display}</td></tr>"
@@ -1170,14 +1170,13 @@ class AttributesAdmin(admin.ModelAdmin):
 @admin.register(ProductVariants)
 class ProductVariantsAdmin(admin.ModelAdmin):
     list_display = ['variant_id', 'product', 'color', 'producer_color',
-                    'size', 'producer_code', 'iai_product_id', 'updated_at']
+                    'size', 'iai_product_id', 'updated_at']
     list_filter = ['color', 'producer_color', 'size', 'updated_at']
-    search_fields = ['variant_id', 'product__name',
-                     'producer_code', 'iai_product_id']
+    search_fields = ['variant_id', 'product__name', 'iai_product_id']
     raw_id_fields = ['product', 'color', 'producer_color', 'size']
     readonly_fields = ['variant_id', 'updated_at']
     fields = ['product', 'color', 'producer_color', 'size',
-              'producer_code', 'iai_product_id', 'exported_to_iai']
+              'iai_product_id', 'exported_to_iai']
     show_full_result_count = False
     list_per_page = 50
 

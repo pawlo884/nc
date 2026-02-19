@@ -215,8 +215,13 @@ class TabuProductAdmin(admin.ModelAdmin):
                         mpd_data = {'name': r[0] or '', 'description': r[1] or '', 'short_description': r[2] or '', 'brand': r[3] or ''}
 
                     cursor.execute(
-                        "SELECT c.name, pv.producer_code FROM product_variants pv "
-                        "LEFT JOIN colors c ON pv.producer_color_id = c.id WHERE pv.product_id = %s LIMIT 1",
+                        """SELECT c.name,
+                            (SELECT pvs.producer_code FROM product_variants_sources pvs
+                             WHERE pvs.variant_id = pv.variant_id AND pvs.producer_code IS NOT NULL AND pvs.producer_code != ''
+                             LIMIT 1)
+                            FROM product_variants pv
+                            LEFT JOIN colors c ON pv.producer_color_id = c.id
+                            WHERE pv.product_id = %s LIMIT 1""",
                         [product.mapped_product_uid]
                     )
                     r = cursor.fetchone()

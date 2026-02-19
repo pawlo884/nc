@@ -285,15 +285,14 @@ class DatabaseUtils:
 
                     cursor.execute("""
                         INSERT INTO product_variants (
-                            variant_id, product_id, color_id, size_id, 
-                            producer_code, iai_product_id, updated_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                            variant_id, product_id, color_id, size_id,
+                            iai_product_id, updated_at
+                        ) VALUES (%s, %s, %s, %s, %s, NOW())
                     """, [
                         variant_id,
                         variant_data.get('product_id'),
                         variant_data.get('color_id'),
                         variant_data.get('size_id'),
-                        variant_data.get('producer_code'),
                         variant_data.get('iai_product_id')
                     ])
 

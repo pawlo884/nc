@@ -55,7 +55,7 @@ alwaysApply: true
 - **to_internal_value** dla custom input
 
 ## Bazy danych
-- **Database routing** w nc/db_routers.py
+- **Database routing** w core/db_routers.py (projekt: src/core/)
 - **using** parameter w QuerySet operations
 - **select_related** i **prefetch_related** dla optymalizacji
 - **only()** i **defer()** dla select_related
@@ -67,12 +67,13 @@ alwaysApply: true
 - **--empty** dla custom migrations
 - **data migrations** dla zmian danych
 - **squash migrations** dla czystości
+- **manage.py** jest w katalogu **src/** – komendy uruchamiaj z `src/` (np. `cd src && python manage.py ...`) lub `python src/manage.py ...` z roota.
 - **Zawsze określaj bazę danych i settings** w komendach:
-  - `python manage.py migrate --database=zzz_matterhorn1 --settings=nc.settings.dev`
-  - `python manage.py migrate --database=zzz_default --settings=nc.settings.dev`
-  - `python manage.py migrate --database=zzz_matterhorn --settings=nc.settings.dev`
-  - `python manage.py migrate --database=zzz_MPD --settings=nc.settings.dev`
-  - `python manage.py migrate --database=zzz_web_agent --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_matterhorn1 --settings=core.settings.dev`
+  - `python manage.py migrate --database=zzz_default --settings=core.settings.dev`
+  - `python manage.py migrate --database=zzz_matterhorn --settings=core.settings.dev`
+  - `python manage.py migrate --database=zzz_MPD --settings=core.settings.dev`
+  - `python manage.py migrate --database=zzz_web_agent --settings=core.settings.dev`
   - **Tabu (dev):** tylko alias `zzz_tabu` – `python manage.py migrate tabu --database=zzz_tabu`. Szczegóły: docs/tabu/database.md
 
 ## Testy

@@ -16,7 +16,7 @@ alwaysApply: true
 
 ## Konfiguracja środowiska
 - **Plik .env.dev** jest w .cursorignore - łączysz się z bazą przez settings.dev
-- **Ustawienia**: nc/settings/dev.py dla development
+- **Ustawienia**: core/settings/dev.py (ścieżka: src/core/settings/dev.py). **manage.py** w src/.
 - **Baza danych**: PostgreSQL z wieloma bazami danych
 - **Redis**: Używany dla Celery i cache
 

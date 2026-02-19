@@ -53,13 +53,14 @@ def link_variants_from_other_sources(
     stats = {'linked_count': 0, 'sources_processed': 0, 'errors': []}
 
     try:
-        variants = list(
-            ProductVariants.objects.using(db).filter(product_id=mpd_product_id)
+        # Tylko variant_id – unikamy SELECT kolumn usuniętych (np. producer_code)
+        variant_ids = list(
+            ProductVariants.objects.using(db)
+            .filter(product_id=mpd_product_id)
+            .values_list('variant_id', flat=True)
         )
-        if not variants:
+        if not variant_ids:
             return stats
-
-        variant_ids = [v.variant_id for v in variants]
         sources_qs = ProductvariantsSources.objects.using(db).filter(
             variant_id__in=variant_ids
         )
@@ -111,12 +112,13 @@ def link_variants_from_other_sources(
                         continue
 
                     variant_uid_int = _variant_uid_int(m)
+                    # producer_code tylko gdy jasno podany z hurtowni, inaczej null
+                    pc = (getattr(m, 'producer_code', None) or '').strip()[:255] or None
                     defaults_pvs = {
                         'ean': (m.ean or '')[:50] if m.ean else '',
                         'variant_uid': variant_uid_int,
+                        'producer_code': pc,
                     }
-                    if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
-                        defaults_pvs['producer_code'] = (m.producer_code or '').strip()[:255]
                     pvs, created = ProductvariantsSources.objects.using(db).get_or_create(
                         variant_id=mpd_variant_id,
                         source=source,
@@ -166,13 +168,23 @@ def link_variants_from_other_sources(
                             )
 
                 # Pozostałe warianty z tego samego produktu w źródle (wszystkie hurtownie)
+                # first_mpd: pierwszy wariant MPD (color_id, producer_color_id) – z variant_ids, nie „variants”
+                if not variant_ids:
+                    stats['sources_processed'] += 1
+                    continue
+                first_mpd = (
+                    ProductVariants.objects.using(db)
+                    .filter(variant_id=variant_ids[0])
+                    .only('variant_id', 'color_id', 'producer_color_id')
+                    .first()
+                )
+                if not first_mpd:
+                    stats['sources_processed'] += 1
+                    continue
                 ean_linked: Set[str] = set(variant_by_ean.keys())
                 for source_product_id in updated_source_products:
                     try:
                         all_in_source = adapter.get_all_variants_for_product(source_product_id)
-                        first_mpd = variants[0] if variants else None
-                        if not first_mpd:
-                            continue
                         for m in all_in_source:
                             ean_norm = normalize_ean(m.ean) if m.ean else ''
                             if ean_norm and ean_norm in ean_linked:
@@ -192,7 +204,8 @@ def link_variants_from_other_sources(
                                         unit=None,
                                         name_lower=size_name.lower() if size_name else '',
                                     )
-                            # Kod producenta w ProductvariantsSources.producer_code (per hurtownia)
+                            # producer_code tylko gdy jasno podany z hurtowni, inaczej null
+                            pc = (getattr(m, 'producer_code', None) or '').strip()[:255] or None
                             new_pv = ProductVariants.objects.using(db).create(
                                 product_id=mpd_product_id,
                                 color_id=first_mpd.color_id,
@@ -205,7 +218,7 @@ def link_variants_from_other_sources(
                                 source=source,
                                 ean=(m.ean or '')[:50] if m.ean else '',
                                 variant_uid=variant_uid_int,
-                                producer_code=(getattr(m, 'producer_code', None) or '').strip()[:255] or None,
+                                producer_code=pc,
                             )
                             StockAndPrices.objects.using(db).create(
                                 variant_id=new_pv.variant_id,
@@ -264,9 +277,12 @@ def link_all_products_to_new_source(new_source_id: int) -> Dict:
         return stats
 
     ean_to_variant = {}
-    for pvs in ProductvariantsSources.objects.using(db).select_related('variant').filter(
+    # only() na variant unika SELECT usuniętych kolumn (np. producer_code)
+    for pvs in ProductvariantsSources.objects.using(db).filter(
         ean__isnull=False
-    ).exclude(ean=''):
+    ).exclude(ean='').select_related('variant').only(
+        'variant_id', 'ean', 'variant__variant_id', 'variant__product_id'
+    ):
         ean_norm = normalize_ean(pvs.ean)
         if ean_norm:
             ean_to_variant[ean_norm] = (pvs.variant_id, pvs.variant.product_id)
@@ -286,12 +302,13 @@ def link_all_products_to_new_source(new_source_id: int) -> Dict:
 
         try:
             variant_uid_int = _variant_uid_int(m)
+            # producer_code tylko gdy jasno podany z hurtowni, inaczej null
+            pc = (getattr(m, 'producer_code', None) or '').strip()[:255] or None
             defaults_pvs = {
                 'ean': (m.ean or '')[:50] if m.ean else '',
                 'variant_uid': variant_uid_int,
+                'producer_code': pc,
             }
-            if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
-                defaults_pvs['producer_code'] = (m.producer_code or '').strip()[:255]
             pvs, created = ProductvariantsSources.objects.using(db).get_or_create(
                 variant_id=mpd_variant_id,
                 source=source,

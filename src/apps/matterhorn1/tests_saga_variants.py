@@ -108,6 +108,40 @@ class CreateMpdVariantsTest(TestCase):
         ).count()
         self.assertEqual(pvs_count, 2)
 
+    def test_create_mpd_variants_saves_producer_code_ean_variant_uid_in_productvariants_sources(self):
+        """create_mpd_variants zapisuje producer_code, ean i variant_uid w product_variants_sources."""
+        result = create_mpd_variants(
+            mpd_product_id=self.mpd_product.id,
+            matterhorn_product_id=self.mh_product.id,
+            size_category='test_category',
+            producer_code='PROD-XYZ-123',
+        )
+        self.assertEqual(result['created_variants'], 2)
+
+        mpd_db = _mpd_db()
+        pvs_list = list(
+            ProductvariantsSources.objects.using(mpd_db)
+            .filter(
+                variant__product_id=self.mpd_product.id,
+                source=self.mpd_source,
+            )
+            .order_by('variant_uid')
+        )
+        self.assertEqual(len(pvs_list), 2)
+
+        # Oba wiersze mają producer_code z parametru
+        for pvs in pvs_list:
+            self.assertEqual(pvs.producer_code, 'PROD-XYZ-123')
+
+        # EAN i variant_uid z wariantów Matterhorn (100001 -> ean 5901234567890, 100002 -> 5901234567891)
+        eans = {pvs.ean for pvs in pvs_list}
+        self.assertIn('5901234567890', eans)
+        self.assertIn('5901234567891', eans)
+
+        variant_uids = {pvs.variant_uid for pvs in pvs_list}
+        self.assertIn(100001, variant_uids)
+        self.assertIn(100002, variant_uids)
+
     def test_create_mpd_variants_creates_stock_and_prices(self):
         """create_mpd_variants tworzy StockAndPrices"""
         result = create_mpd_variants(

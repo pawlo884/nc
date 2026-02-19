@@ -71,12 +71,13 @@ alwaysApply: true
 - **Internal IPs** skonfigurowane
 
 ## Komendy Django z bazami danych
+- **manage.py** znajduje się w katalogu **src/** (uruchomienie: `cd src` then `python manage.py ...` lub z roota `python src/manage.py ...`).
 - **Zawsze określaj bazę danych i settings** w komendach:
-  - `python manage.py migrate --database=zzz_matterhorn1 --settings=nc.settings.dev`
-  - `python manage.py migrate --database=zzz_default --settings=nc.settings.dev`
-  - `python manage.py migrate --database=zzz_matterhorn --settings=nc.settings.dev`
-  - `python manage.py migrate --database=zzz_MPD --settings=nc.settings.dev`
-  - `python manage.py migrate --database=zzz_web_agent --settings=nc.settings.dev`
+  - `python manage.py migrate --database=zzz_matterhorn1 --settings=core.settings.dev`
+  - `python manage.py migrate --database=zzz_default --settings=core.settings.dev`
+  - `python manage.py migrate --database=zzz_matterhorn --settings=core.settings.dev`
+  - `python manage.py migrate --database=zzz_MPD --settings=core.settings.dev`
+  - `python manage.py migrate --database=zzz_web_agent --settings=core.settings.dev`
 - **makemigrations** z określeniem aplikacji i bazy
-- **shell** z określeniem bazy: `python manage.py shell --settings=nc.settings.dev`
-- **dbshell** dla konkretnej bazy: `python manage.py dbshell --database=matterhorn1 --settings=nc.settings.dev`
+- **shell** z określeniem bazy: `python manage.py shell --settings=core.settings.dev`
+- **dbshell** dla konkretnej bazy: `python manage.py dbshell --database=matterhorn1 --settings=core.settings.dev`

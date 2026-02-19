@@ -52,7 +52,7 @@ class MatterhornAdapter(SourceAdapter):
                     size=v.name or '',
                     color=v.product.color if v.product else '',
                     source_product_id=v.product_id if v.product_id else None,
-                    producer_code=(v.variant_uid or v.name or '').strip() or None,
+                    producer_code=getattr(v, 'producer_code', None) and (v.producer_code or '').strip() or None,
                 ))
         return result
 
@@ -82,7 +82,7 @@ class MatterhornAdapter(SourceAdapter):
                 size=v.name or '',
                 color=v.product.color if v.product else '',
                 source_product_id=v.product_id if v.product_id else None,
-                producer_code=(v.variant_uid or v.name or '').strip() or None,
+                producer_code=getattr(v, 'producer_code', None) and (v.producer_code or '').strip() or None,
             ))
         return result
 

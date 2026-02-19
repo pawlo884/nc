@@ -1,8 +1,9 @@
 """
 Adapter dla hurtowni Tabu.
 
-Dla źródła Tabu kolumna variant_uid w tabeli product_variants_sources
-przechowuje api_id z tabu_product_variant (pole „id” wariantu z API Tabu).
+Mapowanie na product_variants_sources:
+- variant_uid = api_id z tabu_product_variant (pole „id” wariantu z API Tabu)
+- producer_code = symbol z tabu_product_variant (pusty, gdy symbol pusty)
 """
 from decimal import Decimal
 from typing import List, Optional
@@ -38,7 +39,7 @@ class TabuAdapter(SourceAdapter):
         for v in qs:
             ean_norm = normalize_ean(v.ean)
             if ean_norm in ean_set:
-                # variant_uid -> product_variants_sources.variant_uid (dla Tabu = api_id)
+                # variant_uid = api_id; producer_code = symbol z tabu_product_variant
                 result.append(VariantMatch(
                     ean=ean_norm,
                     variant_uid=str(v.api_id),
@@ -63,7 +64,7 @@ class TabuAdapter(SourceAdapter):
         result = []
         for v in qs:
             ean_norm = normalize_ean(v.ean) if v.ean else ''
-            # variant_uid -> product_variants_sources.variant_uid (dla Tabu = api_id)
+            # variant_uid = api_id; producer_code = symbol z tabu_product_variant
             result.append(VariantMatch(
                 ean=ean_norm,
                 variant_uid=str(v.api_id),

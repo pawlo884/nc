@@ -148,7 +148,6 @@ class ProductVariantsModelTest(TestCase):
             product=self.product,
             color=self.color,
             size=self.size,
-            producer_code='PROD001',
             iai_product_id=12345,
             exported_to_iai=False
         )
@@ -156,7 +155,6 @@ class ProductVariantsModelTest(TestCase):
         self.assertEqual(variant.product, self.product)
         self.assertEqual(variant.color, self.color)
         self.assertEqual(variant.size, self.size)
-        self.assertEqual(variant.producer_code, 'PROD001')
         self.assertEqual(variant.iai_product_id, 12345)
         self.assertFalse(variant.exported_to_iai)
 
@@ -403,7 +401,6 @@ class MPDProductModelIntegrationTest(TestCase):
             product=self.product,
             color=self.color,
             size=self.size,
-            producer_code='PROD001',
             exported_to_iai=True
         )
 
@@ -411,7 +408,6 @@ class MPDProductModelIntegrationTest(TestCase):
             product=self.product,
             color=self.color,
             size=None,
-            producer_code='PROD002',
             exported_to_iai=False
         )
 

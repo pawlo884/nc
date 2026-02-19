@@ -337,9 +337,12 @@ class ProductAdmin(admin.ModelAdmin):
                     producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]}
                                        for row in cursor.fetchall()]
 
-                    # Pobierz producer_color_name i producer_code z pierwszego wariantu
+                    # Pobierz producer_color_name i producer_code z pierwszego wariantu (producer_code z product_variants_sources)
                     cursor.execute("""
-                        SELECT c.name, pv.producer_code
+                        SELECT c.name,
+                            (SELECT pvs.producer_code FROM product_variants_sources pvs
+                             WHERE pvs.variant_id = pv.variant_id AND pvs.producer_code IS NOT NULL AND pvs.producer_code != ''
+                             LIMIT 1)
                         FROM product_variants pv
                         LEFT JOIN colors c ON pv.producer_color_id = c.id
                         WHERE pv.product_id = %s
@@ -1346,12 +1349,12 @@ class ProductAdmin(admin.ModelAdmin):
                 color_id = self._get_or_create_color(
                     product.color or 'Brak koloru')
 
-                # Utwórz wariant w MPD
+                # Utwórz wariant w MPD (producer_code tylko w product_variants_sources)
                 cursor.execute("""
-                    INSERT INTO product_variants (product_id, size_id, color_id, producer_code)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO product_variants (product_id, size_id, color_id)
+                    VALUES (%s, %s, %s)
                     RETURNING variant_id
-                """, [mpd_product_id, size_id, color_id, f"{product.product_uid}_{variant.name}"])
+                """, [mpd_product_id, size_id, color_id])
 
                 variant_id = cursor.fetchone()[0]
                 mapped_variants.append(variant_id)
@@ -1615,20 +1618,21 @@ class ProductAdmin(admin.ModelAdmin):
                     try:
                         if producer_color_id:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, producer_code, iai_product_id, updated_at)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-                            """, [variant_id, mapped_product_uid, color_id, producer_color_id, size_id, producer_code, iai_product_id])
+                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, iai_product_id, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                            """, [variant_id, mapped_product_uid, color_id, producer_color_id, size_id, iai_product_id])
                         else:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, producer_code, iai_product_id, updated_at)
-                                VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                            """, [variant_id, mapped_product_uid, color_id, size_id, producer_code, iai_product_id])
+                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, iai_product_id, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, NOW())
+                            """, [variant_id, mapped_product_uid, color_id, size_id, iai_product_id])
 
-                        # Dodaj wpis do product_variants_sources
+                        # Dodaj wpis do product_variants_sources (producer_code tylko tutaj)
+                        producer_code_val = (producer_code or '')[:255] if producer_code else None
                         mpd_cursor.execute("""
-                            INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id)
-                            VALUES (%s, %s, %s, %s)
-                        """, [variant_id, ean, variant_uid, 2])
+                            INSERT INTO product_variants_sources (variant_id, ean, variant_uid, source_id, producer_code)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, [variant_id, ean, variant_uid, 2, producer_code_val])
                         variant_logger.info(
                             f"[add_new_variants_to_mpd] Dodano wariant {variant_uid} do product_variants i product_variants_sources")
                     except Exception as e:

@@ -193,7 +193,6 @@ class ProductVariants(models.Model):
         Colors, on_delete=models.CASCADE, db_column='producer_color_id', null=True, blank=True, related_name='producer_variants')
     size = models.ForeignKey(
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
-    producer_code = models.CharField(max_length=255, blank=True, null=True)
     iai_product_id = models.IntegerField(blank=True, null=True)
     exported_to_iai = models.BooleanField(
         default=False, verbose_name='Wyeksportowany do IAI')
