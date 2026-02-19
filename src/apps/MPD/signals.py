@@ -259,11 +259,13 @@ def on_product_created_schedule_link_task(sender, instance, created, using=None,
     if db != mpd_db and 'MPD' not in str(db):
         return
     product_id = instance.id
+    # Użyj tej samej bazy co zapis (Tabu używa 'MPD', dev może mieć 'zzz_MPD') – on_commit musi być na tej samej transakcji
+    connection_for_commit = db
 
     def _send_link_tasks():
         from MPD.tasks import link_variants_from_other_sources_task
         source_ids = list(
-            ProductvariantsSources.objects.using(mpd_db)
+            ProductvariantsSources.objects.using(connection_for_commit)
             .filter(variant__product_id=product_id)
             .values_list('source_id', flat=True)
             .distinct()
@@ -278,7 +280,7 @@ def on_product_created_schedule_link_task(sender, instance, created, using=None,
                 product_id, source_id,
             )
 
-    transaction.on_commit(_send_link_tasks, using=mpd_db)
+    transaction.on_commit(_send_link_tasks, using=connection_for_commit)
 
 
 @receiver(post_save, sender=Sources)

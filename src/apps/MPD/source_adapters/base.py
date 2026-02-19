@@ -24,6 +24,7 @@ class VariantMatch:
     size: Optional[str] = None
     color: Optional[str] = None
     source_product_id: Optional[int] = None  # ID produktu w hurtowni (do ustawienia mapped_product_uid)
+    producer_code: Optional[str] = None  # Kod producenta (symbol, variant_uid itp.) – do ProductvariantsSources.other i ProductVariants.producer_code
 
 
 class SourceAdapter(ABC):
@@ -51,3 +52,29 @@ class SourceAdapter(ABC):
             Lista VariantMatch
         """
         raise NotImplementedError
+
+    def get_all_variants_for_product(
+        self,
+        source_product_id: int,
+    ) -> List[VariantMatch]:
+        """
+        Zwraca wszystkie warianty produktu w hurtowni (do dopinania „pozostałych” wariantów).
+
+        Args:
+            source_product_id: ID produktu w systemie hurtowni
+
+        Returns:
+            Lista VariantMatch (ean może być pusty)
+        """
+        return []
+
+    def update_source_product_mapped(
+        self,
+        source_product_id: int,
+        mpd_product_id: int,
+    ) -> None:
+        """
+        Ustawia mapped_product_uid w hurtowni źródłowej (po zlinkowaniu wariantów do MPD).
+        Adapter może nadpisać; domyślnie brak akcji (dla hurtowni bez takiego pola).
+        """
+        pass

@@ -704,7 +704,8 @@ class ProductsAdmin(admin.ModelAdmin):
                 sources_names) if sources_names else "-"
             eans_display = "<br>".join(eans) if eans else "-"
             # Grupowanie po EAN – ten sam EAN = ten sam produkt (bez sources_display)
-            canonical_ean = "|".join(sorted(set(e for e in eans if e and e != '-'))) or "-"
+            canonical_ean = "|".join(
+                sorted(set(e for e in eans if e and e != '-'))) or "-"
             key = (color, producer_color, size, canonical_ean)
             if key not in grouped:
                 grouped[key] = []
@@ -855,7 +856,8 @@ class ProductsAdmin(admin.ModelAdmin):
                     # Upewnij się, że URL jest bezwzględny (zaczyna się od http:// lub https://)
                     if url and not url.startswith(('http://', 'https://')):
                         # Jeśli to surowa ścieżka, nie używaj jej jako linku
-                        logger.warning(f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
+                        logger.warning(
+                            f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
                         url = "#"
                     html += f'<a href="{url}" target="_blank" rel="noopener noreferrer"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
                 html += '</div>'
@@ -869,7 +871,8 @@ class ProductsAdmin(admin.ModelAdmin):
                     # Upewnij się, że URL jest bezwzględny (zaczyna się od http:// lub https://)
                     if url and not url.startswith(('http://', 'https://')):
                         # Jeśli to surowa ścieżka, nie używaj jej jako linku
-                        logger.warning(f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
+                        logger.warning(
+                            f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
                         url = "#"
                     html += f'<a href="{url}" target="_blank" rel="noopener noreferrer"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
                 html += '</div>'
@@ -881,7 +884,8 @@ class ProductsAdmin(admin.ModelAdmin):
                 # Upewnij się, że URL jest bezwzględny (zaczyna się od http:// lub https://)
                 if url and not url.startswith(('http://', 'https://')):
                     # Jeśli to surowa ścieżka, nie używaj jej jako linku
-                    logger.warning(f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
+                    logger.warning(
+                        f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
                     url = "#"
                 html += f'<a href="{url}" target="_blank" rel="noopener noreferrer"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
             html += '</div>'
@@ -916,7 +920,8 @@ class ProductsAdmin(admin.ModelAdmin):
                             first_img = images_rel.first() if images_rel and hasattr(
                                 images_rel, 'first') else None
                             if first_img:
-                                img_url = resolve_image_url(first_img.file_path) or first_img.file_path
+                                img_url = resolve_image_url(
+                                    first_img.file_path) or first_img.file_path
                                 img_html = f'<a href="{admin_url}"><img src="{img_url}" style="max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;" /></a>'
                             name_html = f'<a href="{admin_url}" style="vertical-align:middle;">{prod.name}</a>'
                             html += f"<div style='display:flex; align-items:center; gap:8px;'>{img_html}{name_html}</div>"
@@ -946,7 +951,8 @@ class ProductsAdmin(admin.ModelAdmin):
                 first_img = images_rel.first() if images_rel and hasattr(
                     images_rel, 'first') else None
                 if first_img:
-                    img_url = resolve_image_url(first_img.file_path) or first_img.file_path
+                    img_url = resolve_image_url(
+                        first_img.file_path) or first_img.file_path
                     img_html = f'<a href=\"{admin_url}\"><img src=\"{img_url}\" style=\"max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;\" /></a>'
                 name_html = f'<a href=\"{admin_url}\" style=\"vertical-align:middle;\">{p.name}</a>'
                 html += f"<div style='display:flex; align-items:center; gap:8px;'>{img_html}{name_html}</div>"
@@ -1280,7 +1286,7 @@ class ProductImageAdmin(admin.ModelAdmin):
             if not url.startswith(('http://', 'https://')):
                 # Jeśli to bucket key, skonwertuj na URL
                 url = resolve_image_url(obj.file_path) or obj.file_path
-            
+
             if url and url.startswith(('http://', 'https://')):
                 return format_html(
                     '<a href="{}" target="_blank" title="Kliknij, aby otworzyć pełny obraz">'
@@ -1297,13 +1303,15 @@ class ProductImageAdmin(admin.ModelAdmin):
                 # Jeśli to ścieżka, nie używaj jej jako ID
                 if '/' in str(obj.product_id) or 'MPD_test' in str(obj.product_id) or 'MPD/' in str(obj.product_id):
                     from django.contrib import messages
-                    messages.error(request, f"Nieprawidłowe product_id: {obj.product_id}. Oczekiwano liczby, otrzymano ścieżkę.")
+                    messages.error(
+                        request, f"Nieprawidłowe product_id: {obj.product_id}. Oczekiwano liczby, otrzymano ścieżkę.")
                     return
                 try:
                     obj.product_id = int(obj.product_id)
                 except (ValueError, TypeError):
                     from django.contrib import messages
-                    messages.error(request, f"Nieprawidłowe product_id: {obj.product_id}.")
+                    messages.error(
+                        request, f"Nieprawidłowe product_id: {obj.product_id}.")
                     return
         obj.save(using='MPD')
 

@@ -3,13 +3,14 @@ Logika dopinania wariantów z innych hurtowni po EAN.
 """
 import logging
 from decimal import Decimal
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 
 from django.utils import timezone
 
 from MPD.models import (
     ProductVariants,
     ProductvariantsSources,
+    Sizes,
     Sources,
     StockAndPrices,
 )
@@ -25,23 +26,13 @@ def _get_mpd_db() -> str:
     return 'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD'
 
 
-def _update_source_product_mapped(source, source_product_id: int, mpd_product_id: int) -> None:
-    """Ustawia mapped_product_uid w hurtowni źródłowej (Tabu/Matterhorn)."""
-    from django.conf import settings
-    name = (source.name or '').lower()
-    if 'tabu' in name:
-        from tabu.models import TabuProduct
-        tabu_db = 'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu'
-        TabuProduct.objects.using(tabu_db).filter(id=source_product_id).update(
-            mapped_product_uid=mpd_product_id
-        )
-    elif 'matterhorn' in name:
-        from matterhorn1.models import Product
-        mh_db = 'zzz_matterhorn1' if 'zzz_matterhorn1' in settings.DATABASES else 'matterhorn1'
-        Product.objects.using(mh_db).filter(id=source_product_id).update(
-            mapped_product_uid=mpd_product_id,
-            is_mapped=True
-        )
+def _variant_uid_int(m) -> Optional[int]:
+    """Konwersja variant_uid z matcha na int do kolumny ProductvariantsSources.variant_uid."""
+    uid = getattr(m, 'variant_uid', None)
+    if uid is None:
+        return None
+    s = str(uid).strip()
+    return int(s) if s.isdigit() else None
 
 
 def link_variants_from_other_sources(
@@ -109,7 +100,7 @@ def link_variants_from_other_sources(
                     "link_variants_from_other_sources: źródło %s zwróciło %s dopasowań",
                     source.name, len(matches)
                 )
-                updated_source_products = set()  # unikalne produkty w hurtowni (mapped_product_uid)
+                updated_source_products: Set[int] = set()  # unikalne produkty w hurtowni (mapped_product_uid)
                 for m in matches:
                     mpd_variant_id = variant_by_ean.get(m.ean)
                     if not mpd_variant_id:
@@ -119,20 +110,37 @@ def link_variants_from_other_sources(
                         )
                         continue
 
+                    variant_uid_int = _variant_uid_int(m)
+                    defaults_pvs = {
+                        'ean': (m.ean or '')[:50] if m.ean else '',
+                        'variant_uid': variant_uid_int,
+                    }
+                    if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
+                        defaults_pvs['other'] = (m.producer_code or '').strip()[:50]
                     pvs, created = ProductvariantsSources.objects.using(db).get_or_create(
                         variant_id=mpd_variant_id,
                         source=source,
-                        defaults={
-                            'ean': m.ean,
-                            'variant_uid': int(m.variant_uid) if m.variant_uid.isdigit() else None,
-                        }
+                        defaults=defaults_pvs,
                     )
+                    if not created and pvs.variant_uid is None and variant_uid_int is not None:
+                        pvs.variant_uid = variant_uid_int
+                        pvs.save(update_fields=['variant_uid'], using=db)
                     if created:
                         stats['linked_count'] += 1
                         logger.info(
-                            "Dopięto ProductvariantsSources: variant=%s source=%s ean=%s",
-                            mpd_variant_id, source.name, m.ean
+                            "Dopięto ProductvariantsSources: variant=%s source=%s ean=%s variant_uid=%s",
+                            mpd_variant_id, source.name, m.ean, variant_uid_int
                         )
+                    # Uzupełnij kod producenta na wariancie MPD, jeśli pusty
+                    if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
+                        variant = ProductVariants.objects.using(db).get(variant_id=mpd_variant_id)
+                        if not (variant.producer_code or '').strip():
+                            variant.producer_code = (m.producer_code or '').strip()[:255]
+                            variant.save(update_fields=['producer_code'], using=db)
+                            logger.debug(
+                                "Ustawiono producer_code=%s dla wariantu MPD %s",
+                                variant.producer_code, mpd_variant_id
+                            )
 
                     sap, created = StockAndPrices.objects.using(db).get_or_create(
                         variant_id=mpd_variant_id,
@@ -153,12 +161,12 @@ def link_variants_from_other_sources(
                     # Ustaw mapped_product_uid w hurtowni źródłowej (jak przy ręcznym mapowaniu)
                     if m.source_product_id and m.source_product_id not in updated_source_products:
                         try:
-                            _update_source_product_mapped(
-                                source, m.source_product_id, mpd_product_id
+                            adapter.update_source_product_mapped(
+                                m.source_product_id, mpd_product_id
                             )
                             updated_source_products.add(m.source_product_id)
                             logger.info(
-                                "Ustawiono mapped_product_uid=%s dla produktu %s w %s",
+                                "Ustawiono mapped_product_uid=%s dla produktu %s w źródle %s",
                                 mpd_product_id, m.source_product_id, source.name
                             )
                         except Exception as upd_err:
@@ -166,6 +174,71 @@ def link_variants_from_other_sources(
                                 "Błąd ustawiania mapped_product_uid dla %s: %s",
                                 m.source_product_id, upd_err
                             )
+
+                # Pozostałe warianty z tego samego produktu w źródle (wszystkie hurtownie)
+                ean_linked: Set[str] = set(variant_by_ean.keys())
+                for source_product_id in updated_source_products:
+                    try:
+                        all_in_source = adapter.get_all_variants_for_product(source_product_id)
+                        first_mpd = variants[0] if variants else None
+                        if not first_mpd:
+                            continue
+                        for m in all_in_source:
+                            ean_norm = normalize_ean(m.ean) if m.ean else ''
+                            if ean_norm and ean_norm in ean_linked:
+                                continue
+                            # Nowy wariant MPD dla „pozostałego” rozmiaru z hurtowni
+                            size_name = (m.size or '').strip()[:255] if m.size else ''
+                            size_obj = None
+                            if size_name:
+                                size_obj = (
+                                    Sizes.objects.using(db).filter(name__iexact=size_name).first()
+                                    or Sizes.objects.using(db).filter(name=size_name).first()
+                                )
+                                if not size_obj:
+                                    size_obj = Sizes.objects.using(db).create(
+                                        name=size_name,
+                                        category=None,
+                                        unit=None,
+                                        name_lower=size_name.lower() if size_name else '',
+                                    )
+                            new_pv = ProductVariants.objects.using(db).create(
+                                product_id=mpd_product_id,
+                                color_id=first_mpd.color_id,
+                                producer_color_id=first_mpd.producer_color_id,
+                                size=size_obj,
+                                producer_code=(getattr(m, 'producer_code', None) or '').strip()[:255] or None,
+                            )
+                            variant_uid_int = _variant_uid_int(m)
+                            ProductvariantsSources.objects.using(db).create(
+                                variant_id=new_pv.variant_id,
+                                source=source,
+                                ean=(m.ean or '')[:50] if m.ean else '',
+                                variant_uid=variant_uid_int,
+                                other=(getattr(m, 'producer_code', None) or '').strip()[:50] or None,
+                            )
+                            StockAndPrices.objects.using(db).create(
+                                variant_id=new_pv.variant_id,
+                                source=source,
+                                stock=m.stock or 0,
+                                price=m.price or Decimal('0'),
+                                currency=m.currency or 'PLN',
+                                last_updated=timezone.now(),
+                            )
+                            if ean_norm:
+                                variant_by_ean[ean_norm] = new_pv.variant_id
+                                ean_linked.add(ean_norm)
+                            stats['linked_count'] += 1
+                            logger.info(
+                                "Dodano pozostały wariant z produktu %s: size=%s ean=%s variant_id=%s",
+                                source_product_id, size_name, m.ean, new_pv.variant_id
+                            )
+                    except Exception as rem_err:
+                        logger.exception(
+                            "Błąd dopinania pozostałych wariantów dla produktu %s: %s",
+                            source_product_id, rem_err
+                        )
+                        stats['errors'].append(str(rem_err))
 
                 stats['sources_processed'] += 1
             except Exception as e:
@@ -222,20 +295,32 @@ def link_all_products_to_new_source(new_source_id: int) -> Dict:
         mpd_variant_id, mpd_product_id = key
 
         try:
+            variant_uid_int = _variant_uid_int(m)
+            defaults_pvs = {
+                'ean': (m.ean or '')[:50] if m.ean else '',
+                'variant_uid': variant_uid_int,
+            }
+            if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
+                defaults_pvs['other'] = (m.producer_code or '').strip()[:50]
             pvs, created = ProductvariantsSources.objects.using(db).get_or_create(
                 variant_id=mpd_variant_id,
                 source=source,
-                defaults={
-                    'ean': m.ean,
-                    'variant_uid': int(m.variant_uid) if m.variant_uid.isdigit() else None,
-                }
+                defaults=defaults_pvs,
             )
+            if not created and pvs.variant_uid is None and variant_uid_int is not None:
+                pvs.variant_uid = variant_uid_int
+                pvs.save(update_fields=['variant_uid'], using=db)
             if created:
                 stats['linked_count'] += 1
                 logger.info(
-                    "Dopięto ProductvariantsSources (new source): variant=%s source=%s ean=%s",
-                    mpd_variant_id, source.name, m.ean
+                    "Dopięto ProductvariantsSources (new source): variant=%s source=%s ean=%s variant_uid=%s",
+                    mpd_variant_id, source.name, m.ean, variant_uid_int
                 )
+            if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
+                variant = ProductVariants.objects.using(db).get(variant_id=mpd_variant_id)
+                if not (variant.producer_code or '').strip():
+                    variant.producer_code = (m.producer_code or '').strip()[:255]
+                    variant.save(update_fields=['producer_code'], using=db)
 
             sap, created = StockAndPrices.objects.using(db).get_or_create(
                 variant_id=mpd_variant_id,
@@ -253,7 +338,7 @@ def link_all_products_to_new_source(new_source_id: int) -> Dict:
             # Ustaw mapped_product_uid w nowej hurtowni
             if m.source_product_id and m.source_product_id not in updated_source_products:
                 try:
-                    _update_source_product_mapped(source, m.source_product_id, mpd_product_id)
+                    adapter.update_source_product_mapped(m.source_product_id, mpd_product_id)
                     updated_source_products.add(m.source_product_id)
                     logger.info(
                         "Ustawiono mapped_product_uid=%s dla produktu %s w nowej hurtowni %s",

@@ -17,7 +17,14 @@ _ADAPTER_CACHE: Dict[int, object] = {}
 
 
 def register_adapter(source_name: str, adapter_class: type) -> None:
-    """Rejestruje adapter dla źródła."""
+    """
+    Rejestruje adapter dla hurtowni (źródła).
+
+    Aby dodać nową hurtownię: zaimplementuj klasę dziedziczącą SourceAdapter
+    (get_variants_by_eans, opcjonalnie get_all_variants_for_product i update_source_product_mapped),
+    dodaj wpis Sources w MPD (nazwa zawierająca source_name) i wywołaj register_adapter.
+    Linkowanie używa wszystkich zarejestrowanych adapterów – bez hardkodu nazw hurtowni.
+    """
     _ADAPTER_REGISTRY[source_name] = adapter_class
     logger.debug("Zarejestrowano adapter dla: %s", source_name)
 
@@ -67,7 +74,10 @@ def get_all_adapters() -> List[tuple]:
 
 
 def register_default_adapters() -> None:
-    """Rejestruje domyślne adaptery (Tabu, Matterhorn)."""
+    """
+    Rejestruje domyślne adaptery. Aby dodać kolejną hurtownię, zaimportuj jej adapter
+    i wywołaj register_adapter('Nazwa w Sources', AdapterClass).
+    """
     from .tabu import TabuAdapter
     from .matterhorn import MatterhornAdapter
     register_adapter('Tabu API', TabuAdapter)

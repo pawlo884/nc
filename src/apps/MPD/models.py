@@ -218,7 +218,10 @@ class ProductvariantsSources(models.Model):
     source = models.ForeignKey(
         Sources, on_delete=models.RESTRICT, db_column='source_id', null=True, blank=True)
     ean = models.CharField(max_length=50, blank=True, null=True)
-    variant_uid = models.IntegerField(blank=True, null=True)
+    variant_uid = models.IntegerField(
+        blank=True, null=True,
+        help_text='Identyfikator wariantu w hurtowni: np. dla Tabu = api_id z tabu_product_variant.'
+    )
     gtin14 = models.CharField(max_length=50, blank=True, null=True)
     gtin13 = models.CharField(max_length=50, blank=True, null=True)
     gtin12 = models.CharField(max_length=50, blank=True, null=True)
