@@ -102,7 +102,8 @@ def link_variants_from_other_sources_task(mpd_product_id: int, current_source_id
         mpd_product_id, current_source_id
     )
     try:
-        stats = link_variants_from_other_sources(mpd_product_id, current_source_id)
+        stats = link_variants_from_other_sources(
+            mpd_product_id, current_source_id)
         if stats.get('linked_count'):
             logger.info(
                 "✅ Dopięto %s wariantów z innych hurtowni do produktu MPD %s",

@@ -740,12 +740,14 @@ class ProductsAdmin(admin.ModelAdmin):
             producer_codes_lines = []
             for variant_id in variant_ids:
                 for s in sources_map.get(variant_id, []):
-                    code = (getattr(s, 'producer_code', None) or '').strip() or None
+                    code = (getattr(s, 'producer_code', None)
+                            or '').strip() or None
                     if code:
                         producer_codes_lines.append(
                             f"{escape(s.source.name if s.source else '-')}: {escape(code)}"
                         )
-            producer_code_cell = "<br>".join(producer_codes_lines) if producer_codes_lines else "-"
+            producer_code_cell = "<br>".join(
+                producer_codes_lines) if producer_codes_lines else "-"
 
             html += f"<tr><td style='{cell_style}'>{color}</td><td style='{cell_style}'>{producer_color}</td><td style='{cell_style}'>{size}</td><td style='{cell_style}'>{producer_code_cell}</td><td style='{cell_style}'>{total_stock}</td><td style='{cell_style}'>{prices_str}</td><td style='{cell_style}'>{retail_price_str}</td><td style='{cell_style}'>{sources_display}</td><td style='{cell_style}'>{eans_display}</td></tr>"
         html += "</table>"
