@@ -24,7 +24,7 @@ class VariantMatch:
     size: Optional[str] = None
     color: Optional[str] = None
     source_product_id: Optional[int] = None  # ID produktu w hurtowni (do ustawienia mapped_product_uid)
-    producer_code: Optional[str] = None  # Kod producenta (symbol, variant_uid itp.) – do ProductvariantsSources.other i ProductVariants.producer_code
+    producer_code: Optional[str] = None  # Kod producenta (symbol, variant_uid itp.) → ProductvariantsSources.producer_code (per hurtownia)
 
 
 class SourceAdapter(ABC):

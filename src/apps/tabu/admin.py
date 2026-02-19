@@ -426,10 +426,7 @@ class TabuProductAdmin(admin.ModelAdmin):
                             name=v.color[:50],
                             defaults={'name': v.color[:50]}
                         )
-                    pc = producer_code or (v.symbol or '')[:255]
-                    if not pc and v.symbol:
-                        pc = (v.symbol or '')[:255]
-
+                    # Kod producenta w ProductvariantsSources.producer_code (per hurtownia)
                     # Rozmiar z Tabu -> MPD Sizes
                     size_obj = None
                     if v.size:
@@ -443,7 +440,6 @@ class TabuProductAdmin(admin.ModelAdmin):
                         color=color_obj,
                         producer_color=producer_color,
                         size=size_obj,
-                        producer_code=pc,
                         iai_product_id=v.api_id,
                     )
 
@@ -454,7 +450,7 @@ class TabuProductAdmin(admin.ModelAdmin):
                         defaults={
                             'ean': v.ean[:50] if v.ean else '',
                             'variant_uid': v.api_id,
-                            'other': (v.symbol or '').strip()[:50] or None,
+                            'producer_code': (v.symbol or '').strip()[:255] or None,
                         }
                     )
 
@@ -473,19 +469,22 @@ class TabuProductAdmin(admin.ModelAdmin):
                     # Cena detaliczna = moja cena - użytkownik ustawia ręcznie w MPD
 
                 # Jeśli brak wariantów - utwórz jeden domyślny (brak tabu_product_variant, variant_uid zostaje null)
+                # Kod producenta w ProductvariantsSources.producer_code
                 if not variants:
                     pv = ProductVariants.objects.using(mpd_db).create(
                         product=mpd_product,
                         color=main_color,
                         producer_color=producer_color,
-                        producer_code=producer_code[:255] or (tabu_product.symbol[:255] if tabu_product.symbol else ''),
                         iai_product_id=tabu_product.api_id,
                     )
-                    # Przy braku wariantów w Tabu nie ma tabu_product_variant → variant_uid pozostaje null
+                    # Przy braku wariantów w Tabu nie ma tabu_product_variant → variant_uid null; producer_code = symbol produktu
                     ProductvariantsSources.objects.using(mpd_db).get_or_create(
                         variant=pv,
                         source=tabu_source,
-                        defaults={'ean': tabu_product.ean[:50] if tabu_product.ean else ''}
+                        defaults={
+                            'ean': tabu_product.ean[:50] if tabu_product.ean else '',
+                            'producer_code': (tabu_product.symbol or '').strip()[:255] or None,
+                        }
                     )
                     StockAndPrices.objects.using(mpd_db).get_or_create(
                         variant=pv,

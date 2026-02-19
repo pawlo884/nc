@@ -191,13 +191,14 @@ def create_mpd_variants(
                     producer_color_id,
                 )
 
-            # ProductvariantsSources (task linkowania wyślemy raz na koniec dla produktu)
+            # ProductvariantsSources: kod producenta w producer_code (per hurtownia)
             pvs, pvs_created = ProductvariantsSources.objects.using(mpd_db).get_or_create(
                 variant=variant,
                 source=mh_source,
                 defaults={
                     'ean': (ean or '')[:50] if ean else '',
                     'variant_uid': variant_uid_int,
+                    'producer_code': (producer_code or '').strip()[:255] or None,
                 },
             )
 

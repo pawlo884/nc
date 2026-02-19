@@ -230,6 +230,10 @@ class ProductvariantsSources(models.Model):
     upce = models.CharField(max_length=50, blank=True, null=True)
     mpn = models.CharField(max_length=50, blank=True, null=True)
     other = models.CharField(max_length=50, blank=True, null=True)
+    producer_code = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text='Kod producenta w tej hurtowni (np. symbol w Tabu, variant_uid w Matterhorn).'
+    )
     objects = models.Manager()
 
     class Meta:

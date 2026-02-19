@@ -116,7 +116,7 @@ def link_variants_from_other_sources(
                         'variant_uid': variant_uid_int,
                     }
                     if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
-                        defaults_pvs['other'] = (m.producer_code or '').strip()[:50]
+                        defaults_pvs['producer_code'] = (m.producer_code or '').strip()[:255]
                     pvs, created = ProductvariantsSources.objects.using(db).get_or_create(
                         variant_id=mpd_variant_id,
                         source=source,
@@ -131,16 +131,6 @@ def link_variants_from_other_sources(
                             "Dopięto ProductvariantsSources: variant=%s source=%s ean=%s variant_uid=%s",
                             mpd_variant_id, source.name, m.ean, variant_uid_int
                         )
-                    # Uzupełnij kod producenta na wariancie MPD, jeśli pusty
-                    if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
-                        variant = ProductVariants.objects.using(db).get(variant_id=mpd_variant_id)
-                        if not (variant.producer_code or '').strip():
-                            variant.producer_code = (m.producer_code or '').strip()[:255]
-                            variant.save(update_fields=['producer_code'], using=db)
-                            logger.debug(
-                                "Ustawiono producer_code=%s dla wariantu MPD %s",
-                                variant.producer_code, mpd_variant_id
-                            )
 
                     sap, created = StockAndPrices.objects.using(db).get_or_create(
                         variant_id=mpd_variant_id,
@@ -202,12 +192,12 @@ def link_variants_from_other_sources(
                                         unit=None,
                                         name_lower=size_name.lower() if size_name else '',
                                     )
+                            # Kod producenta w ProductvariantsSources.producer_code (per hurtownia)
                             new_pv = ProductVariants.objects.using(db).create(
                                 product_id=mpd_product_id,
                                 color_id=first_mpd.color_id,
                                 producer_color_id=first_mpd.producer_color_id,
                                 size=size_obj,
-                                producer_code=(getattr(m, 'producer_code', None) or '').strip()[:255] or None,
                             )
                             variant_uid_int = _variant_uid_int(m)
                             ProductvariantsSources.objects.using(db).create(
@@ -215,7 +205,7 @@ def link_variants_from_other_sources(
                                 source=source,
                                 ean=(m.ean or '')[:50] if m.ean else '',
                                 variant_uid=variant_uid_int,
-                                other=(getattr(m, 'producer_code', None) or '').strip()[:50] or None,
+                                producer_code=(getattr(m, 'producer_code', None) or '').strip()[:255] or None,
                             )
                             StockAndPrices.objects.using(db).create(
                                 variant_id=new_pv.variant_id,
@@ -301,7 +291,7 @@ def link_all_products_to_new_source(new_source_id: int) -> Dict:
                 'variant_uid': variant_uid_int,
             }
             if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
-                defaults_pvs['other'] = (m.producer_code or '').strip()[:50]
+                defaults_pvs['producer_code'] = (m.producer_code or '').strip()[:255]
             pvs, created = ProductvariantsSources.objects.using(db).get_or_create(
                 variant_id=mpd_variant_id,
                 source=source,
@@ -316,11 +306,6 @@ def link_all_products_to_new_source(new_source_id: int) -> Dict:
                     "Dopięto ProductvariantsSources (new source): variant=%s source=%s ean=%s variant_uid=%s",
                     mpd_variant_id, source.name, m.ean, variant_uid_int
                 )
-            if getattr(m, 'producer_code', None) and (m.producer_code or '').strip():
-                variant = ProductVariants.objects.using(db).get(variant_id=mpd_variant_id)
-                if not (variant.producer_code or '').strip():
-                    variant.producer_code = (m.producer_code or '').strip()[:255]
-                    variant.save(update_fields=['producer_code'], using=db)
 
             sap, created = StockAndPrices.objects.using(db).get_or_create(
                 variant_id=mpd_variant_id,

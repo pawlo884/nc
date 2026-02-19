@@ -1,6 +1,6 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
-from django.utils.html import format_html
+from django.utils.html import format_html, escape
 from django.db.models import Exists, OuterRef
 from django.contrib.admin import DateFieldListFilter, SimpleListFilter
 from django.urls import path
@@ -734,54 +734,21 @@ class ProductsAdmin(admin.ModelAdmin):
             prices_str = "<br>".join(prices) if prices else "-"
             retail_price_str = f"{retail_map.get(variant_ids[0], '-')} PLN" if retail_map.get(
                 variant_ids[0]) is not None else "-"
-            # Dla każdego wariantu w grupie, utwórz edytowalne pole
-            producer_code_inputs = []
+            # Kod producenta z product_variants_sources.producer_code (fallback: other, variant_uid)
+            producer_codes_lines = []
             for variant_id in variant_ids:
-                # Znajdź wariant w liście variants
-                variant = next(
-                    (v for v in variants if v.variant_id == variant_id), None)
-                if variant:
-                    current_code = variant.producer_code or ""
-                    producer_code_inputs.append(
-                        f'<input type="text" value="{current_code}" data-variant-id="{variant_id}" class="producer-code-input" style="width:100%;border:1px solid #ccc;padding:2px;" onchange="updateProducerCode({variant_id}, this.value)">')
-
-            producer_code_cell = "<br>".join(
-                producer_code_inputs) if producer_code_inputs else "-"
+                for s in sources_map.get(variant_id, []):
+                    code = (getattr(s, 'producer_code', None) or s.other or getattr(s, 'mpn', None) or '').strip()
+                    if not code and s.variant_uid is not None:
+                        code = str(s.variant_uid)
+                    code = code or '-'
+                    producer_codes_lines.append(
+                        f"{escape(s.source.name if s.source else '-')}: {escape(code)}"
+                    )
+            producer_code_cell = "<br>".join(producer_codes_lines) if producer_codes_lines else "-"
 
             html += f"<tr><td style='{cell_style}'>{color}</td><td style='{cell_style}'>{producer_color}</td><td style='{cell_style}'>{size}</td><td style='{cell_style}'>{producer_code_cell}</td><td style='{cell_style}'>{total_stock}</td><td style='{cell_style}'>{prices_str}</td><td style='{cell_style}'>{retail_price_str}</td><td style='{cell_style}'>{sources_display}</td><td style='{cell_style}'>{eans_display}</td></tr>"
         html += "</table>"
-
-        # Dodaj JavaScript do obsługi aktualizacji kodów producenta
-        html += """
-        <script>
-        function updateProducerCode(variantId, newValue) {
-            fetch('/mpd/update-producer-code/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify({
-                    variant_id: variantId,
-                    producer_code: newValue
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    console.log('Kod producenta zaktualizowany:', variantId, newValue);
-                } else {
-                    console.error('Błąd aktualizacji:', data.message);
-                    alert('Błąd aktualizacji kodu producenta: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Błąd:', error);
-                alert('Błąd połączenia z serwerem');
-            });
-        }
-        </script>
-        """
 
         return mark_safe(html)
 
@@ -1220,10 +1187,10 @@ class ProductVariantsAdmin(admin.ModelAdmin):
 
 @admin.register(ProductvariantsSources)
 class ProductVariantsSourcesAdmin(admin.ModelAdmin):
-    list_display = ['id', 'variant', 'source', 'ean', 'variant_uid',
+    list_display = ['id', 'variant', 'source', 'ean', 'variant_uid', 'producer_code',
                     'gtin14', 'gtin13', 'gtin12', 'isbn10', 'gtin8', 'upce', 'mpn', 'other']
     list_filter = ['source']
-    search_fields = ['ean', 'variant_uid', 'gtin14', 'gtin13',
+    search_fields = ['ean', 'variant_uid', 'producer_code', 'gtin14', 'gtin13',
                      'gtin12', 'isbn10', 'gtin8', 'upce', 'mpn', 'other']
     raw_id_fields = ['variant', 'source']
     show_full_result_count = False
