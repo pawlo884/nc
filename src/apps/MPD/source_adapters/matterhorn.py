@@ -100,3 +100,21 @@ class MatterhornAdapter(SourceAdapter):
             mapped_product_uid=mpd_product_id,
             is_mapped=True,
         )
+
+    def update_source_variant_mapped(
+        self,
+        source_product_id: int,
+        source_variant_uid: Optional[str],
+        mpd_variant_id: int,
+    ) -> None:
+        """Ustawia mapped_variant_uid w Matterhorn productvariant (po linkowaniu)."""
+        if not source_variant_uid or not str(source_variant_uid).strip():
+            return
+        from django.conf import settings
+        from matterhorn1.models import ProductVariant
+
+        mh_db = 'zzz_matterhorn1' if 'zzz_matterhorn1' in settings.DATABASES else 'matterhorn1'
+        ProductVariant.objects.using(mh_db).filter(
+            product_id=source_product_id,
+            variant_uid=str(source_variant_uid).strip(),
+        ).update(mapped_variant_uid=mpd_variant_id, is_mapped=True)

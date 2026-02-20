@@ -78,3 +78,16 @@ class SourceAdapter(ABC):
         Adapter może nadpisać; domyślnie brak akcji (dla hurtowni bez takiego pola).
         """
         pass
+
+    def update_source_variant_mapped(
+        self,
+        source_product_id: int,
+        source_variant_uid: Optional[str],
+        mpd_variant_id: int,
+    ) -> None:
+        """
+        Ustawia mapped_variant_uid w hurtowni źródłowej (np. productvariant w Matterhorn).
+        Wywoływane po dopięciu wariantu do MPD (ProductvariantsSources).
+        source_variant_uid: identyfikator wariantu w źródle (variant_uid w MH, api_id w Tabu jako str).
+        """
+        pass

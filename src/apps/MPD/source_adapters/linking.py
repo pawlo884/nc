@@ -150,6 +150,20 @@ def link_variants_from_other_sources(
                             mpd_variant_id, source.name, m.stock, m.price
                         )
 
+                    # Ustaw mapped_variant_uid w hurtowni źródłowej (np. productvariant w Matterhorn)
+                    if m.source_product_id:
+                        try:
+                            adapter.update_source_variant_mapped(
+                                m.source_product_id,
+                                getattr(m, 'variant_uid', None),
+                                mpd_variant_id,
+                            )
+                        except Exception as var_err:
+                            logger.warning(
+                                "Błąd ustawiania mapped_variant_uid dla variant_uid=%s: %s",
+                                getattr(m, 'variant_uid', None), var_err
+                            )
+
                     # Ustaw mapped_product_uid w hurtowni źródłowej (jak przy ręcznym mapowaniu)
                     if m.source_product_id and m.source_product_id not in updated_source_products:
                         try:
@@ -236,6 +250,19 @@ def link_variants_from_other_sources(
                                 "Dodano pozostały wariant z produktu %s: size=%s ean=%s variant_id=%s",
                                 source_product_id, size_name, m.ean, new_pv.variant_id
                             )
+                            # Ustaw mapped_variant_uid w hurtowni źródłowej (np. Matterhorn productvariant)
+                            if m.source_product_id:
+                                try:
+                                    adapter.update_source_variant_mapped(
+                                        m.source_product_id,
+                                        getattr(m, 'variant_uid', None),
+                                        new_pv.variant_id,
+                                    )
+                                except Exception as var_err:
+                                    logger.warning(
+                                        "Błąd ustawiania mapped_variant_uid (pozostały wariant): %s",
+                                        var_err
+                                    )
                     except Exception as rem_err:
                         logger.exception(
                             "Błąd dopinania pozostałych wariantów dla produktu %s: %s",
