@@ -137,11 +137,11 @@ class AutomationRunAdmin(admin.ModelAdmin):
     """Admin dla AutomationRun z możliwością uruchomienia automatyzacji"""
     form = AutomationRunForm
     list_display = [
-        'id', 'started_at', 'completed_at', 'status',
+        'id', 'source', 'started_at', 'completed_at', 'status',
         'products_processed', 'products_success', 'products_failed',
         'get_brand_name', 'get_category_name'
     ]
-    list_filter = ['status', 'started_at', 'brand_id', 'category_id']
+    list_filter = ['source', 'status', 'started_at', 'brand_id', 'category_id']
     search_fields = ['id', 'error_message']
     readonly_fields = ['started_at', 'completed_at', 'run_automation_button', 'live_logs']
     date_hierarchy = 'started_at'

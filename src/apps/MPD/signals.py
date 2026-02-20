@@ -264,20 +264,27 @@ def on_product_created_schedule_link_task(sender, instance, created, using=None,
 
     def _send_link_tasks():
         from MPD.tasks import link_variants_from_other_sources_task
-        source_ids = list(
-            ProductvariantsSources.objects.using(connection_for_commit)
-            .filter(variant__product_id=product_id)
-            .values_list('source_id', flat=True)
-            .distinct()
-        )
-        for source_id in source_ids:
-            link_variants_from_other_sources_task.apply_async(
-                args=(product_id, source_id),
-                queue='default',
+        try:
+            source_ids = list(
+                ProductvariantsSources.objects.using(connection_for_commit)
+                .filter(variant__product_id=product_id)
+                .values_list('source_id', flat=True)
+                .distinct()
             )
-            logger.info(
-                "Produkt MPD %s utworzony - wysłano task linkowania (exclude source %s)",
-                product_id, source_id,
+            for source_id in source_ids:
+                link_variants_from_other_sources_task.apply_async(
+                    args=(product_id, source_id),
+                    queue='default',
+                )
+                logger.info(
+                    "Produkt MPD %s utworzony - wysłano task linkowania (exclude source %s)",
+                    product_id, source_id,
+                )
+        except Exception as e:
+            # Gdy Redis/Celery niedostępny (np. dev bez Redis) – nie przerywamy; linkowanie można uruchomić później
+            logger.warning(
+                "Produkt MPD %s: nie wysłano tasku linkowania (Redis/Celery?): %s",
+                product_id, e,
             )
 
     transaction.on_commit(_send_link_tasks, using=connection_for_commit)
