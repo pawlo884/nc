@@ -215,8 +215,13 @@ class TabuProductAdmin(admin.ModelAdmin):
                         mpd_data = {'name': r[0] or '', 'description': r[1] or '', 'short_description': r[2] or '', 'brand': r[3] or ''}
 
                     cursor.execute(
-                        "SELECT c.name, pv.producer_code FROM product_variants pv "
-                        "LEFT JOIN colors c ON pv.producer_color_id = c.id WHERE pv.product_id = %s LIMIT 1",
+                        """SELECT c.name,
+                            (SELECT pvs.producer_code FROM product_variants_sources pvs
+                             WHERE pvs.variant_id = pv.variant_id AND pvs.producer_code IS NOT NULL AND pvs.producer_code != ''
+                             LIMIT 1)
+                            FROM product_variants pv
+                            LEFT JOIN colors c ON pv.producer_color_id = c.id
+                            WHERE pv.product_id = %s LIMIT 1""",
                         [product.mapped_product_uid]
                     )
                     r = cursor.fetchone()
@@ -305,6 +310,7 @@ class TabuProductAdmin(admin.ModelAdmin):
 
         try:
             from decimal import Decimal
+            from django.db import transaction
             from django.utils import timezone
 
             from MPD.models import (
@@ -312,7 +318,10 @@ class TabuProductAdmin(admin.ModelAdmin):
                 ProductPaths, ProductAttribute, ProductFabric, ProductSeries,
                 ProductvariantsSources, StockAndPrices, ProductImage
             )
+            from core.db_routers import _get_mpd_db
             from matterhorn1.defs_db import upload_image_to_bucket_and_get_url
+
+            mpd_db = _get_mpd_db()  # z konfiguracji (dev: zzz_MPD, prod: MPD)
 
             # Dane z formularza (fallback na Tabu)
             name = request.POST.get('mpd_name') or tabu_product.name or 'Produkt z Tabu'
@@ -324,16 +333,16 @@ class TabuProductAdmin(admin.ModelAdmin):
             brand_name = request.POST.get('mpd_brand') or (tabu_product.brand.name if tabu_product.brand else '')
             if brand_name:
                 brand_name = brand_name.strip()[:255]
-                brand = Brands.objects.using('MPD').filter(name=brand_name).first()
+                brand = Brands.objects.using(mpd_db).filter(name=brand_name).first()
                 if not brand:
-                    brand = Brands.objects.using('MPD').create(name=brand_name)
+                    brand = Brands.objects.using(mpd_db).create(name=brand_name)
                 brand_id = brand.id
 
             # Seria
             series_id = None
             series_name = request.POST.get('series_name', '').strip()
             if series_name:
-                series, _ = ProductSeries.objects.using('MPD').get_or_create(
+                series, _ = ProductSeries.objects.using(mpd_db).get_or_create(
                     name=series_name[:255],
                     defaults={'name': series_name[:255]}
                 )
@@ -345,176 +354,185 @@ class TabuProductAdmin(admin.ModelAdmin):
             if unit_val and unit_val.isdigit():
                 unit_id = int(unit_val)
 
-            # Utwórz produkt w MPD
-            mpd_product = Products.objects.using('MPD').create(
-                name=name[:255],
-                description=description,
-                short_description=short_desc[:500],
-                brand_id=brand_id,
-                series_id=series_id,
-                unit_id=unit_id,
-                visibility=False,
-            )
+            # Utwórz produkt w MPD; sygnał post_save Products (on_commit) wyśle task linkowania
+            with transaction.atomic(using=mpd_db):
+                mpd_product = Products.objects.using(mpd_db).create(
+                    name=name[:255],
+                    description=description,
+                    short_description=short_desc[:500],
+                    brand_id=brand_id,
+                    series_id=series_id,
+                    unit_id=unit_id,
+                    visibility=False,
+                )
 
-            # Ścieżki
-            for path_id in request.POST.getlist('mpd_paths'):
-                if path_id.isdigit():
-                    ProductPaths.objects.using('MPD').get_or_create(
-                        product_id=mpd_product.id,
-                        path_id=int(path_id),
-                        defaults={'product_id': mpd_product.id, 'path_id': int(path_id)}
-                    )
-
-            # Atrybuty
-            for attr_id in request.POST.getlist('mpd_attributes'):
-                if attr_id.isdigit():
-                    ProductAttribute.objects.using('MPD').get_or_create(
-                        product=mpd_product,
-                        attribute_id=int(attr_id),
-                        defaults={'product': mpd_product, 'attribute_id': int(attr_id)}
-                    )
-
-            # Skład materiałowy
-            fabric_ids = request.POST.getlist('fabric_component[]')
-            fabric_pcts = request.POST.getlist('fabric_percentage[]')
-            for comp_id, pct in zip(fabric_ids, fabric_pcts):
-                if comp_id and pct and comp_id.isdigit() and pct.isdigit():
-                    pct_val = int(pct)
-                    if 0 < pct_val <= 100:
-                        ProductFabric.objects.using('MPD').update_or_create(
-                            product=mpd_product,
-                            component_id=int(comp_id),
-                            defaults={'percentage': pct_val}
+                # Ścieżki
+                for path_id in request.POST.getlist('mpd_paths'):
+                    if path_id.isdigit():
+                        ProductPaths.objects.using(mpd_db).get_or_create(
+                            product_id=mpd_product.id,
+                            path_id=int(path_id),
+                            defaults={'product_id': mpd_product.id, 'path_id': int(path_id)}
                         )
 
-            # Kolory z formularza (dla pierwszego wariantu)
-            main_color_id = request.POST.get('main_color_id')
-            producer_color_name = request.POST.get('producer_color_name', '').strip()
-            producer_code = request.POST.get('producer_code', '') or ''
+                # Atrybuty
+                for attr_id in request.POST.getlist('mpd_attributes'):
+                    if attr_id.isdigit():
+                        ProductAttribute.objects.using(mpd_db).get_or_create(
+                            product=mpd_product,
+                            attribute_id=int(attr_id),
+                            defaults={'product': mpd_product, 'attribute_id': int(attr_id)}
+                        )
 
-            main_color = None
-            if main_color_id and main_color_id.isdigit():
-                try:
-                    main_color = Colors.objects.using('MPD').get(id=int(main_color_id))
-                except Colors.DoesNotExist:
-                    pass
+                # Skład materiałowy
+                fabric_ids = request.POST.getlist('fabric_component[]')
+                fabric_pcts = request.POST.getlist('fabric_percentage[]')
+                for comp_id, pct in zip(fabric_ids, fabric_pcts):
+                    if comp_id and pct and comp_id.isdigit() and pct.isdigit():
+                        pct_val = int(pct)
+                        if 0 < pct_val <= 100:
+                            ProductFabric.objects.using(mpd_db).update_or_create(
+                                product=mpd_product,
+                                component_id=int(comp_id),
+                                defaults={'percentage': pct_val}
+                            )
 
-            producer_color = None
-            if producer_color_name:
-                producer_color, _ = Colors.objects.using('MPD').get_or_create(
-                    name=producer_color_name[:50],
-                    defaults={'name': producer_color_name[:50]}
-                )
+                # Kolory z formularza (dla pierwszego wariantu)
+                main_color_id = request.POST.get('main_color_id')
+                producer_color_name = request.POST.get('producer_color_name', '').strip()
+                producer_code = request.POST.get('producer_code', '') or ''
 
-            # Źródło Tabu dla ProductvariantsSources (source_id jest wymagane w DB)
-            tabu_source, _ = Sources.objects.using('MPD').get_or_create(
-                name='Tabu API',
-                defaults={'type': 'api', 'location': 'https://b2b.tabu.com.pl'}
-            )
+                main_color = None
+                if main_color_id and main_color_id.isdigit():
+                    try:
+                        main_color = Colors.objects.using(mpd_db).get(id=int(main_color_id))
+                    except Colors.DoesNotExist:
+                        pass
 
-            # Warianty z Tabu (rozmiar, EAN, stan, ceny hurtowe)
-            variants = tabu_product.api_variants.all()
-            for v in variants:
-                color_obj = main_color if main_color else None
-                if not color_obj and v.color:
-                    color_obj, _ = Colors.objects.using('MPD').get_or_create(
-                        name=v.color[:50],
-                        defaults={'name': v.color[:50]}
-                    )
-                pc = producer_code or (v.symbol or '')[:255]
-                if not pc and v.symbol:
-                    pc = (v.symbol or '')[:255]
-
-                # Rozmiar z Tabu -> MPD Sizes
-                size_obj = None
-                if v.size:
-                    size_obj, _ = Sizes.objects.using('MPD').get_or_create(
-                        name=v.size[:255],
-                        defaults={'name': v.size[:255]}
+                producer_color = None
+                if producer_color_name:
+                    producer_color, _ = Colors.objects.using(mpd_db).get_or_create(
+                        name=producer_color_name[:50],
+                        defaults={'name': producer_color_name[:50]}
                     )
 
-                pv = ProductVariants.objects.using('MPD').create(
-                    product=mpd_product,
-                    color=color_obj,
-                    producer_color=producer_color,
-                    size=size_obj,
-                    producer_code=pc,
-                    iai_product_id=v.api_id,
+                # Źródło Tabu dla ProductvariantsSources (source_id jest wymagane w DB)
+                tabu_source, _ = Sources.objects.using(mpd_db).get_or_create(
+                    name='Tabu API',
+                    defaults={'type': 'api', 'location': 'https://b2b.tabu.com.pl'}
                 )
 
-                # ProductvariantsSources (wymagane dla StockAndPrices - FK variant_id+source_id)
-                pvs, _ = ProductvariantsSources.objects.using('MPD').get_or_create(
-                    variant=pv,
-                    source=tabu_source,
-                    defaults={'ean': v.ean[:50] if v.ean else ''}
-                )
+                # Warianty z Tabu (rozmiar, EAN, stan, ceny hurtowe)
+                variants = tabu_product.api_variants.all()
+                for v in variants:
+                    color_obj = main_color if main_color else None
+                    if not color_obj and v.color:
+                        color_obj, _ = Colors.objects.using(mpd_db).get_or_create(
+                            name=v.color[:50],
+                            defaults={'name': v.color[:50]}
+                        )
+                    # Kod producenta w ProductvariantsSources.producer_code (per hurtownia)
+                    # Rozmiar z Tabu -> MPD Sizes
+                    size_obj = None
+                    if v.size:
+                        size_obj, _ = Sizes.objects.using(mpd_db).get_or_create(
+                            name=v.size[:255],
+                            defaults={'name': v.size[:255]}
+                        )
 
-                # Stan magazynowy + ceny hurtowe z Tabu (StockAndPrices)
-                stock_val = v.store if v.store is not None else 0
-                StockAndPrices.objects.using('MPD').get_or_create(
-                    variant=pv,
-                    source=tabu_source,
-                    defaults={
-                        'stock': stock_val,
-                        'price': v.price_net or Decimal('0'),
-                        'currency': 'PLN',
-                        'last_updated': timezone.now(),
-                    }
-                )
-                # Cena detaliczna = moja cena - użytkownik ustawia ręcznie w MPD
-
-            # Jeśli brak wariantów - utwórz jeden domyślny
-            if not variants:
-                pv = ProductVariants.objects.using('MPD').create(
-                    product=mpd_product,
-                    color=main_color,
-                    producer_color=producer_color,
-                    producer_code=producer_code[:255] or (tabu_product.symbol[:255] if tabu_product.symbol else ''),
-                    iai_product_id=tabu_product.api_id,
-                )
-                ProductvariantsSources.objects.using('MPD').get_or_create(
-                    variant=pv,
-                    source=tabu_source,
-                    defaults={'ean': tabu_product.ean[:50] if tabu_product.ean else ''}
-                )
-                StockAndPrices.objects.using('MPD').get_or_create(
-                    variant=pv,
-                    source=tabu_source,
-                    defaults={
-                        'stock': tabu_product.store_total or 0,
-                        'price': tabu_product.price_net or Decimal('0'),
-                        'currency': 'PLN',
-                        'last_updated': timezone.now(),
-                    }
-                )
-                # Cena detaliczna = moja cena - użytkownik ustawia ręcznie w MPD
-
-            # Zdjęcia z Tabu → MPD (upload do bucketa + ProductImage)
-            images_to_upload = []
-            if tabu_product.image_url and tabu_product.image_url.strip():
-                images_to_upload.append((tabu_product.image_url.strip(), 1))
-            seen_urls = {u for u, _ in images_to_upload}
-            for img in tabu_product.gallery_images.order_by('order', 'api_image_id'):
-                if img.image_url and img.image_url.strip() and img.image_url.strip() not in seen_urls:
-                    images_to_upload.append((img.image_url.strip(), len(images_to_upload) + 1))
-                    seen_urls.add(img.image_url.strip())
-            for idx, (img_url, order_num) in enumerate(images_to_upload, 1):
-                bucket_key = upload_image_to_bucket_and_get_url(
-                    image_path=img_url,
-                    product_id=mpd_product.id,
-                    producer_color_name=producer_color_name or '',
-                    image_number=order_num,
-                )
-                if bucket_key:
-                    ProductImage.objects.using('MPD').get_or_create(
+                    pv = ProductVariants.objects.using(mpd_db).create(
                         product=mpd_product,
-                        file_path=bucket_key,
-                        defaults={'product': mpd_product, 'file_path': bucket_key}
+                        color=color_obj,
+                        producer_color=producer_color,
+                        size=size_obj,
+                        iai_product_id=v.api_id,
                     )
 
-            # Zapisz mapowanie w Tabu
-            tabu_product.mapped_product_uid = mpd_product.id
-            tabu_product.save(update_fields=['mapped_product_uid'])
+                    # ProductvariantsSources: variant_uid = api_id z tabu_product_variant (identyfikator wariantu w Tabu)
+                    pvs, _ = ProductvariantsSources.objects.using(mpd_db).get_or_create(
+                        variant=pv,
+                        source=tabu_source,
+                        defaults={
+                            'ean': v.ean[:50] if v.ean else '',
+                            'variant_uid': v.api_id,
+                            'producer_code': (v.symbol or '').strip()[:255] or None,
+                        }
+                    )
+
+                    # Stan magazynowy + ceny hurtowe z Tabu (StockAndPrices)
+                    stock_val = v.store if v.store is not None else 0
+                    StockAndPrices.objects.using(mpd_db).get_or_create(
+                        variant=pv,
+                        source=tabu_source,
+                        defaults={
+                            'stock': stock_val,
+                            'price': v.price_net or Decimal('0'),
+                            'currency': 'PLN',
+                            'last_updated': timezone.now(),
+                        }
+                    )
+                    # Mapowanie wariantu Tabu → MPD (jak przy linkowaniu po EAN)
+                    v.mapped_variant_uid = pv.variant_id
+                    v.is_mapped = True
+                    v.save(update_fields=['mapped_variant_uid', 'is_mapped'])
+                    # Cena detaliczna = moja cena - użytkownik ustawia ręcznie w MPD
+
+                # Jeśli brak wariantów - utwórz jeden domyślny (brak tabu_product_variant, variant_uid zostaje null)
+                # Kod producenta w ProductvariantsSources.producer_code
+                if not variants:
+                    pv = ProductVariants.objects.using(mpd_db).create(
+                        product=mpd_product,
+                        color=main_color,
+                        producer_color=producer_color,
+                        iai_product_id=tabu_product.api_id,
+                    )
+                    # Przy braku wariantów w Tabu nie ma tabu_product_variant → variant_uid null; producer_code = symbol produktu
+                    ProductvariantsSources.objects.using(mpd_db).get_or_create(
+                        variant=pv,
+                        source=tabu_source,
+                        defaults={
+                            'ean': tabu_product.ean[:50] if tabu_product.ean else '',
+                            'producer_code': (tabu_product.symbol or '').strip()[:255] or None,
+                        }
+                    )
+                    StockAndPrices.objects.using(mpd_db).get_or_create(
+                        variant=pv,
+                        source=tabu_source,
+                        defaults={
+                            'stock': tabu_product.store_total or 0,
+                            'price': tabu_product.price_net or Decimal('0'),
+                            'currency': 'PLN',
+                            'last_updated': timezone.now(),
+                        }
+                    )
+                    # Cena detaliczna = moja cena - użytkownik ustawia ręcznie w MPD
+
+                # Zdjęcia z Tabu → MPD (upload do bucketa + ProductImage)
+                images_to_upload = []
+                if tabu_product.image_url and tabu_product.image_url.strip():
+                    images_to_upload.append((tabu_product.image_url.strip(), 1))
+                seen_urls = {u for u, _ in images_to_upload}
+                for img in tabu_product.gallery_images.order_by('order', 'api_image_id'):
+                    if img.image_url and img.image_url.strip() and img.image_url.strip() not in seen_urls:
+                        images_to_upload.append((img.image_url.strip(), len(images_to_upload) + 1))
+                        seen_urls.add(img.image_url.strip())
+                for idx, (img_url, order_num) in enumerate(images_to_upload, 1):
+                    bucket_key = upload_image_to_bucket_and_get_url(
+                        image_path=img_url,
+                        product_id=mpd_product.id,
+                        producer_color_name=producer_color_name or '',
+                        image_number=order_num,
+                    )
+                    if bucket_key:
+                        ProductImage.objects.using(mpd_db).get_or_create(
+                            product=mpd_product,
+                            file_path=bucket_key,
+                            defaults={'product': mpd_product, 'file_path': bucket_key}
+                        )
+
+                # Zapisz mapowanie w Tabu
+                tabu_product.mapped_product_uid = mpd_product.id
+                tabu_product.save(update_fields=['mapped_product_uid'])
 
             logger.info("Utworzono produkt MPD %s z Tabu produktu %s", mpd_product.id, product_id)
             return JsonResponse({

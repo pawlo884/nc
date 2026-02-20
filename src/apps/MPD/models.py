@@ -193,7 +193,6 @@ class ProductVariants(models.Model):
         Colors, on_delete=models.CASCADE, db_column='producer_color_id', null=True, blank=True, related_name='producer_variants')
     size = models.ForeignKey(
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
-    producer_code = models.CharField(max_length=255, blank=True, null=True)
     iai_product_id = models.IntegerField(blank=True, null=True)
     exported_to_iai = models.BooleanField(
         default=False, verbose_name='Wyeksportowany do IAI')
@@ -218,7 +217,10 @@ class ProductvariantsSources(models.Model):
     source = models.ForeignKey(
         Sources, on_delete=models.RESTRICT, db_column='source_id', null=True, blank=True)
     ean = models.CharField(max_length=50, blank=True, null=True)
-    variant_uid = models.IntegerField(blank=True, null=True)
+    variant_uid = models.IntegerField(
+        blank=True, null=True,
+        help_text='Identyfikator wariantu w hurtowni: np. dla Tabu = api_id z tabu_product_variant.'
+    )
     gtin14 = models.CharField(max_length=50, blank=True, null=True)
     gtin13 = models.CharField(max_length=50, blank=True, null=True)
     gtin12 = models.CharField(max_length=50, blank=True, null=True)
@@ -227,6 +229,10 @@ class ProductvariantsSources(models.Model):
     upce = models.CharField(max_length=50, blank=True, null=True)
     mpn = models.CharField(max_length=50, blank=True, null=True)
     other = models.CharField(max_length=50, blank=True, null=True)
+    producer_code = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text='Kod producenta w tej hurtowni (np. symbol w Tabu, variant_uid w Matterhorn).'
+    )
     objects = models.Manager()
 
     class Meta:

@@ -89,6 +89,77 @@ def export_full_change_xml_full(self):
         }
 
 
+@shared_task(name='MPD.tasks.link_variants_from_other_sources')
+def link_variants_from_other_sources_task(mpd_product_id: int, current_source_id: int):
+    """
+    Asynchroniczne dopinanie wariantów z innych hurtowni po EAN.
+    Uruchamiane po dodaniu produktu do MPD (Tabu/Matterhorn) - nie blokuje głównego flow.
+    """
+    from MPD.source_adapters import link_variants_from_other_sources
+
+    logger.info(
+        "🚀 Task link_variants_from_other_sources: mpd_product_id=%s, current_source_id=%s",
+        mpd_product_id, current_source_id
+    )
+    try:
+        stats = link_variants_from_other_sources(
+            mpd_product_id, current_source_id)
+        if stats.get('linked_count'):
+            logger.info(
+                "✅ Dopięto %s wariantów z innych hurtowni do produktu MPD %s",
+                stats['linked_count'], mpd_product_id
+            )
+        elif stats.get('errors'):
+            logger.warning(
+                "⚠️ link_variants_from_other_sources: mpd_product_id=%s błędy=%s",
+                mpd_product_id, stats['errors']
+            )
+        else:
+            logger.info(
+                "ℹ️ link_variants_from_other_sources: mpd_product_id=%s - brak dopasowań (linked=0)",
+                mpd_product_id
+            )
+        return {'status': 'success', 'stats': stats}
+    except Exception as e:
+        logger.exception("Błąd link_variants_from_other_sources: %s", e)
+        raise
+
+
+@shared_task(name='MPD.tasks.link_all_products_to_new_source')
+def link_all_products_to_new_source_task(new_source_id: int):
+    """
+    Asynchroniczne dopinanie wariantów z nowej hurtowni do wszystkich produktów MPD (po EAN).
+    Uruchamiane automatycznie przy dodaniu nowego źródła (Sources) lub ręcznie.
+    """
+    from MPD.source_adapters import link_all_products_to_new_source
+
+    logger.info(
+        "🚀 Task link_all_products_to_new_source: source_id=%s",
+        new_source_id
+    )
+    try:
+        stats = link_all_products_to_new_source(new_source_id)
+        if stats.get('linked_count'):
+            logger.info(
+                "✅ Dopięto %s wariantów z nowej hurtowni do MPD",
+                stats['linked_count']
+            )
+        elif stats.get('errors'):
+            logger.warning(
+                "⚠️ link_all_products_to_new_source: source_id=%s błędy=%s",
+                new_source_id, stats['errors']
+            )
+        else:
+            logger.info(
+                "ℹ️ link_all_products_to_new_source: source_id=%s - brak dopasowań",
+                new_source_id
+            )
+        return {'status': 'success', 'stats': stats}
+    except Exception as e:
+        logger.exception("Błąd link_all_products_to_new_source: %s", e)
+        raise
+
+
 @shared_task(bind=True, name='MPD.tasks.track_recent_stock_changes')
 def track_recent_stock_changes(self):
     """

@@ -12,8 +12,9 @@ Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa wyłącznie w tr
   - **Konfiguracja pyenv**: Zobacz `docs/PYENV_SETUP.md` jeśli masz problemy z konfiguracją.
 
 ## Struktura repo (najważniejsze)
-- `nc/` – konfiguracja projektu (settings/urls/celery/db_routers)
-- `matterhorn1/`, `MPD/` – aplikacje Django
+- `src/core/` – konfiguracja projektu (settings, urls, celery, db_routers)
+- `src/apps/` – aplikacje Django (matterhorn1, MPD, tabu, …)
+- **manage.py** – w katalogu `src/` (uruchomienie: `cd src && python manage.py ...` lub `python src/manage.py ...`)
 - `docker/` – pliki Docker (m.in. `docker/docker-entrypoint.sh`, postgres config)
 - `scripts/` – skrypty (build/deploy/security/monitoring)
 - `docs/` – dokumentacja

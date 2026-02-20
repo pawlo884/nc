@@ -9,7 +9,7 @@ alwaysApply: true
 ## Konfiguracja baz danych
 - **5 baz danych**: default, matterhorn, MPD, zzz_web_agent, matterhorn1
 - **Wszystkie bazy dev mają prefiks zzz** (np. zzz_default, zzz_matterhorn, zzz_MPD, zzz_web_agent, zzz_matterhorn1)
-- **Database routing** w nc/db_routers.py
+- **Database routing** w core/db_routers.py (ścieżka: src/core/db_routers.py)
 - **CONN_MAX_AGE=0** dla connection management
 - **Environment variables** dla credentials
 - **Connection pooling** dla performance
@@ -50,12 +50,13 @@ alwaysApply: true
 - **squash migrations** dla czystości
 - **rollback** dla problemów
 - **fake** dla manual migrations
+- **manage.py** jest w **src/** – z roota: `python src/manage.py ...` lub `cd src && python manage.py ...`.
 - **Zawsze określaj bazę danych i settings** w komendach:
-  - `python manage.py migrate matterhorn1 --database=matterhorn1 --settings=nc.settings.dev`
-  - `python manage.py migrate --database=default --settings=nc.settings.dev`
-  - `python manage.py migrate --database=matterhorn --settings=nc.settings.dev`
-  - `python manage.py migrate --database=MPD --settings=nc.settings.dev`
-  - `python manage.py migrate --database=zzz_web_agent --settings=nc.settings.dev`
+  - `python manage.py migrate matterhorn1 --database=matterhorn1 --settings=core.settings.dev`
+  - `python manage.py migrate --database=default --settings=core.settings.dev`
+  - `python manage.py migrate --database=matterhorn --settings=core.settings.dev`
+  - `python manage.py migrate --database=MPD --settings=core.settings.dev`
+  - `python manage.py migrate --database=zzz_web_agent --settings=core.settings.dev`
 
 ## Transakcje
 - **atomic()** dla critical operations

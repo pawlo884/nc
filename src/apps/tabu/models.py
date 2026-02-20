@@ -259,6 +259,17 @@ class TabuProductVariant(models.Model):
 
     raw_data = models.JSONField(default=dict, blank=True)
 
+    # Mapowanie do MPD (wzorzec jak Matterhorn – sync stanów, widok w adminie)
+    mapped_variant_uid = models.IntegerField(
+        null=True, blank=True,
+        help_text='ID wariantu w bazie MPD (variant_id)',
+        db_index=True,
+    )
+    is_mapped = models.BooleanField(
+        null=True, blank=True,
+        help_text='Czy wariant jest zmapowany do MPD',
+    )
+
     class Meta:
         db_table = 'tabu_product_variant'
         verbose_name = 'Tabu wariant (API)'
@@ -268,6 +279,7 @@ class TabuProductVariant(models.Model):
             models.Index(fields=['product']),
             models.Index(fields=['ean']),
             models.Index(fields=['store']),
+            models.Index(fields=['mapped_variant_uid']),
         ]
 
     def __str__(self) -> str:

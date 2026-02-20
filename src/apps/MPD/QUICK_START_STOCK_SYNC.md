@@ -7,7 +7,7 @@
 .\.venv\Scripts\Activate.ps1
 
 # Uruchom Django shell
-python manage.py shell --settings=nc.settings.dev
+cd src && python manage.py shell --settings=core.settings.dev
 ```
 
 ```python
@@ -30,10 +30,10 @@ print(result_data)
 
 ```bash
 # Konfiguruj periodic task (domyślnie: co 5 minut, sprawdza ostatnie 15 minut)
-python manage.py setup_stock_sync_task --settings=nc.settings.dev
+python manage.py setup_stock_sync_task --settings=core.settings.dev
 
 # Lub z własnymi ustawieniami:
-python manage.py setup_stock_sync_task --interval 5 --time-window 15 --settings=nc.settings.dev
+python manage.py setup_stock_sync_task --interval 5 --time-window 15 --settings=core.settings.dev
 ```
 
 Opcje:

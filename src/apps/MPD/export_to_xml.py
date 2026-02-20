@@ -381,7 +381,7 @@ class FullXMLExporter(BaseXMLExporter):
                     panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
                     # code_external: product_id-variant_id (variant_id jest unikalny dla każdego wariantu)
                     code_external = f'{product.id}-{variant.variant_id}'
-                    # code_producer: z tabeli product_variants_sources (ean, gtin14, gtin13, other)
+                    # code_producer: z tabeli product_variants_sources (ean, gtin14, gtin13, producer_code, other)
                     from .models import ProductvariantsSources
                     variant_source = ProductvariantsSources.objects.using(
                         'MPD').filter(variant=variant).first()
@@ -394,6 +394,8 @@ class FullXMLExporter(BaseXMLExporter):
                             code_producer = variant_source.gtin14
                         elif variant_source.gtin13:
                             code_producer = variant_source.gtin13
+                        elif getattr(variant_source, 'producer_code', None):
+                            code_producer = variant_source.producer_code
                         elif variant_source.other:
                             code_producer = variant_source.other
 
@@ -773,13 +775,14 @@ class LightXMLExporter(BaseXMLExporter):
                             variant=variant
                         ).first()
                         if variant_source:
-                            # Sprawdź kolejno: ean, gtin14, gtin13, other (identycznie jak w FullXMLExporter)
                             if variant_source.ean:
                                 code_producer = variant_source.ean
                             elif variant_source.gtin14:
                                 code_producer = variant_source.gtin14
                             elif variant_source.gtin13:
                                 code_producer = variant_source.gtin13
+                            elif getattr(variant_source, 'producer_code', None):
+                                code_producer = variant_source.producer_code
                             elif variant_source.other:
                                 code_producer = variant_source.other
                     except Exception:
@@ -1049,6 +1052,8 @@ class LightXMLExporter(BaseXMLExporter):
                                 code_producer = variant_source.gtin14
                             elif variant_source.gtin13:
                                 code_producer = variant_source.gtin13
+                            elif getattr(variant_source, 'producer_code', None):
+                                code_producer = variant_source.producer_code
                             elif variant_source.other:
                                 code_producer = variant_source.other
                     except Exception:
@@ -2310,19 +2315,20 @@ class FullChangeXMLExporter(BaseXMLExporter):
                     panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
                     # code_external: product_id-variant_id (variant_id jest unikalny dla każdego wariantu)
                     code_external = f'{product.id}-{variant.variant_id}'
-                    # code_producer: z tabeli product_variants_sources (ean, gtin14, gtin13, other)
+                    # code_producer: z tabeli product_variants_sources (ean, gtin14, gtin13, producer_code, other)
                     from .models import ProductvariantsSources
                     variant_source = ProductvariantsSources.objects.using(
                         'MPD').filter(variant=variant).first()
                     code_producer = ''
                     if variant_source:
-                        # Sprawdź kolejno: ean, gtin14, gtin13, other
                         if variant_source.ean:
                             code_producer = variant_source.ean
                         elif variant_source.gtin14:
                             code_producer = variant_source.gtin14
                         elif variant_source.gtin13:
                             code_producer = variant_source.gtin13
+                        elif getattr(variant_source, 'producer_code', None):
+                            code_producer = variant_source.producer_code
                         elif variant_source.other:
                             code_producer = variant_source.other
 

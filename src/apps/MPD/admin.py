@@ -1,6 +1,6 @@
 from django.contrib import admin  # type: ignore
 from django.utils.safestring import mark_safe
-from django.utils.html import format_html
+from django.utils.html import format_html, escape
 from django.db.models import Exists, OuterRef
 from django.contrib.admin import DateFieldListFilter, SimpleListFilter
 from django.urls import path
@@ -38,12 +38,13 @@ def admin_update_producer_code(request):
         except ProductVariants.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Wariant nie istnieje'}, status=404)
 
-        # Aktualizuj kod producenta
-        variant.producer_code = producer_code
-        variant.save(using='MPD')
+        # Aktualizuj kod producenta w product_variants_sources (wszystkie źródła tego wariantu)
+        updated = ProductvariantsSources.objects.using('MPD').filter(
+            variant_id=variant_id
+        ).update(producer_code=producer_code[:255] if producer_code else None)
 
         logger.info(
-            f"Zaktualizowano kod producenta dla wariantu {variant_id}: {producer_code}")
+            f"Zaktualizowano kod producenta dla wariantu {variant_id} ({updated} źródeł): {producer_code}")
 
         return JsonResponse({
             'status': 'success',
@@ -688,7 +689,6 @@ class ProductsAdmin(admin.ModelAdmin):
             color = v.color.name if v.color else "-"
             producer_color = v.producer_color.name if v.producer_color else "-"
             size = v.size.name if v.size else "-"
-            producer_code = v.producer_code or "-"
             sources = sources_map.get(v.variant_id, [])
             sources_names = []
             eans = []
@@ -704,14 +704,23 @@ class ProductsAdmin(admin.ModelAdmin):
             sources_display = "<br>".join(
                 sources_names) if sources_names else "-"
             eans_display = "<br>".join(eans) if eans else "-"
-            key = (color, producer_color, size, producer_code,
-                   sources_display, eans_display)
+            # Grupowanie po EAN – ten sam EAN = ten sam produkt (bez sources_display)
+            canonical_ean = "|".join(
+                sorted(set(e for e in eans if e and e != '-'))) or "-"
+            key = (color, producer_color, size, canonical_ean)
             if key not in grouped:
                 grouped[key] = []
-            grouped[key].append(v.variant_id)
+            grouped[key].append((v.variant_id, sources_display, eans_display))
+        cell_style = "border:1px solid #ccc;padding:2px 6px;vertical-align:middle;"
         html = "<table style='border-collapse:collapse;'>"
-        html += "<tr><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kolor producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Rozmiar</th><th style='border:1px solid #ccc;padding:2px 6px;'>Kod producenta</th><th style='border:1px solid #ccc;padding:2px 6px;'>Stan (suma)</th><th style='border:1px solid #ccc;padding:2px 6px;'>Ceny</th><th style='border:1px solid #ccc;padding:2px 6px;'>Cena detaliczna</th><th style='border:1px solid #ccc;padding:2px 6px;'>Źródła</th><th style='border:1px solid #ccc;padding:2px 6px;'>EAN</th></tr>"
-        for (color, producer_color, size, producer_code, sources_display, eans_display), variant_ids in grouped.items():
+        html += f"<tr><th style='{cell_style}'>Kolor</th><th style='{cell_style}'>Kolor producenta</th><th style='{cell_style}'>Rozmiar</th><th style='{cell_style}'>Kod producenta</th><th style='{cell_style}'>Stan (suma)</th><th style='{cell_style}'>Ceny</th><th style='{cell_style}'>Cena detaliczna</th><th style='{cell_style}'>Źródła</th><th style='{cell_style}'>EAN</th></tr>"
+        for (color, producer_color, size, canonical_ean), group_items in grouped.items():
+            variant_ids = [item[0] for item in group_items]
+            sources_display = "<br>".join(
+                item[1] for item in group_items if item[1] and item[1] != "-"
+            ) or "-"
+            # EAN: jedna wartość (wspólna dla wiersza), z klucza grupy
+            eans_display = canonical_ean if canonical_ean != "-" else "-"
             # Zsumuj stock i pobierz ceny dla wszystkich variant_id
             total_stock = 0
             prices = []
@@ -727,54 +736,21 @@ class ProductsAdmin(admin.ModelAdmin):
             prices_str = "<br>".join(prices) if prices else "-"
             retail_price_str = f"{retail_map.get(variant_ids[0], '-')} PLN" if retail_map.get(
                 variant_ids[0]) is not None else "-"
-            # Dla każdego wariantu w grupie, utwórz edytowalne pole
-            producer_code_inputs = []
+            # Kod producenta wyłącznie z product_variants_sources.producer_code (bez other/mpn/variant_uid)
+            producer_codes_lines = []
             for variant_id in variant_ids:
-                # Znajdź wariant w liście variants
-                variant = next(
-                    (v for v in variants if v.variant_id == variant_id), None)
-                if variant:
-                    current_code = variant.producer_code or ""
-                    producer_code_inputs.append(
-                        f'<input type="text" value="{current_code}" data-variant-id="{variant_id}" class="producer-code-input" style="width:100%;border:1px solid #ccc;padding:2px;" onchange="updateProducerCode({variant_id}, this.value)">')
-
+                for s in sources_map.get(variant_id, []):
+                    code = (getattr(s, 'producer_code', None)
+                            or '').strip() or None
+                    if code:
+                        producer_codes_lines.append(
+                            f"{escape(s.source.name if s.source else '-')}: {escape(code)}"
+                        )
             producer_code_cell = "<br>".join(
-                producer_code_inputs) if producer_code_inputs else producer_code
+                producer_codes_lines) if producer_codes_lines else "-"
 
-            html += f"<tr><td style='border:1px solid #ccc;padding:2px 6px;'>{color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_color}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{size}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{producer_code_cell}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{total_stock}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{prices_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{retail_price_str}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{sources_display}</td><td style='border:1px solid #ccc;padding:2px 6px;'>{eans_display}</td></tr>"
+            html += f"<tr><td style='{cell_style}'>{color}</td><td style='{cell_style}'>{producer_color}</td><td style='{cell_style}'>{size}</td><td style='{cell_style}'>{producer_code_cell}</td><td style='{cell_style}'>{total_stock}</td><td style='{cell_style}'>{prices_str}</td><td style='{cell_style}'>{retail_price_str}</td><td style='{cell_style}'>{sources_display}</td><td style='{cell_style}'>{eans_display}</td></tr>"
         html += "</table>"
-
-        # Dodaj JavaScript do obsługi aktualizacji kodów producenta
-        html += """
-        <script>
-        function updateProducerCode(variantId, newValue) {
-            fetch('/mpd/update-producer-code/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify({
-                    variant_id: variantId,
-                    producer_code: newValue
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    console.log('Kod producenta zaktualizowany:', variantId, newValue);
-                } else {
-                    console.error('Błąd aktualizacji:', data.message);
-                    alert('Błąd aktualizacji kodu producenta: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Błąd:', error);
-                alert('Błąd połączenia z serwerem');
-            });
-        }
-        </script>
-        """
 
         return mark_safe(html)
 
@@ -849,7 +825,8 @@ class ProductsAdmin(admin.ModelAdmin):
                     # Upewnij się, że URL jest bezwzględny (zaczyna się od http:// lub https://)
                     if url and not url.startswith(('http://', 'https://')):
                         # Jeśli to surowa ścieżka, nie używaj jej jako linku
-                        logger.warning(f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
+                        logger.warning(
+                            f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
                         url = "#"
                     html += f'<a href="{url}" target="_blank" rel="noopener noreferrer"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
                 html += '</div>'
@@ -863,7 +840,8 @@ class ProductsAdmin(admin.ModelAdmin):
                     # Upewnij się, że URL jest bezwzględny (zaczyna się od http:// lub https://)
                     if url and not url.startswith(('http://', 'https://')):
                         # Jeśli to surowa ścieżka, nie używaj jej jako linku
-                        logger.warning(f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
+                        logger.warning(
+                            f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
                         url = "#"
                     html += f'<a href="{url}" target="_blank" rel="noopener noreferrer"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
                 html += '</div>'
@@ -875,7 +853,8 @@ class ProductsAdmin(admin.ModelAdmin):
                 # Upewnij się, że URL jest bezwzględny (zaczyna się od http:// lub https://)
                 if url and not url.startswith(('http://', 'https://')):
                     # Jeśli to surowa ścieżka, nie używaj jej jako linku
-                    logger.warning(f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
+                    logger.warning(
+                        f"Nieprawidłowy URL obrazu dla produktu {obj.id}: {url}")
                     url = "#"
                 html += f'<a href="{url}" target="_blank" rel="noopener noreferrer"><img src="{url}" style="max-height:60px; margin:2px; border:1px solid #ccc;" /></a>'
             html += '</div>'
@@ -910,7 +889,8 @@ class ProductsAdmin(admin.ModelAdmin):
                             first_img = images_rel.first() if images_rel and hasattr(
                                 images_rel, 'first') else None
                             if first_img:
-                                img_url = resolve_image_url(first_img.file_path) or first_img.file_path
+                                img_url = resolve_image_url(
+                                    first_img.file_path) or first_img.file_path
                                 img_html = f'<a href="{admin_url}"><img src="{img_url}" style="max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;" /></a>'
                             name_html = f'<a href="{admin_url}" style="vertical-align:middle;">{prod.name}</a>'
                             html += f"<div style='display:flex; align-items:center; gap:8px;'>{img_html}{name_html}</div>"
@@ -940,7 +920,8 @@ class ProductsAdmin(admin.ModelAdmin):
                 first_img = images_rel.first() if images_rel and hasattr(
                     images_rel, 'first') else None
                 if first_img:
-                    img_url = resolve_image_url(first_img.file_path) or first_img.file_path
+                    img_url = resolve_image_url(
+                        first_img.file_path) or first_img.file_path
                     img_html = f'<a href=\"{admin_url}\"><img src=\"{img_url}\" style=\"max-height:40px; max-width:40px; margin-right:5px; border:1px solid #ccc; vertical-align:middle;\" /></a>'
                 name_html = f'<a href=\"{admin_url}\" style=\"vertical-align:middle;\">{p.name}</a>'
                 html += f"<div style='display:flex; align-items:center; gap:8px;'>{img_html}{name_html}</div>"
@@ -1032,9 +1013,24 @@ class SourceAdmin(admin.ModelAdmin):
               'email', 'tel', 'fax', 'www', 'street', 'zipcode', 'city', 'country', 'province']
     list_display = ['id', 'name', 'location', 'type']
     search_fields = ['name']
+    actions = ['link_products_from_source']
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
+
+    @admin.action(description='Linkuj produkty z tej hurtowni (po EAN)')
+    def link_products_from_source(self, request, queryset):
+        from .tasks import link_all_products_to_new_source_task
+        from .source_adapters.registry import get_adapter_for_source
+        queued = 0
+        for source in queryset:
+            if get_adapter_for_source(source.id):
+                link_all_products_to_new_source_task.delay(source.id)
+                queued += 1
+        self.message_user(
+            request,
+            f'Wysłano {queued} zadań do kolejki (dopinanie wariantów po EAN).'
+        )
 
 
 @admin.register(ProductSet)
@@ -1176,14 +1172,13 @@ class AttributesAdmin(admin.ModelAdmin):
 @admin.register(ProductVariants)
 class ProductVariantsAdmin(admin.ModelAdmin):
     list_display = ['variant_id', 'product', 'color', 'producer_color',
-                    'size', 'producer_code', 'iai_product_id', 'updated_at']
+                    'size', 'iai_product_id', 'updated_at']
     list_filter = ['color', 'producer_color', 'size', 'updated_at']
-    search_fields = ['variant_id', 'product__name',
-                     'producer_code', 'iai_product_id']
+    search_fields = ['variant_id', 'product__name', 'iai_product_id']
     raw_id_fields = ['product', 'color', 'producer_color', 'size']
     readonly_fields = ['variant_id', 'updated_at']
     fields = ['product', 'color', 'producer_color', 'size',
-              'producer_code', 'iai_product_id', 'exported_to_iai']
+              'iai_product_id', 'exported_to_iai']
     show_full_result_count = False
     list_per_page = 50
 
@@ -1193,10 +1188,10 @@ class ProductVariantsAdmin(admin.ModelAdmin):
 
 @admin.register(ProductvariantsSources)
 class ProductVariantsSourcesAdmin(admin.ModelAdmin):
-    list_display = ['id', 'variant', 'source', 'ean', 'variant_uid',
+    list_display = ['id', 'variant', 'source', 'ean', 'variant_uid', 'producer_code',
                     'gtin14', 'gtin13', 'gtin12', 'isbn10', 'gtin8', 'upce', 'mpn', 'other']
     list_filter = ['source']
-    search_fields = ['ean', 'variant_uid', 'gtin14', 'gtin13',
+    search_fields = ['ean', 'variant_uid', 'producer_code', 'gtin14', 'gtin13',
                      'gtin12', 'isbn10', 'gtin8', 'upce', 'mpn', 'other']
     raw_id_fields = ['variant', 'source']
     show_full_result_count = False
@@ -1259,7 +1254,7 @@ class ProductImageAdmin(admin.ModelAdmin):
             if not url.startswith(('http://', 'https://')):
                 # Jeśli to bucket key, skonwertuj na URL
                 url = resolve_image_url(obj.file_path) or obj.file_path
-            
+
             if url and url.startswith(('http://', 'https://')):
                 return format_html(
                     '<a href="{}" target="_blank" title="Kliknij, aby otworzyć pełny obraz">'
@@ -1276,13 +1271,15 @@ class ProductImageAdmin(admin.ModelAdmin):
                 # Jeśli to ścieżka, nie używaj jej jako ID
                 if '/' in str(obj.product_id) or 'MPD_test' in str(obj.product_id) or 'MPD/' in str(obj.product_id):
                     from django.contrib import messages
-                    messages.error(request, f"Nieprawidłowe product_id: {obj.product_id}. Oczekiwano liczby, otrzymano ścieżkę.")
+                    messages.error(
+                        request, f"Nieprawidłowe product_id: {obj.product_id}. Oczekiwano liczby, otrzymano ścieżkę.")
                     return
                 try:
                     obj.product_id = int(obj.product_id)
                 except (ValueError, TypeError):
                     from django.contrib import messages
-                    messages.error(request, f"Nieprawidłowe product_id: {obj.product_id}.")
+                    messages.error(
+                        request, f"Nieprawidłowe product_id: {obj.product_id}.")
                     return
         obj.save(using='MPD')
 

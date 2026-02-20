@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from .models import Products, ProductSet, ProductSetItem, ProductPaths, ProductAttribute
-from .models import Brands, Colors, Sizes, ProductVariants, ProductVariantsRetailPrice
+from .models import Brands, Colors, Sizes, ProductVariants, ProductVariantsRetailPrice, ProductvariantsSources
 from .models import FabricComponent, ProductFabric, Attributes
 from django.http import JsonResponse
 from django.db import connections, transaction
@@ -884,7 +884,6 @@ def create_product(request):
                 color_id=color_id,
                 producer_color_id=producer_color_id,
                 size_id=size_id,
-                producer_code=variant_data.get('producer_code', ''),
                 iai_product_id=variant_data.get('iai_product_id')
             )
 
@@ -916,6 +915,7 @@ def create_product(request):
                 attribute_id=attribute_id
             )
 
+        # Task linkowania - sygnał MPD (ProductvariantsSources post_save) gdy dodano źródła
         logger.info("Utworzono produkt MPD: %s (ID: %s)",
                     product.name, product.id)
 
@@ -1021,7 +1021,6 @@ def update_product(request, product_id):
                     color_id=color_id,
                     producer_color_id=producer_color_id,
                     size_id=size_id,
-                    producer_code=variant_data.get('producer_code', ''),
                     iai_product_id=variant_data.get('iai_product_id')
                 )
 
@@ -1070,12 +1069,15 @@ def get_product(request, product_id):
         # Pobierz warianty
         variants = []
         for variant in product.productvariants_set.all():
+            first_pvs = ProductvariantsSources.objects.using('MPD').filter(
+                variant_id=variant.variant_id
+            ).values_list('producer_code', flat=True).first()
             variant_data = {
                 'variant_id': variant.variant_id,
                 'color_id': variant.color_id,
                 'producer_color_id': variant.producer_color_id,
                 'size_id': variant.size_id,
-                'producer_code': variant.producer_code,
+                'producer_code': first_pvs or '',
                 'iai_product_id': variant.iai_product_id,
                 'exported_to_iai': variant.exported_to_iai
             }
@@ -1159,6 +1161,7 @@ def bulk_create_products(request):
 
                 # Wymagane pola
                 name = product_data.get('name')
+                matterhorn_product_id = product_data.get('matterhorn_product_id')
                 if not name:
                     logger.warning(
                         f"⚠️ MPD bulk_create_products: Brak nazwy produktu {i}")
@@ -1219,6 +1222,8 @@ def bulk_create_products(request):
 
                 created_products.append({
                     'id': product.id,
+                    'mpd_product_id': product.id,
+                    'matterhorn_product_id': matterhorn_product_id,
                     'name': product.name,
                     'variants': created_variants
                 })
@@ -1281,7 +1286,7 @@ def bulk_map_from_matterhorn1(request):
                     # Pobierz produkt z matterhorn1
                     try:
                         matterhorn_product = MatterhornProduct.objects.get(
-                            product_id=matterhorn_product_id)
+                            product_uid=matterhorn_product_id)
                     except MatterhornProduct.DoesNotExist:
                         errors.append(
                             {'error': f'Produkt matterhorn1 o ID {matterhorn_product_id} nie istnieje', 'data': product_data})
@@ -1343,8 +1348,6 @@ def bulk_map_from_matterhorn1(request):
                             product=mpd_product,
                             color=color,
                             size=size,
-                            producer_code=variant_data.get(
-                                'producer_code', ''),
                             iai_product_id=variant_data.get('iai_product_id')
                         )
 
@@ -1380,6 +1383,7 @@ def bulk_map_from_matterhorn1(request):
                         'name': mpd_product.name,
                         'variants_created': len(created_variants)
                     })
+                    # Task linkowania - sygnał MPD gdy bulk_map doda ProductvariantsSources
 
                 except Exception as e:
                     errors.append({
@@ -1526,9 +1530,10 @@ def update_producer_code(request):
         except ProductVariants.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Wariant nie istnieje'}, status=404)
 
-        # Aktualizuj kod producenta
-        variant.producer_code = producer_code
-        variant.save(using='MPD')
+        # Aktualizuj kod producenta w product_variants_sources (wszystkie źródła tego wariantu)
+        ProductvariantsSources.objects.using('MPD').filter(
+            variant_id=variant_id
+        ).update(producer_code=producer_code[:255] if producer_code else None)
 
         logger.info(
             f"Zaktualizowano kod producenta dla wariantu {variant_id}: {producer_code}")

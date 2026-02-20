@@ -77,7 +77,7 @@ Możliwość dodania pola `brand_config_id` do `AutomationRun` dla lepszego śle
 
 ```bash
 # Uruchomienie z marką (użyje konfiguracji marki jeśli istnieje)
-python manage.py run_automation --brand "Marko" --settings=nc.settings.dev
+python manage.py run_automation --brand "Marko" --settings=core.settings.dev
 
 # Jeśli marka ma konfigurację:
 # - Zastosuje domyślne filtry z BrandConfig
