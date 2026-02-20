@@ -471,6 +471,10 @@ class TabuProductAdmin(admin.ModelAdmin):
                             'last_updated': timezone.now(),
                         }
                     )
+                    # Mapowanie wariantu Tabu → MPD (jak przy linkowaniu po EAN)
+                    v.mapped_variant_uid = pv.variant_id
+                    v.is_mapped = True
+                    v.save(update_fields=['mapped_variant_uid', 'is_mapped'])
                     # Cena detaliczna = moja cena - użytkownik ustawia ręcznie w MPD
 
                 # Jeśli brak wariantów - utwórz jeden domyślny (brak tabu_product_variant, variant_uid zostaje null)
