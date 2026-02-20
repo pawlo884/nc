@@ -9,6 +9,7 @@ from django.views.decorators.http import require_http_methods
 from django.db import connections
 from django.utils import timezone
 from django.utils.html import format_html
+from rapidfuzz import fuzz
 
 from .models import Brand, Category, ApiSyncLog, TabuProduct, TabuProductImage, TabuProductVariant, StockHistory
 
@@ -160,6 +161,7 @@ class TabuProductAdmin(admin.ModelAdmin):
         urls = super().get_urls()
         custom_urls = [
             path('mpd-create/<int:product_id>/', self.admin_site.admin_view(self.mpd_create), name='tabu-mpd-create'),
+            path('assign-mapping/<int:product_id>/<int:mpd_product_id>/', self.admin_site.admin_view(self.assign_mapping), name='tabu-assign-mapping'),
         ]
         return custom_urls + urls
 
@@ -248,9 +250,41 @@ class TabuProductAdmin(admin.ModelAdmin):
                     if r and r[0] is not None:
                         selected_unit_id = r[0]
 
+            # Sugerowane podobne produkty w MPD (fuzzy – jak w Matterhorn1)
+            suggested_products = []
+            try:
+                brand_name = product.brand.name if product.brand else None
+                if brand_name:
+                    with connections['MPD'].cursor() as cursor:
+                        cursor.execute("""
+                            SELECT p.id, p.name, b.name as brand_name
+                            FROM products p
+                            LEFT JOIN brands b ON p.brand_id = b.id
+                            WHERE b.name = %s
+                            ORDER BY p.name
+                        """, [brand_name])
+                        all_products = cursor.fetchall()
+                        scored = []
+                        for row in all_products:
+                            similarity = fuzz.token_sort_ratio(product.name or '', row[1] or '')
+                            suggested_words = set((row[1] or '').lower().replace('(', '').replace(')', '').replace('-', ' ').split())
+                            query_words = set((product.name or '').lower().replace('(', '').replace(')', '').replace('-', ' ').split())
+                            suggested_in_query = int(100 * len(suggested_words & query_words) / len(suggested_words)) if suggested_words else 0
+                            scored.append({
+                                'id': row[0],
+                                'name': row[1] or '',
+                                'brand': row[2] or '',
+                                'similarity': similarity,
+                                'suggested_in_query': suggested_in_query,
+                            })
+                        suggested_products = sorted(scored, key=lambda x: x['similarity'], reverse=True)[:5]
+            except Exception as e:
+                logger.warning("Tabu suggested_products (fuzzy): %s", e)
+
             extra_context.update({
                 'is_mapped': is_mapped,
                 'mpd_data': mpd_data,
+                'suggested_products': suggested_products,
                 'main_colors': main_colors,
                 'producer_colors': producer_colors,
                 'mpd_paths': mpd_paths,
@@ -269,6 +303,7 @@ class TabuProductAdmin(admin.ModelAdmin):
         except TabuProduct.DoesNotExist:
             extra_context['is_mapped'] = False
             extra_context['mpd_data'] = {}
+            extra_context['suggested_products'] = []
             extra_context['main_colors'] = []
             extra_context['producer_colors'] = []
             extra_context['mpd_paths'] = []
@@ -283,6 +318,7 @@ class TabuProductAdmin(admin.ModelAdmin):
             logger.exception("Błąd change_view Tabu: %s", e)
             extra_context['is_mapped'] = False
             extra_context['mpd_data'] = {}
+            extra_context['suggested_products'] = []
             extra_context['main_colors'] = []
             extra_context['producer_colors'] = []
             extra_context['mpd_paths'] = []
@@ -326,6 +362,89 @@ class TabuProductAdmin(admin.ModelAdmin):
             })
         status_code = 404 if (result.get('error_message') or '').find('nie istnieje') >= 0 else 400
         return JsonResponse({'success': False, 'error': result['error_message']}, status=status_code)
+
+    @method_decorator(csrf_exempt)
+    @method_decorator(require_http_methods(["POST"]))
+    def assign_mapping(self, request, product_id, mpd_product_id):
+        """Przypisuje istniejący produkt MPD do produktu Tabu (wzór: matterhorn1 assign_mapping)."""
+        try:
+            tabu_product = TabuProduct.objects.get(pk=product_id)
+        except TabuProduct.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Produkt Tabu nie istnieje'}, status=404)
+        try:
+            from django.db import connections
+            from core.db_routers import _get_mpd_db
+            from MPD.models import ProductVariants
+            from tabu.services import create_mpd_variants_from_tabu, upload_tabu_images_to_mpd
+
+            mpd_db = _get_mpd_db()
+            if not ProductVariants.objects.using(mpd_db).filter(product_id=mpd_product_id).exists():
+                return JsonResponse({'success': False, 'error': 'Produkt MPD nie istnieje'}, status=404)
+
+            tabu_product.mapped_product_uid = mpd_product_id
+            tabu_product.save(update_fields=['mapped_product_uid'])
+
+            size_category = None
+            with connections[mpd_db].cursor() as cursor:
+                cursor.execute("""
+                    SELECT s.category
+                    FROM product_variants pv
+                    JOIN sizes s ON pv.size_id = s.id
+                    WHERE pv.product_id = %s
+                    LIMIT 1
+                """, [mpd_product_id])
+                row = cursor.fetchone()
+                if row and row[0]:
+                    size_category = row[0]
+
+            producer_color_name = (request.POST.get('producer_color_name') or '').strip() or None
+            mapping_info = {}
+            if size_category:
+                producer_code = request.POST.get('producer_code', '').strip() or None
+                main_color_id = request.POST.get('main_color_id')
+                main_color_id = int(main_color_id) if main_color_id and str(main_color_id).isdigit() else None
+                try:
+                    mapping_info = create_mpd_variants_from_tabu(
+                        mpd_product_id,
+                        product_id,
+                        size_category,
+                        producer_code=producer_code,
+                        main_color_id=main_color_id,
+                        producer_color_name=producer_color_name,
+                    )
+                    logger.info("Wynik dodawania wariantów Tabu→MPD: %s", mapping_info)
+                except Exception as e:
+                    logger.exception("Błąd podczas dodawania wariantów Tabu→MPD: %s", e)
+                    mapping_info = {'error': str(e)}
+
+            # Upload zdjęć do bucketa i MPD (jak w Matterhorn1)
+            try:
+                upload_result = upload_tabu_images_to_mpd(
+                    mpd_product_id, product_id, producer_color_name=producer_color_name
+                )
+                mapping_info['uploaded_images'] = upload_result.get('uploaded_images', 0)
+                if upload_result.get('upload_error'):
+                    mapping_info['upload_error'] = upload_result['upload_error']
+                logger.info("Wynik uploadu zdjęć Tabu→MPD: %s", upload_result)
+            except Exception as e:
+                logger.exception("Błąd podczas uploadu zdjęć Tabu→MPD: %s", e)
+                mapping_info['upload_error'] = str(e)
+
+            if not size_category and not mapping_info.get('error'):
+                mapping_info['error'] = 'Brak kategorii rozmiarowej w MPD (produkt bez wariantów z rozmiarem?).'
+
+            created = mapping_info.get('created_variants', 0)
+            uploaded = mapping_info.get('uploaded_images', 0)
+            msg = f'Przypisano do MPD ID {mpd_product_id}. Wariantów: {created}. Zdjęć: {uploaded}.'
+            return JsonResponse({
+                'success': True,
+                'message': msg,
+                'mapping_info': mapping_info,
+            })
+        except Exception as e:
+            logger.exception("Błąd assign_mapping Tabu: %s", e)
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
     def image_preview(self, obj):
         if obj and obj.image_url:
             return format_html(

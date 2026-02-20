@@ -290,3 +290,264 @@ def create_mpd_product_from_tabu(
             'mpd_product_id': None,
             'error_message': str(e),
         }
+
+
+def create_mpd_variants_from_tabu(
+    mpd_product_id: int,
+    tabu_product_id: int,
+    size_category: str,
+    producer_code: Optional[str] = None,
+    main_color_id: Optional[int] = None,
+    producer_color_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Tworzy/dopina warianty w MPD z wariantów Tabu (wzór: matterhorn1/saga_variants.create_mpd_variants).
+    Dla każdego wariantu Tabu: szuka istniejącego wariantu MPD po EAN (inna hurtownia) lub tworzy nowy,
+    dopina ProductvariantsSources + StockAndPrices dla źródła Tabu, ustawia mapped_variant_uid w Tabu.
+    """
+    from django.db import connections
+    from django.utils import timezone
+    from tabu.models import TabuProduct, TabuProductVariant
+    from MPD.models import (
+        Colors,
+        ProductVariants,
+        ProductvariantsSources,
+        Sizes,
+        Sources,
+        StockAndPrices,
+    )
+    from MPD.source_adapters.base import normalize_ean
+    from core.db_routers import _get_mpd_db
+
+    mpd_db = _get_mpd_db()
+
+    tabu_product = TabuProduct.objects.get(pk=tabu_product_id)
+    tabu_variants = list(TabuProductVariant.objects.filter(product_id=tabu_product_id))
+    if not tabu_variants:
+        logger.warning("Brak wariantów Tabu dla produktu %s", tabu_product_id)
+        return {"created_variants": 0, "variant_ids": []}
+
+    # Główny kolor: z formularza (main_color_id) albo z produktu MPD / Tabu
+    color_id = None
+    producer_color_id = None
+    if main_color_id:
+        main_color_obj = Colors.objects.using(mpd_db).filter(pk=main_color_id).first()
+        if main_color_obj:
+            color_id = main_color_obj.id
+            logger.info("Użyto głównego koloru z formularza: %s (id=%s)", main_color_obj.name, color_id)
+
+    if color_id is None:
+        first_mpd = (
+            ProductVariants.objects.using(mpd_db)
+            .filter(product_id=mpd_product_id)
+            .select_related("color", "producer_color")
+            .first()
+        )
+        tabu_color_name = (tabu_variants[0].color or (tabu_product.brand.name if tabu_product.brand else "Brak koloru")).strip() or "Brak koloru"
+        tabu_producer_name = (producer_color_name or "").strip()[:50] if producer_color_name else ""
+        if first_mpd and first_mpd.color and (first_mpd.color.name or "").strip() == tabu_color_name:
+            if tabu_producer_name:
+                if first_mpd.producer_color and (first_mpd.producer_color.name or "").strip() == tabu_producer_name:
+                    color_id = first_mpd.color_id
+                    producer_color_id = first_mpd.producer_color_id
+                    logger.info("Ten sam kolor i kolor producenta – dopisuję tylko warianty (color_id=%s, producer_color_id=%s)", color_id, producer_color_id)
+            else:
+                color_id = first_mpd.color_id
+                producer_color_id = first_mpd.producer_color_id
+                logger.info("Ten sam kolor – dopisuję tylko warianty (color_id=%s)", color_id)
+
+    if color_id is None:
+        tabu_color_name = (tabu_variants[0].color or (tabu_product.brand.name if tabu_product.brand else "Brak koloru")).strip() or "Brak koloru"
+        color = Colors.objects.using(mpd_db).filter(name=tabu_color_name).first()
+        if not color:
+            color = Colors.objects.using(mpd_db).create(name=tabu_color_name)
+        color_id = color.id
+
+    if producer_color_id is None and producer_color_name:
+        name_key = producer_color_name.strip()[:50]
+        defaults = {"hex_code": ""}
+        if main_color_id:
+            parent_color = Colors.objects.using(mpd_db).filter(pk=main_color_id).first()
+            if parent_color:
+                defaults["parent_id"] = parent_color
+        producer_color, _ = Colors.objects.using(mpd_db).get_or_create(
+            name=name_key,
+            defaults=defaults,
+        )
+        producer_color_id = producer_color.id
+
+    with connections[mpd_db].cursor() as cursor:
+        cursor.execute("""
+            INSERT INTO iai_product_counter (id, counter_value)
+            VALUES (1, 1)
+            ON CONFLICT (id)
+            DO UPDATE SET counter_value = iai_product_counter.counter_value + 1
+            RETURNING counter_value
+        """)
+        row = cursor.fetchone()
+        iai_product_id = row[0] if row else 1
+
+    tabu_source = Sources.objects.using(mpd_db).filter(name__icontains="Tabu").first()
+    if not tabu_source:
+        tabu_source = Sources.objects.using(mpd_db).create(
+            name="Tabu API", type="api", location="https://b2b.tabu.com.pl"
+        )
+
+    producer_code_val = (producer_code or getattr(tabu_product, "symbol", None) or "").strip()[:255] or None
+    created_count = 0
+    variant_ids = []
+
+    for tabu_var in tabu_variants:
+        size_name = (tabu_var.size or "").strip()
+        ean_raw = (tabu_var.ean or "").strip()
+        ean_norm = normalize_ean(tabu_var.ean)
+        variant_uid_int = tabu_var.api_id
+
+        size = (
+            Sizes.objects.using(mpd_db)
+            .filter(name__iexact=size_name, category=size_category)
+            .first()
+        )
+        if not size and size_name:
+            # Ten sam produkt – brakujący rozmiar dopisz w tej samej kategorii co produkt MPD
+            size, _ = Sizes.objects.using(mpd_db).get_or_create(
+                name=size_name[:255],
+                category=size_category,
+                defaults={
+                    "name_lower": size_name.lower()[:255] if size_name else "",
+                    "unit": "",
+                },
+            )
+            logger.info("Dodano rozmiar w MPD: %s (kategoria %s)", size_name, size_category)
+        if not size:
+            logger.warning("Rozmiar %s nie znaleziony w kategorii %s – pomijam wariant", size_name, size_category)
+            continue
+
+        if ProductvariantsSources.objects.using(mpd_db).filter(
+            variant_uid=variant_uid_int, source=tabu_source
+        ).exists():
+            logger.info("Wariant Tabu api_id=%s już istnieje w MPD - pomijam", variant_uid_int)
+            continue
+
+        variant = None
+        if ean_norm:
+            for pvs in (
+                ProductvariantsSources.objects.using(mpd_db)
+                .filter(variant__product_id=mpd_product_id)
+                .exclude(source=tabu_source)
+                .select_related("variant")
+            ):
+                if normalize_ean(pvs.ean) == ean_norm:
+                    variant = pvs.variant
+                    logger.info(
+                        "Znaleziono wariant MPD po EAN %s (variant_id=%s) - dopinam Tabu",
+                        ean_norm, variant.variant_id,
+                    )
+                    break
+
+        if variant is None:
+            variant = ProductVariants.objects.using(mpd_db).create(
+                product_id=mpd_product_id,
+                color_id=color_id,
+                producer_color_id=producer_color_id,
+                size=size,
+                iai_product_id=iai_product_id,
+            )
+            logger.info("Utworzono wariant MPD %s dla Tabu api_id=%s", variant.variant_id, tabu_var.api_id)
+
+        ProductvariantsSources.objects.using(mpd_db).get_or_create(
+            variant=variant,
+            source=tabu_source,
+            defaults={
+                "ean": (ean_raw or "")[:50] if ean_raw else "",
+                "variant_uid": variant_uid_int,
+                "producer_code": (tabu_var.symbol or producer_code_val or "").strip()[:255] or None,
+            },
+        )
+        StockAndPrices.objects.using(mpd_db).get_or_create(
+            variant=variant,
+            source=tabu_source,
+            defaults={
+                "stock": tabu_var.store if tabu_var.store is not None else 0,
+                "price": tabu_var.price_net or Decimal("0"),
+                "currency": "PLN",
+                "last_updated": timezone.now(),
+            },
+        )
+        TabuProductVariant.objects.filter(pk=tabu_var.pk).update(
+            mapped_variant_uid=variant.variant_id,
+            is_mapped=True,
+        )
+        variant_ids.append(variant.variant_id)
+        created_count += 1
+
+    if created_count > 0:
+        from MPD.tasks import link_variants_from_other_sources_task
+        link_variants_from_other_sources_task.apply_async(
+            args=(mpd_product_id, tabu_source.id),
+            queue="default",
+        )
+        logger.info(
+            "Wysłano task linkowania po EAN dla produktu MPD %s (source %s)",
+            mpd_product_id, tabu_source.id,
+        )
+
+    return {"created_variants": created_count, "variant_ids": variant_ids}
+
+
+def upload_tabu_images_to_mpd(
+    mpd_product_id: int,
+    tabu_product_id: int,
+    producer_color_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Upload zdjęć produktu Tabu do bucketa i zapis do MPD (jak Matterhorn1 _upload_product_images).
+    Zwraca dict z kluczami: uploaded_images (int), images (lista), upload_error (str, opcjonalnie).
+    """
+    try:
+        from tabu.models import TabuProduct
+        from MPD.models import Products, ProductImage
+        from core.db_routers import _get_mpd_db
+        from matterhorn1.defs_db import upload_image_to_bucket_and_get_url
+
+        mpd_db = _get_mpd_db()
+        tabu_product = TabuProduct.objects.get(pk=tabu_product_id)
+        images_to_upload = []
+        if tabu_product.image_url and tabu_product.image_url.strip():
+            images_to_upload.append((tabu_product.image_url.strip(), 1))
+        seen = {u for u, _ in images_to_upload}
+        for img in tabu_product.gallery_images.order_by("order", "api_image_id"):
+            if img.image_url and img.image_url.strip() and img.image_url.strip() not in seen:
+                images_to_upload.append((img.image_url.strip(), len(images_to_upload) + 1))
+                seen.add(img.image_url.strip())
+
+        if not images_to_upload:
+            logger.info("Brak zdjęć Tabu do uploadu dla produktu %s", tabu_product_id)
+            return {"uploaded_images": 0, "images": []}
+
+        mpd_product = Products.objects.using(mpd_db).get(pk=mpd_product_id)
+        producer_color = (producer_color_name or "").strip()
+        uploaded_count = 0
+        uploaded_images = []
+        for idx, (img_url, order_num) in enumerate(images_to_upload, 1):
+            bucket_key = upload_image_to_bucket_and_get_url(
+                image_path=img_url,
+                product_id=mpd_product_id,
+                producer_color_name=producer_color,
+                image_number=order_num,
+            )
+            if bucket_key:
+                ProductImage.objects.using(mpd_db).get_or_create(
+                    product=mpd_product,
+                    file_path=bucket_key,
+                    defaults={"product": mpd_product, "file_path": bucket_key},
+                )
+                uploaded_count += 1
+                uploaded_images.append({"original_url": img_url, "storage_key": bucket_key, "order": order_num})
+                logger.info("Uploadowano zdjęcie Tabu %s -> MPD %s (nr %s)", tabu_product_id, mpd_product_id, order_num)
+
+        logger.info("Uploadowano %s zdjęć Tabu do MPD produktu %s", uploaded_count, mpd_product_id)
+        return {"uploaded_images": uploaded_count, "images": uploaded_images}
+    except Exception as e:
+        logger.exception("Błąd uploadu zdjęć Tabu→MPD: %s", e)
+        return {"uploaded_images": 0, "images": [], "upload_error": str(e)}
