@@ -91,3 +91,25 @@ class TabuAdapter(SourceAdapter):
         TabuProduct.objects.using(tabu_db).filter(id=source_product_id).update(
             mapped_product_uid=mpd_product_id,
         )
+
+    def update_source_variant_mapped(
+        self,
+        source_product_id: int,
+        source_variant_uid: Optional[str],
+        mpd_variant_id: int,
+    ) -> None:
+        """Ustawia mapped_variant_uid i is_mapped w Tabu TabuProductVariant (wzorzec jak Matterhorn)."""
+        if not source_variant_uid or not str(source_variant_uid).strip():
+            return
+        try:
+            api_id = int(source_variant_uid.strip())
+        except (ValueError, TypeError):
+            return
+        from django.conf import settings
+        from tabu.models import TabuProductVariant
+
+        tabu_db = 'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu'
+        TabuProductVariant.objects.using(tabu_db).filter(
+            product_id=source_product_id,
+            api_id=api_id,
+        ).update(mapped_variant_uid=mpd_variant_id, is_mapped=True)
