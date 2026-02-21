@@ -213,7 +213,7 @@ XML_FILES = [
     "full", "full_change", "light", "categories", "sizes", "producers", "units", "parameters", "stocks", "series", "warranties", "preset"
 ]
 
-XML_BUCKET_PREFIX = "MPD_test/xml/matterhorn/"
+XML_BUCKET_PREFIX = "MPD_test/xml/"
 if BUCKET_PUBLIC_BASE_URL:
     BUCKET_URL = f"{BUCKET_PUBLIC_BASE_URL.rstrip('/')}/{XML_BUCKET_PREFIX}"
 else:
@@ -294,7 +294,7 @@ def generate_full_xml(request):
 
     # Zapisz lokalnie dla debugowania
     import os
-    local_path = 'misc/MPD_test/xml/matterhorn/full.xml'
+    local_path = 'misc/MPD_test/xml/full.xml'
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
     with open(exporter_result['local_path'], 'rb') as f:
@@ -330,7 +330,7 @@ def generate_full_change_xml(request):
 
     # Zapisz lokalnie dla debugowania
     import os
-    local_path = 'misc/MPD_test/xml/matterhorn/full_change.xml'
+    local_path = 'misc/MPD_test/xml/full_change.xml'
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
     with open(local_path, 'wb') as f:
@@ -479,7 +479,7 @@ def generate_gateway_xml_api(request):
 
         # Zapisz lokalnie dla debugowania
         import os
-        local_path = 'misc/MPD_test/xml/matterhorn/gateway.xml'
+        local_path = 'misc/MPD_test/xml/gateway.xml'
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
         with open(local_path, 'w', encoding='utf-8') as f:

@@ -83,7 +83,7 @@ task = generate_daily_full_xml.delay()
 ## 📊 Co robi zadanie
 
 1. **Generuje full.xml** używając `FullXMLExporter`
-2. **Zapisuje lokalnie** do `MPD_test/xml/matterhorn/full.xml`
+2. **Zapisuje lokalnie** do `MPD_test/xml/full.xml`
 3. **Przesyła na bucket** Digital Ocean Spaces
 4. **Aktualizuje gateway.xml** automatycznie
 5. **Loguje wszystkie operacje** z czasami wykonania
@@ -107,5 +107,5 @@ To jest dokładna nazwa, którą musisz wpisać w polu "Task" w panelu admina.
 
 - Zadanie automatycznie używa tylko źródła Matterhorn (id=2)
 - Po wygenerowaniu full.xml automatycznie aktualizuje gateway.xml
-- Wszystkie pliki są zapisywane w folderze `MPD_test/xml/matterhorn/`
+- Wszystkie pliki są zapisywane w folderze `MPD_test/xml/`
 - Zadanie zwraca szczegółowe informacje o rezultacie

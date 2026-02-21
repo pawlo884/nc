@@ -105,7 +105,7 @@ class BaseXMLExporter:
         raise NotImplementedError
 
     def save_local(self, xml_content):
-        local_dir = 'misc/MPD_test/xml/matterhorn/'
+        local_dir = 'misc/MPD_test/xml/'
         os.makedirs(local_dir, exist_ok=True)
         local_path = os.path.join(local_dir, self.filename)
         with open(local_path, 'w', encoding='utf-8') as f:
@@ -114,7 +114,7 @@ class BaseXMLExporter:
 
     def save_to_bucket(self, local_file_path):
         try:
-            bucket_path = f"MPD_test/xml/matterhorn/{self.filename}"
+            bucket_path = f"MPD_test/xml/{self.filename}"
             with open(local_file_path, 'rb') as f:
                 file_data = f.read()
             s3_client.put_object(
@@ -2526,7 +2526,7 @@ def test_gateway_refresh():
     print("🧪 Test odświeżania gateway.xml...")
 
     # Sprawdź aktualny stan plików lokalnych
-    local_dir = 'misc/MPD_test/xml/matterhorn/'
+    local_dir = 'misc/MPD_test/xml/'
     full_path = os.path.join(local_dir, 'full.xml')
 
     if os.path.exists(full_path):
@@ -2565,7 +2565,7 @@ def refresh_gateway_simple():
         print("🔄 Odświeżam gateway.xml (prosta metoda)...")
 
         # Sprawdź pliki lokalne
-        local_dir = 'misc/MPD_test/xml/matterhorn/'
+        local_dir = 'misc/MPD_test/xml/'
         full_path = os.path.join(local_dir, 'full.xml')
 
         if not os.path.exists(full_path):
