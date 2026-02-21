@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     'matterhorn1',
     'web_agent',
     'tabu',
+    'producer_catalog',
 ]
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny

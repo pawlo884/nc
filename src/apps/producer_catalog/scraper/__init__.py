@@ -1,0 +1,1 @@
+# Scrapery katalogów producentów
