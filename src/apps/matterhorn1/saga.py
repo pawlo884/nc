@@ -447,12 +447,15 @@ class SagaService:
                     'MPD').get_or_create(name=brand_name)
                 brand_id = brand.id
 
-            # Pobierz lub utwórz series
+            # Pobierz lub utwórz series (z przypisaniem do marki)
             series_id = None
             series_name = mpd_data.get('series_name')
             if series_name:
-                series, _ = ProductSeries.objects.using(
-                    'MPD').get_or_create(name=series_name)
+                series, _ = ProductSeries.objects.using('MPD').get_or_create(
+                    brand_id=brand_id,
+                    name=series_name,
+                    defaults={'name': series_name, 'brand_id': brand_id},
+                )
                 series_id = series.id
 
             # Utwórz produkt w MPD

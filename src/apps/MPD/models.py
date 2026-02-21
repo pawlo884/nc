@@ -45,6 +45,29 @@ class Brands(models.Model):
         return str(self.name) if self.name else 'Brak nazwy'
 
 
+class Collection(models.Model):
+    """Kolekcja danej marki (np. AVA BASIC, WEDDING COLLECTION)."""
+    id = models.BigAutoField(primary_key=True)
+    brand = models.ForeignKey(
+        Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id',
+        related_name='collections', verbose_name='Marka')
+    name = models.CharField(max_length=255, verbose_name='Nazwa')
+    sort_order = models.PositiveIntegerField(default=0, verbose_name='Kolejność')
+    objects = models.Manager()
+
+    class Meta:
+        managed = True
+        db_table = 'collections'
+        app_label = 'MPD'
+        verbose_name = 'Kolekcja'
+        verbose_name_plural = 'Kolekcje'
+        ordering = ['brand', 'sort_order', 'name']
+        unique_together = [['brand', 'name']]
+
+    def __str__(self):
+        return f"{self.brand.name}: {self.name}" if self.brand else self.name
+
+
 class Colors(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=50, blank=True, null=True)
@@ -89,6 +112,9 @@ class Products(models.Model):
     short_description = models.CharField(max_length=500, blank=True, null=True)
     brand = models.ForeignKey(
         Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id', null=True, blank=True)
+    collection = models.ForeignKey(
+        'Collection', on_delete=models.SET_NULL, db_column='collection_id', null=True, blank=True,
+        related_name='products', verbose_name='Kolekcja')
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     series = models.ForeignKey('ProductSeries', db_column='series_id',
@@ -355,6 +381,9 @@ class ProductSetItem(models.Model):
 
 class ProductSeries(models.Model):
     id = models.BigAutoField(primary_key=True)
+    brand = models.ForeignKey(
+        Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id',
+        null=True, blank=True, related_name='series', verbose_name='Marka')
     name = models.CharField(max_length=255, blank=True, null=True)
     objects = models.Manager()
 
@@ -364,7 +393,8 @@ class ProductSeries(models.Model):
         app_label = 'MPD'
         verbose_name = 'Seria'
         verbose_name_plural = 'Serie'
-        ordering = ['name']
+        ordering = ['brand', 'name']
+        unique_together = [['brand', 'name']]
 
     def __str__(self):
         return str(self.name) if self.name else f'Seria {self.id}'

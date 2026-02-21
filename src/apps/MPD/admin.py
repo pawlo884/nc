@@ -9,7 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
 import logging
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Seasons, Categories, Vat, Units, FabricComponent, ProductFabric
+from .models import Brands, Collection, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Seasons, Categories, Vat, Units, FabricComponent, ProductFabric
 from matterhorn1.defs_db import resolve_image_url
 import decimal
 # Register your models here.
@@ -105,7 +105,7 @@ class ProductsAdmin(admin.ModelAdmin):
     list_per_page = 30
     fieldsets = (
         ('Podstawowe informacje', {
-            'fields': ('name', 'short_description', 'description', 'brand', 'series', 'season', 'unit', 'visibility')
+            'fields': ('name', 'short_description', 'description', 'brand', 'collection', 'series', 'season', 'unit', 'visibility')
         }),
         ('Warianty produktu', {
             'fields': ('show_variants',),
@@ -138,9 +138,10 @@ class ProductsAdmin(admin.ModelAdmin):
         }),
     )
     list_display = ['id', 'name', 'description',
-                    'brand', 'season', 'updated_at', 'visibility']  # widok listy produktów
+                    'brand', 'collection', 'season', 'updated_at', 'visibility']  # widok listy produktów
     list_filter = [
         'brand',
+        'collection',
         'series',
         'season',
         'visibility',
@@ -1284,10 +1285,19 @@ class ProductImageAdmin(admin.ModelAdmin):
         obj.save(using='MPD')
 
 
+@admin.register(Collection)
+class CollectionAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'brand', 'sort_order']
+    list_filter = ['brand']
+    search_fields = ['name', 'brand__name']
+    ordering = ['brand', 'sort_order', 'name']
+
+
 @admin.register(ProductSeries)
 class ProductSeriesAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name']
-    search_fields = ['name']
+    list_display = ['id', 'name', 'brand']
+    list_filter = ['brand']
+    search_fields = ['name', 'brand__name']
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
