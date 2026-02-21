@@ -33,6 +33,17 @@ class AutomationRun(models.Model):
     category_id = models.IntegerField(
         null=True, blank=True, verbose_name='ID kategorii')
     filters = models.JSONField(default=dict, blank=True, verbose_name='Filtry')
+    SOURCE_CHOICES = [
+        ('matterhorn1', 'Matterhorn1'),
+        ('tabu', 'Tabu'),
+    ]
+    source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        default='matterhorn1',
+        verbose_name='Źródło',
+        help_text='Źródło produktów: Matterhorn1 (przeglądarka) lub Tabu (backend).'
+    )
     logs = models.TextField(
         blank=True, null=True, verbose_name='Logi',
         help_text='Logi automatyzacji w czasie rzeczywistym'

@@ -1,10 +1,11 @@
 """
 Taski Celery dla automatyzacji wypełniania formularzy MPD.
+- matterhorn1: przeglądarka (Selenium) + AI.
+- tabu: backend – masowe tworzenie produktów MPD z Tabu (bez przeglądarki).
 """
 import logging
 from celery import shared_task
 from django.utils import timezone
-from django.db import connections
 from .models import AutomationRun, ProductProcessingLog
 from .automation.browser_automation import BrowserAutomation
 from .automation.ai_processor import AIProcessor
@@ -12,6 +13,118 @@ from .automation.product_processor import ProductProcessor
 import os
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task(bind=True, name='web_agent.tasks.automate_tabu_to_mpd')
+def automate_tabu_to_mpd(
+    self,
+    brand_id: int = None,
+    category_id: int = None,
+    filters: dict = None,
+    automation_run_id: int = None,
+):
+    """
+    Automatyzacja dodawania produktów z Tabu do MPD (backend, bez przeglądarki).
+    Pobiera listę produktów Tabu (np. niezmapowanych), dla każdego wywołuje
+    tabu.services.create_mpd_product_from_tabu.
+    """
+    run = None
+    if automation_run_id:
+        try:
+            run = AutomationRun.objects.get(pk=automation_run_id)
+        except AutomationRun.DoesNotExist:
+            pass
+    if not run:
+        run = AutomationRun.objects.create(
+            status='running',
+            source='tabu',
+            brand_id=brand_id,
+            category_id=category_id,
+            filters=filters or {},
+        )
+
+    try:
+        from tabu.models import TabuProduct
+        from tabu.services import create_mpd_product_from_tabu
+
+        qs = TabuProduct.objects.filter(mapped_product_uid__isnull=True)
+        if brand_id is not None:
+            qs = qs.filter(brand_id=brand_id)
+        if category_id is not None:
+            qs = qs.filter(category_id=category_id)
+        if filters:
+            if filters.get('brand_id') is not None:
+                qs = qs.filter(brand_id=filters['brand_id'])
+            if filters.get('category_id') is not None:
+                qs = qs.filter(category_id=filters['category_id'])
+
+        product_ids = list(qs.values_list('id', flat=True)[:500])
+        if not product_ids:
+            run.status = 'completed'
+            run.completed_at = timezone.now()
+            run.save()
+            return {
+                'status': 'completed',
+                'automation_run_id': run.id,
+                'products_processed': 0,
+                'products_success': 0,
+                'products_failed': 0,
+            }
+
+        for pid in product_ids:
+            try:
+                plog = ProductProcessingLog.objects.create(
+                    automation_run=run,
+                    product_id=pid,
+                    status='processing',
+                )
+                tabu_product = TabuProduct.objects.filter(pk=pid).first()
+                if tabu_product:
+                    plog.product_name = (tabu_product.name or '')[:500]
+                    plog.save()
+                result = create_mpd_product_from_tabu(pid, form_data=None)
+                if result['success']:
+                    plog.status = 'success'
+                    plog.mpd_product_id = result['mpd_product_id']
+                    run.products_success += 1
+                else:
+                    plog.status = 'failed'
+                    plog.error_message = (result.get('error_message') or '')[:2000]
+                    run.products_failed += 1
+                plog.processing_data = result
+                plog.save()
+            except Exception as e:
+                logger.exception("Tabu automatyzacja produkt %s: %s", pid, e)
+                try:
+                    ProductProcessingLog.objects.create(
+                        automation_run=run,
+                        product_id=pid,
+                        status='failed',
+                        error_message=str(e)[:2000],
+                    )
+                except Exception:
+                    pass
+                run.products_failed += 1
+            run.products_processed += 1
+            run.save()
+
+        run.status = 'completed'
+        run.completed_at = timezone.now()
+        run.save()
+        return {
+            'status': 'completed',
+            'automation_run_id': run.id,
+            'products_processed': run.products_processed,
+            'products_success': run.products_success,
+            'products_failed': run.products_failed,
+        }
+    except Exception as e:
+        logger.exception("Automatyzacja Tabu→MPD: %s", e)
+        run.status = 'failed'
+        run.error_message = str(e)
+        run.completed_at = timezone.now()
+        run.save()
+        raise
 
 
 @shared_task(bind=True, name='web_agent.tasks.automate_mpd_form_filling')
@@ -30,12 +143,13 @@ def automate_mpd_form_filling(self, brand_id: int = None, category_id: int = Non
     automation_run = None
     
     try:
-        # Utwórz log uruchomienia
+        # Utwórz log uruchomienia (źródło: Matterhorn1 – przeglądarka)
         automation_run = AutomationRun.objects.create(
             status='running',
+            source='matterhorn1',
             brand_id=brand_id,
             category_id=category_id,
-            filters=filters or {}
+            filters=filters or {},
         )
         
         logger.info(f"Rozpoczęcie automatyzacji MPD - Run ID: {automation_run.id}")

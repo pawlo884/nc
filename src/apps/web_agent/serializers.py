@@ -29,7 +29,7 @@ class AutomationRunSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'started_at', 'completed_at', 'status',
             'products_processed', 'products_success', 'products_failed',
-            'error_message', 'brand_id', 'category_id', 'filters',
+            'error_message', 'brand_id', 'category_id', 'filters', 'source',
             'product_logs', 'duration_seconds'
         ]
         read_only_fields = ['id', 'started_at', 'completed_at']
@@ -43,16 +43,22 @@ class AutomationRunSerializer(serializers.ModelSerializer):
 
 class StartAutomationSerializer(serializers.Serializer):
     """Serializer dla parametrów uruchomienia automatyzacji"""
-    
+
+    source = serializers.ChoiceField(
+        choices=[('matterhorn1', 'Matterhorn1'), ('tabu', 'Tabu')],
+        default='matterhorn1',
+        required=False,
+    )
     brand_id = serializers.IntegerField(required=False, allow_null=True)
     category_id = serializers.IntegerField(required=False, allow_null=True)
     filters = serializers.DictField(required=False, default=dict)
-    
+
     def validate(self, data):
-        """Walidacja danych"""
-        if not data.get('brand_id') and not data.get('category_id'):
-            raise serializers.ValidationError(
-                "Musisz podać przynajmniej brand_id lub category_id"
-            )
+        """Walidacja danych – dla matterhorn1 wymagane brand_id lub category_id."""
+        if data.get('source', 'matterhorn1') == 'matterhorn1':
+            if not data.get('brand_id') and not data.get('category_id'):
+                raise serializers.ValidationError(
+                    "Dla źródła matterhorn1 podaj przynajmniej brand_id lub category_id"
+                )
         return data
 

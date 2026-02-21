@@ -34,6 +34,59 @@
       <h2>Dane MPD</h2>
       <div id="tabu-mpd-status" class="tabu-mpd-status" style="display: none;"></div>
 
+      {% if suggested_products %}
+      <div class="form-row" style="margin-bottom: 20px; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+        <h3 style="margin: 0 0 10px 0; color: #333; font-size: 13px; font-weight: bold;">Sugerowane podobne produkty w MPD</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+          <thead>
+            <tr style="background: #eee;">
+              <th style="text-align: left; border: 1px solid #ddd; padding: 6px;">Nazwa</th>
+              <th style="text-align: left; border: 1px solid #ddd; padding: 6px; width: 80px;">Marka</th>
+              <th style="text-align: center; border: 1px solid #ddd; padding: 6px; width: 55px;">Podob.</th>
+              <th style="text-align: center; border: 1px solid #ddd; padding: 6px; width: 55px;">Pokrycie</th>
+              <th style="text-align: left; border: 1px solid #ddd; padding: 6px; width: 100px;">Główny kolor</th>
+              <th style="text-align: left; border: 1px solid #ddd; padding: 6px; width: 100px;">Kolor prod.</th>
+              <th style="text-align: left; border: 1px solid #ddd; padding: 6px; width: 80px;">Kod prod.</th>
+              <th style="text-align: center; border: 1px solid #ddd; padding: 6px; width: 90px;">Akcja</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in suggested_products %}
+            <tr style="border-bottom: 1px solid #eee;">
+              <td style="border: 1px solid #ddd; padding: 6px; max-width: 180px; overflow: hidden; text-overflow: ellipsis;" title="{{ p.name }}">{{ p.name|truncatechars:28 }}</td>
+              <td style="border: 1px solid #ddd; padding: 6px;">{{ p.brand|truncatechars:10 }}</td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold; color: #28a745;">{{ p.similarity|floatformat:1 }}%</td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; color: #17a2b8;">{{ p.suggested_in_query|floatformat:1 }}%</td>
+              <td style="border: 1px solid #ddd; padding: 4px;">
+                <select class="tabu-main-color-select" style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;">
+                  <option value="">-- kolor --</option>
+                  {% for color in main_colors %}
+                  <option value="{{ color.id }}">{{ color.name|truncatechars:15 }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td style="border: 1px solid #ddd; padding: 4px;">
+                <input type="text" class="tabu-producer-color-input" list="tabu_producer_colors_list" autocomplete="off" style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;" placeholder="Kolor prod." />
+                <datalist id="tabu_producer_colors_list">
+                  {% for color in producer_colors %}
+                  <option value="{{ color.name }}">{{ color.name }}</option>
+                  {% endfor %}
+                </datalist>
+              </td>
+              <td style="border: 1px solid #ddd; padding: 4px;">
+                <input type="text" class="tabu-producer-code-input" placeholder="Kod" style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;" />
+              </td>
+              <td style="border: 1px solid #ddd; padding: 4px; text-align: center;">
+                <button type="button" class="tabu-assign-mpd-btn" data-mpd-id="{{ p.id }}" style="background: #007cba; color: white; border: none; padding: 4px 10px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 6px;">Przypisz</button>
+                <a href="/admin/MPD/products/{{ p.id }}/change/" target="_blank" class="tabu-mpd-link" style="font-size: 11px;">Otwórz</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
       <form id="tabu-mpd-form">
         {% csrf_token %}
         <input type="hidden" name="product_id" value="{{ original.id }}" />
@@ -214,21 +267,76 @@ document.addEventListener('DOMContentLoaded', function() {
 
       fetch('/admin/tabu/tabuproduct/mpd-create/{{ original.id }}/', {
         method: 'POST',
-        headers: { 'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value },
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value, 'X-Requested-With': 'XMLHttpRequest' },
         body: formData
       })
       .then(function(r) { return r.json(); })
       .then(function(data) {
         statusEl.className = 'tabu-mpd-status ' + (data.success ? 'success' : 'error');
-        statusEl.textContent = data.message || data.error || 'Wystąpił błąd.';
-        if (data.success) setTimeout(function() { window.location.reload(); }, 1500);
+        statusEl.textContent = data.message || data.error || (data.success ? 'Utworzono.' : 'Błąd.');
+        if (data.success) { setTimeout(function() { window.location.reload(); }, 1500); }
       })
       .catch(function(err) {
         statusEl.className = 'tabu-mpd-status error';
-        statusEl.textContent = 'Błąd: ' + (err.message || 'Nie udało się utworzyć produktu.');
+        statusEl.textContent = 'Błąd podczas tworzenia produktu.';
       });
     });
   }
+
+  function getTabuCsrfToken() {
+    var form = document.getElementById('tabu-mpd-form');
+    if (form) {
+      var input = form.querySelector('input[name=csrfmiddlewaretoken]');
+      if (input) return input.value;
+    }
+    var any = document.querySelector('input[name=csrfmiddlewaretoken]');
+    return any ? any.value : '';
+  }
+
+  document.addEventListener('click', function(ev) {
+    var btn = ev.target && ev.target.closest && ev.target.closest('.tabu-assign-mpd-btn');
+    if (!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    var mpdId = btn.getAttribute('data-mpd-id');
+    if (!mpdId) return;
+    var row = btn.closest('tr');
+    var mainColorId = row ? (row.querySelector('.tabu-main-color-select') && row.querySelector('.tabu-main-color-select').value) || '' : '';
+    var producerColorName = row ? (row.querySelector('.tabu-producer-color-input') && row.querySelector('.tabu-producer-color-input').value) || '' : '';
+    var producerCode = row ? (row.querySelector('.tabu-producer-code-input') && row.querySelector('.tabu-producer-code-input').value) || '' : '';
+    var statusEl = document.getElementById('tabu-mpd-status');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.className = 'tabu-mpd-status';
+      statusEl.textContent = 'Przypisywanie...';
+    }
+    var csrf = getTabuCsrfToken();
+    var assignUrl = '/admin/tabu/tabuproduct/assign-mapping/{{ original.id }}/' + mpdId + '/';
+    var body = 'csrfmiddlewaretoken=' + encodeURIComponent(csrf) + '&main_color_id=' + encodeURIComponent(mainColorId) + '&producer_color_name=' + encodeURIComponent(producerColorName) + '&producer_code=' + encodeURIComponent(producerCode);
+    fetch(assignUrl, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrf,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (statusEl) {
+        statusEl.className = 'tabu-mpd-status ' + (data.success ? 'success' : 'error');
+        statusEl.textContent = data.message || data.error || (data.success ? 'Przypisano.' : 'Błąd.');
+      }
+      if (data.success) { setTimeout(function() { window.location.reload(); }, 1500); }
+    })
+    .catch(function(err) {
+      if (statusEl) {
+        statusEl.className = 'tabu-mpd-status error';
+        statusEl.textContent = 'Błąd podczas przypisywania.';
+      }
+    });
+  });
 });
 </script>
 {% endblock %}

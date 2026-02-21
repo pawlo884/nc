@@ -12,7 +12,7 @@ from .serializers import (
     ProductProcessingLogSerializer,
     StartAutomationSerializer
 )
-from .tasks import automate_mpd_form_filling
+from .tasks import automate_mpd_form_filling, automate_tabu_to_mpd
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,11 @@ class AutomationRunViewSet(viewsets.ModelViewSet):
         category_id = self.request.query_params.get('category_id', None)
         if category_id:
             queryset = queryset.filter(category_id=category_id)
-        
+        # Filtrowanie po source (matterhorn1 | tabu)
+        source = self.request.query_params.get('source', None)
+        if source:
+            queryset = queryset.filter(source=source)
+
         return queryset.order_by('-started_at')
     
     @action(detail=False, methods=['post'], url_path='start-automation')
@@ -65,21 +69,41 @@ class AutomationRunViewSet(viewsets.ModelViewSet):
             )
         
         validated_data = serializer.validated_data
-        
-        # Uruchom task Celery
+        source = validated_data.get('source', 'matterhorn1')
+
         try:
+            if source == 'tabu':
+                run = AutomationRun.objects.create(
+                    status='running',
+                    source='tabu',
+                    brand_id=validated_data.get('brand_id'),
+                    category_id=validated_data.get('category_id'),
+                    filters=validated_data.get('filters', {}),
+                )
+                task = automate_tabu_to_mpd.delay(
+                    brand_id=validated_data.get('brand_id'),
+                    category_id=validated_data.get('category_id'),
+                    filters=validated_data.get('filters', {}),
+                    automation_run_id=run.id,
+                )
+                logger.info("Uruchomiono automatyzację Tabu→MPD - run_id=%s task_id=%s", run.id, task.id)
+                return Response({
+                    'status': 'started',
+                    'task_id': task.id,
+                    'automation_run_id': run.id,
+                    'message': 'Automatyzacja Tabu→MPD została uruchomiona',
+                }, status=status.HTTP_202_ACCEPTED)
+
             task = automate_mpd_form_filling.delay(
                 brand_id=validated_data.get('brand_id'),
                 category_id=validated_data.get('category_id'),
-                filters=validated_data.get('filters', {})
+                filters=validated_data.get('filters', {}),
             )
-            
-            logger.info(f"Uruchomiono automatyzację - Task ID: {task.id}")
-            
+            logger.info("Uruchomiono automatyzację Matterhorn1 - Task ID: %s", task.id)
             return Response({
                 'status': 'started',
                 'task_id': task.id,
-                'message': 'Automatyzacja została uruchomiona'
+                'message': 'Automatyzacja została uruchomiona',
             }, status=status.HTTP_202_ACCEPTED)
             
         except Exception as e:

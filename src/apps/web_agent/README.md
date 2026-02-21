@@ -15,15 +15,21 @@ OPENAI_API_KEY=twoj_klucz_openai
 BROWSER_HEADLESS=False  # Opcjonalne, domyślnie False (przeglądarka widoczna)
 ```
 
+## Źródła automatyzacji (source)
+
+- **matterhorn1** (domyślne) – przeglądarka (Selenium) + AI: lista produktów Matterhorn1, wypełnianie formularza MPD, wymaga `brand_id` lub `category_id`.
+- **tabu** – backend (bez przeglądarki): produkty Tabu z `mapped_product_uid=NULL` są masowo tworzone w MPD; opcjonalnie `brand_id`, `category_id`, `filters`.
+
 ## Uruchomienie automatyzacji
 
-### Przez API
+### Przez API (Matterhorn1 – przeglądarka)
 
 ```bash
 curl -X POST http://localhost:8000/api/web-agent/automation-runs/start-automation/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Token YOUR_TOKEN" \
   -d '{
+    "source": "matterhorn1",
     "brand_id": 28,
     "category_id": 15,
     "filters": {
@@ -32,6 +38,19 @@ curl -X POST http://localhost:8000/api/web-agent/automation-runs/start-automatio
     }
   }'
 ```
+
+### Przez API (Tabu – backend)
+
+```bash
+curl -X POST http://localhost:8000/api/web-agent/automation-runs/start-automation/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Token YOUR_TOKEN" \
+  -d '{
+    "source": "tabu",
+    "filters": {}
+  }'
+```
+Opcjonalnie: `brand_id`, `category_id` (ID marki/kategorii w Tabu) do zawężenia listy.
 
 ### Przez Django shell
 
