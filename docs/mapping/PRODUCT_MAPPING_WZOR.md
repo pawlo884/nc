@@ -12,7 +12,7 @@ Kolejność operacji przy „mapowaniu produktu z hurtowni do MPD”:
 
 | Krok | Opis | Odpowiedzialność |
 |------|------|------------------|
-| 1 | **Utwórz produkt w MPD** | Products (name, description, short_description, brand_id, series_id, unit_id, visibility). Marka/seria: get_or_create po nazwie. |
+| 1 | **Utwórz produkt w MPD** | Products (name, description, short_description, brand_id, series_id, unit_id, visibility). Marka: get_or_create po nazwie. Seria: get_or_create po **brand_id + name** (seria przypisana do marki). |
 | 2 | **Zapisz mapping w hurtowni** | W modelu produktu hurtowni: `mapped_product_uid = mpd_product_id` (oraz ewent. `is_mapped = True`). |
 | 3 | **Ścieżki / atrybuty / skład** (opcjonalnie) | ProductPaths, ProductAttribute, ProductFabric w MPD – jeśli formularz/admin je podaje. |
 | 4 | **Utwórz warianty w MPD** | Dla każdego wariantu źródłowego: ProductVariants (product_id, color_id, producer_color_id, size, iai_product_id), ProductvariantsSources (variant, source, ean, variant_uid, producer_code), StockAndPrices (variant, source, stock, price). Źródło (Sources) w MPD: get_or_create po nazwie hurtowni (np. „Tabu API”, „Matterhorn”). |
@@ -20,7 +20,7 @@ Kolejność operacji przy „mapowaniu produktu z hurtowni do MPD”:
 | 6 | **Task linkowania po EAN** | Jedno wywołanie `link_variants_from_other_sources_task(mpd_product_id, source_id)` na koniec – łączy warianty z innych hurtowni po EAN. |
 | 7 | **Zdjęcia** (opcjonalnie) | Upload URLi/plików do ProductImage i bucket – jeśli hurtownia ma galerię. |
 
-Kompensacja (np. Saga): przy błędzie w dowolnym kroku cofnij poprzednie (np. usuń produkt z MPD i wyzeruj `mapped_product_uid` w hurtowni). Matterhorn1 używa Saga; Tabu może działać bez Sagi z prostym rollbackiem w transakcji.
+Kompensacja (np. Saga): przy błędzie w dowolnym kroku cofnij poprzednie (np. usuń produkt z MPD i wyzeruj `mapped_product_uid` w hurtowni). **Matterhorn1** i **Tabu** używają Saga (dwie bazy – MPD + hurtownia – bez wspólnej transakcji).
 
 ---
 
@@ -49,7 +49,10 @@ Pola do **odczytu** (do wypełnienia MPD): nazwa, opis, short_description, marka
 ## 3. Wymagane elementy w MPD (wspólne)
 
 - **Sources** – jeden wpis na hurtownię (np. name zawiera „Tabu API” / „Matterhorn”). Używany w ProductvariantsSources i StockAndPrices.
-- **Products** – name, description, short_description, brand_id, series_id, unit_id, visibility.
+- **Products** – name, description, short_description, brand_id, collection_id (opcjonalnie), series_id, unit_id, visibility.
+- **Brands** – get_or_create po nazwie.
+- **ProductSeries** – get_or_create po **brand_id + name** (seria należy do marki; `unique_together = [['brand', 'name']]`). Przy tworzeniu produktu z Tabu/Matterhorn zawsze przekazuj `brand_id` do serii, żeby seria była przypisana do marki produktu.
+- **Collection** (opcjonalnie) – kolekcja marki (brand_id + name); produkt może mieć collection_id.
 - **ProductVariants** – product_id, color_id, producer_color_id (opcjonalnie), size (Sizes), iai_product_id.
 - **ProductvariantsSources** – variant (MPD), source, ean, variant_uid (string z hurtowni), producer_code (opcjonalnie).
 - **StockAndPrices** – variant, source, stock, price, currency, last_updated.
@@ -66,7 +69,7 @@ Aby nowa hurtownia była „jak Matterhorn1”, zaimplementuj:
 - **Dane wejściowe do produktu MPD**: name, description, short_description, brand_name, (series_name, unit_id, visibility) – z modelu hurtowni lub form_data.
 - **Dane wejściowe do wariantów**: dla każdego wariantu: ean, size (nazwa), stock, price, variant_uid (string), producer_code (opcjonalnie), color (nazwa).
 - **Jedna funkcja lub serwis** typu: `create_mpd_product_from_<hurtownia>(source_product_id, form_data=None)` → `{ success, mpd_product_id, error_message }`.
-- W środku: utwórz Products, ustaw w hurtowni `mapped_product_uid`, utwórz warianty (ProductVariants + PVS + StockAndPrices), ustaw w hurtowni `mapped_variant_uid`, wywołaj task linkowania po EAN (jeśli tworzono warianty).
+- W środku: utwórz Brands (get_or_create po nazwie), **ProductSeries (get_or_create po brand_id + name – seria przypisana do marki)**, utwórz Products, ustaw w hurtowni `mapped_product_uid`, utwórz warianty (ProductVariants + PVS + StockAndPrices), ustaw w hurtowni `mapped_variant_uid`, wywołaj task linkowania po EAN (jeśli tworzono warianty).
 - **Opcjonalnie**: ścieżki, atrybuty, skład, zdjęcia – według tego samego wzoru co Matterhorn1 (paths, attributes, fabric, upload_product_images).
 
 Szczegóły interfejsu (klasa bazowa / Protocol) w `src/apps/MPD/source_adapters/product_mapping_contract.py`.
@@ -80,7 +83,7 @@ Szczegóły interfejsu (klasa bazowa / Protocol) w `src/apps/MPD/source_adapters
 - [ ] **Źródło w MPD**: wpis w Sources (nazwa rozpoznawalna przez adapter).
 - [ ] **Serwis/funkcja** `create_mpd_product_from_<hurtownia>(source_product_id, form_data=None)`:
   - [ ] Pobranie produktu i wariantów z hurtowni.
-  - [ ] Utworzenie produktu w MPD (Products + Brands/Series po nazwie).
+  - [ ] Utworzenie produktu w MPD (Products + Brands po nazwie; **ProductSeries po brand_id + name**, żeby seria była przypisana do marki).
   - [ ] Zapis `mapped_product_uid` w hurtowni.
   - [ ] Ścieżki/atrybuty/skład – jeśli używane (jak we wzorze).
   - [ ] Utworzenie wariantów w MPD (Colors, Sizes, ProductVariants, ProductvariantsSources, StockAndPrices).
@@ -98,7 +101,8 @@ Referencja implementacji: **matterhorn1** (`saga.py`, `saga_variants.py`, `datab
 
 | Element | Plik / moduł |
 |--------|------------------|
-| Tworzenie produktu MPD + mapping w MH | matterhorn1/saga.py – SagaService.create_product_with_mapping, _create_mpd_product, _create_matterhorn_product_with_mapping |
+| Tworzenie produktu MPD + mapping w MH | matterhorn1/saga.py – SagaService.create_product_with_mapping, _create_mpd_product, _create_matterhorn_product_with_mapping (ProductSeries z brand_id) |
+| Tworzenie produktu MPD z Tabu | tabu/services.py – create_mpd_product_from_tabu (Saga: krok 1 MPD, krok 2 mapping w Tabu; ProductSeries z brand_id) |
 | Tworzenie wariantów MPD + mapping w MH | matterhorn1/saga_variants.py – create_mpd_variants; saga.py – _create_mpd_product_variants |
 | Źródło Matterhorn w MPD | Sources (name zawiera „matterhorn”) |
 | Admin: „Utwórz w MPD”, „Przypisz”, bulk | matterhorn1/admin.py – assign_mapping, bulk_create_mpd, _get_mpd_product_data |
