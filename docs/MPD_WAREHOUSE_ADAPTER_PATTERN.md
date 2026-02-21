@@ -2,6 +2,8 @@
 
 Dokument opisuje pełny wzorzec integracji nowej hurtowni z MPD: model w hurtowni, adapter w `MPD/source_adapters/` oraz zachowanie przy linkowaniu. Wzorzec jest zaimplementowany dla **Matterhorn** i **Tabu** – przy dodawaniu kolejnej hurtowni skorzystaj z tego samego schematu.
 
+**Mapowanie produktu (tworzenie w MPD + mapping w hurtowni):** osobny wzorzec w [docs/mapping/PRODUCT_MAPPING_WZOR.md](mapping/PRODUCT_MAPPING_WZOR.md). Kontrakt w kodzie: `MPD/source_adapters/product_mapping_contract.py`.
+
 ---
 
 ## 1. Mapowanie w MPD (wspólne dla wszystkich hurtowni)
