@@ -1,10 +1,9 @@
 import json
 import logging
 from django.core.management.base import CommandError
-from django.db import transaction
 
 from .base_api_command import BaseAPICommand
-from matterhorn1.models import Product, Brand, Category
+from matterhorn1.models import Product
 from matterhorn1.serializers import ProductSerializer
 
 logger = logging.getLogger(__name__)
