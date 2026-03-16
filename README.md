@@ -13,11 +13,39 @@ Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa wyłącznie w tr
 
 ## Struktura repo (najważniejsze)
 - `src/core/` – konfiguracja projektu (settings, urls, celery, db_routers)
-- `src/apps/` – aplikacje Django (matterhorn1, MPD, tabu, …)
+- `src/apps/` – aplikacje Django (poniżej opis)
 - **manage.py** – w katalogu `src/` (uruchomienie: `cd src && python manage.py ...` lub `python src/manage.py ...`)
-- `docker/` – pliki Docker (m.in. `docker/docker-entrypoint.sh`, postgres config)
-- `scripts/` – skrypty (build/deploy/security/monitoring)
-- `docs/` – dokumentacja
+- `deployments/docker/` – Dockerfile dev/prod/ML + entrypoint
+- `docker-compose*.yml` – definicje usług (dev, dev+ML, blue‑green prod)
+- `scripts/` – skrypty (build, deploy, migracje, security, monitoring)
+- `docs/` – dokumentacja (quick start, deploy, struktura, API itp.)
+
+## Co jest w projekcie (aplikacje)
+
+- **`src/apps/matterhorn1/`** – integracja z hurtownią Matterhorn:
+  - import produktów/variantów/zdjęć do lokalnej bazy `matterhorn1`,
+  - modele odzwierciedlające API hurtowni,
+  - saga (`saga.py`, `saga_variants.py`) mapująca produkty do MPD.
+
+- **`src/apps/MPD/`** – moduł MPD (nasza docelowa baza produktów):
+  - modele produktów, wariantów, źródeł (`ProductVariants`, `ProductvariantsSources`, `StockAndPrices` itd.),
+  - eksport XML (pełny, przyrostowy, gateway, light, stocks, units…),
+  - widoki do zarządzania produktami (tworzenie/aktualizacja/bulk) i generowania XML,
+  - REST API pod `/mpd/` oraz `/api/mpd/…` (m.in. `product-sets`, zarządzanie ścieżkami, atrybutami, mapowanie z `matterhorn1`).
+
+- **`src/apps/web_agent/`** – web‑owy agent automatyzacji:
+  - modele i API do uruchamiania automatyzacji (`AutomationRun`, `ProductProcessingLog`),
+  - taski Celery do wypełniania formularzy MPD na podstawie danych z hurtowni,
+  - REST API pod `/api/web-agent/…` (uruchamianie automatyzacji, podgląd logów).
+
+- **`src/apps/tabu/`** – integracja z hurtownią Tabu:
+  - modele lustrzane danych Tabu,
+  - logika mapowania produktów Tabu → MPD (analogicznie do `matterhorn1`).
+
+- **Inne elementy**
+  - **Celery + Redis** – kolejki (`celery-default`, opcjonalnie ML worker), monitoring przez Flower.
+  - **drf-spectacular** – dokumentacja REST API pod `/api/schema/`, `/api/docs/`, `/api/redoc/`.
+  - **Blue‑green deploy** – pełny pipeline deployu na VPS (`deployments/docker`, `scripts/deploy`, `.github/workflows/deploy-vps.yml`).
 
 ## Konfiguracja środowiska (`.env.dev`)
 Plik **`.env.dev` nie jest wersjonowany** (jest ignorowany) – musisz go mieć lokalnie.
