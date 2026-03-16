@@ -50,6 +50,39 @@ class MPDProductsAPITest(APITestCase):
             [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
         )
 
+    def test_products_list_requires_auth(self):
+        """GET /api/mpd/products/ wymaga autoryzacji."""
+        client = APIClient()
+        response = client.get("/api/mpd/products/")
+        self.assertIn(
+            response.status_code,
+            [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
+        )
+
+    def test_products_list_returns_data(self):
+        """GET /api/mpd/products/ zwraca poprawnie paginowaną listę produktów."""
+        # dodaj drugi produkt, żeby lista nie była pusta
+        Products.objects.create(
+            name="Another Product",
+            description="Other",
+            short_description="Other short",
+            brand=self.brand,
+            visibility=False,
+        )
+
+        url = "/api/mpd/products/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("results", response.data)
+        # struktura odpowiedzi powinna zawierać listę wyników
+        results = response.data["results"]
+        self.assertIsInstance(results, list)
+        if results:
+            first = results[0]
+            self.assertIn("id", first)
+            self.assertIn("name", first)
+            self.assertIn("brand_name", first)
+
     def test_products_detail_requires_auth(self):
         """GET /api/mpd/products/{id}/ wymaga autoryzacji."""
         client = APIClient()

@@ -1,9 +1,15 @@
 import logging
 
+from django.db.models import Q
+from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import views as mpd_views
+from .models import Products
+from .serializers import ProductListSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +22,43 @@ class MPDProductCreateAPI(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+        """Lista produktów MPD z prostym filtrowaniem i paginacją."""
+        queryset = Products.objects.using('MPD').all()
+
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search)
+                | Q(brand__name__icontains=search)
+            )
+
+        brand_id = request.query_params.get('brand_id')
+        if brand_id:
+            queryset = queryset.filter(brand_id=brand_id)
+
+        visibility = request.query_params.get('visibility')
+        if visibility is not None:
+            visibility = visibility.lower()
+            if visibility in ('true', '1', 'yes', 'y'):
+                queryset = queryset.filter(visibility=True)
+            elif visibility in ('false', '0', 'no', 'n'):
+                queryset = queryset.filter(visibility=False)
+
+        paginator = PageNumberPagination()
+        page_size_param = request.query_params.get('page_size')
+        if page_size_param:
+            try:
+                paginator.page_size = max(1, min(int(page_size_param), 200))
+            except (TypeError, ValueError):
+                paginator.page_size = 50
+        else:
+            paginator.page_size = 50
+
+        page = paginator.paginate_queryset(queryset.order_by('id'), request)
+        serializer = ProductListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     def post(self, request, *args, **kwargs):  # pylint: disable=unused-argument
         return mpd_views.create_product(request._request)

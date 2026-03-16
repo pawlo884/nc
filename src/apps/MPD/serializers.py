@@ -36,6 +36,23 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
 
 
+class ProductListSerializer(serializers.ModelSerializer):
+    """Serializer listy produktów MPD do endpointu /api/mpd/products/."""
+
+    brand_name = serializers.CharField(source='brand.name', read_only=True)
+
+    class Meta:
+        model = Products
+        fields = [
+            'id',
+            'name',
+            'brand_name',
+            'visibility',
+            'created_at',
+            'updated_at',
+        ]
+
+
 @extend_schema_serializer(
     examples=[
         OpenApiExample(
