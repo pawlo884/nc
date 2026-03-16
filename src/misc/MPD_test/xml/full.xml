@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<offer file_format="IOF" version="3.0" generated="2026-02-22 13:50:50" expires="2026-02-23 13:50:50" extensions="yes" xmlns:iaiext="http://www.iai-shop.com/developers/iof/extensions.phtml">
+  <products language="pol">
+    <product id="1772" currency="PLN" type="regular" vat="23.00" site="1">
+      <producer id="1513170658" name="Ava"/>
+      <iaiext:deliverer id="1" name="MPD"/>
+      <iaiext:date_created datetime="2026-02-22 13:50:09"/>
+      <iaiext:modification_date datetime="2026-02-22 13:50:41"/>
+      <category id="1214553893" name="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty"/>
+      <unit id="0" name="szt."/>
+      <description>
+        <name>Figi SF216/12 PIN</name>
+        <short_desc><![CDATA[Figi kąpielowe o klasycznym kroju. Wykonane z kolorowej mikrofibry w modny wzór w cętki. Skład: 80% poliamid 20% elastan]]></short_desc>
+        <long_desc><![CDATA[<p>Figi kąpielowe o klasycznym kroju. Wykonane z kolorowej mikrofibry w modny wz&oacute;r w cętki.</p><p><strong>Skład:</strong></p><ul><li>80% poliamid</li><li>20% elastan</li></ul>]]></long_desc>
+      </description>
+      <parameters>
+        <parameter type="parameter" id="26" name="Kolor">
+          <value id="114" name="różowy"/>
+        </parameter>
+        <parameter type="parameter" id="388" name="Atrybuty bielizna">
+          <value id="390" name="na kopie"/>
+        </parameter>
+        <parameter type="parameter" id="99" name="Materiał">
+          <value id="391" name="elastan"/>
+        </parameter>
+      </parameters>
+      <price gross="80.00" net="65.04"/>
+      <iaiext:visibility>
+        <iaiext:site visible="no"/>
+      </iaiext:visibility>
+      <iaiext:navigation>
+        <iaiext:site id="1">
+          <iaiext:menu id="1">
+            <iaiext:item id="388" menu_id="1" textid="Moda damska\Bielizna\Stroje kąpielowe\Figi | Stringi | Szorty" iaiext:priority_menu="1"/>
+          </iaiext:menu>
+        </iaiext:site>
+      </iaiext:navigation>
+      <sizes iaiext:group_name="bielizna" iaiext:group_id="1098261181" iaiext:sizeList="full">
+        <size id="I" code="1772-I" name="XL" panel_name="XL_bielizna" iaiext:code_external="1772-2946" code_producer="5901363658349">
+          <price gross="80.00" net="65.04"/>
+          <stock id="0" quantity="12"/>
+        </size>
+        <size id="C" code="1772-C" name="M" panel_name="M_bielizna" iaiext:code_external="1772-2945" code_producer="5901363658332">
+          <price gross="80.00" net="65.04"/>
+          <stock id="0" quantity="5"/>
+        </size>
+        <size id="E" code="1772-E" name="XXL" panel_name="XXL_bielizna" iaiext:code_external="1772-2944" code_producer="5901363656000">
+          <price gross="80.00" net="65.04"/>
+          <stock id="0" quantity="4"/>
+        </size>
+        <size id="G" code="1772-G" name="L" panel_name="L_bielizna" iaiext:code_external="1772-2943" code_producer="5901363652422">
+          <price gross="80.00" net="65.04"/>
+          <stock id="0" quantity="10"/>
+        </size>
+      </sizes>
+      <images>
+        <large>
+          <image url="https://minio-api.sowa.ch/nc-media/MPD_test/1772/1772_1_Pink.jpg"/>
+          <image url="https://minio-api.sowa.ch/nc-media/MPD_test/1772/1772_2_Pink.jpg"/>
+          <image url="https://minio-api.sowa.ch/nc-media/MPD_test/1772/1772_3_Pink.jpg"/>
+          <image url="https://minio-api.sowa.ch/nc-media/MPD_test/1772/1772_4_Pink.jpg"/>
+        </large>
+      </images>
+    </product>
+  </products>
+</offer>

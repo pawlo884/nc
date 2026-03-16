@@ -219,7 +219,6 @@ class ProductVariants(models.Model):
         Colors, on_delete=models.CASCADE, db_column='producer_color_id', null=True, blank=True, related_name='producer_variants')
     size = models.ForeignKey(
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
-    iai_product_id = models.IntegerField(blank=True, null=True)
     exported_to_iai = models.BooleanField(
         default=False, verbose_name='Wyeksportowany do IAI')
     updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
@@ -291,7 +290,6 @@ class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id', related_name='images')
-    iai_product_id = models.IntegerField(blank=True, null=True)
     file_path = models.CharField(max_length=500)
     updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     objects = models.Manager()
