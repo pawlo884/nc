@@ -110,7 +110,19 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r src/requirements.txt
+          python - << 'PY'
+          from pathlib import Path
+          src = Path("src/requirements.txt")
+          data = src.read_bytes()
+          try:
+            # Try UTF-8 first
+            text = data.decode("utf-8")
+          except UnicodeDecodeError:
+            # Fall back to UTF-16LE (obecny format pliku)
+            text = data.decode("utf-16-le")
+          Path("src/requirements.ci.txt").write_text(text, encoding="utf-8")
+          PY
+          pip install -r src/requirements.ci.txt
 
       - name: Sprawdź migracje Django
         # ⚠️ WYŁĄCZONE: Wymaga konfiguracji MinIO/S3
