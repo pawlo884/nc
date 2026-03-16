@@ -491,10 +491,10 @@ class ProductAdmin(admin.ModelAdmin):
             # DEBUG: Sprawdź czy fuzzy search znalazł produkty
             if not suggested_products:
                 logger.warning(
-                    f"[matterhorn1_fuzzy] DEBUG: No suggested_products found from fuzzy search")
+                    "[matterhorn1_fuzzy] DEBUG: No suggested_products found from fuzzy search")
             else:
                 logger.info(
-                    f"[matterhorn1_fuzzy] DEBUG: Found {len(suggested_products)} real suggested_products")
+                    "[matterhorn1_fuzzy] DEBUG: Found %s real suggested_products", len(suggested_products))
 
             extra_context.update({
                 'is_mapped': is_mapped,

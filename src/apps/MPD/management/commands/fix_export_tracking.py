@@ -61,7 +61,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"   • Powinien mieć = {max_iai_id} (jak full.xml)")
                 self.stdout.write(
-                    f"   • To dlatego full_change.xml jest pusty!")
+                    "   • To dlatego full_change.xml jest pusty!")
 
                 if options['dry_run']:
                     self.stdout.write("🔍 DRY RUN - co zostanie zmienione:")

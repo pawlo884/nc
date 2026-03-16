@@ -1,7 +1,7 @@
-import time
 import logging
 from django.core.management.base import CommandError
 from .base_api_command import BaseAPICommand
+
 
 logger = logging.getLogger(__name__)
 

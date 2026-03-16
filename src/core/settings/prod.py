@@ -297,9 +297,10 @@ CELERY_TASK_ROUTES = {
 }
 
 # Cache Configuration - Redis dla blokad między workerami
-# Użyj django-redis z obsługą błędów
-try:
-    import django_redis
+# Użyj django-redis z obsługą błędów, ale sprawdź dostępność pakietu
+from importlib.util import find_spec
+
+if find_spec('django_redis') is not None:
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
@@ -318,7 +319,7 @@ try:
             }
         }
     }
-except ImportError:
+else:
     # Fallback do dummy cache jeśli django-redis nie jest dostępne
     CACHES = {
         'default': {
@@ -358,15 +359,11 @@ REST_FRAMEWORK = {
 }
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
-try:
-    import drf_spectacular
+if find_spec('drf_spectacular') is not None:
     REST_FRAMEWORK['DEFAULT_SCHEMA_CLASS'] = 'drf_spectacular.openapi.AutoSchema'
-except ImportError:
-    pass
 
 # drf-spectacular Configuration (tylko jeśli dostępny)
-try:
-    import drf_spectacular
+if find_spec('drf_spectacular') is not None:
     SPECTACULAR_SETTINGS = {
         'TITLE': 'NC Project API',
         'DESCRIPTION': 'API dla zarządzania produktami, wariantami i eksportu XML',
@@ -386,5 +383,5 @@ try:
             {'name': 'Sync', 'description': 'Synchronizacja z zewnętrznymi API'},
         ],
     }
-except ImportError:
+else:
     SPECTACULAR_SETTINGS = {}

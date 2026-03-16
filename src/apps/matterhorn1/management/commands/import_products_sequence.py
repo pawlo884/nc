@@ -1,7 +1,10 @@
-import time
 from datetime import datetime, timedelta
+import logging
 from django.core.management.base import CommandError
 from .base_api_command import BaseAPICommand
+
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseAPICommand):
@@ -507,7 +510,7 @@ class Command(BaseAPICommand):
         # Oblicz czas dla następnego zakresu
         time_estimate = self.calculate_import_time(max_products, batch_size)
 
-        self.stdout.write(f"\n🔄 NASTĘPNY ZAKRES DO IMPORTU:")
+        self.stdout.write("\n🔄 NASTĘPNY ZAKRES DO IMPORTU:")
         self.stdout.write(f"   ID: {next_start} - {next_end}")
         self.stdout.write(
             f"   Czas: {time_estimate['hours']}h {time_estimate['minutes']}m {time_estimate['seconds']}s")

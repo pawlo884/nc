@@ -198,7 +198,7 @@ class Command(BaseAPICommand):
                     logger.info(
                         f"    ✅ Pole 'active': {item['active']} (typ: {type(item['active'])})")
                 else:
-                    logger.info(f"    ❌ Brak pola 'active'")
+                    logger.info("    ❌ Brak pola 'active'")
 
             # Sprawdź czy jakikolwiek element ma pole active
             has_active = any('active' in item for item in inventory_data)

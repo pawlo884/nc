@@ -104,7 +104,7 @@ class Command(BaseAPICommand):
                     self.execute_component_sync(component, options)
 
                 # Wykonaj sekwencyjny import produktów
-                self.stdout.write(f"\n🔄 Sekwencyjny import produktów...")
+                self.stdout.write("\n🔄 Sekwencyjny import produktów...")
                 call_command('import_products_sequence',
                              '--api-url', options.get('api_url', ''),
                              '--username', options.get('username', ''),

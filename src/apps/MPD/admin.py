@@ -31,10 +31,9 @@ def admin_update_producer_code(request):
         if not variant_id:
             return JsonResponse({'status': 'error', 'message': 'Brak variant_id'}, status=400)
 
-        # Znajdź wariant
+        # Znajdź wariant (weryfikacja istnienia przez .get)
         try:
-            variant = ProductVariants.objects.using(
-                'MPD').get(variant_id=variant_id)
+            ProductVariants.objects.using('MPD').get(variant_id=variant_id)
         except ProductVariants.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Wariant nie istnieje'}, status=404)
 

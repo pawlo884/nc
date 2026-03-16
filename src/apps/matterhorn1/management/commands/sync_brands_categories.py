@@ -1,7 +1,6 @@
 import json
 import logging
 from django.core.management.base import CommandError
-from django.db import transaction
 
 from .base_api_command import BaseAPICommand
 from matterhorn1.models import Brand, Category

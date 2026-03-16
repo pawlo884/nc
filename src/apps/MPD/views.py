@@ -1165,7 +1165,7 @@ def bulk_create_products(request):
                 if not name:
                     logger.warning(
                         f"⚠️ MPD bulk_create_products: Brak nazwy produktu {i}")
-                    errors.append(f"Brak nazwy produktu")
+                    errors.append("Brak nazwy produktu")
                     continue
 
                 # KROK 6: Nazwa + Opis + Krótki opis + Atrybuty + Marka + Grupa rozmiarowa + Series + Jednostka
@@ -1173,7 +1173,6 @@ def bulk_create_products(request):
                 short_description = product_data.get(
                     'short_description', '')
                 brand_name = product_data.get('brand_name', '')
-                size_category = product_data.get('size_category', '')
                 series_name = product_data.get('series_name', '')
                 unit_id = product_data.get('unit_id')
                 visibility = product_data.get('visibility', True)
@@ -1198,9 +1197,8 @@ def bulk_create_products(request):
                     series_id = series.id
 
                 # Utwórz produkt z nazwą, opisem, krótkim opisem, marką, series i jednostką
-                # size_category jest używane tylko do filtrowania rozmiarów, nie zapisujemy go w produkcie
                 logger.info(
-                    f"💾 MPD bulk_create_products: Tworzę produkt w bazie danych")
+                    "💾 MPD bulk_create_products: Tworzę produkt w bazie danych")
                 product = Products.objects.using('MPD').create(
                     name=name,
                     description=description or '',
@@ -1233,7 +1231,7 @@ def bulk_create_products(request):
                     f"Błąd tworzenia produktu {product_data.get('name', 'Unknown')}: {str(e)}")
                 continue
 
-        logger.info(f"🏁 MPD bulk_create_products: Zakończono przetwarzanie")
+        logger.info("🏁 MPD bulk_create_products: Zakończono przetwarzanie")
         logger.info(
             f"📊 MPD bulk_create_products: Wynik - utworzono={len(created_products)}, błędy={len(errors)}")
         logger.info(
@@ -1523,10 +1521,9 @@ def update_producer_code(request):
         if not variant_id:
             return JsonResponse({'status': 'error', 'message': 'Brak variant_id'}, status=400)
 
-        # Znajdź wariant
+        # Znajdź wariant (sprawdzenie istnienia przez .get)
         try:
-            variant = ProductVariants.objects.using(
-                'MPD').get(variant_id=variant_id)
+            ProductVariants.objects.using('MPD').get(variant_id=variant_id)
         except ProductVariants.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Wariant nie istnieje'}, status=404)
 
