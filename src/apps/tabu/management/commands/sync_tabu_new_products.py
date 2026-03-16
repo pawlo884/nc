@@ -3,7 +3,7 @@ Sprawdza czy w API Tabu są nowe produkty – max(api_id)+1, potem kolejne.
 Zatrzymanie po N kolejnych 404 (luki w numeracji – np. produkt usunięty).
 Użycie:
   python manage.py sync_tabu_new_products --settings=core.settings.dev
-  python manage.py sync_tabu_new_products --stop-after-404 10 --max-products 500 --settings=core.settings.dev
+  python manage.py sync_tabu_new_products --stop-after-404 5 --max-products 500 --settings=core.settings.dev
 """
 import logging
 import time
@@ -34,8 +34,8 @@ class Command(BaseTabuAPICommand):
         parser.add_argument(
             '--stop-after-404',
             type=int,
-            default=10,
-            help='Zatrzymaj po N kolejnych 404 (domyślnie: 10)',
+            default=5,
+            help='Zatrzymaj po N kolejnych 404 (domyślnie: 5)',
         )
         parser.add_argument(
             '--max-products',
@@ -49,7 +49,7 @@ class Command(BaseTabuAPICommand):
         self.get_api_credentials(options)
 
         delay = max(0.7, float(options.get('delay', 1.0)))
-        stop_after_404 = options.get('stop_after_404', 10)
+        stop_after_404 = options.get('stop_after_404', 5)
         max_products = options.get('max_products')
         dry_run = options.get('dry_run', False)
 
