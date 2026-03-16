@@ -432,6 +432,7 @@ class SagaService:
     @staticmethod
     def _create_mpd_product(mpd_data: Dict) -> Dict:
         """Utwórz produkt w MPD bezpośrednio przez model Django"""
+        from django.db import connections
         from MPD.models import Products, Brands, ProductSeries
 
         logger.info(
@@ -445,26 +446,6 @@ class SagaService:
                 brand, _ = Brands.objects.using(
                     'MPD').get_or_create(name=brand_name)
                 brand_id = brand.id
-
-            # Sprawdź, czy produkt o tej samej nazwie i marce już istnieje
-            # (chroni przed podwójnym utworzeniem tego samego produktu w MPD,
-            # np. przy ponownym uruchomieniu Sagi dla tego samego produktu).
-            existing_qs = Products.objects.using('MPD').filter(
-                name=mpd_data.get('name')
-            )
-            if brand_id is not None:
-                existing_qs = existing_qs.filter(brand_id=brand_id)
-
-            existing_product = existing_qs.order_by('id').first()
-            if existing_product:
-                logger.info(
-                    f"ℹ️ Produkt MPD o tej nazwie i marce już istnieje "
-                    f"(ID: {existing_product.id}) – używam istniejącego rekordu"
-                )
-                return {
-                    'mpd_product_id': existing_product.id,
-                    'created_products': [{'id': existing_product.id, 'name': existing_product.name}]
-                }
 
             # Pobierz lub utwórz series (z przypisaniem do marki)
             series_id = None
@@ -634,50 +615,19 @@ class SagaService:
 
         try:
             with connections['MPD'].cursor() as cursor:
-                # Sprawdź, czy kolumna iai_product_id istnieje w tabeli product_variants
-                cursor.execute(
-                    """
-                    SELECT 1
-                    FROM information_schema.columns
-                    WHERE table_name = 'product_variants'
-                      AND column_name = 'iai_product_id'
-                    """
-                )
-                has_iai_product_id = cursor.fetchone() is not None
-
                 for variant_data in variants_data:
-                    if has_iai_product_id:
-                        cursor.execute(
-                            """
-                            INSERT INTO product_variants 
-                            (variant_id, product_id, color_id, size_id, iai_product_id, updated_at)
-                            VALUES (%s, %s, %s, %s, %s, NOW())
-                            RETURNING variant_id
-                            """,
-                            [
-                                variant_data["variant_id"],
-                                mpd_product_id,
-                                variant_data["color_id"],
-                                variant_data["size_id"],
-                                variant_data.get("iai_product_id"),
-                            ],
-                        )
-                    else:
-                        # Starsza wersja schematu bez kolumny iai_product_id
-                        cursor.execute(
-                            """
-                            INSERT INTO product_variants 
-                            (variant_id, product_id, color_id, size_id, updated_at)
-                            VALUES (%s, %s, %s, %s, NOW())
-                            RETURNING variant_id
-                            """,
-                            [
-                                variant_data["variant_id"],
-                                mpd_product_id,
-                                variant_data["color_id"],
-                                variant_data["size_id"],
-                            ],
-                        )
+                    cursor.execute("""
+                        INSERT INTO product_variants 
+                        (variant_id, product_id, color_id, size_id, iai_product_id, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, NOW())
+                        RETURNING variant_id
+                    """, [
+                        variant_data['variant_id'],
+                        mpd_product_id,
+                        variant_data['color_id'],
+                        variant_data['size_id'],
+                        variant_data.get('iai_product_id')
+                    ])
 
                     result = cursor.fetchone()
                     if result:

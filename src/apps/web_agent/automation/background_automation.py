@@ -7,7 +7,7 @@ from typing import Dict, Optional, List
 from django.db import connections
 from matterhorn1.models import Product, Brand, Category
 from matterhorn1.saga import SagaService
-from web_agent.automation.ai_processor import AIProcessor, get_ai_processor
+from web_agent.automation.ai_processor import AIProcessor
 from web_agent.models import ProducerColor, BrandConfig
 from rapidfuzz import fuzz
 
@@ -25,7 +25,7 @@ class BackgroundAutomation:
             ai_processor: Instancja AIProcessor do ulepszania nazw/opisów. Jeśli None, tworzy nową.
             log_callback: Funkcja callback do logowania (np. self.stdout_write). Jeśli None, używa logger.
         """
-        self.ai_processor = ai_processor or get_ai_processor()
+        self.ai_processor = ai_processor or AIProcessor()
         self._original_product_name = None
         self.log_callback = log_callback  # Callback do logowania (np. stdout_write)
         logger.info("BackgroundAutomation zainicjalizowany")
@@ -39,9 +39,9 @@ class BackgroundAutomation:
             level: Poziom logowania ('info', 'success', 'warning', 'error')
         """
         if self.log_callback:
-            # If the callback is stdout_write, use it directly
-            # stdout_write accepts a message and may use self.style
-            # But since the callback is a function, we need to pass an already formatted message
+            # Jeśli callback jest stdout_write, użyj go bezpośrednio
+            # stdout_write przyjmuje message i może użyć self.style
+            # Ale ponieważ callback jest funkcją, musimy przekazać już sformatowaną wiadomość
             if level == 'success':
                 self.log_callback(f"[OK] {message}")
             elif level == 'warning':
@@ -117,7 +117,7 @@ class BackgroundAutomation:
         try:
             product = Product.objects.get(id=product_id)
             
-            # Retrieve product details (size_table_html)
+            # Pobierz szczegóły produktu (size_table_html)
             size_table_html = None
             try:
                 from django.conf import settings

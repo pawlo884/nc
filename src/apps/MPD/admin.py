@@ -1173,13 +1173,13 @@ class AttributesAdmin(admin.ModelAdmin):
 @admin.register(ProductVariants)
 class ProductVariantsAdmin(admin.ModelAdmin):
     list_display = ['variant_id', 'product', 'color', 'producer_color',
-                    'size', 'updated_at']
+                    'size', 'iai_product_id', 'updated_at']
     list_filter = ['color', 'producer_color', 'size', 'updated_at']
-    search_fields = ['variant_id', 'product__name']
+    search_fields = ['variant_id', 'product__name', 'iai_product_id']
     raw_id_fields = ['product', 'color', 'producer_color', 'size']
     readonly_fields = ['variant_id', 'updated_at']
     fields = ['product', 'color', 'producer_color', 'size',
-              'exported_to_iai']
+              'iai_product_id', 'exported_to_iai']
     show_full_result_count = False
     list_per_page = 50
 
@@ -1224,14 +1224,14 @@ class ProductVariantsRetailPriceAdmin(admin.ModelAdmin):
 @admin.register(ProductImage)
 class ProductImageAdmin(admin.ModelAdmin):
     list_display = ['id', 'product',
-                    'image_thumbnail', 'updated_at']
+                    'iai_product_id', 'image_thumbnail', 'updated_at']
     list_filter = ['updated_at']
-    search_fields = ['product__name', 'file_path']
+    search_fields = ['product__name', 'file_path', 'iai_product_id']
     raw_id_fields = ['product']
     readonly_fields = ['id', 'image_thumbnail', 'file_path', 'updated_at']
     fieldsets = (
         ('Podstawowe informacje', {
-            'fields': ('product',)
+            'fields': ('product', 'iai_product_id')
         }),
         ('Obraz', {
             'fields': ('file_path', 'image_thumbnail'),

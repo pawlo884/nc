@@ -4,7 +4,7 @@ Management command do uruchomienia automatyzacji w tle (bez przeglądarki)
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from web_agent.automation.background_automation import BackgroundAutomation
-from web_agent.automation.ai_processor import get_ai_processor
+from web_agent.automation.ai_processor import AIProcessor
 from web_agent.models import AutomationRun, BrandConfig
 from matterhorn1.models import Brand, Category
 import logging
@@ -174,7 +174,7 @@ class Command(LoggingCommand):
         try:
             # Inicjalizuj automatyzację w tle z callback do logowania
             automation = BackgroundAutomation(log_callback=self.stdout_write)
-            ai_processor = get_ai_processor()
+            ai_processor = AIProcessor()
 
             # Przygotuj filtry
             automation_filters = {}

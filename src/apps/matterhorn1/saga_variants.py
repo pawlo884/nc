@@ -155,55 +155,44 @@ def create_mpd_variants(
                 continue
 
             # Wariant po EAN z innej hurtowni?
-            variant_id = None
+            variant = None
             if ean:
-                # Szukaj istniejącego wariantu po EAN (bez użycia ORM ProductVariants,
-                # żeby nie odwoływać się do nieistniejącej kolumny iai_product_id)
-                with connections[mpd_db].cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT pv.variant_id
-                        FROM product_variants pv
-                        INNER JOIN product_variants_sources pvs
-                            ON pv.variant_id = pvs.variant_id
-                        WHERE pvs.ean = %s
-                          AND pv.product_id = %s
-                          AND (pvs.source_id IS NULL OR pvs.source_id <> %s)
-                        LIMIT 1
-                        """,
-                        [ean, mpd_product_id, mh_source.id],
+                pvs = (
+                    ProductvariantsSources.objects.using(mpd_db)
+                    .filter(
+                        ean=ean,
+                        variant__product_id=mpd_product_id,
                     )
-                    row = cursor.fetchone()
-                    if row:
-                        variant_id = row[0]
-                        logger.info(
-                            "Znaleziono wariant po EAN %s (variant_id=%s) - dopinam Matterhorn",
-                            ean,
-                            variant_id,
-                        )
+                    .exclude(source=mh_source)
+                    .select_related('variant')
+                    .first()
+                )
+                if pvs:
+                    variant = pvs.variant
+                    logger.info(
+                        "Znaleziono wariant po EAN %s (variant_id=%s) - dopinam Matterhorn",
+                        ean,
+                        variant.variant_id,
+                    )
 
             # Utwórz nowy wariant jeśli nie znaleziono (producer_code tylko w ProductvariantsSources)
-            if variant_id is None:
-                with connections[mpd_db].cursor() as cursor:
-                    cursor.execute(
-                        """
-                        INSERT INTO product_variants (product_id, color_id, producer_color_id, size_id)
-                        VALUES (%s, %s, %s, %s)
-                        RETURNING variant_id
-                        """,
-                        [mpd_product_id, color_id, producer_color_id, size.id],
-                    )
-                    row = cursor.fetchone()
-                    variant_id = row[0]
+            if variant is None:
+                variant = ProductVariants.objects.using(mpd_db).create(
+                    product_id=mpd_product_id,
+                    color_id=color_id,
+                    producer_color_id=producer_color_id,
+                    size=size,
+                    iai_product_id=iai_product_id,
+                )
                 logger.info(
                     "Utworzono wariant %s (producer_color_id=%s)",
-                    variant_id,
+                    variant.variant_id,
                     producer_color_id,
                 )
 
             # ProductvariantsSources: kod producenta w producer_code (per hurtownia)
             pvs, pvs_created = ProductvariantsSources.objects.using(mpd_db).get_or_create(
-                variant_id=variant_id,
+                variant=variant,
                 source=mh_source,
                 defaults={
                     'ean': (ean or '')[:50] if ean else '',
@@ -214,7 +203,7 @@ def create_mpd_variants(
 
             # StockAndPrices
             StockAndPrices.objects.using(mpd_db).get_or_create(
-                variant_id=variant_id,
+                variant=variant,
                 source=mh_source,
                 defaults={
                     'stock': stock,
@@ -228,14 +217,14 @@ def create_mpd_variants(
             MhProductVariant.objects.using(mh_db).filter(
                 variant_uid=variant_uid_raw
             ).update(
-                mapped_variant_uid=variant_id,
+                mapped_variant_uid=variant.variant_id,
                 is_mapped=True,
                 updated_at=timezone.now(),
             )
 
-            variant_ids.append(variant_id)
+            variant_ids.append(variant.variant_id)
             created_count += 1
-            logger.info("Utworzono wariant %s -> %s", variant_uid_raw, variant_id)
+            logger.info("Utworzono wariant %s -> %s", variant_uid_raw, variant.variant_id)
 
         logger.info("Utworzono %s wariantów w MPD", created_count)
 

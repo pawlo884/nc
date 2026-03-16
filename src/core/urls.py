@@ -20,8 +20,6 @@ from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
-import os
-
 from core.views import index, health_check
 
 # Import drf_spectacular tylko jeśli jest dostępny
@@ -62,7 +60,6 @@ urlpatterns += i18n_patterns(
 # API URLs (bez i18n)
 urlpatterns += [
     path('api/web-agent/', include('web_agent.urls')),
-    path('api/mpd/', include('MPD.api_urls')),
 ]
 
 if settings.DEBUG:
@@ -73,6 +70,7 @@ if settings.DEBUG:
 # Serwuj pliki statyczne tylko gdy DEBUG=True i NIE jesteśmy w Dockerze (lokalny dev bez nginx)
 # W Dockerze nginx zawsze obsługuje pliki statyczne, więc Django nie powinno ich serwować
 # W produkcji zawsze dodaj jako fallback (na wypadek gdyby nginx nie działał)
+import os
 is_docker = os.path.exists('/.dockerenv') or os.environ.get('DJANGO_SETTINGS_MODULE', '').endswith('.dev')
 if settings.DEBUG and not is_docker:
     # Tylko lokalny development bez Docker (nginx nie jest dostępny)

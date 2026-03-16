@@ -8,7 +8,7 @@ from celery import shared_task
 from django.utils import timezone
 from .models import AutomationRun, ProductProcessingLog
 from .automation.browser_automation import BrowserAutomation
-from .automation.ai_processor import get_ai_processor
+from .automation.ai_processor import AIProcessor
 from .automation.product_processor import ProductProcessor
 import os
 
@@ -189,7 +189,7 @@ def automate_mpd_form_filling(self, brand_id: int = None, category_id: int = Non
             headless=headless
         )
         
-        ai_processor = get_ai_processor(api_key=openai_api_key)
+        ai_processor = AIProcessor(api_key=openai_api_key)
         
         product_processor = ProductProcessor(
             browser_automation=browser_automation,
