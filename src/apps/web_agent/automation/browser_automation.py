@@ -1315,8 +1315,8 @@ class BrowserAutomation:
 
             # Użyj AIProcessor do ulepszenia nazwy (ze strukturą Pydantic)
             if ai_processor is None:
-                from web_agent.automation.ai_processor import AIProcessor
-                ai_processor = AIProcessor()
+                from web_agent.automation.ai_processor import get_ai_processor
+                ai_processor = get_ai_processor()
 
             logger.info("Ulepszanie nazwy przez AI...")
             print("[DEBUG] Ulepszanie nazwy przez AI...")
@@ -1881,8 +1881,8 @@ class BrowserAutomation:
 
             # KROK 2.4: Ulepsz opis przez AI
             if ai_processor is None:
-                from web_agent.automation.ai_processor import AIProcessor
-                ai_processor = AIProcessor()
+                from web_agent.automation.ai_processor import get_ai_processor
+                ai_processor = get_ai_processor()
 
             logger.info("Ulepszanie opisu przez AI...")
             print("[INFO] ========================================")
@@ -2119,8 +2119,8 @@ class BrowserAutomation:
 
             # KROK 3.4: Utwórz krótki opis przez AI
             if ai_processor is None:
-                from web_agent.automation.ai_processor import AIProcessor
-                ai_processor = AIProcessor()
+                from web_agent.automation.ai_processor import get_ai_processor
+                ai_processor = get_ai_processor()
 
             logger.info("Tworzenie krótkiego opisu przez AI...")
             print("[DEBUG] Tworzenie krótkiego opisu przez AI...")
@@ -2344,8 +2344,8 @@ class BrowserAutomation:
 
             # KROK 1.2: Ulepsz nazwę przez AI (jeśli potrzeba)
             if ai_processor is None:
-                from web_agent.automation.ai_processor import AIProcessor
-                ai_processor = AIProcessor()
+                from web_agent.automation.ai_processor import get_ai_processor
+                ai_processor = get_ai_processor()
 
             logger.info("Ulepszanie nazwy przez AI...")
             print("[DEBUG] Ulepszanie nazwy przez AI...")
@@ -3330,8 +3330,8 @@ class BrowserAutomation:
 
             # KROK 4.4: Wyciągnij atrybuty z opisu przez AI
             if ai_processor is None:
-                from web_agent.automation.ai_processor import AIProcessor
-                ai_processor = AIProcessor()
+                from web_agent.automation.ai_processor import get_ai_processor
+                ai_processor = get_ai_processor()
 
             logger.info("Wyciąganie atrybutów z opisu przez AI...")
             print("[DEBUG] Wyciąganie atrybutów z opisu przez AI...")

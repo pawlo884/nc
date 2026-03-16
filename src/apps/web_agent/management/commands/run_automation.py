@@ -416,8 +416,8 @@ class Command(BaseCommand):
                         try:
                             self.stdout.write(
                                 "\n[INFO] KROK 4: Wyciąganie atrybutów z opisu produktu...")
-                            from web_agent.automation.ai_processor import AIProcessor
-                            ai_processor = AIProcessor()
+                            from web_agent.automation.ai_processor import get_ai_processor
+                            ai_processor = get_ai_processor()
 
                             # Pobierz dostępne atrybuty z formularza
                             available_attributes = browser.get_available_attributes()
