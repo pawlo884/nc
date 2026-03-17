@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = 'Naprawia ExportTracking dla full_change.xml - ustawia last_exported_product_id na maksymalny iai_product_id'
+    help = 'Naprawia ExportTracking dla full_change.xml - ustawia last_exported_product_id na maksymalne ID produktu'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -21,10 +21,10 @@ class Command(BaseCommand):
         self.stdout.write("🔍 Sprawdzam stan ExportTracking...")
 
         try:
-            # Pobierz maksymalny iai_product_id z bazy
-            max_iai_id = ProductVariants.objects.using('MPD').filter(
-                iai_product_id__isnull=False
-            ).aggregate(max_id=Max('iai_product_id'))['max_id'] or 0
+            # Pobierz maksymalne ID produktu z bazy (bez pola iai_product_id)
+            max_iai_id = ProductVariants.objects.using('MPD').aggregate(
+                max_id=Max('product_id')
+            )['max_id'] or 0
 
             self.stdout.write(
                 f"📊 Maksymalny iai_product_id w bazie: {max_iai_id}")

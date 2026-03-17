@@ -182,7 +182,6 @@ def create_mpd_variants(
                     color_id=color_id,
                     producer_color_id=producer_color_id,
                     size=size,
-                    iai_product_id=iai_product_id,
                 )
                 logger.info(
                     "Utworzono wariant %s (producer_color_id=%s)",

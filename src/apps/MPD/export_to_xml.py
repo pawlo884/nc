@@ -228,15 +228,15 @@ class FullXMLExporter(BaseXMLExporter):
             print(
                 f"Generowanie pełnej oferty full.xml - wszystkie produkty ({count} wariantów)")
 
-        # Grupuj warianty po iai_product_id
+        # Grupuj warianty po identyfikatorze produktu (bez iai_product_id)
         grouped_variants = {}
         for variant in variants_with_iai:
-            iai_id = variant.iai_product_id
-            if iai_id not in grouped_variants:
-                grouped_variants[iai_id] = []
-            grouped_variants[iai_id].append(variant)
+            group_id = getattr(variant, "iai_product_id", None) or variant.product_id
+            if group_id not in grouped_variants:
+                grouped_variants[group_id] = []
+            grouped_variants[group_id].append(variant)
 
-        # Iteruj po unikalnych iai_product_id
+        # Iteruj po unikalnych identyfikatorach produktów
         for iai_product_id, variants in grouped_variants.items():
             if not variants:
                 continue
@@ -687,9 +687,9 @@ class LightXMLExporter(BaseXMLExporter):
             ).select_related('size', 'color', 'producer_color')
 
             if variants:
-                # Użyj iai_product_id z pierwszego wariantu
+                # Użyj identyfikatora produktu jako ID w eksporcie
                 first_variant = variants.first()
-                iai_product_id = first_variant.iai_product_id if first_variant and first_variant.iai_product_id else product.id
+                iai_product_id = getattr(first_variant, "iai_product_id", None) or product.id
 
                 # Pobierz VAT z pierwszego wariantu który ma cenę detaliczną
                 vat_rate = None
