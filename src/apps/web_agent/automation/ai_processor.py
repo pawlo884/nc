@@ -2523,3 +2523,17 @@ ODPOWIEDŹ MUSI BYĆ W FORMACIE JSON zgodnym z podanym schematem."""
 
         logger.info("Dane produktu przetworzone przez AI")
         return processed_data
+
+
+def get_ai_processor(api_key: Optional[str] = None, api_type: Optional[str] = None):
+    """
+    Zwraca procesor AI: LangChainAIProcessor gdy USE_LANGCHAIN_AI=1, w przeciwnym razie AIProcessor.
+    Przy braku zainstalowanego LangChain fallback do AIProcessor.
+    """
+    if os.getenv("USE_LANGCHAIN_AI", "").lower() in ("1", "true", "yes"):
+        try:
+            from .langchain_ai_processor import LangChainAIProcessor
+            return LangChainAIProcessor(api_key=api_key)
+        except ImportError as e:
+            logger.warning("LangChain niedostępny, używam AIProcessor: %s", e)
+    return AIProcessor(api_key=api_key, api_type=api_type)

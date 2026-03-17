@@ -16,8 +16,8 @@ RUN groupadd -r -g 999 celery && useradd -r -g celery -u 999 celery
 # Ustaw katalog roboczy
 WORKDIR /app
 
-# Skopiuj requirements i zainstaluj zależności z cache'owaniem pip
-COPY src/requirements.txt .
+# Skopiuj requirements (requirements.ci.txt - UTF-8, requirements.txt moze miec problemy z kodowaniem)
+COPY src/requirements.ci.txt ./requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --break-system-packages -r requirements.txt
 

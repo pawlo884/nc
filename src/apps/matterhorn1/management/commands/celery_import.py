@@ -1,8 +1,5 @@
-import time
 import logging
-from datetime import datetime, timedelta
 from django.core.management.base import CommandError
-from django.core.management import call_command
 from .base_api_command import BaseAPICommand
 
 logger = logging.getLogger(__name__)
@@ -90,7 +87,7 @@ class Command(BaseAPICommand):
         dry_run = options.get('dry_run', False)
 
         self.stdout.write("🚀 Uruchamianie importu (ITEMS + INVENTORY)...")
-        self.stdout.write(f"📊 Parametry:")
+        self.stdout.write("📊 Parametry:")
         self.stdout.write(f"   - Start ID: {start_id or 'ostatni w bazie'}")
         self.stdout.write(f"   - Max produkty na iterację: {max_products}")
         self.stdout.write(f"   - Auto-continue: {auto_continue}")
@@ -116,7 +113,7 @@ class Command(BaseAPICommand):
             self.stdout.write(
                 f"📊 Sprawdź status: python manage.py celery_import --action status --task-id {result.id}")
             self.stdout.write(
-                f"📊 Monitoruj logi: celery -A nc worker --loglevel=info")
+                "📊 Monitoruj logi: celery -A nc worker --loglevel=info")
 
         else:
             # Uruchom synchronicznie

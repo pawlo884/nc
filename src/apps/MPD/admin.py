@@ -9,7 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
 import logging
-from .models import Brands, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Seasons, Categories, Vat, Units, FabricComponent, ProductFabric
+from .models import Brands, Collection, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Seasons, Categories, Vat, Units, FabricComponent, ProductFabric
 from matterhorn1.defs_db import resolve_image_url
 import decimal
 # Register your models here.
@@ -31,10 +31,9 @@ def admin_update_producer_code(request):
         if not variant_id:
             return JsonResponse({'status': 'error', 'message': 'Brak variant_id'}, status=400)
 
-        # Znajdź wariant
+        # Znajdź wariant (weryfikacja istnienia przez .get)
         try:
-            variant = ProductVariants.objects.using(
-                'MPD').get(variant_id=variant_id)
+            ProductVariants.objects.using('MPD').get(variant_id=variant_id)
         except ProductVariants.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Wariant nie istnieje'}, status=404)
 
@@ -105,7 +104,7 @@ class ProductsAdmin(admin.ModelAdmin):
     list_per_page = 30
     fieldsets = (
         ('Podstawowe informacje', {
-            'fields': ('name', 'short_description', 'description', 'brand', 'series', 'season', 'unit', 'visibility')
+            'fields': ('name', 'short_description', 'description', 'brand', 'collection', 'series', 'season', 'unit', 'visibility')
         }),
         ('Warianty produktu', {
             'fields': ('show_variants',),
@@ -138,9 +137,10 @@ class ProductsAdmin(admin.ModelAdmin):
         }),
     )
     list_display = ['id', 'name', 'description',
-                    'brand', 'season', 'updated_at', 'visibility']  # widok listy produktów
+                    'brand', 'collection', 'season', 'updated_at', 'visibility']  # widok listy produktów
     list_filter = [
         'brand',
+        'collection',
         'series',
         'season',
         'visibility',
@@ -1177,7 +1177,8 @@ class ProductVariantsAdmin(admin.ModelAdmin):
     search_fields = ['variant_id', 'product__name']
     raw_id_fields = ['product', 'color', 'producer_color', 'size']
     readonly_fields = ['variant_id', 'updated_at']
-    fields = ['product', 'color', 'producer_color', 'size', 'exported_to_iai']
+    fields = ['product', 'color', 'producer_color', 'size',
+              'exported_to_iai']
     show_full_result_count = False
     list_per_page = 50
 
@@ -1282,10 +1283,19 @@ class ProductImageAdmin(admin.ModelAdmin):
         obj.save(using='MPD')
 
 
+@admin.register(Collection)
+class CollectionAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'brand', 'sort_order']
+    list_filter = ['brand']
+    search_fields = ['name', 'brand__name']
+    ordering = ['brand', 'sort_order', 'name']
+
+
 @admin.register(ProductSeries)
 class ProductSeriesAdmin(admin.ModelAdmin):
-    list_display = ['id', 'name']
-    search_fields = ['name']
+    list_display = ['id', 'name', 'brand']
+    list_filter = ['brand']
+    search_fields = ['name', 'brand__name']
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')

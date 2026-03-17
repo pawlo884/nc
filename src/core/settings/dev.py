@@ -38,8 +38,8 @@ else:
                      '192.168.50.63', '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch']
 
 # API URL configuration for development
-API_BASE_URL = os.getenv('API_BASE_URL', 'http://83.168.79.109:8000')
-MPD_API_URL = os.getenv('MPD_API_URL', 'http://localhost:8000/mpd')
+API_BASE_URL = os.getenv('API_BASE_URL', 'https://nc-dev.sowa.ch')
+MPD_API_URL = os.getenv('MPD_API_URL', 'https://nc-dev.sowa.ch/mpd')
 
 # Timeout settings for long-running requests
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
@@ -191,7 +191,7 @@ CELERY_TASK_SOFT_TIME_LIMIT = 3300  # 55 minut soft limit
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # STATICFILES_FINDERS - używamy domyślnych z base.py
-# Ostrzeżenia o duplikatach (np. admin/js/cancel.js) są normalne - 
+# Ostrzeżenia o duplikatach (np. admin/js/cancel.js) są normalne -
 # Django używa pierwszego znalezionego pliku zgodnie z kolejnością w INSTALLED_APPS
 # admin_interface jest przed django.contrib.admin, więc jego pliki mają priorytet
 

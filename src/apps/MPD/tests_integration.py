@@ -6,12 +6,9 @@ Weryfikują że:
 - Przy dopinaniu wariantów (linkowanie) mapped_product_uid jest ustawiany w hurtowniach
 """
 from datetime import datetime
-from decimal import Decimal
-from unittest.mock import patch
 
 from django.conf import settings
 from django.test import TestCase, override_settings
-from django.utils import timezone
 
 from MPD.models import (
     Brands,
@@ -21,10 +18,9 @@ from MPD.models import (
     ProductvariantsSources,
     Sizes,
     Sources,
-    StockAndPrices,
 )
-from matterhorn1.models import Product as MhProduct, ProductVariant as MhProductVariant
-from tabu.models import TabuProduct, Brand as TabuBrand, Category as TabuCategory
+from matterhorn1.models import Product as MhProduct
+from tabu.models import TabuProduct, Brand as TabuBrand
 
 
 def _mpd_db():
@@ -74,7 +70,7 @@ class MPDDeletePropagatesToHurtownieTest(TestCase):
         )
 
         # Produkt Tabu z mapowaniem
-        tabu_brand = TabuBrand.objects.using(tabu_db).create(
+        TabuBrand.objects.using(tabu_db).create(
             brand_id='TABU_INT_BR',
             name='Tabu Brand',
         )
@@ -121,7 +117,6 @@ class MPDSavePropagatesLinkTest(TestCase):
 
     def setUp(self):
         mpd_db = _mpd_db()
-        mh_db = _mh_db()
         tabu_db = _tabu_db()
 
         # Źródła MPD
@@ -158,7 +153,7 @@ class MPDSavePropagatesLinkTest(TestCase):
         )
 
         # Produkt Tabu z tym samym EAN (żeby link mógł dopiąć)
-        tabu_brand = TabuBrand.objects.using(tabu_db).create(
+        TabuBrand.objects.using(tabu_db).create(
             brand_id='TABU_LINK',
             name='Tabu Link',
         )

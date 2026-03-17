@@ -12,14 +12,14 @@ System eksportu XML został zmodyfikowany aby:
 ## Struktura węzła full z changes w gateway.xml
 
 ```xml
-<full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full.xml" 
+<full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/full.xml" 
       hash="652ab697d3d5cdc25f262bdaf10e3fa1" 
       changed="2025-08-25 09:45:49">
   <changes>
-    <change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change2025-08-25T10-30-45.xml" 
+    <change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/full_change2025-08-25T10-30-45.xml" 
             hash="982a963722ff18c7e1580de635841caa" 
             changed="2025-08-25 10:30:45"/>
-    <change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change2025-08-25T11-15-22.xml" 
+    <change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/full_change2025-08-25T11-15-22.xml" 
             hash="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" 
             changed="2025-08-25 11:15:22"/>
   </changes>
@@ -119,7 +119,7 @@ LIMIT 10;
 
 ### Lokalne pliki
 ```
-MPD_test/xml/matterhorn/
+MPD_test/xml/
 ├── full.xml
 ├── full_change2025-08-25T10-30-45.xml
 ├── full_change2025-08-25T11-15-22.xml
@@ -129,7 +129,7 @@ MPD_test/xml/matterhorn/
 
 ### Bucket S3/DO Spaces
 ```
-MPD_test/xml/matterhorn/
+MPD_test/xml/
 ├── full.xml
 ├── full_change2025-08-25T10-30-45.xml
 ├── full_change2025-08-25T11-15-22.xml
@@ -180,7 +180,7 @@ def cleanup_old_full_change_files(days_to_keep=30):
             os.remove(file_record.local_path)
         
         # Usuń z bucketa (opcjonalne)
-        # s3_client.delete_object(Bucket=DO_SPACES_BUCKET, Key=f"MPD_test/xml/matterhorn/{file_record.filename}")
+        # s3_client.delete_object(Bucket=DO_SPACES_BUCKET, Key=f"MPD_test/xml/{file_record.filename}")
         
         # Usuń rekord z bazy
         file_record.delete()
@@ -259,7 +259,7 @@ result = export_gateway_xml()
 print(f"Gateway.xml zaktualizowany: {result}")
 
 # Sprawdź zawartość pliku
-with open('MPD_test/xml/matterhorn/gateway.xml', 'r') as f:
+with open('MPD_test/xml/gateway.xml', 'r') as f:
     content = f.read()
     print("Węzeł full z changes w gateway.xml:")
     if '<full' in content and '<changes>' in content:
@@ -285,19 +285,19 @@ Po uruchomieniu systemu, gateway.xml będzie wyglądał tak:
   <meta>
     <!-- ... meta data ... -->
   </meta>
-  <full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full.xml" 
+  <full url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/full.xml" 
         hash="652ab697d3d5cdc25f262bdaf10e3fa1" 
         changed="2025-08-25 09:45:49">
     <changes>
-      <change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change2025-08-25T10-30-45.xml" 
+      <change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/full_change2025-08-25T10-30-45.xml" 
               hash="982a963722ff18c7e1580de635841caa" 
               changed="2025-08-25 10:30:45"/>
-      <change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/full_change2025-08-25T11-15-22.xml" 
+      <change url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/full_change2025-08-25T11-15-22.xml" 
               hash="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" 
               changed="2025-08-25 11:15:22"/>
     </changes>
   </full>
-  <light url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/matterhorn/light.xml" 
+  <light url="https://mojbucket.fra1.digitaloceanspaces.com/MPD_test/xml/light.xml" 
          hash="86dcf2f59bf2341ba697c8b15ef4b37c" 
          changed="2025-08-24 15:01:24"/>
   <!-- ... inne węzły ... -->

@@ -150,7 +150,7 @@ def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
         else:
             logger.info("Brak variant_id do usunięcia")
 
-        # Usunięcie mapped_product_uid w Tabu (tabu_product_detail)
+        # Usunięcie mapped_product_uid i mapped_variant_uid w Tabu
         from django.conf import settings
         if tabu_db in settings.DATABASES:
             try:
@@ -166,6 +166,22 @@ def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
                     if tabu_updated:
                         logger.info(
                             f"Zaktualizowano {tabu_updated} rekordów w tabu_product_detail (mapped_product_uid = {instance.id})")
+                    # Usunięcie mapped_variant_uid z wariantów Tabu (tabu_product_variant)
+                    if variant_ids:
+                        placeholders = ', '.join(['%s'] * len(variant_ids))
+                        cursor.execute(
+                            f"""
+                            UPDATE tabu_product_variant
+                            SET mapped_variant_uid = NULL,
+                                is_mapped = FALSE
+                            WHERE mapped_variant_uid IN ({placeholders})
+                            """,
+                            variant_ids,
+                        )
+                        tabu_variants_updated = cursor.rowcount
+                        if tabu_variants_updated:
+                            logger.info(
+                                f"Zaktualizowano {tabu_variants_updated} rekordów w tabu_product_variant (mapped_variant_uid)")
             except Exception as e:
                 logger.warning(f"Nie udało się zaktualizować Tabu dla produktu MPD {instance.id}: {e}")
 
