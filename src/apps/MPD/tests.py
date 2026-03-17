@@ -148,14 +148,12 @@ class ProductVariantsModelTest(TestCase):
             product=self.product,
             color=self.color,
             size=self.size,
-            iai_product_id=12345,
             exported_to_iai=False
         )
 
         self.assertEqual(variant.product, self.product)
         self.assertEqual(variant.color, self.color)
         self.assertEqual(variant.size, self.size)
-        self.assertEqual(variant.iai_product_id, 12345)
         self.assertFalse(variant.exported_to_iai)
 
     def test_variant_str(self):

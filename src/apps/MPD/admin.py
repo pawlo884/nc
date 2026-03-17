@@ -1222,8 +1222,7 @@ class ProductVariantsRetailPriceAdmin(admin.ModelAdmin):
 
 @admin.register(ProductImage)
 class ProductImageAdmin(admin.ModelAdmin):
-    list_display = ['id', 'product',
-                    'image_thumbnail', 'updated_at']
+    list_display = ['id', 'product', 'image_thumbnail', 'updated_at']
     list_filter = ['updated_at']
     search_fields = ['product__name', 'file_path']
     raw_id_fields = ['product']
