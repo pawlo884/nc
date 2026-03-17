@@ -10,7 +10,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # DROP COLUMN IF EXISTS - idempotentne (druga gałąź migracji mogła już usunąć)
+        # RunSQL z IF EXISTS - idempotentne (druga gałąź mogła już usunąć kolumny).
+        # Uwaga: RunSQL nie aktualizuje stanu Django, ale w tym merge obie gałęzie
+        # usuwały te pola - stan jest ustawiony przez 0010_remove_productimage (RemoveField
+        # w 0009 dla productvariants, RunSQL dla product_images) lub przez kolejność aplikowania.
         migrations.RunSQL(
             sql="ALTER TABLE product_images DROP COLUMN IF EXISTS iai_product_id;",
             reverse_sql=migrations.RunSQL.noop,
