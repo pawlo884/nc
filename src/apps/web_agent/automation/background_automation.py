@@ -187,7 +187,8 @@ class BackgroundAutomation:
                         FROM products p 
                         LEFT JOIN brands b ON p.brand_id = b.id 
                         INNER JOIN product_variants pv ON p.id = pv.product_id
-                        WHERE pv.producer_code = %s
+                        INNER JOIN product_variants_sources pvs ON pv.variant_id = pvs.variant_id
+                        WHERE pvs.producer_code = %s
                         ORDER BY p.name
                         LIMIT 10
                     """, [producer_code])
