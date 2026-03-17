@@ -10,12 +10,13 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='productimage',
-            name='iai_product_id',
+        # DROP COLUMN IF EXISTS - idempotentne (druga gałąź migracji mogła już usunąć)
+        migrations.RunSQL(
+            sql="ALTER TABLE product_images DROP COLUMN IF EXISTS iai_product_id;",
+            reverse_sql=migrations.RunSQL.noop,
         ),
-        migrations.RemoveField(
-            model_name='productvariants',
-            name='iai_product_id',
+        migrations.RunSQL(
+            sql="ALTER TABLE product_variants DROP COLUMN IF EXISTS iai_product_id;",
+            reverse_sql=migrations.RunSQL.noop,
         ),
     ]
