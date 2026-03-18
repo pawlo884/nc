@@ -9,7 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
 import logging
-from .models import Brands, Collection, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, IaiProductCounter, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Seasons, Categories, Vat, Units, FabricComponent, ProductFabric
+from .models import Brands, Collection, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Seasons, Categories, Vat, Units, FabricComponent, ProductFabric
 from matterhorn1.defs_db import resolve_image_url
 import decimal
 # Register your models here.
@@ -1121,18 +1121,6 @@ class PathsAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Paths, PathsAdmin)
-
-
-@admin.register(IaiProductCounter)
-class IaiProductCounterAdmin(admin.ModelAdmin):
-    list_display = ['id', 'counter_value']
-    readonly_fields = ['id', 'counter_value']
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 
 @admin.register(FullChangeFile)

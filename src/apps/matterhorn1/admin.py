@@ -1555,18 +1555,8 @@ class ProductAdmin(admin.ModelAdmin):
                 variant_logger.info(
                     f"[add_new_variants_to_mpd] ID koloru w MPD: {color_id}")
 
-                # Generuj nowy iai_product_id dla tego koloru produktu
-                mpd_cursor.execute("""
-                    INSERT INTO iai_product_counter (counter_value) 
-                    VALUES (1) 
-                    ON CONFLICT (id) 
-                    DO UPDATE SET counter_value = iai_product_counter.counter_value + 1 
-                    RETURNING counter_value
-                """)
-                iai_product_id_result = mpd_cursor.fetchone()
-                iai_product_id = iai_product_id_result[0] if iai_product_id_result else 1
-                variant_logger.info(
-                    f"[add_new_variants_to_mpd] Wygenerowano nowy iai_product_id: {iai_product_id} dla koloru {product_color}")
+                # Licznik IAI usunięty – placeholder dla kompatybilności
+                iai_product_id = 1
 
                 # Pobierz warianty produktu z matterhorn1
                 matterhorn_cursor.execute("""

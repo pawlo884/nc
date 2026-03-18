@@ -90,18 +90,8 @@ def create_mpd_variants(
                 "Brak producer_color_name lub main_color_id - producer_color_id będzie None"
             )
 
-        # IaiProductCounter - atomic increment (raw SQL dla ON CONFLICT)
-        with connections[mpd_db].cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO iai_product_counter (id, counter_value)
-                VALUES (1, 1)
-                ON CONFLICT (id)
-                DO UPDATE SET counter_value = iai_product_counter.counter_value + 1
-                RETURNING counter_value
-            """)
-            row = cursor.fetchone()
-            iai_product_id = row[0] if row else 1
-        logger.info("Wygenerowano iai_product_id: %s", iai_product_id)
+        # Licznik IAI usunięty – zwracamy placeholder dla kompatybilności API
+        iai_product_id = None
 
         # Źródło Matterhorn
         mh_source = Sources.objects.using(mpd_db).filter(

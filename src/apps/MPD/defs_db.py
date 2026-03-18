@@ -232,14 +232,6 @@ def create_tables_if_not_exist(conn):
         )
     """
 
-    create_iai_product_counter_table_queries = """
-        CREATE TABLE IF NOT EXISTS iai_product_counter (
-            id INTEGER PRIMARY KEY DEFAULT 1,
-            counter_value BIGINT NOT NULL DEFAULT 0,
-            CONSTRAINT single_row CHECK (id = 1)
-        )
-    """
-
     create_fabric_component_table_queries = """
         CREATE TABLE IF NOT EXISTS fabric_component (
             id SERIAL PRIMARY KEY,
@@ -312,20 +304,12 @@ def create_tables_if_not_exist(conn):
     cursor.execute(create_sizes_table_queries)
     cursor.execute(create_sources_table_queries)
     cursor.execute(create_stock_and_prices_table_queries)
-    cursor.execute(create_iai_product_counter_table_queries)
     cursor.execute(create_fabric_component_table_queries)
     cursor.execute(create_product_fabric_table_queries)
 
     # Utwórz funkcję i trigger sprawdzający sumę procentów materiałów
     cursor.execute(create_check_percentage_function)
     cursor.execute(create_percentage_check_trigger)
-
-    # Inicjalizacja tabeli iai_product_counter z wartością początkową
-    cursor.execute("""
-        INSERT INTO iai_product_counter (id, counter_value) 
-        VALUES (1, 0) 
-        ON CONFLICT (id) DO NOTHING
-    """)
 
     conn.commit()
     cursor.close()

@@ -166,7 +166,6 @@ def _saga_create_mpd_tabu(
                 color=color_obj,
                 producer_color=producer_color,
                 size=size_obj,
-                iai_product_id=v.api_id,
             )
 
             ProductvariantsSources.objects.using(mpd_db).get_or_create(
@@ -458,17 +457,6 @@ def create_mpd_variants_from_tabu(
         )
         producer_color_id = producer_color.id
 
-    with connections[mpd_db].cursor() as cursor:
-        cursor.execute("""
-            INSERT INTO iai_product_counter (id, counter_value)
-            VALUES (1, 1)
-            ON CONFLICT (id)
-            DO UPDATE SET counter_value = iai_product_counter.counter_value + 1
-            RETURNING counter_value
-        """)
-        row = cursor.fetchone()
-        iai_product_id = row[0] if row else 1
-
     tabu_source = Sources.objects.using(mpd_db).filter(name__icontains="Tabu").first()
     if not tabu_source:
         tabu_source = Sources.objects.using(mpd_db).create(
@@ -533,7 +521,6 @@ def create_mpd_variants_from_tabu(
                 color_id=color_id,
                 producer_color_id=producer_color_id,
                 size=size,
-                iai_product_id=iai_product_id,
             )
             logger.info("Utworzono wariant MPD %s dla Tabu api_id=%s", variant.variant_id, tabu_var.api_id)
 

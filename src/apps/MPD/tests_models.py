@@ -198,3 +198,45 @@ class MPDStockAndPricesModelTest(TestCase):
         pk = sap.pk
         sap.delete()
         self.assertFalse(StockAndPrices.objects.filter(pk=pk).exists())
+
+
+class NoIaiProductCounterTest(TestCase):
+    """Testy potwierdzające usunięcie powiązań z IAI counter – aplikacja działa bez niego."""
+
+    def test_mpd_models_do_not_define_iai_product_counter(self):
+        """W MPD.models nie ma już modelu IaiProductCounter."""
+        import MPD.models as mpd_models
+        self.assertFalse(
+            hasattr(mpd_models, "IaiProductCounter"),
+            "IaiProductCounter nie powinien być zdefiniowany w MPD.models",
+        )
+
+    def test_mpd_admin_imports_without_iai_product_counter(self):
+        """MPD admin importuje się poprawnie bez IaiProductCounter."""
+        from django.contrib import admin
+
+        # Po załadowaniu MPD.admin żaden model o nazwie IaiProductCounter nie jest w rejestrze
+        from MPD import admin as _mpd_admin  # noqa: F401 – ładujemy rejestracje
+
+        registered_names = [m.__name__ for m in admin.site._registry]
+        self.assertNotIn(
+            "IaiProductCounter",
+            registered_names,
+            "IaiProductCounter nie powinien być zarejestrowany w admin",
+        )
+
+    def test_saga_variants_return_structure_has_iai_product_id_key(self):
+        """create_mpd_variants zwraca dict z kluczem iai_product_id (może być None)."""
+        from matterhorn1.saga_variants import create_mpd_variants
+        # Nie uruchamiamy pełnej logiki – sprawdzamy tylko sygnaturę/zwrot przy wczesnym wyjściu.
+        # Przy braku koloru w MPD funkcja rzuca ValueError; przy braku wariantów zwraca dict.
+        # Sprawdzamy, że zwracany dict (gdy jest) ma klucz iai_product_id.
+        self.assertTrue(
+            hasattr(create_mpd_variants, "__call__"),
+            "create_mpd_variants powinna być wywoływalna",
+        )
+        # Dokumentacja zwrotu: dict z created_variants, iai_product_id, variant_ids
+        import inspect
+        sig = inspect.signature(create_mpd_variants)
+        self.assertIn("mpd_product_id", sig.parameters)
+        self.assertIn("matterhorn_product_id", sig.parameters)

@@ -1,9 +1,11 @@
-from django.db import models
 from decimal import Decimal
-from django.contrib import admin
+import logging
+
+from django.db import models
 
 
-# Create your models here.
+logger = logging.getLogger(__name__)
+
 
 class Attributes(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -37,8 +39,9 @@ class Brands(models.Model):
         verbose_name_plural = 'Brands'
 
     def save(self, *args, **kwargs):
-        print(f"Zapisywanie marki: {self.name}")
-        print(f"Używana baza danych: {self._state.db}")
+        logger.debug(
+            "Zapisywanie marki: %s (baza: %s)", self.name, self._state.db
+        )
         return super().save(*args, **kwargs)
 
     def __str__(self):
@@ -52,7 +55,8 @@ class Collection(models.Model):
         Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id',
         related_name='collections', verbose_name='Marka')
     name = models.CharField(max_length=255, verbose_name='Nazwa')
-    sort_order = models.PositiveIntegerField(default=0, verbose_name='Kolejność')
+    sort_order = models.PositiveIntegerField(
+        default=0, verbose_name='Kolejność')
     objects = models.Manager()
 
     class Meta:
@@ -284,6 +288,7 @@ class ProductVariantsRetailPrice(models.Model):
     class Meta:
         managed = True
         db_table = 'product_variants_retail_price'
+        app_label = 'MPD'
 
 
 class ProductImage(models.Model):
@@ -351,6 +356,7 @@ class ProductSet(models.Model):
         managed = True
         db_table = 'product_set'
         verbose_name = 'Product Set'
+        app_label = 'MPD'
         verbose_name_plural = 'Product Sets'
 
     def __str__(self):
@@ -371,6 +377,7 @@ class ProductSetItem(models.Model):
         managed = True
         db_table = 'product_set_items'
         verbose_name = 'Product Set Item'
+        app_label = 'MPD'
         verbose_name_plural = 'Product Set Items'
 
     def __str__(self):
@@ -412,6 +419,7 @@ class StockAndPrices(models.Model):
 
     class Meta:
         managed = True
+        app_label = 'MPD'
         db_table = 'stock_and_prices'
         verbose_name = 'Stan magazynowy'
         verbose_name_plural = 'Stany magazynowe'
@@ -431,6 +439,7 @@ class StockHistory(models.Model):
 
     class Meta:
         managed = True
+        app_label = 'MPD'
         db_table = 'stock_history'
         app_label = 'MPD'  # Wyraźnie określ app_label dla uniknięcia konfliktów
         verbose_name = 'Historia stanu magazynowego'
@@ -447,22 +456,9 @@ class Categories(models.Model):
     class Meta:
         managed = True
         db_table = 'categories'
+        app_label = 'MPD'
         verbose_name = 'Kategoria'
         verbose_name_plural = 'Kategorie'
-
-
-class StockAndPricesInline(admin.TabularInline):
-    model = StockAndPrices
-    product = models.ForeignKey(
-        Products, on_delete=models.CASCADE, related_name='stock_and_prices')
-    fields = ['variant_id', 'stock', 'price', 'currency']
-    readonly_fields = ['variant_id', 'stock', 'price', 'currency']
-    extra = 0
-    can_delete = False
-    max_num = 0
-
-    def has_add_permission(self, request, obj=None):
-        return False
 
 
 class Vat(models.Model):
@@ -473,6 +469,7 @@ class Vat(models.Model):
 
     class Meta:
         managed = True
+        app_label = 'MPD'
         db_table = 'vat'
 
 
@@ -489,6 +486,7 @@ class Paths(models.Model):
     class Meta:
         managed = True
         db_table = 'path'
+        app_label = 'MPD'
         verbose_name = 'Ścieżka'
         verbose_name_plural = 'Ścieżki'
 
@@ -502,6 +500,7 @@ class ProductPaths(models.Model):
     class Meta:
         managed = True
         db_table = 'product_path'
+        app_label = 'MPD'
         verbose_name = 'Ścieżka produktu'
         verbose_name_plural = 'Ścieżki produktów'
         unique_together = ('product_id', 'path_id')
@@ -516,6 +515,7 @@ class Units(models.Model):
     class Meta:
         managed = True
         db_table = 'units'
+        app_label = 'MPD'
         verbose_name = 'Jednostka'
         verbose_name_plural = 'Jednostki'
 
@@ -528,6 +528,7 @@ class FabricComponent(models.Model):
 
     class Meta:
         db_table = 'fabric_component'
+        app_label = 'MPD'
 
     def __str__(self):
         return str(self.name) if self.name else "Brak nazwy"
@@ -541,26 +542,12 @@ class ProductFabric(models.Model):
 
     class Meta:
         db_table = 'product_fabric'
+        app_label = 'MPD'
         unique_together = ('product', 'component')
 
     def __str__(self):
         component_name = self.component.name if self.component and self.component.name else "Nieznany komponent"
         return f"{component_name} {self.percentage}%"
-
-
-class IaiProductCounter(models.Model):
-    id = models.IntegerField(primary_key=True)
-    counter_value = models.BigIntegerField()
-    objects = models.Manager()
-
-    class Meta:
-        managed = True
-        db_table = 'iai_product_counter'
-        verbose_name = 'Licznik IAI Product ID'
-        verbose_name_plural = 'Liczniki IAI Product ID'
-
-    def __str__(self):
-        return f"Licznik IAI: {str(self.counter_value)}"
 
 
 class FullChangeFile(models.Model):
@@ -576,6 +563,7 @@ class FullChangeFile(models.Model):
 
     class Meta:
         managed = True
+        app_label = 'MPD'
         db_table = 'full_change_files'
         verbose_name = 'Plik XML'
         verbose_name_plural = 'Pliki XML'
