@@ -196,7 +196,6 @@ def _saga_create_mpd_tabu(
                 product=mpd_product,
                 color=main_color,
                 producer_color=producer_color,
-                iai_product_id=tabu_product.api_id,
             )
             ProductvariantsSources.objects.using(mpd_db).get_or_create(
                 variant=pv,
