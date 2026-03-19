@@ -884,7 +884,6 @@ def create_product(request):
                 color_id=color_id,
                 producer_color_id=producer_color_id,
                 size_id=size_id,
-                iai_product_id=variant_data.get('iai_product_id')
             )
 
             # Dodaj cenę jeśli podano
@@ -1021,7 +1020,6 @@ def update_product(request, product_id):
                     color_id=color_id,
                     producer_color_id=producer_color_id,
                     size_id=size_id,
-                    iai_product_id=variant_data.get('iai_product_id')
                 )
 
                 # Dodaj cenę jeśli podano
@@ -1078,7 +1076,6 @@ def get_product(request, product_id):
                 'producer_color_id': variant.producer_color_id,
                 'size_id': variant.size_id,
                 'producer_code': first_pvs or '',
-                'iai_product_id': variant.iai_product_id,
                 'exported_to_iai': variant.exported_to_iai
             }
 
@@ -1346,7 +1343,6 @@ def bulk_map_from_matterhorn1(request):
                             product=mpd_product,
                             color=color,
                             size=size,
-                            iai_product_id=variant_data.get('iai_product_id')
                         )
 
                         # Dodaj cenę jeśli podano
