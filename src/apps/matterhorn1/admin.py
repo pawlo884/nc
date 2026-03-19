@@ -1555,9 +1555,6 @@ class ProductAdmin(admin.ModelAdmin):
                 variant_logger.info(
                     f"[add_new_variants_to_mpd] ID koloru w MPD: {color_id}")
 
-                # Licznik IAI usunięty – placeholder dla kompatybilności
-                iai_product_id = 1
-
                 # Pobierz warianty produktu z matterhorn1
                 matterhorn_cursor.execute("""
                     SELECT name, stock, ean, variant_uid FROM productvariant WHERE product_id = %s
@@ -1608,14 +1605,14 @@ class ProductAdmin(admin.ModelAdmin):
                     try:
                         if producer_color_id:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, iai_product_id, updated_at)
-                                VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                            """, [variant_id, mapped_product_uid, color_id, producer_color_id, size_id, iai_product_id])
+                                INSERT INTO product_variants (variant_id, product_id, color_id, producer_color_id, size_id, updated_at)
+                                VALUES (%s, %s, %s, %s, %s, NOW())
+                            """, [variant_id, mapped_product_uid, color_id, producer_color_id, size_id])
                         else:
                             mpd_cursor.execute("""
-                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, iai_product_id, updated_at)
-                                VALUES (%s, %s, %s, %s, %s, NOW())
-                            """, [variant_id, mapped_product_uid, color_id, size_id, iai_product_id])
+                                INSERT INTO product_variants (variant_id, product_id, color_id, size_id, updated_at)
+                                VALUES (%s, %s, %s, %s, NOW())
+                            """, [variant_id, mapped_product_uid, color_id, size_id])
 
                         # Dodaj wpis do product_variants_sources (producer_code tylko tutaj)
                         producer_code_val = (producer_code or '')[:255] if producer_code else None
