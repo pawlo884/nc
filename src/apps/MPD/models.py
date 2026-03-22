@@ -76,7 +76,7 @@ class Colors(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=50, blank=True, null=True)
     hex_code = models.CharField(max_length=7, blank=True, null=True)
-    parent_id = models.ForeignKey(
+    parent = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, db_column='parent_id')
     iai_colors_id = models.IntegerField(blank=True, null=True)
     objects = models.Manager()
@@ -122,7 +122,7 @@ class Products(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     series = models.ForeignKey('ProductSeries', db_column='series_id',
-                               on_delete=models.DO_NOTHING, blank=True, null=True)
+                               on_delete=models.SET_NULL, blank=True, null=True)
     unit = models.ForeignKey(
         'Units', on_delete=models.CASCADE, db_column='unit', to_field='unit_id', null=True, blank=True)
     season = models.ForeignKey(
@@ -218,9 +218,9 @@ class ProductVariants(models.Model):
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id')
     color = models.ForeignKey(
-        Colors, on_delete=models.CASCADE, db_column='color_id', null=True, blank=True)
+        Colors, on_delete=models.SET_NULL, db_column='color_id', null=True, blank=True)
     producer_color = models.ForeignKey(
-        Colors, on_delete=models.CASCADE, db_column='producer_color_id', null=True, blank=True, related_name='producer_variants')
+        Colors, on_delete=models.SET_NULL, db_column='producer_color_id', null=True, blank=True, related_name='producer_variants')
     size = models.ForeignKey(
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
     exported_to_iai = models.BooleanField(
@@ -271,6 +271,9 @@ class ProductvariantsSources(models.Model):
         verbose_name = 'Product Variant Source'
         verbose_name_plural = 'Product Variant Sources'
 
+    def __str__(self):
+        return f"Source {self.source_id} for variant {self.variant_id}"
+
 
 class ProductVariantsRetailPrice(models.Model):
     variant = models.OneToOneField(ProductVariants, on_delete=models.CASCADE,
@@ -290,6 +293,9 @@ class ProductVariantsRetailPrice(models.Model):
         db_table = 'product_variants_retail_price'
         app_label = 'MPD'
 
+    def __str__(self):
+        return f"RetailPrice for variant {self.variant_id}: {self.retail_price} {self.currency}"
+
 
 class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -307,9 +313,10 @@ class ProductImage(models.Model):
         verbose_name_plural = 'Product Images'
 
     def save(self, *args, **kwargs):
-        # Wymuś użycie bazy danych MPD
+        # Użyj routera do określenia bazy danych (MPD w produkcji, zzz_MPD w dev)
         if 'using' not in kwargs:
-            kwargs['using'] = 'MPD'
+            from django.db import router
+            kwargs['using'] = router.db_for_write(self.__class__)
         # Upewnij się, że product_id jest liczbą, nie ścieżką
         if self.product_id and not isinstance(self.product_id, (int, type(None))):
             try:
@@ -365,8 +372,10 @@ class ProductSet(models.Model):
 
 class ProductSetItem(models.Model):
     id = models.BigAutoField(primary_key=True)
-    product_set_id = models.IntegerField()
-    product_id = models.IntegerField()
+    product_set = models.ForeignKey(
+        ProductSet, on_delete=models.CASCADE, db_column='product_set_id', related_name='items')
+    product = models.ForeignKey(
+        Products, on_delete=models.CASCADE, db_column='product_id')
     quantity = models.IntegerField(default=1)
     position = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -424,6 +433,9 @@ class StockAndPrices(models.Model):
         verbose_name = 'Stan magazynowy'
         verbose_name_plural = 'Stany magazynowe'
 
+    def __str__(self):
+        return f"Stock {self.stock} @ {self.price} {self.currency} (variant {self.variant_id})"
+
 
 class StockHistory(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -441,7 +453,6 @@ class StockHistory(models.Model):
         managed = True
         app_label = 'MPD'
         db_table = 'stock_history'
-        app_label = 'MPD'  # Wyraźnie określ app_label dla uniknięcia konfliktów
         verbose_name = 'Historia stanu magazynowego'
         verbose_name_plural = 'Historia stanów magazynowych'
 
@@ -460,6 +471,9 @@ class Categories(models.Model):
         verbose_name = 'Kategoria'
         verbose_name_plural = 'Kategorie'
 
+    def __str__(self):
+        return str(self.name) if self.name else f'Kategoria {self.id}'
+
 
 class Vat(models.Model):
     id = models.BigAutoField(primary_key=True)
@@ -471,6 +485,9 @@ class Vat(models.Model):
         managed = True
         app_label = 'MPD'
         db_table = 'vat'
+
+    def __str__(self):
+        return f"VAT {self.vat_rate}%"
 
 
 class Paths(models.Model):
@@ -493,8 +510,10 @@ class Paths(models.Model):
 
 class ProductPaths(models.Model):
     id = models.BigAutoField(primary_key=True)
-    product_id = models.IntegerField()
-    path_id = models.IntegerField()
+    product = models.ForeignKey(
+        Products, on_delete=models.CASCADE, db_column='product_id')
+    path = models.ForeignKey(
+        Paths, on_delete=models.CASCADE, db_column='path_id')
     objects = models.Manager()
 
     class Meta:
@@ -503,7 +522,10 @@ class ProductPaths(models.Model):
         app_label = 'MPD'
         verbose_name = 'Ścieżka produktu'
         verbose_name_plural = 'Ścieżki produktów'
-        unique_together = ('product_id', 'path_id')
+        unique_together = ('product', 'path')
+
+    def __str__(self):
+        return f"Product {self.product_id} → Path {self.path_id}"
 
 
 class Units(models.Model):
@@ -527,6 +549,7 @@ class FabricComponent(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
     class Meta:
+        managed = True
         db_table = 'fabric_component'
         app_label = 'MPD'
 
@@ -541,6 +564,7 @@ class ProductFabric(models.Model):
     percentage = models.PositiveSmallIntegerField()
 
     class Meta:
+        managed = True
         db_table = 'product_fabric'
         app_label = 'MPD'
         unique_together = ('product', 'component')

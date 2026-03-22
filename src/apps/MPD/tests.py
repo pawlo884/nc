@@ -75,10 +75,10 @@ class ColorsModelTest(TestCase):
         child_color = Colors.objects.create(
             name='Shade of Primary',
             hex_code='#111111',
-            parent_id=parent_color
+            parent=parent_color
         )
 
-        self.assertEqual(child_color.parent_id, parent_color)
+        self.assertEqual(child_color.parent, parent_color)
 
 
 class ProductsModelTest(TestCase):

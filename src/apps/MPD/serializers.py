@@ -73,11 +73,11 @@ class ProductListSerializer(serializers.ModelSerializer):
     ]
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema_serializer()
 class ProductSetItemSerializer(serializers.ModelSerializer):
-    mapped_product = ProductSerializer()
+    product = ProductSerializer()
 
     class Meta:
         model = ProductSetItem
-        fields = ['id', 'mapped_product', 'quantity', 'created_at']
+        fields = ['id', 'product', 'quantity', 'created_at']
 
 
 @extend_schema_serializer(

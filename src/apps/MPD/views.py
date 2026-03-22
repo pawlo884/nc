@@ -153,8 +153,8 @@ class ProductSetViewSet(viewsets.ModelViewSet):
         try:
             product = Products.objects.get(id=product_id)
             ProductSetItem.objects.create(
-                set=set,
-                mapped_product=product,
+                product_set=set,
+                product=product,
                 quantity=quantity
             )
             return Response({'status': 'product added to set'})
@@ -171,8 +171,8 @@ class ProductSetViewSet(viewsets.ModelViewSet):
 
         try:
             item = ProductSetItem.objects.get(
-                set=set,
-                mapped_product_uid=product_id
+                product_set=set,
+                product_id=product_id
             )
             item.delete()
             return Response({'status': 'product removed from set'})
@@ -185,7 +185,7 @@ class ProductSetViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def products(self, request, pk=None):
         set = self.get_object()
-        items = ProductSetItem.objects.filter(set=set)
+        items = ProductSetItem.objects.filter(product_set=set)
         serializer = ProductSetItemSerializer(items, many=True)
         return Response(serializer.data)
 
