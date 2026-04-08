@@ -51,6 +51,8 @@ MATTERHORN_API_KEY = os.getenv('MATTERHORN_API_KEY', '')
 # Tabu API configuration (dokumentacja: https://b2b.tabu.com.pl/api/v1)
 TABU_API_BASE_URL = (os.getenv('TABU_API_BASE_URL') or 'https://b2b.tabu.com.pl/api/v1').strip().rstrip('/')
 TABU_API_KEY = os.getenv('TABU_API_KEY', '')
+# Domyślne ustawienia sync dla Tabu (możliwe do nadpisania przez env)
+TABU_SYNC_STOP_AFTER_404_DEFAULT = int(os.getenv('TABU_SYNC_STOP_AFTER_404_DEFAULT', '10'))
 
 # Konfiguracja logowania - tylko console logging
 LOGGING = {
