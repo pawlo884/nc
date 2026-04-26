@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
 from django.http import JsonResponse
 from django.db import connections, transaction
+from django.db.models import OuterRef, Subquery
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.shortcuts import render
@@ -199,7 +200,7 @@ class ProductVariantInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = [
-        'product_uid', 'name', 'brand', 'category', 'active',
+        'product_image_thumbnail', 'product_uid', 'name', 'brand', 'category', 'active',
         'stock_total', 'is_mapped', 'mapped_product_uid', 'created_at', 'updated_at'
     ]
     list_display_links = ['product_uid', 'name']
@@ -250,11 +251,49 @@ class ProductAdmin(admin.ModelAdmin):
     stock_total.short_description = 'Stan magazynowy'
     stock_total.admin_order_field = 'productvariant__stock'
 
+    def product_image_thumbnail(self, obj):
+        """Wyświetl miniaturę pierwszego zdjęcia produktu na liście."""
+        original_url = getattr(obj, 'first_image_url', None)
+        if not original_url:
+            return '-'
+        normalized_url = original_url.strip()
+        storage_prefixes = ('MPD/', 'MPD_test/')
+
+        if normalized_url.startswith(('http://', 'https://')):
+            # Zewnętrzne URL (np. matterhorn) pokazujemy bez przepisywania do MinIO.
+            display_url = normalized_url
+        elif normalized_url.startswith('//'):
+            display_url = f"https:{normalized_url}"
+        elif normalized_url.startswith('matterhorn-wholesale.com/'):
+            display_url = f"https://{normalized_url}"
+        elif normalized_url.startswith(storage_prefixes):
+            display_url = resolve_image_url(normalized_url) or normalized_url
+        else:
+            display_url = f"https://matterhorn-wholesale.com/{normalized_url.lstrip('/')}"
+
+        return format_html(
+            '<a href="{}" target="_blank" title="{}">'
+            '<img src="{}" alt="Obraz produktu" loading="lazy" width="56" height="56" '
+            'style="object-fit: contain; width: 56px; height: 56px; max-width: 56px; max-height: 56px;" '
+            'onerror="this.onerror=null; this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiBmaWxsPSIjZWVlIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSI4IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+YnJhayB6ZGo8L3RleHQ+PC9zdmc+\';" />'
+            '</a>',
+            display_url,
+            original_url,
+            display_url,
+        )
+    product_image_thumbnail.short_description = 'Zdjęcie'
+
     def get_queryset(self, request):
         """Optymalizacja zapytań"""
+        first_image_url_subquery = ProductImage.objects.filter(
+            product_id=OuterRef('pk')
+        ).order_by('order', 'id').values('image_url')[:1]
+
         return super().get_queryset(request).select_related(
             'brand', 'category'
-        ).prefetch_related('variants')
+        ).prefetch_related('variants').annotate(
+            first_image_url=Subquery(first_image_url_subquery)
+        )
 
     def get_urls(self):
         from django.urls import path as url_path
