@@ -1,5 +1,4 @@
 import time
-from concurrent.futures import ThreadPoolExecutor
 from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.conf import settings
@@ -257,58 +256,154 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         imported_count = 0
         page = start_page
         limit = 1000  # Limit 1000 dla importu ITEMS
+        max_page_db_retries = 5
+        page_db_retry_delay = 5  # sekundy
 
         logger.info(f"🔍 Używam bulk API ITEMS z last_update i limit={limit}")
-        # Prefetch 1 stronę do przodu: pobieranie następnej strony trwa równolegle z zapisem bieżącej
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            next_fetch = executor.submit(
-                _fetch_items_page, api_url, username, password, last_update, page, limit
-            )
 
-            while imported_count < max_products:
-                page_result = next_fetch.result()
+        while imported_count < max_products:
+            max_attempts = 10
+            attempt = 1
 
-                if page_result['status'] == 'completed':
-                    return {
-                        'status': 'completed',
-                        'imported_count': imported_count,
-                        'reason': page_result.get('reason', 'no_more_products')
+            while attempt <= max_attempts:
+                try:
+                    # Pobierz dane uwierzytelniające
+                    from django.conf import settings
+                    import requests
+                    api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
+                    if not api_key:
+                        api_key = f"{username}:{password}"
+
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": api_key
                     }
 
-                if page_result['status'] == 'error':
-                    return {
-                        'status': 'error',
-                        'error': page_result.get('error', 'Unknown API fetch error')
-                    }
+                    # Użyj bulk API z last_update
+                    url = f"{api_url}/B2BAPI/ITEMS/?page={page}&limit={limit}&last_update={last_update}"
+                    logger.info(f"🔗 Request URL: {url}")
+                    response = requests.get(url, headers=headers, timeout=120)
+                    time.sleep(1.0)  # Ograniczenie API: 1 request/sekundę
 
-                current_page = page_result['page']
-                items = page_result['items']
+                    logger.info(
+                        f"🔍 Bulk API Response strona {page}: status={response.status_code}, content_length={len(response.text)}")
 
-                logger.info(f"📥 Pobrano {len(items)} produktów ze strony {current_page}")
+                    if response.status_code == 200:
+                        if not response.text.strip():
+                            logger.info("📊 Pusta odpowiedź - koniec danych")
+                            return {
+                                'status': 'completed',
+                                'imported_count': imported_count,
+                                'reason': 'empty_response'
+                            }
 
-                # Uruchom prefetch kolejnej strony zanim zaczniemy zapis do bazy
-                next_page = current_page + 1
-                next_fetch = executor.submit(
-                    _fetch_items_page, api_url, username, password, last_update, next_page, limit
-                )
+                        try:
+                            items = response.json()
+                            if not items:
+                                logger.info(
+                                    "📊 Brak produktów na stronie - koniec danych")
+                                return {
+                                    'status': 'completed',
+                                    'imported_count': imported_count,
+                                    'reason': 'no_more_products'
+                                }
 
-                # Bulk import/update
-                if not dry_run:
-                    bulk_result = _bulk_import_products(items)
-                    imported_count += bulk_result['imported_count']
-                else:
-                    # Dry run - tylko zlicz
-                    for item in items:
-                        if imported_count >= max_products:
+                            logger.info(
+                                f"📥 Pobrano {len(items)} produktów ze strony {page}")
+
+                            # Bulk import/update
+                            if not dry_run:
+                                bulk_result = None
+                                for db_attempt in range(1, max_page_db_retries + 1):
+                                    bulk_result = _bulk_import_products(items)
+                                    if bulk_result.get('status') != 'error':
+                                        break
+
+                                    if db_attempt < max_page_db_retries:
+                                        delay = min(page_db_retry_delay * (2 ** (db_attempt - 1)), 30)
+                                        logger.warning(
+                                            f"⏳ Błąd zapisu DB dla strony {page} "
+                                            f"(próba {db_attempt}/{max_page_db_retries}): "
+                                            f"{bulk_result.get('error', 'unknown_error')}. "
+                                            f"Ponowienie tej samej strony za {delay}s..."
+                                        )
+                                        time.sleep(delay)
+                                    else:
+                                        logger.error(
+                                            f"❌ Wyczerpano retry zapisu DB dla strony {page} "
+                                            f"({max_page_db_retries} prób)"
+                                        )
+
+                                if bulk_result is None or bulk_result.get('status') == 'error':
+                                    return {
+                                        'status': 'error',
+                                        'error': bulk_result.get('error', f'Bulk import failed for page {page}') if bulk_result else f'Bulk import failed for page {page}'
+                                    }
+                                imported_count += bulk_result['imported_count']
+                            else:
+                                # Dry run - tylko zlicz
+                                for item in items:
+                                    if imported_count >= max_products:
+                                        break
+                                    if item.get("creation_date") is not None:
+                                        imported_count += 1
+
+                            page += 1
+                            # Aktualizuj current_page w bazie danych
+                            if not dry_run:
+                                _update_items_import_status(
+                                    'running', imported_count, page, updated_count=bulk_result.get('updated_count', 0), processed_count=imported_count)
+                            break  # Sukces - wyjdź z retry loop
+
+                        except Exception as e:
+                            logger.error(f"❌ Błąd parsowania JSON: {e}")
+                            if attempt < max_attempts:
+                                logger.warning(
+                                    f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
+                                time.sleep(20)
+                                attempt += 1
+                                continue
+                            else:
+                                logger.error(
+                                    "❌ Osiągnięto maksymalną liczbę prób parsowania JSON")
+                                break
+
+                    elif response.status_code == 404:
+                        logger.info("📊 Strona nie istnieje - koniec danych")
+                        break
+                    else:
+                        logger.warning(f"⚠️ Błąd API {response.status_code}")
+                        if attempt < max_attempts:
+                            logger.warning(
+                                f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
+                            time.sleep(20)
+                            attempt += 1
+                            continue
+                        else:
+                            logger.error(
+                                "❌ Osiągnięto maksymalną liczbę prób API")
                             break
-                        if item.get("creation_date") is not None:
-                            imported_count += 1
 
-                page = next_page
-                # Aktualizuj current_page w bazie danych
-                if not dry_run:
-                    _update_items_import_status(
-                        'running', imported_count, page, updated_count=bulk_result.get('updated_count', 0), processed_count=imported_count)
+                except Exception as e:
+                    logger.error(
+                        f"❌ Błąd podczas pobierania strony {page}: {e}")
+                    logger.error(f"❌ Typ błędu: {type(e).__name__}")
+                    if "timeout" in str(e).lower():
+                        logger.warning("⚠️ Timeout - API może być wolne, zwiększam timeout")
+                    if attempt < max_attempts:
+                        logger.warning(
+                            f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
+                        time.sleep(20)
+                        attempt += 1
+                        continue
+                    else:
+                        logger.error(
+                            "❌ Osiągnięto maksymalną liczbę prób połączenia")
+                        break
+
+            # Jeśli osiągnięto maksymalną liczbę prób, przerwij główną pętlę
+            if attempt > max_attempts:
+                break
 
         # Zaktualizuj status importu na 'success' po zakończeniu
         if not dry_run:
@@ -332,118 +427,6 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
             'status': 'error',
             'error': str(e)
         }
-
-
-def _fetch_items_page(api_url, username, password, last_update, page, limit):
-    """Pobiera jedną stronę ITEMS API z retry logic."""
-    max_attempts = 10
-    attempt = 1
-
-    while attempt <= max_attempts:
-        try:
-            from django.conf import settings
-            import requests
-
-            api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
-            if not api_key:
-                api_key = f"{username}:{password}"
-
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": api_key
-            }
-
-            url = f"{api_url}/B2BAPI/ITEMS/?page={page}&limit={limit}&last_update={last_update}"
-            logger.info(f"🔗 Request URL: {url}")
-            response = requests.get(url, headers=headers, timeout=120)
-            time.sleep(1.0)  # Ograniczenie API: 1 request/sekundę
-
-            logger.info(
-                f"🔍 Bulk API Response strona {page}: status={response.status_code}, content_length={len(response.text)}")
-
-            if response.status_code == 200:
-                if not response.text.strip():
-                    logger.info("📊 Pusta odpowiedź - koniec danych")
-                    return {
-                        'status': 'completed',
-                        'reason': 'empty_response',
-                        'page': page
-                    }
-
-                try:
-                    items = response.json()
-                except Exception as exc:
-                    logger.error(f"❌ Błąd parsowania JSON dla strony {page}: {exc}")
-                    if attempt < max_attempts:
-                        logger.warning(
-                            f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
-                        time.sleep(20)
-                        attempt += 1
-                        continue
-                    logger.error("❌ Osiągnięto maksymalną liczbę prób parsowania JSON")
-                    return {
-                        'status': 'error',
-                        'error': f'JSON parse failed for page {page}: {exc}'
-                    }
-
-                if not items:
-                    logger.info("📊 Brak produktów na stronie - koniec danych")
-                    return {
-                        'status': 'completed',
-                        'reason': 'no_more_products',
-                        'page': page
-                    }
-
-                return {
-                    'status': 'success',
-                    'items': items,
-                    'page': page
-                }
-
-            if response.status_code == 404:
-                logger.info("📊 Strona nie istnieje - koniec danych")
-                return {
-                    'status': 'completed',
-                    'reason': 'page_not_found',
-                    'page': page
-                }
-
-            logger.warning(f"⚠️ Błąd API {response.status_code} dla strony {page}")
-            if attempt < max_attempts:
-                logger.warning(
-                    f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
-                time.sleep(20)
-                attempt += 1
-                continue
-
-            logger.error("❌ Osiągnięto maksymalną liczbę prób API")
-            return {
-                'status': 'error',
-                'error': f'API status {response.status_code} for page {page}'
-            }
-
-        except Exception as exc:
-            logger.error(f"❌ Błąd podczas pobierania strony {page}: {exc}")
-            logger.error(f"❌ Typ błędu: {type(exc).__name__}")
-            if "timeout" in str(exc).lower():
-                logger.warning("⚠️ Timeout - API może być wolne, zwiększam timeout")
-            if attempt < max_attempts:
-                logger.warning(
-                    f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
-                time.sleep(20)
-                attempt += 1
-                continue
-
-            logger.error("❌ Osiągnięto maksymalną liczbę prób połączenia")
-            return {
-                'status': 'error',
-                'error': f'Connection failed for page {page}: {exc}'
-            }
-
-    return {
-        'status': 'error',
-        'error': f'Unexpected retry loop exit for page {page}'
-    }
 
 
 def _check_database_connection():
@@ -755,6 +738,7 @@ def _bulk_import_products(items):
                 _create_related_objects_for_products(products_to_update)
 
         return {
+            'status': 'success',
             'imported_count': imported_count
         }
 
@@ -762,7 +746,9 @@ def _bulk_import_products(items):
         logger.error(f"❌ Błąd bulk import: {e}")
         # Nie ma fallback - tylko bulk operations
         return {
-            'imported_count': 0
+            'status': 'error',
+            'imported_count': 0,
+            'error': str(e)
         }
 
 
