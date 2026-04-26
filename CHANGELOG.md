@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.11.2 (2026-04-26)</small>
+
+* fix(matterhorn1/admin): dodaj miniatury na liście produktów ([e05a482](https://github.com/pawlo884/nc/commit/e05a482))
+
 ## <small>1.11.1 (2026-04-26)</small>
 
 * fix(matterhorn1): retry zapisu tej samej strony ITEMS przy błędzie DB ([4496bb2](https://github.com/pawlo884/nc/commit/4496bb2))
