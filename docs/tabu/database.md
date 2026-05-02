@@ -24,6 +24,43 @@ python manage.py migrate tabu --database=zzz_tabu --settings=core.settings.dev
 
 Użycie `--database=tabu` w dev **nie** zastosuje migracji do właściwej bazy (router zezwala tylko na `zzz_tabu`).
 
+## Produkcja
+
+Router `TabuRouter` w prod kieruje aplikację `tabu` na alias **`tabu`** (gdy w `DATABASES` **nie** ma wpisu `zzz_tabu`).
+
+### 1. Baza na Postgresie
+
+Na tym samym serwerze co inne bazy NC utwórz pustą bazę o nazwie zgodnej z `TABU_DB_NAME` (np. `tabu`) i nadaj uprawnienia użytkownikowi z `TABU_DB_USER` — przykład jako superuser:
+
+```sql
+CREATE DATABASE tabu OWNER pawel;
+-- ewentualnie: GRANT ALL PRIVILEGES ON DATABASE tabu TO pawel;
+```
+
+W `.env.prod` muszą być ustawione: `TABU_DB_HOST`, `TABU_DB_PORT`, `TABU_DB_NAME`, `TABU_DB_USER`, `TABU_DB_PASSWORD` (bez spacji wokół `=` w pliku). Host w Dockerze to zwykle `postgres`.
+
+W `docker-compose/docker-compose.blue-green.yml` dla **web-blue**, **web-green** i **celery-default** są domyślne wartości interpolacji (`TABU_DB_HOST` itd.) — po `docker compose ... up -d` kontener dostanie poprawny host TCP nawet gdy wcześniej `HOST` był pusty. **Hasło** nadal musi pochodzić z `env_file` (`.env.prod`).
+
+### 2. Migracje
+
+W kontenerze web (np. `nc-web-green`), katalog z `manage.py` to `/app`:
+
+```bash
+docker exec nc-web-green bash -lc 'cd /app && python manage.py migrate tabu --database=tabu --settings=core.settings.prod'
+```
+
+Jeśli `DJANGO_SETTINGS_MODULE` w kontenerze jest już `core.settings.prod`, można pominąć `--settings`:
+
+```bash
+docker exec nc-web-green bash -lc 'cd /app && python manage.py migrate tabu --database=tabu'
+```
+
+### 3. Weryfikacja
+
+```bash
+docker exec nc-web-green bash -lc 'cd /app && python manage.py showmigrations tabu --database=tabu --settings=core.settings.prod'
+```
+
 ## Tabele (po `0001_initial`)
 
 W schemacie `public` bazy `zzz_tabu`:

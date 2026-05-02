@@ -33,6 +33,11 @@ services:
       - TZ=Europe/Warsaw
       - DJANGO_ENV=prod
       - DEPLOYMENT_COLOR=blue
+      # Tabu: interpolacja przy `docker compose up` + domyślny host TCP w Dockerze
+      - TABU_DB_HOST=${TABU_DB_HOST:-postgres}
+      - TABU_DB_PORT=${TABU_DB_PORT:-5432}
+      - TABU_DB_NAME=${TABU_DB_NAME:-tabu}
+      - TABU_DB_USER=${TABU_DB_USER:-pawel}
     restart: always
     networks:
       - nc_network
@@ -85,6 +90,11 @@ services:
       - TZ=Europe/Warsaw
       - DJANGO_ENV=prod
       - DEPLOYMENT_COLOR=green
+      # Tabu: interpolacja przy `docker compose up` + domyślny host TCP w Dockerze
+      - TABU_DB_HOST=${TABU_DB_HOST:-postgres}
+      - TABU_DB_PORT=${TABU_DB_PORT:-5432}
+      - TABU_DB_NAME=${TABU_DB_NAME:-tabu}
+      - TABU_DB_USER=${TABU_DB_USER:-pawel}
     restart: always
     networks:
       - nc_network
@@ -227,6 +237,10 @@ services:
       - TZ=Europe/Warsaw
       - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
+      - TABU_DB_HOST=${TABU_DB_HOST:-postgres}
+      - TABU_DB_PORT=${TABU_DB_PORT:-5432}
+      - TABU_DB_NAME=${TABU_DB_NAME:-tabu}
+      - TABU_DB_USER=${TABU_DB_USER:-pawel}
     depends_on:
       - redis
     restart: always
