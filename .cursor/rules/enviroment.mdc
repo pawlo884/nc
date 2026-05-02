@@ -7,7 +7,7 @@ alwaysApply: true
 # Reguły środowiska dla projektu NC
 
 ## Architektura projektu
-- **Framework**: Django 5.2.4 z PostgreSQL
+- **Framework**: Django 5.2.13 z PostgreSQL
 - **Bazy danych**: 5 baz PostgreSQL (zzz_default, zzz_matterhorn, zzz_MPD, zzz_web_agent, zzz_matterhorn1)
 - **Cache/Broker**: Redis
 - **Task Queue**: Celery z django-celery-beat
