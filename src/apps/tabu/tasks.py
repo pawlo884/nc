@@ -3,6 +3,7 @@ Taski Celery dla aplikacji Tabu.
 """
 from celery import shared_task
 from celery.utils.log import get_task_logger
+from django.core.cache import cache
 from django.core.management import call_command
 from django.utils import timezone
 from datetime import timedelta
@@ -26,27 +27,42 @@ def sync_tabu_stock(self):
     from tabu.models import ApiSyncLog
     from django.db import router
 
-    db = router.db_for_read(ApiSyncLog)
-    last_sync = (
-        ApiSyncLog.objects.using(db)
-        .filter(sync_type__in=('stock_update', 'stock_full'))
-        .order_by('-started_at')
-        .values('started_at')
-        .first()
-    )
-    if last_sync and last_sync.get('started_at'):
-        update_from = last_sync['started_at'].strftime('%Y-%m-%d %H:%M:%S')
-    else:
-        update_from = (
-            timezone.now() - timedelta(hours=24)
-        ).strftime('%Y-%m-%d %H:%M:%S')
+    lock_key = 'tabu:lock:sync_tabu_stock'
+    lock_ttl_seconds = 3 * 60 * 60  # 3h awaryjnie (przy crashu lock sam wygaśnie)
+    lock_value = f'{self.request.id}'
 
+    # cache.add działa atomowo: tylko pierwszy task ustawi lock.
+    if not cache.add(lock_key, lock_value, timeout=lock_ttl_seconds):
+        logger.warning(
+            'Pomijam sync_tabu_stock: poprzedni task nadal trwa (lock aktywny).'
+        )
+        return {'status': 'skipped', 'reason': 'already_running'}
+
+    db = router.db_for_read(ApiSyncLog)
     try:
+        last_sync = (
+            ApiSyncLog.objects.using(db)  # type: ignore[attr-defined]
+            .filter(sync_type__in=('stock_update', 'stock_full'))
+            .order_by('-started_at')
+            .values('started_at')
+            .first()
+        )
+        if last_sync and last_sync.get('started_at'):
+            update_from = last_sync['started_at'].strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            update_from = (
+                timezone.now() - timedelta(hours=24)
+            ).strftime('%Y-%m-%d %H:%M:%S')
+
         call_command('sync_tabu_stock', '--update-from', update_from)
         return {'status': 'ok', 'update_from': update_from}
     except Exception as exc:
         logger.exception(f'Błąd synchronizacji stanów Tabu: {exc}')
         raise self.retry(exc=exc)
+    finally:
+        # Zwolnij lock tylko jeśli nadal należy do tego taska.
+        if cache.get(lock_key) == lock_value:
+            cache.delete(lock_key)
 
 
 @shared_task(
@@ -64,10 +80,7 @@ def sync_tabu_products_update(self):
     Wywoływany co kilka godzin (np. 4h).
     """
     try:
-        call_command(
-            'sync_tabu_new_products',
-            stop_after_404=5,
-        )
+        call_command('sync_tabu_new_products')
         return {'status': 'ok'}
     except Exception as exc:
         logger.exception(f'Błąd sprawdzania nowych produktów Tabu: {exc}')

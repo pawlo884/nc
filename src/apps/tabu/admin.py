@@ -7,7 +7,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db import connections
-from django.utils import timezone
+from django.db.models import OuterRef, Subquery
 from django.utils.html import format_html
 from rapidfuzz import fuzz
 
@@ -109,7 +109,7 @@ class TabuProductVariantInline(admin.TabularInline):
 @admin.register(TabuProduct)
 class TabuProductAdmin(admin.ModelAdmin):
     list_display = [
-        'api_id', 'name', 'brand', 'category', 'symbol', 'price_gross',
+        'product_image_thumbnail', 'api_id', 'name', 'brand', 'category', 'symbol', 'price_gross',
         'store_total', 'is_mapped_mpd', 'last_update'
     ]
     list_display_links = ['api_id', 'name']
@@ -454,8 +454,50 @@ class TabuProductAdmin(admin.ModelAdmin):
         return '-'
     image_preview.short_description = 'Podgląd'
 
+    def product_image_thumbnail(self, obj):
+        """Wyświetl miniaturę zdjęcia produktu na liście."""
+        original_url = getattr(obj, 'image_url', None) or getattr(obj, 'first_gallery_image_url', None)
+        if not original_url:
+            return '-'
+
+        normalized_url = str(original_url).strip()
+        if not normalized_url:
+            return '-'
+
+        if normalized_url.startswith(('http://', 'https://')):
+            display_url = normalized_url
+        elif normalized_url.startswith('//'):
+            display_url = f'https:{normalized_url}'
+        else:
+            display_url = f'https://tabu.com.pl/{normalized_url.lstrip("/")}'
+
+        return format_html(
+            '<a href="{}" target="_blank" title="{}">'
+            '<img src="{}" alt="Obraz produktu" loading="lazy" width="56" height="56" '
+            'style="object-fit: contain; width: 56px; height: 56px; max-width: 56px; max-height: 56px;" '
+            'onerror="this.onerror=null; this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiBmaWxsPSIjZWVlIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSI4IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+YnJhayB6ZGo8L3RleHQ+PC9zdmc+\';" />'
+            '</a>',
+            display_url,
+            normalized_url,
+            display_url,
+        )
+    product_image_thumbnail.short_description = 'Zdjęcie'
+
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related('brand', 'category')
+        first_gallery_image_subquery = (
+            TabuProductImage.objects.filter(
+                product_id=OuterRef('pk')
+            )
+            .order_by('-is_main', 'order', 'id')
+            .values('image_url')[:1]
+        )
+
+        return (
+            super()
+            .get_queryset(request)
+            .select_related('brand', 'category')
+            .annotate(first_gallery_image_url=Subquery(first_gallery_image_subquery))
+        )
 
 
 @admin.register(TabuProductVariant)
