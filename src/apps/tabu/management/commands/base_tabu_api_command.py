@@ -4,8 +4,12 @@ API Tabu: X-API-KEY, https://b2b.tabu.com.pl/api/v1
 """
 import json
 import logging
+import os
 import time
 from decimal import Decimal
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 import requests
 from django.conf import settings
@@ -75,13 +79,30 @@ class BaseTabuAPICommand(BaseCommand):
 
     def get_api_credentials(self, options):
         """Pobierz dane dostępowe do API"""
+        # Docker `env_file` odrzuca cały plik przy błędnej składni; montowany .env.prod + dotenv
+        # bywa bardziej tolerancyjny. Używamy os.environ po load_dotenv przed settings (settings ładuje się raz przy starcie).
+        base_dir = Path(getattr(settings, 'BASE_DIR', '/app'))
+        for env_path in (Path('/app/.env.prod'), base_dir / '.env.prod', base_dir / '.env'):
+            if env_path.is_file():
+                load_dotenv(env_path, override=True)
+                break
+
+        def _strip_env(s):
+            if not s:
+                return ''
+            t = str(s).strip().strip('"').strip("'")
+            return t
+
         self.api_base_url = (
             options.get('api_url')
-            or getattr(settings, 'TABU_API_BASE_URL', '')
+            or _strip_env(os.environ.get('TABU_API_BASE_URL', ''))
+            or _strip_env(getattr(settings, 'TABU_API_BASE_URL', '') or '')
             or ''
         ).strip().rstrip('/')
         self.api_key = (
-            options.get('api_key') or getattr(settings, 'TABU_API_KEY', '') or ''
+            options.get('api_key')
+            or _strip_env(os.environ.get('TABU_API_KEY', ''))
+            or _strip_env(getattr(settings, 'TABU_API_KEY', '') or '')
         )
 
         if not self.api_base_url:

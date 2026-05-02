@@ -43,6 +43,8 @@ W `.env.prod` muszą być ustawione: `TABU_DB_HOST`, `TABU_DB_PORT`, `TABU_DB_NA
 
 W `docker-compose/docker-compose.blue-green.yml` dla **web-blue**, **web-green** i **celery-default** są domyślne wartości interpolacji (`TABU_DB_HOST` itd.) — po `docker compose ... up -d` kontener dostanie poprawny host TCP nawet gdy wcześniej `HOST` był pusty. **Hasło** nadal musi pochodzić z `env_file` (`.env.prod`).
 
+**`TABU_API_KEY`:** ten sam plik `.env.prod` jest montowany do **`/app/.env.prod`** w kontenerach web/celery/flower. Komendy Tabu przy starcie wywołują `load_dotenv` na tym pliku (python-dotenv), żeby wczytać klucz nawet wtedy, gdy Docker `env_file` pominął część zmiennych z powodu wcześniejszej błędnej linii w pliku.
+
 ### 2. Migracje
 
 W kontenerze web (np. `nc-web-green`), katalog z `manage.py` to `/app`:
