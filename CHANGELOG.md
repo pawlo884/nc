@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.11.3 (2026-05-02)</small>
+
+* fix(tabu): lock na sync stanów, nowy check_range dla nowych produktów, miniatura w adminie ([10d751f](https://github.com/pawlo884/nc/commit/10d751f))
+
 ## <small>1.11.2 (2026-04-26)</small>
 
 * fix(matterhorn1/admin): dodaj miniatury na liście produktów ([e05a482](https://github.com/pawlo884/nc/commit/e05a482))
