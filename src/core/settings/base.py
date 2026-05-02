@@ -38,6 +38,17 @@ elif os.getenv('DJANGO_SETTINGS_MODULE', '').endswith('.prod'):
 else:
     load_dotenv()
 
+
+def _strip_env_value(value):
+    """Spacje + obwiednie cudzysłowy z wartości (Docker env_file bywa zwracał je dosłownie)."""
+    if value is None:
+        return ''
+    s = str(value).strip()
+    if len(s) >= 2 and s[0] in ('"', "'") and s[-1] == s[0]:
+        s = s[1:-1].strip()
+    return s
+
+
 # API URL configuration
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
 
@@ -46,11 +57,14 @@ MATTERHORN_API_URL = os.getenv(
     'MATTERHORN_API_URL', 'https://matterhorn.pl')
 MATTERHORN_API_USERNAME = os.getenv('MATTERHORN_API_USERNAME', '')
 MATTERHORN_API_PASSWORD = os.getenv('MATTERHORN_API_PASSWORD', '')
-MATTERHORN_API_KEY = os.getenv('MATTERHORN_API_KEY', '')
+MATTERHORN_API_KEY = _strip_env_value(os.getenv('MATTERHORN_API_KEY', ''))
 
 # Tabu API configuration (dokumentacja: https://b2b.tabu.com.pl/api/v1)
-TABU_API_BASE_URL = (os.getenv('TABU_API_BASE_URL') or 'https://b2b.tabu.com.pl/api/v1').strip().rstrip('/')
-TABU_API_KEY = os.getenv('TABU_API_KEY', '')
+TABU_API_BASE_URL = (
+    _strip_env_value(os.getenv('TABU_API_BASE_URL'))
+    or 'https://b2b.tabu.com.pl/api/v1'
+).rstrip('/')
+TABU_API_KEY = _strip_env_value(os.getenv('TABU_API_KEY', ''))
 
 # Konfiguracja logowania - tylko console logging
 LOGGING = {
