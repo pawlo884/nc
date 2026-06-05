@@ -14,7 +14,7 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
 # Explicit import tasków (force registration)
-app.autodiscover_tasks(['MPD', 'matterhorn1', 'web_agent', 'tabu'])
+app.autodiscover_tasks(['MPD', 'matterhorn1', 'web_agent', 'tabu', 'core'])
 
 # Konfiguracja tasków
 app.conf.update(
@@ -36,6 +36,7 @@ app.conf.task_routes = {
     'matterhorn1.tasks.*': {'queue': 'default'},
     'MPD.tasks.*': {'queue': 'default'},
     'tabu.tasks.*': {'queue': 'default'},
+    'core.tasks.*': {'queue': 'default'},
 }
 
 # Konfiguracja retry

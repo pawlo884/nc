@@ -553,3 +553,8 @@ if S3_BUCKET_NAME and S3_ACCESS_KEY and S3_SECRET_KEY:
                 'MEDIA_URL',
                 f"{AWS_S3_ENDPOINT_URL.rstrip('/')}/{AWS_STORAGE_BUCKET_NAME}/"
             )
+
+# Sentry – monitoring błędów i wydajności (aktywne tylko gdy SENTRY_DSN jest ustawiony)
+from core.sentry_config import init_sentry  # noqa: E402
+
+init_sentry()

@@ -22,7 +22,7 @@ from django.conf.urls.static import static
 from django.views.generic import TemplateView
 import os
 
-from core.views import index, health_check
+from core.views import index, health_check, sentry_debug
 
 # Import drf_spectacular tylko jeśli jest dostępny
 try:
@@ -64,6 +64,13 @@ urlpatterns += [
     path('api/web-agent/', include('web_agent.urls')),
     path('api/mpd/', include('MPD.api_urls')),
 ]
+
+if settings.DEBUG or os.getenv('SENTRY_DEBUG_ENDPOINT', '').lower() in (
+    '1', 'true', 'yes', 'on',
+):
+    urlpatterns += [
+        path('sentry-debug/', sentry_debug, name='sentry_debug'),
+    ]
 
 if settings.DEBUG:
     urlpatterns += [

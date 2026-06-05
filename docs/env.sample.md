@@ -76,3 +76,15 @@ REDIS_DB=
 # Celery Configuration
 CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}
 CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}
+
+# Sentry – monitoring błędów i dostępności serwera
+# DSN z: Sentry → Settings → Projects → Client Keys (DSN)
+SENTRY_DSN=
+SENTRY_ENVIRONMENT=production
+SENTRY_SEND_DEFAULT_PII=true
+# Testowy endpoint /sentry-debug/ (tylko gdy true lub DEBUG=True)
+SENTRY_DEBUG_ENDPOINT=false
+SENTRY_TRACES_SAMPLE_RATE=0.1
+SENTRY_PROFILES_SAMPLE_RATE=0
+# Opcjonalnie: wersja release (np. git commit SHA)
+SENTRY_RELEASE=
