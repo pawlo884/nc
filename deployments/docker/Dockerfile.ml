@@ -21,8 +21,7 @@ RUN groupadd -r celery && useradd -r -g celery -u 1001 celery
 WORKDIR /app
 
 # WARSTWA 1: Podstawowe zależności (cache rzadko się zmienia)
-# requirements.ci.txt - UTF-8, requirements.txt moze miec problemy z kodowaniem
-COPY src/requirements.ci.txt ./requirements.txt
+COPY src/requirements.txt ./requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --break-system-packages -r requirements.txt
 

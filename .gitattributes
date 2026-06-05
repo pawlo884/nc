@@ -15,8 +15,8 @@
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
 
-# CI requirements - pure UTF-8 for pip
-src/requirements.ci.txt text eol=lf
+# Requirements - UTF-8 bez BOM, LF dla pip/Docker
+src/requirements.txt text eol=lf
 
 # Binary files
 *.png binary
