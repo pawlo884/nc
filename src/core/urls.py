@@ -23,6 +23,7 @@ from django.views.generic import TemplateView
 import os
 
 from core.views import index, health_check
+from core.auth_views import CustomObtainAuthToken
 
 # Import drf_spectacular tylko jeśli jest dostępny
 try:
@@ -61,6 +62,7 @@ urlpatterns += i18n_patterns(
 
 # API URLs (bez i18n)
 urlpatterns += [
+    path('api/auth/token/', CustomObtainAuthToken.as_view(), name='api-auth-token'),
     path('api/web-agent/', include('web_agent.urls')),
     path('api/mpd/', include('MPD.api_urls')),
 ]

@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from .models import Products, ProductSet, ProductSetItem, ProductPaths, ProductAttribute
 from .models import Brands, Colors, Sizes, ProductVariants, ProductVariantsRetailPrice, ProductvariantsSources
-from .models import FabricComponent, ProductFabric, Attributes
+from .models import FabricComponent, ProductFabric, Attributes, ProductImage, StockAndPrices
 from django.http import JsonResponse
 from django.db import connections, transaction
 from django.utils import timezone
@@ -1058,48 +1058,78 @@ def get_product(request, product_id):
         return JsonResponse({'status': 'error', 'message': 'Tylko metoda GET jest obsługiwana'}, status=405)
 
     try:
-        # Sprawdź czy produkt istnieje
         try:
-            product = Products.objects.using('MPD').get(id=product_id)
+            product = Products.objects.using('MPD').select_related(
+                'brand', 'collection', 'series', 'season', 'unit',
+            ).get(id=product_id)
         except Products.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Produkt nie istnieje'}, status=404)
 
-        # Pobierz warianty
+        variants_qs = ProductVariants.objects.using('MPD').filter(
+            product_id=product_id,
+        ).select_related('color', 'size', 'producer_color').order_by('size__name', 'color__name')
+
+        variant_ids = [v.variant_id for v in variants_qs]
+        stock_by_variant = {}
+        if variant_ids:
+            for stock in StockAndPrices.objects.using('MPD').filter(
+                variant_id__in=variant_ids,
+                source_id=2,
+            ):
+                stock_by_variant[stock.variant_id] = stock
+
         variants = []
-        for variant in product.productvariants_set.all():
+        for variant in variants_qs:
             first_pvs = ProductvariantsSources.objects.using('MPD').filter(
-                variant_id=variant.variant_id
+                variant_id=variant.variant_id,
             ).values_list('producer_code', flat=True).first()
+            stock = stock_by_variant.get(variant.variant_id)
             variant_data = {
                 'variant_id': variant.variant_id,
                 'color_id': variant.color_id,
+                'color_name': variant.color.name if variant.color else None,
+                'hex_code': variant.color.hex_code if variant.color else None,
                 'producer_color_id': variant.producer_color_id,
+                'producer_color_name': (
+                    variant.producer_color.name if variant.producer_color else None
+                ),
                 'size_id': variant.size_id,
+                'size_name': variant.size.name if variant.size else None,
                 'producer_code': first_pvs or '',
-                'exported_to_iai': variant.exported_to_iai
+                'exported_to_iai': variant.exported_to_iai,
+                'stock': stock.stock if stock else None,
+                'warehouse_price': float(stock.price) if stock else None,
             }
 
-            # Pobierz cenę jeśli istnieje
             try:
                 price = variant.productvariantsretailprice
                 variant_data['price'] = {
                     'retail_price': float(price.retail_price) if price.retail_price else None,
                     'vat': float(price.vat) if price.vat else None,
                     'currency': price.currency,
-                    'net_price': float(price.net_price) if price.net_price else None
+                    'net_price': float(price.net_price) if price.net_price else None,
                 }
             except Exception:
                 variant_data['price'] = None
 
             variants.append(variant_data)
 
-        # Pobierz ścieżki
         paths = list(ProductPaths.objects.using('MPD').filter(
             product_id=product_id).values_list('path_id', flat=True))
 
-        # Pobierz atrybuty
         attributes = list(ProductAttribute.objects.using('MPD').filter(
             product_id=product_id).values_list('attribute_id', flat=True))
+
+        images = [
+            {
+                'id': img.id,
+                'image_url': img.get_image_url(),
+                'file_path': img.file_path,
+            }
+            for img in ProductImage.objects.using('MPD').filter(
+                product_id=product_id,
+            ).order_by('id')
+        ]
 
         return JsonResponse({
             'status': 'success',
@@ -1109,15 +1139,23 @@ def get_product(request, product_id):
                 'description': product.description,
                 'short_description': product.short_description,
                 'brand_id': product.brand_id,
-                'unit_id': product.unit_id,
+                'brand_name': product.brand.name if product.brand else None,
+                'collection_id': product.collection_id,
+                'collection_name': product.collection.name if product.collection else None,
                 'series_id': product.series_id,
+                'series_name': product.series.name if product.series else None,
+                'season_id': product.season_id,
+                'season_name': product.season.name if product.season else None,
+                'unit_id': product.unit_id,
+                'unit_name': product.unit.name if product.unit else None,
                 'visibility': product.visibility,
                 'created_at': product.created_at.isoformat() if product.created_at else None,
                 'updated_at': product.updated_at.isoformat() if product.updated_at else None,
                 'variants': variants,
                 'paths': paths,
-                'attributes': attributes
-            }
+                'attributes': attributes,
+                'images': images,
+            },
         })
 
     except Exception as e:
