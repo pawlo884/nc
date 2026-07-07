@@ -12,7 +12,7 @@ from decimal import Decimal
 
 from django.db import router, transaction
 
-from tabu.models import TabuProduct, TabuProductVariant
+from tabu.models import ApiSyncLog, TabuProduct, TabuProductVariant
 from tabu.stock_tracker import track_stock_change
 
 from .base_tabu_api_command import BaseTabuAPICommand
@@ -94,6 +94,26 @@ class Command(BaseTabuAPICommand):
 
             self.stdout.write(f'   Pobrano {len(all_products)} rekordów (wariantów)')
 
+            if update_from and not dry_run and self._should_skip_processing(len(all_products)):
+                self.stdout.write(
+                    self.style.WARNING(
+                        '   Pomijam aktualizację: liczba rekordów jest taka sama jak poprzednio.'
+                    )
+                )
+                self.update_sync_log(
+                    products_processed=len(all_products),
+                    products_success=0,
+                    products_failed=0,
+                    raw_response={
+                        'stock_changes_logged': 0,
+                        'update_from': update_from,
+                        'skipped_reason': 'same_count_as_previous_run',
+                        'fetched_variants': len(all_products),
+                    },
+                )
+                self.complete_sync_log('completed')
+                return
+
             success_count = 0
             fail_count = 0
             history_count = 0
@@ -163,6 +183,28 @@ class Command(BaseTabuAPICommand):
             if not dry_run and self.sync_log:
                 self.complete_sync_log('failed', str(e))
             raise
+
+    def _should_skip_processing(self, fetched_count):
+        """
+        Pomija przetwarzanie stock_update, jeśli liczba pobranych rekordów
+        jest taka sama jak w poprzednim zakończonym uruchomieniu.
+        """
+        if not self.sync_log:
+            return False
+
+        previous_log = (
+            ApiSyncLog.objects
+            .filter(sync_type='stock_update', status='completed')
+            .exclude(pk=self.sync_log.pk)
+            .order_by('-started_at')
+            .only('products_processed')
+            .first()
+        )
+
+        if not previous_log:
+            return False
+
+        return previous_log.products_processed == fetched_count
 
     def _update_variant(self, api_variant):
         """
