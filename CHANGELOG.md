@@ -1,5 +1,13 @@
 # Zmiany
 
+## <small>1.11.4 (2026-07-07)</small>
+
+* Docker compose: wymuś TCP dla bazy Tabu (web + celery-default). ([7f677dd](https://github.com/pawlo884/nc/commit/7f677dd))
+* Merge pull request #43 from pawlo884/fix/tabu-stock-update-skip-same-count-clean ([c3f92a6](https://github.com/pawlo884/nc/commit/c3f92a6)), closes [#43](https://github.com/pawlo884/nc/issues/43)
+* Tabu API: load_dotenv z /app/.env.prod + mount pliku env w compose. ([cf100c5](https://github.com/pawlo884/nc/commit/cf100c5))
+* Tabu API: normalizacja wartości z env + dokumentacja składni env_file Dockera ([5596ea2](https://github.com/pawlo884/nc/commit/5596ea2))
+* fix(tabu): skip stock update processing when count unchanged ([d9942d1](https://github.com/pawlo884/nc/commit/d9942d1))
+
 ## <small>1.11.3 (2026-05-02)</small>
 
 * fix(tabu): lock na sync stanów, nowy check_range dla nowych produktów, miniatura w adminie ([10d751f](https://github.com/pawlo884/nc/commit/10d751f))
