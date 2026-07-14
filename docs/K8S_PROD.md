@@ -82,6 +82,17 @@ echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
 
 Kolejne wersje: tylko merge + tag — reszta robi CI.
 
+## Flower (monitoring Celery)
+
+Manifest: `deployments/k8s/nc-prod/flower.yaml` (Deployment + Service + Ingress).
+
+- **Broker:** Redis w klastrze (`redis` w `nc-prod`) — te same workery co `celery-default` / `celery-import`
+- **Auth:** `FLOWER_USER` / `FLOWER_PASSWORD` z `.env.prod` (domyslnie admin/flower jak w blue-green)
+- **URL:** `https://flower.nc.sowa.ch` — w NPM dodaj Proxy Host -> IP VPS, port 80 (Traefik), host `flower.nc.sowa.ch`
+- **Lokalnie na serwerze:** `kubectl port-forward -n nc-prod svc/flower 5555:5555`
+
+Po deployu zatrzymaj stary Docker Flower: `docker stop nc-flower`
+
 Rollback:
 
 ```bash

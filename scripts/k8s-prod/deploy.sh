@@ -39,6 +39,7 @@ echo "=== Apply manifestow nc-prod ==="
 kubectl apply -f "$MANIFEST_DIR/redis.yaml"
 kubectl apply -f "$MANIFEST_DIR/web.yaml"
 kubectl apply -f "$MANIFEST_DIR/celery.yaml"
+kubectl apply -f "$MANIFEST_DIR/flower.yaml"
 kubectl apply -f "$MANIFEST_DIR/ingress.yaml"
 
 if [[ "$RUN_MIGRATE" == true ]]; then
@@ -57,7 +58,7 @@ else
   echo "Pierwszy deploy — czekam na utworzenie deployment nc-web..."
   kubectl rollout status deployment/nc-web -n nc-prod --timeout=600s
 fi
-kubectl rollout restart deployment/celery-default deployment/celery-import deployment/celery-beat -n nc-prod 2>/dev/null || true
+kubectl rollout restart deployment/celery-default deployment/celery-import deployment/celery-beat deployment/flower -n nc-prod 2>/dev/null || true
 
 POD_COUNT="$(kubectl get pods -n nc-prod --no-headers 2>/dev/null | wc -l | tr -d ' ')"
 if [[ "${POD_COUNT:-0}" -lt 1 ]]; then
