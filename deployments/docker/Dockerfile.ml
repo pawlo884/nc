@@ -40,6 +40,7 @@ COPY src/core/ ./core/
 COPY src/apps/matterhorn1/ ./matterhorn1/
 COPY src/apps/MPD/ ./MPD/
 COPY src/apps/web_agent/ ./web_agent/
+COPY src/apps/tabu/ ./tabu/
 COPY deployments/nginx/nginx.conf ./nginx.conf
 COPY deployments/redis.conf ./redis.conf
 COPY package.json .
