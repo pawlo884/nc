@@ -11,27 +11,5 @@
     <ul>
         <li><a href="/admin/">Admin Panel</a></li>
     </ul>
-    <hr>
-    <h2>JavaScript Playground (dev)</h2>
-    <p>To jest bezpieczne miejsce do nauki JavaScript – modyfikuj ten kod w szablonie <code>index.html</code>.</p>
-    <div>
-        <label for="js-playground-input">Wpisz tekst:</label>
-        <input id="js-playground-input" type="text" placeholder="np. Hello JS">
-        <button id="js-playground-button">Pokaż w wynikach</button>
-    </div>
-    <div id="js-playground-output"></div>
-
-    <script>
-        const input = document.getElementById('js-playground-input');
-        const button = document.getElementById('js-playground-button');
-        const output = document.getElementById('js-playground-output');
-
-        if (button && input && output) {
-            button.addEventListener('click', () => {
-                const value = input.value || 'Brak treści';
-                output.textContent = `Wynik z JS: ${value}`;
-            });
-        }
-    </script>
 </body>
 </html>

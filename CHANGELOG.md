@@ -1,5 +1,11 @@
 # Zmiany
 
+## <small>1.11.5 (2026-07-14)</small>
+
+* fix(docker): dodaj aplikację tabu do obrazu produkcyjnego ([0eac617](https://github.com/pawlo884/nc/commit/0eac617))
+* ci: upgrade checkout and setup-node to v5 for Node.js 24 ([508379f](https://github.com/pawlo884/nc/commit/508379f))
+* chore: usun JavaScript Playground ze strony glownej ([23c43ce](https://github.com/pawlo884/nc/commit/23c43ce))
+
 ## <small>1.11.4 (2026-07-07)</small>
 
 * Docker compose: wymuś TCP dla bazy Tabu (web + celery-default). ([7f677dd](https://github.com/pawlo884/nc/commit/7f677dd))
