@@ -1,5 +1,19 @@
 # Zmiany
 
+## 1.12.0 (2026-07-14)
+
+* fix(k8s): deduplikacja kluczy w .env.prod przy tworzeniu secretu ([e1a683a](https://github.com/pawlo884/nc/commit/e1a683a))
+* fix(k8s): deploy.sh automatycznie tworzy secret z .env.prod ([933052b](https://github.com/pawlo884/nc/commit/933052b))
+* fix(k8s): nadpisz REDIS_HOST i DB_HOST dla podow w nc-prod ([02bf75d](https://github.com/pawlo884/nc/commit/02bf75d))
+* fix(k8s): setup kubeconfig dla uzytkownika bez sudo kubectl ([ab97d0e](https://github.com/pawlo884/nc/commit/ab97d0e))
+* fix(k8s): ustaw bit wykonywalności na skryptach k8s-prod ([ce8430e](https://github.com/pawlo884/nc/commit/ce8430e))
+* fix(k8s): weryfikacja deployu i set -e w workflow SSH ([2fe3e70](https://github.com/pawlo884/nc/commit/2fe3e70))
+* ci: upgrade GitHub Actions to v6/v5 to fix punycode deprecation ([74b1f81](https://github.com/pawlo884/nc/commit/74b1f81))
+* ci(k8s): trigger deploy-vps on push to k8s-nc-test ([b322c7a](https://github.com/pawlo884/nc/commit/b322c7a))
+* chore(k8s): merge main przed deployem k3s ([04a1297](https://github.com/pawlo884/nc/commit/04a1297))
+* chore(npm): upgrade ESLint 9 and remove deprecated standard-version ([2b633d5](https://github.com/pawlo884/nc/commit/2b633d5))
+* feat(k8s): produkcja na k3s zamiast blue-green ([fee778f](https://github.com/pawlo884/nc/commit/fee778f))
+
 ## <small>1.11.5 (2026-07-14)</small>
 
 * fix(docker): dodaj aplikację tabu do obrazu produkcyjnego ([0eac617](https://github.com/pawlo884/nc/commit/0eac617))
