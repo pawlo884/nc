@@ -19,13 +19,23 @@ done
 
 cd "$REPO_ROOT"
 
+ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env.prod}"
+
+echo "=== Namespace nc-prod ==="
+kubectl apply -f "$MANIFEST_DIR/00-namespace.yaml"
+
 if ! kubectl get secret nc-env -n nc-prod &>/dev/null; then
-  echo "Brak secret nc-env — uruchom: ./scripts/k8s-prod/create-secret.sh"
-  exit 1
+  if [[ -f "$ENV_FILE" ]]; then
+    echo "Brak secret nc-env — tworze z $ENV_FILE..."
+    "$SCRIPT_DIR/create-secret.sh"
+  else
+    echo "Brak secret nc-env i brak pliku $ENV_FILE"
+    echo "Utworz .env.prod na serwerze, potem: ./scripts/k8s-prod/create-secret.sh"
+    exit 1
+  fi
 fi
 
 echo "=== Apply manifestow nc-prod ==="
-kubectl apply -f "$MANIFEST_DIR/00-namespace.yaml"
 kubectl apply -f "$MANIFEST_DIR/redis.yaml"
 kubectl apply -f "$MANIFEST_DIR/web.yaml"
 kubectl apply -f "$MANIFEST_DIR/celery.yaml"
