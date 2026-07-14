@@ -6,6 +6,8 @@ on:
   push:
     tags:
       - 'v*'  # Wszystkie tagi zaczynające się od 'v'
+    branches:
+      - k8s-nc-test  # tymczasowo: deploy k3s z brancha testowego
   # Ręczne wywołanie z UI (możesz wybrać tag lub branch)
   workflow_dispatch:
     inputs:
@@ -70,6 +72,9 @@ jobs:
             # Ręczne wywołanie - użyj podanego ref (tag lub branch)
             DEPLOY_REF="${{ github.event.inputs.ref }}"
             echo "🔧 Manual deployment: ${DEPLOY_REF}"
+          elif [ "${{ github.ref_type }}" = "branch" ]; then
+            DEPLOY_REF="${{ github.ref_name }}"
+            echo "🌿 Branch deployment: ${DEPLOY_REF}"
           else
             # Deployment z tagu - użyj tagu który wywołał workflow
             DEPLOY_REF="${{ github.ref_name }}"
