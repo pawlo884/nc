@@ -1,5 +1,9 @@
 # Zmiany
 
+## 1.13.0 (2026-07-14)
+
+* feat(k8s): dodaj Flower do nc-prod zamiast kontenera Docker ([72de808](https://github.com/pawlo884/nc/commit/72de808))
+
 ## <small>1.12.1 (2026-07-14)</small>
 
 * fix(k8s): ustaw bit wykonywalności na skryptach k8s-test ([6f966b4](https://github.com/pawlo884/nc/commit/6f966b4))
