@@ -96,18 +96,16 @@ jobs:
           echo "📌 Deploying: $(git rev-parse HEAD) ($(git log -1 --pretty=format:'%h - %s'))"
           
           export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
-          if [[ ! -f "$KUBECONFIG" ]] && [[ -f /etc/rancher/k3s/k3s.yaml ]]; then
-            mkdir -p "$HOME/.kube"
-            sudo k3s kubectl config view --raw > "$KUBECONFIG"
-            chmod 600 "$KUBECONFIG"
+          chmod +x scripts/k8s-prod/*.sh
+          if [[ ! -f "$KUBECONFIG" ]]; then
+            ./scripts/k8s-prod/setup-kubeconfig.sh
           fi
-          
+          export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
+
           if [[ ! -f .env.prod ]]; then
             echo "Brak .env.prod na serwerze — wymagany przed pierwszym deployem k3s."
             exit 1
           fi
-          
-          chmod +x scripts/k8s-prod/*.sh
           
           echo "=== k3s prod deploy (Traefik + repliki) ==="
           ./scripts/k8s-prod/create-secret.sh

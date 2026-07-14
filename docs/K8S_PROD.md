@@ -45,8 +45,17 @@ Domyslnie manifest uruchamia **Redis w klastrze** (`nc-prod`). Aby zostawic `nc-
 
 ```bash
 curl -sfL https://get.k3s.io | sh -
-sudo kubectl get nodes
+sudo k3s kubectl get nodes
+
+# kubectl dla uzytkownika pawel (bez sudo):
+chmod +x scripts/k8s-prod/setup-kubeconfig.sh
+./scripts/k8s-prod/setup-kubeconfig.sh
+echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
+export KUBECONFIG=$HOME/.kube/config
+kubectl get pods -n nc-prod
 ```
+
+Bez setupu: `sudo k3s kubectl get pods -n nc-prod` (dziala od razu).
 
 ## Workflow CI (automatyczny deploy)
 
@@ -61,7 +70,8 @@ Po merge → tag (`v*`) → GitHub Actions `deploy-vps.yml`:
 ```bash
 # k3s
 curl -sfL https://get.k3s.io | sh -
-mkdir -p ~/.kube && sudo k3s kubectl config view --raw > ~/.kube/config && chmod 600 ~/.kube/config
+./scripts/k8s-prod/setup-kubeconfig.sh
+echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
 
 # sudo bez hasla dla build-image (docker save | k3s ctr import) — np. w sudoers dla pawel
 # .env.prod — DB_HOST na IP hosta (patrz wyzej), reszta jak dotychczas
