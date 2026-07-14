@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=ensure-kubectl.sh
+source "$SCRIPT_DIR/ensure-kubectl.sh"
+
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env.prod}"
 
 if [[ ! -f "$ENV_FILE" ]]; then

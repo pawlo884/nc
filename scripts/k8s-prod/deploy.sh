@@ -3,7 +3,11 @@
 # Uzycie: ./scripts/k8s-prod/deploy.sh [--migrate]
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=ensure-kubectl.sh
+source "$SCRIPT_DIR/ensure-kubectl.sh"
+
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MANIFEST_DIR="$REPO_ROOT/deployments/k8s/nc-prod"
 RUN_MIGRATE=false
 
@@ -36,9 +40,21 @@ if [[ "$RUN_MIGRATE" == true ]]; then
 fi
 
 echo "=== Rollout nc-web ==="
-kubectl rollout restart deployment/nc-web -n nc-prod
-kubectl rollout status deployment/nc-web -n nc-prod --timeout=600s
+if kubectl get deployment nc-web -n nc-prod &>/dev/null; then
+  kubectl rollout restart deployment/nc-web -n nc-prod
+  kubectl rollout status deployment/nc-web -n nc-prod --timeout=600s
+else
+  echo "Pierwszy deploy — czekam na utworzenie deployment nc-web..."
+  kubectl rollout status deployment/nc-web -n nc-prod --timeout=600s
+fi
 kubectl rollout restart deployment/celery-default deployment/celery-import deployment/celery-beat -n nc-prod 2>/dev/null || true
+
+POD_COUNT="$(kubectl get pods -n nc-prod --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+if [[ "${POD_COUNT:-0}" -lt 1 ]]; then
+  echo "BLAD: Brak podow w nc-prod po deploy!"
+  kubectl get events -n nc-prod --sort-by='.lastTimestamp' | tail -20
+  exit 1
+fi
 
 echo ""
 kubectl get pods,svc,ingress -n nc-prod

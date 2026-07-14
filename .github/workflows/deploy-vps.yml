@@ -60,6 +60,7 @@ jobs:
         timeout: 60s
         command_timeout: 20m
         script: |
+          set -euo pipefail
           echo "🚀 Starting deployment..."
           
           # Aktualizuj kod aplikacji
@@ -113,7 +114,13 @@ jobs:
           ./scripts/k8s-prod/deploy.sh --migrate
           
           echo "=== Status nc-prod ==="
-          kubectl get pods,ingress -n nc-prod
-          curl -sf -H "Host: nc.sowa.ch" http://127.0.0.1/health/ && echo " health OK" || echo " health check failed (sprawdz NPM/Traefik)"
+          kubectl get pods,ingress,deployments -n nc-prod
+          POD_COUNT="$(kubectl get pods -n nc-prod --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+          if [[ "${POD_COUNT:-0}" -lt 1 ]]; then
+            echo "❌ Brak podow w nc-prod — deploy nieudany!"
+            kubectl get events -n nc-prod --sort-by='.lastTimestamp' | tail -20
+            exit 1
+          fi
+          curl -sf -H "Host: nc.sowa.ch" http://127.0.0.1/health/ && echo " health OK" || echo "⚠️ health check failed (sprawdz NPM/Traefik)"
           
           echo "✅ Deployment completed!"
