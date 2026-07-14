@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.13.1 (2026-07-14)</small>
+
+* fix(k8s): usun sowa.ch z Ingress prod — tylko nc.sowa.ch ([744757c](https://github.com/pawlo884/nc/commit/744757c))
+
 ## 1.13.0 (2026-07-14)
 
 * feat(k8s): dodaj Flower do nc-prod zamiast kontenera Docker ([72de808](https://github.com/pawlo884/nc/commit/72de808))
