@@ -20,13 +20,3 @@ spec:
                 name: nc-web
                 port:
                   number: 8000
-    - host: sowa.ch
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: nc-web
-                port:
-                  number: 8000
