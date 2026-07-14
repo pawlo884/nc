@@ -1,0 +1,32 @@
+# Traefik Ingress — zamiast nginx-router + blue-green
+# NPM: Forward nc.sowa.ch -> IP serwera k3s (port 80/443 Traefik)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nc-web
+  namespace: nc-prod
+  labels:
+    app: nc-web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: nc.sowa.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nc-web
+                port:
+                  number: 8000
+    - host: sowa.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nc-web
+                port:
+                  number: 8000

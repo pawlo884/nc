@@ -90,64 +90,27 @@ jobs:
           
           echo "📌 Deploying: $(git rev-parse HEAD) ($(git log -1 --pretty=format:'%h - %s'))"
           
-          # Ustaw uprawnienia dla katalogów migrations (potrzebne dla makemigrations w kontenerze)
-          echo "🔐 Ustawianie uprawnień dla katalogów migrations..."
-          find . -type d -name migrations -exec chmod 755 {} \; 2>/dev/null || true
-          find . -type f -path "*/migrations/*.py" -exec chmod 644 {} \; 2>/dev/null || true
-          
-          # Blue-Green Deployment - Zero Downtime
-          echo "🔵🟢 Starting Blue-Green Deployment..."
-          export DOCKER_BUILDKIT=1
-          export COMPOSE_DOCKER_CLI_BUILD=1
-          export ENVIRONMENT=prod
-          
-          # Nadaj uprawnienia wykonywania dla skryptu
-          chmod +x scripts/deploy/deploy-blue-green.sh
-          
-          # Wykonaj blue-green deployment
-          ./scripts/deploy/deploy-blue-green.sh deploy
-          
-          # Pokaż status po deploy
-          echo "📊 Deployment status:"
-          ./scripts/deploy/deploy-blue-green.sh status
-          
-          # Czekaj aż kontener się uruchomi
-          echo "⏳ Waiting for containers to be ready..."
-          sleep 20
-          
-          # Migracje są już w komendzie startowej web, ale sprawdzamy czy się wykonały
-          echo "🔄 Checking if migrations completed..."
-          
-          # Sprawdź status kontenerów blue-green
-          echo "📊 Container status (Blue-Green):"
-          docker-compose -f docker-compose/docker-compose.blue-green.yml ps || echo "⚠️ Could not get status!"
-          
-          # Sprawdź który environment jest aktywny
-          ACTIVE_ENV=$(./scripts/deploy/deploy-blue-green.sh status | grep "🔀 Active environment:" | awk '{print $4}')
-          echo "🔀 Active environment: ${ACTIVE_ENV}"
-          
-          # Jeśli nie ma aktywnego environment, sprawdź kontenery
-          if [ -z "$ACTIVE_ENV" ] || [ "$ACTIVE_ENV" = "" ]; then
-            echo "⚠️ Nie można wykryć aktywnego environment, sprawdzam kontenery..."
-            if docker ps --format '{{.Names}}' | grep -q "nc-web-blue"; then
-              ACTIVE_ENV="blue"
-            elif docker ps --format '{{.Names}}' | grep -q "nc-web-green"; then
-              ACTIVE_ENV="green"
-            else
-              echo "❌ Żaden environment nie działa!"
-              exit 1
-            fi
+          export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
+          if [[ ! -f "$KUBECONFIG" ]] && [[ -f /etc/rancher/k3s/k3s.yaml ]]; then
+            mkdir -p "$HOME/.kube"
+            sudo k3s kubectl config view --raw > "$KUBECONFIG"
+            chmod 600 "$KUBECONFIG"
           fi
           
-          # Sprawdź migracje i bazę danych na aktywnym kontenerze
-          echo "🗄️ Checking database migrations..."
-          docker exec nc-web-${ACTIVE_ENV} python manage.py showmigrations --settings=core.settings.prod || echo "⚠️ Could not check migrations"
+          if [[ ! -f .env.prod ]]; then
+            echo "Brak .env.prod na serwerze — wymagany przed pierwszym deployem k3s."
+            exit 1
+          fi
           
-          # Sprawdź czy baza jest pusta (czy są tabele)
-          echo "📋 Checking if database is initialized..."
-          docker exec nc-web-${ACTIVE_ENV} python manage.py shell --settings=core.settings.prod -c "from django.db import connection; print('Tables:', connection.introspection.table_names())" || echo "⚠️ Could not check database"
+          chmod +x scripts/k8s-prod/*.sh
           
-          echo "📋 Recent logs (active web):"
-          docker logs nc-web-${ACTIVE_ENV} --tail 50 || echo "⚠️ Could not get logs"
+          echo "=== k3s prod deploy (Traefik + repliki) ==="
+          ./scripts/k8s-prod/create-secret.sh
+          ./scripts/k8s-prod/build-image.sh
+          ./scripts/k8s-prod/deploy.sh --migrate
+          
+          echo "=== Status nc-prod ==="
+          kubectl get pods,ingress -n nc-prod
+          curl -sf -H "Host: nc.sowa.ch" http://127.0.0.1/health/ && echo " health OK" || echo " health check failed (sprawdz NPM/Traefik)"
           
           echo "✅ Deployment completed!"

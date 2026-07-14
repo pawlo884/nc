@@ -1,0 +1,93 @@
+# Django web — 3 repliki, RollingUpdate (zamiast blue-green)
+# Wymaga: Secret nc-env (scripts/k8s-prod/create-secret.sh)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nc-web
+  namespace: nc-prod
+  labels:
+    app: nc-web
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: nc-web
+  template:
+    metadata:
+      labels:
+        app: nc-web
+    spec:
+      containers:
+        - name: web
+          image: nc-django-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - >
+              gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 2
+              --worker-class sync --timeout 300 --keep-alive 5
+              --max-requests 1000 --max-requests-jitter 100 --preload
+              --access-logfile - --error-logfile - --log-level warning
+              --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: core.settings.prod
+            - name: TZ
+              value: Europe/Warsaw
+            - name: DJANGO_ENV
+              value: prod
+          envFrom:
+            - secretRef:
+                name: nc-env
+          readinessProbe:
+            httpGet:
+              path: /health/
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: nc.sowa.ch
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: nc.sowa.ch
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nc-web
+  namespace: nc-prod
+  labels:
+    app: nc-web
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  selector:
+    app: nc-web
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
