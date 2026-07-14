@@ -35,9 +35,28 @@ spec:
               value: prod
             - name: CELERY_STATE_DB
               value: /var/lib/celery/worker_state_default
+            - name: REDIS_HOST
+              value: redis
+            - name: CELERY_BROKER_URL
+              value: ""
+            - name: CELERY_RESULT_BACKEND
+              value: ""
+            - name: DEFAULT_DB_HOST
+              value: host.k3s.internal
+            - name: MPD_DB_HOST
+              value: host.k3s.internal
+            - name: MATTERHORN1_DB_HOST
+              value: host.k3s.internal
+            - name: WEB_AGENT_DB_HOST
+              value: host.k3s.internal
+            - name: TABU_DB_HOST
+              value: host.k3s.internal
           envFrom:
             - secretRef:
                 name: nc-env
+          volumeMounts:
+            - name: celery-state
+              mountPath: /var/lib/celery
           resources:
             requests:
               cpu: 200m
@@ -45,6 +64,9 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+      volumes:
+        - name: celery-state
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -83,9 +105,28 @@ spec:
               value: prod
             - name: CELERY_STATE_DB
               value: /var/lib/celery/worker_state_import
+            - name: REDIS_HOST
+              value: redis
+            - name: CELERY_BROKER_URL
+              value: ""
+            - name: CELERY_RESULT_BACKEND
+              value: ""
+            - name: DEFAULT_DB_HOST
+              value: host.k3s.internal
+            - name: MPD_DB_HOST
+              value: host.k3s.internal
+            - name: MATTERHORN1_DB_HOST
+              value: host.k3s.internal
+            - name: WEB_AGENT_DB_HOST
+              value: host.k3s.internal
+            - name: TABU_DB_HOST
+              value: host.k3s.internal
           envFrom:
             - secretRef:
                 name: nc-env
+          volumeMounts:
+            - name: celery-state
+              mountPath: /var/lib/celery
           resources:
             requests:
               cpu: 200m
@@ -93,6 +134,9 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+      volumes:
+        - name: celery-state
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -126,6 +170,22 @@ spec:
               value: Europe/Warsaw
             - name: DJANGO_ENV
               value: prod
+            - name: REDIS_HOST
+              value: redis
+            - name: CELERY_BROKER_URL
+              value: ""
+            - name: CELERY_RESULT_BACKEND
+              value: ""
+            - name: DEFAULT_DB_HOST
+              value: host.k3s.internal
+            - name: MPD_DB_HOST
+              value: host.k3s.internal
+            - name: MATTERHORN1_DB_HOST
+              value: host.k3s.internal
+            - name: WEB_AGENT_DB_HOST
+              value: host.k3s.internal
+            - name: TABU_DB_HOST
+              value: host.k3s.internal
           envFrom:
             - secretRef:
                 name: nc-env
