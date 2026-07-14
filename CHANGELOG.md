@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.12.1 (2026-07-14)</small>
+
+* fix(k8s): ustaw bit wykonywalności na skryptach k8s-test ([6f966b4](https://github.com/pawlo884/nc/commit/6f966b4))
+
 ## 1.12.0 (2026-07-14)
 
 * fix(k8s): deduplikacja kluczy w .env.prod przy tworzeniu secretu ([e1a683a](https://github.com/pawlo884/nc/commit/e1a683a))
