@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.13.3 (2026-07-15)</small>
+
+* fix(MPD): idempotentne usuniecie iai_product_id w 0016 ([b84ea3f](https://github.com/pawlo884/nc/commit/b84ea3f))
+
 ## <small>1.13.2 (2026-07-15)</small>
 
 * fix(MPD): idempotentny drop unique_together w 0015 dla product_path ([afb34aa](https://github.com/pawlo884/nc/commit/afb34aa))
