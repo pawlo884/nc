@@ -50,16 +50,6 @@ spec:
               value: ""
             - name: CELERY_RESULT_BACKEND
               value: ""
-            - name: DEFAULT_DB_HOST
-              value: host.k3s.internal
-            - name: MPD_DB_HOST
-              value: host.k3s.internal
-            - name: MATTERHORN1_DB_HOST
-              value: host.k3s.internal
-            - name: WEB_AGENT_DB_HOST
-              value: host.k3s.internal
-            - name: TABU_DB_HOST
-              value: host.k3s.internal
           envFrom:
             - secretRef:
                 name: nc-env

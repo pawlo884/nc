@@ -103,6 +103,8 @@ jobs:
           fi
           export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
 
+          ./scripts/k8s-prod/expose-traefik.sh
+
           if [[ ! -f .env.prod ]]; then
             echo "Brak .env.prod na serwerze — wymagany przed pierwszym deployem k3s."
             exit 1

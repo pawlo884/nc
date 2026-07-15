@@ -34,6 +34,8 @@ TABU_DB_HOST=172.17.0.1
 
 Porty jak dotychczas (`5432`).
 
+**Hosty DB w `.env.prod`:** ustaw IP hosta VPS (np. `172.17.0.1`), nie `host.k3s.internal` — ten DNS nie dziala na kazdym k3s. Manifesty nadpisuja tylko `REDIS_HOST=redis`; reszta DB_HOST idzie z secretu `nc-env`.
+
 ## Redis
 
 Domyslnie manifest uruchamia **Redis w klastrze** (`nc-prod`). Aby zostawic `nc-redis-1` z Docker:
@@ -76,9 +78,12 @@ echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
 # sudo bez hasla dla build-image (docker save | k3s ctr import) — np. w sudoers dla pawel
 # .env.prod — DB_HOST na IP hosta (patrz wyzej), reszta jak dotychczas
 
-# cutover NPM (jednorazowo): nc.sowa.ch -> Traefik :80 zamiast nc-nginx-router
+# cutover NPM (jednorazowo): nc.sowa.ch -> Traefik :30080 zamiast nc-nginx-router
 ./scripts/k8s-prod/cutover-from-blue-green.sh
+./scripts/k8s-prod/expose-traefik.sh
 ```
+
+**NPM Proxy Host `nc.sowa.ch`:** Forward → IP serwera (np. `192.168.50.31`), port **30080** (Traefik NodePort). Bez tego NPM dostaje 504.
 
 Kolejne wersje: tylko merge + tag — reszta robi CI.
 
@@ -89,6 +94,7 @@ Manifest: `deployments/k8s/nc-prod/flower.yaml` (Deployment + Service + Ingress)
 - **Broker:** Redis w klastrze (`redis` w `nc-prod`) — te same workery co `celery-default` / `celery-import`
 - **Auth:** `FLOWER_USER` / `FLOWER_PASSWORD` z `.env.prod` (domyslnie admin/flower jak w blue-green)
 - **URL:** `https://flower.nc.sowa.ch` — w NPM dodaj Proxy Host -> IP VPS, port 80 (Traefik), host `flower.nc.sowa.ch`
+- **Service w k3s:** `nc-flower` (nie `flower` — kolizja zmiennych K8s `FLOWER_PORT`)
 - **Lokalnie na serwerze:** `kubectl port-forward -n nc-prod svc/flower 5555:5555`
 
 Po deployu zatrzymaj stary Docker Flower: `docker stop nc-flower`

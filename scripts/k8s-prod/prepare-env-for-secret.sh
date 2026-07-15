@@ -37,6 +37,28 @@ prepare_env_for_k8s_secret() {
   ' "$src" > "$dst"
 }
 
+# Zamienia hosty docker-compose (postgres) na IP bramki hosta dla podow k3s
+remap_k8s_db_hosts() {
+  local file="$1"
+  local gateway="${K8S_HOST_GATEWAY:-172.17.0.1}"
+  local tmp
+  tmp="$(mktemp)"
+
+  awk -v gw="$gateway" '
+    /^[A-Za-z_][A-Za-z0-9_]*=/ {
+      eq = index($0, "=")
+      key = substr($0, 1, eq - 1)
+      val = substr($0, eq + 1)
+      if (key ~ /_DB_HOST$/ && (val == "postgres" || val == "nc-postgres-1")) {
+        print key "=" gw
+        next
+      }
+    }
+    { print }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+}
+
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   if [[ $# -ne 2 ]]; then
     echo "Uzycie: $0 <src.env> <dst.env>"

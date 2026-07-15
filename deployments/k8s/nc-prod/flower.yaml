@@ -1,5 +1,6 @@
 # Flower — monitoring Celery (zamiast nc-flower w Docker blue-green)
 # Wymaga: Secret nc-env (FLOWER_USER, FLOWER_PASSWORD, REDIS_PASSWORD)
+# Uwaga: Service musi nazywac sie nc-flower — K8s wstrzykuje FLOWER_* dla Service "flower"
 # Dostep: Ingress flower.nc.sowa.ch (NPM -> Traefik :80) lub port-forward
 apiVersion: apps/v1
 kind: Deployment
@@ -18,6 +19,7 @@ spec:
       labels:
         app: flower
     spec:
+      enableServiceLinks: false
       containers:
         - name: flower
           image: nc-django-app:latest
@@ -48,16 +50,6 @@ spec:
               value: ""
             - name: CELERY_RESULT_BACKEND
               value: ""
-            - name: DEFAULT_DB_HOST
-              value: host.k3s.internal
-            - name: MPD_DB_HOST
-              value: host.k3s.internal
-            - name: MATTERHORN1_DB_HOST
-              value: host.k3s.internal
-            - name: WEB_AGENT_DB_HOST
-              value: host.k3s.internal
-            - name: TABU_DB_HOST
-              value: host.k3s.internal
           envFrom:
             - secretRef:
                 name: nc-env
@@ -88,7 +80,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: flower
+  name: nc-flower
   namespace: nc-prod
   labels:
     app: flower
@@ -118,6 +110,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: flower
+                name: nc-flower
                 port:
                   number: 5555

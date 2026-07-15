@@ -7,7 +7,8 @@ metadata:
     app: nc-migrate
 spec:
   ttlSecondsAfterFinished: 600
-  backoffLimit: 2
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
   template:
     metadata:
       labels:
@@ -24,6 +25,14 @@ spec:
             - |
               set -e
               echo "Migracje nc-prod..."
+              python manage.py shell -c "
+              from django.db import connections
+              with connections['default'].cursor() as c:
+                  c.execute(
+                      \"DELETE FROM django_migrations WHERE app IN ('MPD', 'matterhorn1', 'web_agent', 'tabu')\"
+                  )
+                  print('Wyczyszczono bledne wpisy migracji aplikacji z bazy default')
+              "
               python manage.py migrate --database=default --noinput
               python manage.py migrate admin_interface --database=default --noinput
               python manage.py migrate matterhorn1 --database=matterhorn1 --noinput
@@ -44,16 +53,6 @@ spec:
               value: ""
             - name: CELERY_RESULT_BACKEND
               value: ""
-            - name: DEFAULT_DB_HOST
-              value: host.k3s.internal
-            - name: MPD_DB_HOST
-              value: host.k3s.internal
-            - name: MATTERHORN1_DB_HOST
-              value: host.k3s.internal
-            - name: WEB_AGENT_DB_HOST
-              value: host.k3s.internal
-            - name: TABU_DB_HOST
-              value: host.k3s.internal
           envFrom:
             - secretRef:
                 name: nc-env

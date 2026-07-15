@@ -2,7 +2,7 @@
 # Uzyj w sekcji containers[].env po envFrom.
 #
 # Redis: Service w namespace nc-prod
-# DB: host.k3s.internal = maszyna VPS (Docker z postgres)
+# DB: hosty z .env.prod (secret nc-env) — np. 172.17.0.1 dla postgres w Dockerze na VPS
 #
 # - name: REDIS_HOST
 #   value: redis
@@ -10,13 +10,3 @@
 #   value: ""
 # - name: CELERY_RESULT_BACKEND
 #   value: ""
-# - name: DEFAULT_DB_HOST
-#   value: host.k3s.internal
-# - name: MPD_DB_HOST
-#   value: host.k3s.internal
-# - name: MATTERHORN1_DB_HOST
-#   value: host.k3s.internal
-# - name: WEB_AGENT_DB_HOST
-#   value: host.k3s.internal
-# - name: TABU_DB_HOST
-#   value: host.k3s.internal

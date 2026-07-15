@@ -20,6 +20,7 @@ PREPARED_ENV="$(mktemp)"
 trap 'rm -f "$PREPARED_ENV"' EXIT
 
 prepare_env_for_k8s_secret "$ENV_FILE" "$PREPARED_ENV"
+remap_k8s_db_hosts "$PREPARED_ENV"
 
 kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 kubectl delete secret nc-env -n "$NAMESPACE" --ignore-not-found

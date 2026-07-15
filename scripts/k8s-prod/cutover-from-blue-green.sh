@@ -26,6 +26,7 @@ fi
 
 echo ""
 echo "=== Nastepny krok reczny w NPM ==="
-echo "1. Proxy Host nc.sowa.ch -> IP tego serwera, port 80 (Traefik k3s)"
-echo "2. Wylacz forward na nc-nginx-router"
-echo "3. Sprawdz https://nc.sowa.ch/health/"
+echo "1. Proxy Host nc.sowa.ch -> IP tego serwera, port 30080 (Traefik NodePort)"
+echo "2. Proxy Host flower.nc.sowa.ch -> ten sam IP, port 30080"
+echo "3. Wylacz forward na nc-nginx-router"
+echo "4. Sprawdz https://nc.sowa.ch/health/"

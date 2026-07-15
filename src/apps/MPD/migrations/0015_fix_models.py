@@ -10,6 +10,12 @@
 from django.db import migrations, models
 import django.db.models.deletion
 
+from ._legacy_pk_utils import MPD_LEGACY_PK_TABLES, ensure_primary_key_on_tables
+
+
+def ensure_legacy_primary_keys(apps, schema_editor):
+    ensure_primary_key_on_tables(schema_editor, MPD_LEGACY_PK_TABLES)
+
 
 class Migration(migrations.Migration):
 
@@ -18,6 +24,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(ensure_legacy_primary_keys, migrations.RunPython.noop),
         # 1. Rename Colors.parent_id field (ForeignKey was confusingly named with _id suffix)
         migrations.RenameField(
             model_name='colors',
