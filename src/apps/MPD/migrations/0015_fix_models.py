@@ -10,11 +10,19 @@
 from django.db import migrations, models
 import django.db.models.deletion
 
-from ._legacy_pk_utils import MPD_LEGACY_PK_TABLES, ensure_primary_key_on_tables
+from ._legacy_pk_utils import (
+    MPD_LEGACY_PK_TABLES,
+    drop_unique_constraints_on_table,
+    ensure_primary_key_on_tables,
+)
 
 
 def ensure_legacy_primary_keys(apps, schema_editor):
     ensure_primary_key_on_tables(schema_editor, MPD_LEGACY_PK_TABLES)
+
+
+def drop_product_path_unique_together(apps, schema_editor):
+    drop_unique_constraints_on_table(schema_editor, 'product_path')
 
 
 class Migration(migrations.Migration):
@@ -105,11 +113,8 @@ class Migration(migrations.Migration):
             new_name='product',
         ),
 
-        # 6a. ProductPaths: remove old unique_together (uses old field names)
-        migrations.AlterUniqueTogether(
-            name='productpaths',
-            unique_together=set(),
-        ),
+        # 6a. ProductPaths: remove old unique_together (legacy moze nie miec constraintu)
+        migrations.RunPython(drop_product_path_unique_together, migrations.RunPython.noop),
 
         # 6b. ProductPaths: product_id IntegerField -> ForeignKey
         migrations.AlterField(

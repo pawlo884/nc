@@ -44,6 +44,72 @@ def ensure_primary_key_on_tables(schema_editor, table_names):
             )
 
 
+def drop_unique_constraints_on_table(schema_editor, table_name):
+    if schema_editor.connection.alias != 'MPD':
+        return
+
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            DO $$
+            DECLARE r RECORD;
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = current_schema()
+                      AND table_name = '{table_name}'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                FOR r IN
+                    SELECT c.conname
+                    FROM pg_constraint c
+                    JOIN pg_class t ON c.conrelid = t.oid
+                    WHERE t.relname = '{table_name}' AND c.contype = 'u'
+                LOOP
+                    EXECUTE format(
+                        'ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS %I',
+                        r.conname
+                    );
+                END LOOP;
+            END $$;
+            """
+        )
+
+
+def ensure_unique_constraint(schema_editor, table_name, constraint_name, columns):
+    if schema_editor.connection.alias != 'MPD':
+        return
+
+    columns_sql = ', '.join(columns)
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = current_schema()
+                      AND table_name = '{table_name}'
+                ) THEN
+                    RETURN;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint c
+                    JOIN pg_class t ON c.conrelid = t.oid
+                    WHERE t.relname = '{table_name}' AND c.contype = 'u'
+                ) THEN
+                    ALTER TABLE {table_name}
+                    ADD CONSTRAINT {constraint_name}
+                    UNIQUE ({columns_sql});
+                END IF;
+            END $$;
+            """
+        )
+
+
 # Tabele MPD czesto bez PK w starym schemacie produkcyjnym
 MPD_LEGACY_PK_TABLES = [
     'attributes',
