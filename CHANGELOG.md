@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.13.2 (2026-07-15)</small>
+
+* fix(MPD): idempotentny drop unique_together w 0015 dla product_path ([afb34aa](https://github.com/pawlo884/nc/commit/afb34aa))
+* fix(k8s,MPD): migracje legacy PK, deploy bez 504 i Traefik NodePort ([ff85eb2](https://github.com/pawlo884/nc/commit/ff85eb2))
+
 ## <small>1.13.1 (2026-07-14)</small>
 
 * fix(k8s): usun sowa.ch z Ingress prod — tylko nc.sowa.ch ([744757c](https://github.com/pawlo884/nc/commit/744757c))
