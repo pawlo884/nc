@@ -110,6 +110,28 @@ def ensure_unique_constraint(schema_editor, table_name, constraint_name, columns
         )
 
 
+def drop_column_if_exists(schema_editor, table_name, column_name):
+    if schema_editor.connection.alias != 'MPD':
+        return
+
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = '{table_name}'
+                      AND column_name = '{column_name}'
+                ) THEN
+                    ALTER TABLE {table_name} DROP COLUMN {column_name};
+                END IF;
+            END $$;
+            """
+        )
+
+
 # Tabele MPD czesto bez PK w starym schemacie produkcyjnym
 MPD_LEGACY_PK_TABLES = [
     'attributes',

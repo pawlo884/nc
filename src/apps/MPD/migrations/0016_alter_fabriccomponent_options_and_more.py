@@ -2,6 +2,13 @@
 
 from django.db import migrations
 
+from ._legacy_pk_utils import drop_column_if_exists
+
+
+def remove_legacy_iai_product_id_columns(apps, schema_editor):
+    drop_column_if_exists(schema_editor, 'product_images', 'iai_product_id')
+    drop_column_if_exists(schema_editor, 'product_variants', 'iai_product_id')
+
 
 class Migration(migrations.Migration):
 
@@ -18,12 +25,21 @@ class Migration(migrations.Migration):
             name='productfabric',
             options={'managed': True},
         ),
-        migrations.RemoveField(
-            model_name='productimage',
-            name='iai_product_id',
+        migrations.RunPython(
+            remove_legacy_iai_product_id_columns,
+            migrations.RunPython.noop,
         ),
-        migrations.RemoveField(
-            model_name='productvariants',
-            name='iai_product_id',
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.RemoveField(
+                    model_name='productimage',
+                    name='iai_product_id',
+                ),
+                migrations.RemoveField(
+                    model_name='productvariants',
+                    name='iai_product_id',
+                ),
+            ],
         ),
     ]
