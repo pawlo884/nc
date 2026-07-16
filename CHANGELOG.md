@@ -1,5 +1,12 @@
 # Zmiany
 
+## <small>1.13.4 (2026-07-16)</small>
+
+* Merge pull request #44 from pawlo884/chore/django-upgrade-compat ([fe2abbd](https://github.com/pawlo884/nc/commit/fe2abbd)), closes [#44](https://github.com/pawlo884/nc/issues/44)
+* Merge pull request #45 from pawlo884/cursor/fix-admin-changelist-django6 ([80bca5b](https://github.com/pawlo884/nc/commit/80bca5b)), closes [#45](https://github.com/pawlo884/nc/issues/45)
+* fix(admin): napraw layout changelist po Django 6 ([5d95b31](https://github.com/pawlo884/nc/commit/5d95b31))
+* chore: upgrade Django 5.2.4 → 6.0.7 z poprawkami kompatybilności ([3be5179](https://github.com/pawlo884/nc/commit/3be5179))
+
 ## <small>1.13.3 (2026-07-15)</small>
 
 * fix(MPD): idempotentne usuniecie iai_product_id w 0016 ([b84ea3f](https://github.com/pawlo884/nc/commit/b84ea3f))
