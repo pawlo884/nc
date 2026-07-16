@@ -114,7 +114,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     # 'matterhorn',  # usunięta stara aplikacja
     'MPD',
-    'matterhorn1',
+    'matterhorn1.apps.Matterhorn1Config',
     'web_agent',
     'tabu',
 ]
