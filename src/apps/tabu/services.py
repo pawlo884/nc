@@ -53,11 +53,16 @@ def _saga_create_mpd_tabu(
         StockAndPrices,
         ProductImage,
     )
-    from core.db_routers import _get_mpd_db
+    from core.db_routers import _get_mpd_db, _get_tabu_db
     from django.utils import timezone
 
     mpd_db = _get_mpd_db()
-    tabu_product = TabuProduct.objects.select_related('brand').get(pk=tabu_product_id)
+    tabu_db = _get_tabu_db()
+    tabu_product = (
+        TabuProduct.objects.using(tabu_db)
+        .select_related('brand')
+        .get(pk=tabu_product_id)
+    )
 
     name = _post('mpd_name') or tabu_product.name or 'Produkt z Tabu'
     short_desc = _post('mpd_short_description') or (tabu_product.desc_short or '')
@@ -267,11 +272,16 @@ def _saga_update_tabu_mapping(
 ) -> None:
     """Krok 2 Sagi: zapisz mapowanie produktu i wariantów w Tabu."""
     from tabu.models import TabuProduct, TabuProductVariant
+    from core.db_routers import _get_tabu_db
+
+    tabu_db = _get_tabu_db()
     if mpd_product_id is not None:
-        TabuProduct.objects.filter(pk=tabu_product_id).update(mapped_product_uid=mpd_product_id)
+        TabuProduct.objects.using(tabu_db).filter(pk=tabu_product_id).update(
+            mapped_product_uid=mpd_product_id
+        )
     variant_mapping = variant_mapping or []
     for tabu_variant_pk, mpd_variant_id in variant_mapping:
-        TabuProductVariant.objects.filter(pk=tabu_variant_pk).update(
+        TabuProductVariant.objects.using(tabu_db).filter(pk=tabu_variant_pk).update(
             mapped_variant_uid=mpd_variant_id,
             is_mapped=True,
         )
@@ -280,8 +290,13 @@ def _saga_update_tabu_mapping(
 def _saga_clear_tabu_mapping(tabu_product_id: int, **kwargs: Any) -> None:
     """Kompensacja kroku 2: wyzeruj mapowanie w Tabu."""
     from tabu.models import TabuProduct, TabuProductVariant
-    TabuProduct.objects.filter(pk=tabu_product_id).update(mapped_product_uid=None)
-    TabuProductVariant.objects.filter(product_id=tabu_product_id).update(
+    from core.db_routers import _get_tabu_db
+
+    tabu_db = _get_tabu_db()
+    TabuProduct.objects.using(tabu_db).filter(pk=tabu_product_id).update(
+        mapped_product_uid=None
+    )
+    TabuProductVariant.objects.using(tabu_db).filter(product_id=tabu_product_id).update(
         mapped_variant_uid=None,
         is_mapped=False,
     )
@@ -312,9 +327,15 @@ def create_mpd_product_from_tabu(
 
     try:
         from tabu.models import TabuProduct
+        from core.db_routers import _get_tabu_db
 
+        tabu_db = _get_tabu_db()
         try:
-            tabu_product = TabuProduct.objects.select_related('brand').get(pk=tabu_product_id)
+            tabu_product = (
+                TabuProduct.objects.using(tabu_db)
+                .select_related('brand')
+                .get(pk=tabu_product_id)
+            )
         except TabuProduct.DoesNotExist:
             return {
                 'success': False,
@@ -397,12 +418,15 @@ def create_mpd_variants_from_tabu(
         StockAndPrices,
     )
     from MPD.source_adapters.base import normalize_ean
-    from core.db_routers import _get_mpd_db
+    from core.db_routers import _get_mpd_db, _get_tabu_db
 
     mpd_db = _get_mpd_db()
+    tabu_db = _get_tabu_db()
 
-    tabu_product = TabuProduct.objects.get(pk=tabu_product_id)
-    tabu_variants = list(TabuProductVariant.objects.filter(product_id=tabu_product_id))
+    tabu_product = TabuProduct.objects.using(tabu_db).get(pk=tabu_product_id)
+    tabu_variants = list(
+        TabuProductVariant.objects.using(tabu_db).filter(product_id=tabu_product_id)
+    )
     if not tabu_variants:
         logger.warning("Brak wariantów Tabu dla produktu %s", tabu_product_id)
         return {"created_variants": 0, "variant_ids": []}
@@ -542,7 +566,7 @@ def create_mpd_variants_from_tabu(
                 "last_updated": timezone.now(),
             },
         )
-        TabuProductVariant.objects.filter(pk=tabu_var.pk).update(
+        TabuProductVariant.objects.using(tabu_db).filter(pk=tabu_var.pk).update(
             mapped_variant_uid=variant.variant_id,
             is_mapped=True,
         )
@@ -575,11 +599,12 @@ def upload_tabu_images_to_mpd(
     try:
         from tabu.models import TabuProduct
         from MPD.models import Products, ProductImage
-        from core.db_routers import _get_mpd_db
+        from core.db_routers import _get_mpd_db, _get_tabu_db
         from matterhorn1.defs_db import upload_image_to_bucket_and_get_url
 
         mpd_db = _get_mpd_db()
-        tabu_product = TabuProduct.objects.get(pk=tabu_product_id)
+        tabu_db = _get_tabu_db()
+        tabu_product = TabuProduct.objects.using(tabu_db).get(pk=tabu_product_id)
         images_to_upload = []
         if tabu_product.image_url and tabu_product.image_url.strip():
             images_to_upload.append((tabu_product.image_url.strip(), 1))
