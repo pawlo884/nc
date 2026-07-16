@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.13.5 (2026-07-16)</small>
+
+* fix(dev): lan healthcheck and pod hostname in /health/ ([ce6a706](https://github.com/pawlo884/nc/commit/ce6a706))
+
 ## <small>1.13.4 (2026-07-16)</small>
 
 * Merge pull request #44 from pawlo884/chore/django-upgrade-compat ([fe2abbd](https://github.com/pawlo884/nc/commit/fe2abbd)), closes [#44](https://github.com/pawlo884/nc/issues/44)
