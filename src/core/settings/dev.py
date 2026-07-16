@@ -107,7 +107,10 @@ INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.50.63'] + \
 
 
 def show_debug_toolbar(request):
-    """Callback dla debug toolbar - pokazuje się tylko dla localhost."""
+    """Callback dla debug toolbar - pokazuje się tylko dla localhost (nie w testach)."""
+    # django-debug-toolbar 7.x psuje reverse('djdt') w APIClient jeśli toolbar jest aktywny w testach
+    if 'test' in sys.argv:
+        return False
     return get_debug() and request.META.get('REMOTE_ADDR') in INTERNAL_IPS
 
 
@@ -116,7 +119,7 @@ DEBUG_TOOLBAR_CONFIG = {
     'SHOW_TEMPLATE_CONTEXT': True,
     'ENABLE_STACKTRACES': True,
     'SQL_WARNING_THRESHOLD': 500,  # milliseconds
-    'IS_RUNNING_TESTS': False,  # bypass debug toolbar check during manage.py test
+    'IS_RUNNING_TESTS': False,  # custom callback obsługuje testy (powyżej)
 }
 
 # CORS Configuration

@@ -163,6 +163,9 @@ class ProductImageSerializer(serializers.ModelSerializer):
 class ProductVariantSerializer(serializers.ModelSerializer):
     """Serializer dla wariantów produktu"""
 
+    # required=False: bulk update często wysyła tylko variant_uid + stock/ean
+    name = serializers.CharField(required=False, allow_blank=False)
+
     class Meta:
         model = ProductVariant
         fields = ['variant_uid', 'name', 'stock', 'max_processing_time', 'ean']
@@ -250,8 +253,8 @@ class ProductSerializer(serializers.ModelSerializer):
     brand_id = serializers.CharField(write_only=True, required=False)
     category_id = serializers.CharField(write_only=True, required=False)
     # Mapowanie product_id (z API) na product_uid (w modelu)
-    # Używamy write_only=True, żeby akceptować product_id w danych wejściowych
-    product_id = serializers.IntegerField(write_only=True, required=False)
+    product_id = serializers.IntegerField(
+        source='product_uid', write_only=True, required=True)
     product_uid = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -340,11 +343,8 @@ class ProductSerializer(serializers.ModelSerializer):
         return value
 
     def to_internal_value(self, data):
-        """Map product_id from incoming data to product_uid for the model."""
-        # Skopiuj dane głęboko, żeby nie modyfikować oryginalnych
+        """Normalizacja wejścia (deepcopy); product_id → product_uid przez source=."""
         data = copy.deepcopy(data) if isinstance(data, dict) else data
-        if isinstance(data, dict) and 'product_id' in data:
-            data['product_uid'] = data.pop('product_id')
         return super().to_internal_value(data)
 
     def create(self, validated_data):
@@ -546,7 +546,7 @@ class BulkCategorySerializer(serializers.Serializer):
 
 
 class BulkVariantSerializer(serializers.Serializer):
-    """Serializer dla bulk operations na wariantach"""
+    """Serializer dla bulk create na wariantach"""
 
     variants = ProductVariantSerializer(many=True)
 
@@ -562,6 +562,31 @@ class BulkVariantSerializer(serializers.Serializer):
         if len(variant_uids) != len(set(variant_uids)):
             raise serializers.ValidationError("Duplikaty w variant_uid")
 
+        return value
+
+
+class ProductVariantUpdateItemSerializer(serializers.Serializer):
+    """Lekka walidacja pozycji bulk update (bez UniqueValidator na variant_uid)."""
+
+    variant_uid = serializers.CharField(required=True)
+    name = serializers.CharField(required=False, allow_blank=False)
+    stock = serializers.IntegerField(required=False, min_value=0)
+    max_processing_time = serializers.IntegerField(required=False, min_value=0)
+    ean = serializers.CharField(required=False, allow_blank=True)
+
+
+class BulkVariantUpdateSerializer(serializers.Serializer):
+    """Serializer dla bulk update na wariantach"""
+
+    variants = ProductVariantUpdateItemSerializer(many=True)
+
+    def validate_variants(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                "Lista wariantów nie może być pusta")
+        variant_uids = [v.get('variant_uid') for v in value if v.get('variant_uid')]
+        if len(variant_uids) != len(set(variant_uids)):
+            raise serializers.ValidationError("Duplikaty w variant_uid")
         return value
 
 
