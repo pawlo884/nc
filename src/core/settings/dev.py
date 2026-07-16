@@ -32,10 +32,15 @@ else:
 # Dodaj konkretne IP/domeny do .env.dev jako DJANGO_ALLOWED_HOSTS (oddzielone przecinkami)
 allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS', '')
 if allowed_hosts_env:
-    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',')]
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
 else:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1',
-                     '192.168.50.63', '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch']
+                     '192.168.50.63', '192.168.50.150', '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch']
+
+# LAN healthcheck z landingu (ten PC)
+for _lan_host in ('192.168.50.150',):
+    if _lan_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_lan_host)
 
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'https://nc-dev.sowa.ch')
