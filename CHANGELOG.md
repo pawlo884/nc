@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.13.6 (2026-07-17)</small>
+
+* fix(dev): allow lan host 192.168.50.4 ([4fa5794](https://github.com/pawlo884/nc/commit/4fa5794))
+
 ## <small>1.13.5 (2026-07-16)</small>
 
 * fix(dev): lan healthcheck and pod hostname in /health/ ([ce6a706](https://github.com/pawlo884/nc/commit/ce6a706))
