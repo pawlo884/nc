@@ -35,10 +35,11 @@ if allowed_hosts_env:
     ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
 else:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1',
-                     '192.168.50.63', '192.168.50.150', '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch']
+                     '192.168.50.4', '192.168.50.63', '192.168.50.150',
+                     '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch']
 
-# LAN healthcheck z landingu (ten PC)
-for _lan_host in ('192.168.50.150',):
+# LAN healthcheck / dostęp z sieci lokalnej
+for _lan_host in ('192.168.50.4', '192.168.50.150'):
     if _lan_host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_lan_host)
 
@@ -87,8 +88,12 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://localhost:8090',
     'http://127.0.0.1:8090',
+    'http://192.168.50.4',
+    'http://192.168.50.4:8000',
     'http://192.168.50.63',
     'http://192.168.50.63:8000',
+    'http://192.168.50.150',
+    'http://192.168.50.150:8000',
     'http://83.168.79.109',
     'http://83.168.79.109:8000',
     'http://212.127.93.27',
@@ -138,7 +143,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8090",
     "http://127.0.0.1:8090",
+    "http://192.168.50.4:8000",
     "http://192.168.50.63:8000",
+    "http://192.168.50.150:8000",
     "http://83.168.79.109:8000",
     "http://212.127.93.27:8090",
     "http://212.127.93.27:8000",
