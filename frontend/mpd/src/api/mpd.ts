@@ -27,6 +27,7 @@ export async function fetchProducts(params: {
   search?: string;
   brand_id?: number;
   visibility?: boolean;
+  path_id?: number;
   page?: number;
   page_size?: number;
   ordering?: string;
@@ -62,6 +63,11 @@ export async function fetchCatalogAttributes(): Promise<MpdNamedRef[]> {
   const { data } = await apiClient.get<CatalogResponse<MpdNamedRef>>(
     '/api/mpd/catalog/attributes/'
   );
+  return data.results;
+}
+
+export async function fetchCatalogBrands(): Promise<MpdNamedRef[]> {
+  const { data } = await apiClient.get<CatalogResponse<MpdNamedRef>>('/api/mpd/catalog/brands/');
   return data.results;
 }
 

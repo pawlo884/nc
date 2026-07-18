@@ -48,6 +48,11 @@ urlpatterns = [
         name="catalog-attributes",
     ),
     path(
+        "catalog/brands/",
+        api_views.MPDCatalogBrandsAPI.as_view(),
+        name="catalog-brands",
+    ),
+    path(
         "catalog/fabric-components/",
         api_views.MPDCatalogFabricComponentsAPI.as_view(),
         name="catalog-fabric-components",

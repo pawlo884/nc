@@ -1,8 +1,8 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { deleteProduct, fetchProducts } from '../api/mpd';
+import { deleteProduct, fetchCatalogBrands, fetchCatalogPaths, fetchProducts } from '../api/mpd';
 import { ProductThumbnail } from '../components/ProductThumbnail';
 import '../components/Layout.css';
 import './ProductDetailPage.css';
@@ -10,6 +10,7 @@ import './ProductDetailPage.css';
 const PAGE_SIZE = 50;
 
 type SortField = 'id' | 'name' | 'brand_name' | 'visibility' | 'updated_at';
+type VisibilityFilter = '' | 'true' | 'false';
 
 const SORTABLE_COLUMNS: { field: SortField; label: string; width?: number }[] = [
   { field: 'id', label: 'ID', width: 70 },
@@ -23,11 +24,22 @@ function orderingParam(field: SortField, direction: 'asc' | 'desc'): string {
   return direction === 'desc' ? `-${field}` : field;
 }
 
+function parseOptionalNumber(value: string): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 export function ProductsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [brandId, setBrandId] = useState('');
+  const [visibility, setVisibility] = useState<VisibilityFilter>('');
+  const [pathId, setPathId] = useState('');
   const [sortField, setSortField] = useState<SortField>('id');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [listError, setListError] = useState<string | null>(null);
@@ -35,13 +47,40 @@ export function ProductsPage() {
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const ordering = orderingParam(sortField, sortDir);
+  const brandIdNum = parseOptionalNumber(brandId);
+  const pathIdNum = parseOptionalNumber(pathId);
+  const visibilityBool = visibility === 'true' ? true : visibility === 'false' ? false : undefined;
+
+  const brandsQuery = useQuery({
+    queryKey: ['mpd-catalog-brands'],
+    queryFn: fetchCatalogBrands,
+    staleTime: 5 * 60_000,
+  });
+
+  const pathsQuery = useQuery({
+    queryKey: ['mpd-catalog-paths'],
+    queryFn: fetchCatalogPaths,
+    staleTime: 5 * 60_000,
+  });
+
+  const pathOptions = useMemo(() => {
+    const rows = pathsQuery.data || [];
+    return [...rows].sort((a, b) => {
+      const left = `${a.path || ''} ${a.name || ''}`.trim();
+      const right = `${b.path || ''} ${b.name || ''}`.trim();
+      return left.localeCompare(right, 'pl');
+    });
+  }, [pathsQuery.data]);
 
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
-      queryKey: ['mpd-products', debouncedSearch, ordering],
+      queryKey: ['mpd-products', debouncedSearch, brandIdNum, visibilityBool, pathIdNum, ordering],
       queryFn: ({ pageParam }) =>
         fetchProducts({
           search: debouncedSearch || undefined,
+          brand_id: brandIdNum,
+          visibility: visibilityBool,
+          path_id: pathIdNum,
           page: pageParam,
           page_size: PAGE_SIZE,
           ordering,
@@ -115,15 +154,28 @@ export function ProductsPage() {
     deleteMutation.mutate(productId);
   }
 
+  function clearFilters() {
+    setSearch('');
+    setDebouncedSearch('');
+    setBrandId('');
+    setVisibility('');
+    setPathId('');
+  }
+
+  const hasActiveFilters =
+    Boolean(debouncedSearch) || Boolean(brandId) || Boolean(visibility) || Boolean(pathId);
+
   const products = data?.pages.flatMap(page => page.results) ?? [];
   const totalCount = data?.pages[0]?.count ?? 0;
 
   return (
     <div className="page-card">
       <h2 className="page-title">Produkty MPD</h2>
-      <p className="page-subtitle">Lista produktów w bazie MPD z filtrowaniem po nazwie i marce.</p>
+      <p className="page-subtitle">
+        Lista produktów z filtrowaniem po marce, widoczności i kategorii (ścieżce).
+      </p>
 
-      <div className="toolbar">
+      <div className="toolbar toolbar--filters">
         <input
           type="search"
           className="search-input"
@@ -131,6 +183,47 @@ export function ProductsPage() {
           value={search}
           onChange={e => handleSearchChange(e.target.value)}
         />
+        <select
+          className="filter-select"
+          value={brandId}
+          onChange={e => setBrandId(e.target.value)}
+          aria-label="Filtr marki"
+        >
+          <option value="">Wszystkie marki</option>
+          {(brandsQuery.data || []).map(brand => (
+            <option key={brand.id} value={brand.id}>
+              {brand.name || `Marka #${brand.id}`}
+            </option>
+          ))}
+        </select>
+        <select
+          className="filter-select"
+          value={visibility}
+          onChange={e => setVisibility(e.target.value as VisibilityFilter)}
+          aria-label="Filtr widoczności"
+        >
+          <option value="">Widoczność: wszystkie</option>
+          <option value="true">Widoczne</option>
+          <option value="false">Ukryte</option>
+        </select>
+        <select
+          className="filter-select filter-select--wide"
+          value={pathId}
+          onChange={e => setPathId(e.target.value)}
+          aria-label="Filtr kategorii"
+        >
+          <option value="">Wszystkie kategorie</option>
+          {pathOptions.map(path => (
+            <option key={path.id} value={path.id}>
+              {path.name || '(brak nazwy)'} [{path.path || '-'}]
+            </option>
+          ))}
+        </select>
+        {hasActiveFilters && (
+          <button type="button" className="btn btn-muted" onClick={clearFilters}>
+            Wyczyść filtry
+          </button>
+        )}
       </div>
 
       {isLoading && <div className="loading">Ładowanie produktów…</div>}
