@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.14.0 (2026-07-18)
+
+* Merge pull request #46 from pawlo884/feat/mpd-admin-react-shortcut ([1eff37a](https://github.com/pawlo884/nc/commit/1eff37a)), closes [#46](https://github.com/pawlo884/nc/issues/46)
+* feat(mpd): add django admin shortcuts to react panel ([cd41ab7](https://github.com/pawlo884/nc/commit/cd41ab7))
+
 ## <small>1.13.6 (2026-07-17)</small>
 
 * fix(dev): allow lan host 192.168.50.4 ([4fa5794](https://github.com/pawlo884/nc/commit/4fa5794))
