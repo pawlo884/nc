@@ -1,38 +1,59 @@
-import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchProducts } from '../api/mpd';
 import { ProductThumbnail } from '../components/ProductThumbnail';
 import '../components/Layout.css';
 import './ProductDetailPage.css';
 
+const PAGE_SIZE = 50;
+
 export function ProductsPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const searchTimerRef = useRef<number | undefined>(undefined);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['mpd-products', debouncedSearch, page],
-    queryFn: () =>
-      fetchProducts({
-        search: debouncedSearch || undefined,
-        page,
-        page_size: 50,
-      }),
-  });
+  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ['mpd-products', debouncedSearch],
+      queryFn: ({ pageParam }) =>
+        fetchProducts({
+          search: debouncedSearch || undefined,
+          page: pageParam,
+          page_size: PAGE_SIZE,
+        }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, _pages, lastPageParam) =>
+        lastPage.next ? lastPageParam + 1 : undefined,
+    });
+
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: '240px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, data?.pages.length]);
 
   function handleSearchChange(value: string) {
     setSearch(value);
-    setPage(1);
-    window.clearTimeout((window as unknown as { _searchTimer?: number })._searchTimer);
-    (window as unknown as { _searchTimer?: number })._searchTimer = window.setTimeout(
-      () => setDebouncedSearch(value),
-      350
-    );
+    window.clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = window.setTimeout(() => setDebouncedSearch(value), 350);
   }
 
-  const totalPages = data ? Math.ceil(data.count / 50) : 1;
+  const products = data?.pages.flatMap(page => page.results) ?? [];
+  const totalCount = data?.pages[0]?.count ?? 0;
 
   return (
     <div className="page-card">
@@ -60,7 +81,8 @@ export function ProductsPage() {
       {data && (
         <>
           <p style={{ color: '#666', marginBottom: '0.75rem' }}>
-            Znaleziono: <strong>{data.count}</strong> produktów
+            Wyświetlono: <strong>{products.length}</strong> z <strong>{totalCount}</strong>{' '}
+            produktów
           </p>
           <table className="data-table products-table">
             <thead>
@@ -74,14 +96,14 @@ export function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.results.length === 0 ? (
+              {products.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="empty-state">
                     Brak produktów spełniających kryteria.
                   </td>
                 </tr>
               ) : (
-                data.results.map(product => (
+                products.map(product => (
                   <tr key={product.id} onClick={() => navigate(`/products/${product.id}`)}>
                     <td className="products-table__thumb-cell">
                       <ProductThumbnail
@@ -114,23 +136,12 @@ export function ProductsPage() {
             </tbody>
           </table>
 
-          {totalPages > 1 && (
-            <div className="pagination">
-              <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-                ‹ Poprzednia
-              </button>
-              <span style={{ padding: '0.35rem 0.65rem', color: '#666' }}>
-                Strona {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => p + 1)}
-              >
-                Następna ›
-              </button>
-            </div>
-          )}
+          <div ref={loadMoreRef} className="infinite-scroll-sentinel" aria-hidden={!hasNextPage}>
+            {isFetchingNextPage && <div className="loading">Ładowanie kolejnych…</div>}
+            {!hasNextPage && products.length > 0 && (
+              <p className="infinite-scroll-end">Koniec listy</p>
+            )}
+          </div>
         </>
       )}
     </div>
