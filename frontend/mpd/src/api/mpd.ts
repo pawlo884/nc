@@ -29,6 +29,7 @@ export async function fetchProducts(params: {
   visibility?: boolean;
   page?: number;
   page_size?: number;
+  ordering?: string;
 }): Promise<PaginatedResponse<MpdProduct>> {
   const { data } = await apiClient.get<PaginatedResponse<MpdProduct>>('/api/mpd/products/', {
     params,
@@ -49,6 +50,11 @@ export async function updateProduct(
     `/api/mpd/products/${productId}/`,
     payload
   );
+  return data;
+}
+
+export async function deleteProduct(productId: number): Promise<ManageActionResponse> {
+  const { data } = await apiClient.delete<ManageActionResponse>(`/api/mpd/products/${productId}/`);
   return data;
 }
 

@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { fetchProduct, updateProduct } from '../api/mpd';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { deleteProduct, fetchProduct, updateProduct } from '../api/mpd';
 import { ProductExtrasPanels } from '../components/ProductExtrasPanels';
 import type { MpdProductDetail, MpdProductUpdatePayload } from '../types/mpd';
 import '../components/Layout.css';
@@ -40,6 +40,7 @@ function formsEqual(a: FormState, b: FormState): boolean {
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const productId = Number(id);
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(() => ({
     name: '',
@@ -92,6 +93,29 @@ export function ProductDetailPage() {
         return;
       }
       setSaveError('Nie udało się zapisać produktu.');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteProduct(productId),
+    onSuccess: async result => {
+      if (result.status === 'error') {
+        setSaveError(result.message || 'Nie udało się usunąć produktu.');
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ['mpd-products'] });
+      navigate('/');
+    },
+    onError: err => {
+      if (axios.isAxiosError(err)) {
+        const message =
+          (err.response?.data as { message?: string; detail?: string } | undefined)?.message ||
+          (err.response?.data as { detail?: string } | undefined)?.detail ||
+          err.message;
+        setSaveError(message || 'Nie udało się usunąć produktu.');
+        return;
+      }
+      setSaveError('Nie udało się usunąć produktu.');
     },
   });
 
@@ -155,6 +179,16 @@ export function ProductDetailPage() {
     });
   }
 
+  function handleDelete() {
+    const label = form.name.trim() || product.name || `#${product.id}`;
+    if (!window.confirm(`Na pewno usunąć produkt „${label}” (ID ${product.id})?`)) {
+      return;
+    }
+    setSaveError(null);
+    setSaveOk(null);
+    deleteMutation.mutate();
+  }
+
   return (
     <div className="product-detail">
       <div className="product-detail__nav">
@@ -164,9 +198,17 @@ export function ProductDetailPage() {
         <div className="product-detail__actions">
           <button
             type="button"
+            className="btn btn-danger"
+            onClick={handleDelete}
+            disabled={saveMutation.isPending || deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? 'Usuwanie…' : 'Usuń'}
+          </button>
+          <button
+            type="button"
             className="btn btn-muted"
             onClick={handleReset}
-            disabled={!dirty || saveMutation.isPending}
+            disabled={!dirty || saveMutation.isPending || deleteMutation.isPending}
           >
             Cofnij
           </button>
@@ -174,7 +216,7 @@ export function ProductDetailPage() {
             type="button"
             className="btn btn-primary"
             onClick={handleSave}
-            disabled={!dirty || saveMutation.isPending}
+            disabled={!dirty || saveMutation.isPending || deleteMutation.isPending}
           >
             {saveMutation.isPending ? 'Zapisywanie…' : 'Zapisz'}
           </button>

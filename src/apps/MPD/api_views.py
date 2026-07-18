@@ -86,6 +86,16 @@ class MPDProductCreateAPI(APIView):
                 required=False,
                 description="Rozmiar strony (1-200, domyślnie 50).",
             ),
+            OpenApiParameter(
+                name="ordering",
+                type=OpenApiTypes.STR,
+                required=False,
+                description=(
+                    "Sortowanie listy. Dozwolone: id, name, brand_name, "
+                    "visibility, updated_at, created_at. Prefiks `-` = malejąco "
+                    "(np. `-updated_at`). Domyślnie: id."
+                ),
+            ),
         ],
         responses={200: ProductListSerializer(many=True)},
     )
@@ -121,6 +131,21 @@ class MPDProductCreateAPI(APIView):
             elif visibility in ('false', '0', 'no', 'n'):
                 queryset = queryset.filter(visibility=False)
 
+        ordering_map = {
+            'id': 'id',
+            'name': 'name',
+            'brand_name': 'brand__name',
+            'visibility': 'visibility',
+            'updated_at': 'updated_at',
+            'created_at': 'created_at',
+        }
+        ordering_param = (request.query_params.get('ordering') or 'id').strip()
+        descending = ordering_param.startswith('-')
+        ordering_key = ordering_param.lstrip('-')
+        order_field = ordering_map.get(ordering_key, 'id')
+        if descending:
+            order_field = f'-{order_field}'
+
         paginator = PageNumberPagination()
         page_size_param = request.query_params.get('page_size')
         if page_size_param:
@@ -131,7 +156,7 @@ class MPDProductCreateAPI(APIView):
         else:
             paginator.page_size = 50
 
-        page = paginator.paginate_queryset(queryset.order_by('id'), request)
+        page = paginator.paginate_queryset(queryset.order_by(order_field, 'id'), request)
         serializer = ProductListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
@@ -188,6 +213,43 @@ class MPDProductDetailAPI(APIView):
     )
     def patch(self, request, product_id, *args, **kwargs):  # pylint: disable=unused-argument
         return mpd_views.update_product(request._request, product_id=product_id)
+
+    @extend_schema(
+        summary="Usunięcie produktu MPD",
+        description=(
+            "Usuwa produkt MPD wraz z powiązaniami (jak w Django admin). "
+            "Używa bazy MPD i uruchamia sygnały czyszczące mapowania."
+        ),
+        tags=["Products"],
+        responses={200: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+    )
+    def delete(self, request, product_id, *args, **kwargs):  # pylint: disable=unused-argument
+        try:
+            product = Products.objects.using('MPD').get(pk=product_id)
+        except Products.DoesNotExist:
+            return Response(
+                {'status': 'error', 'message': 'Produkt nie istnieje.'},
+                status=404,
+            )
+        product_name = product.name
+        try:
+            product.delete(using='MPD')
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception('Błąd usuwania produktu MPD %s', product_id)
+            return Response(
+                {
+                    'status': 'error',
+                    'message': f'Nie udało się usunąć produktu: {exc}',
+                },
+                status=500,
+            )
+        return Response(
+            {
+                'status': 'success',
+                'message': f'Usunięto produkt „{product_name}”.',
+                'product_id': product_id,
+            }
+        )
 
 
 class MPDBulkCreateProductsAPI(APIView):
