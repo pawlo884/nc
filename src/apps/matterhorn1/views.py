@@ -221,7 +221,7 @@ class ProductBulkCreateView(ProductBulkView):
             logger.error(f"Błąd w ProductBulkCreateView: {str(e)}")
             return JsonResponse({
                 'success': False,
-                'error': f'Błąd serwera: {str(e)}'
+                'error': 'Błąd serwera'
             }, status=500)
 
 
@@ -340,7 +340,7 @@ class ProductBulkUpdateView(ProductBulkView):
             logger.error(f"Błąd w ProductBulkUpdateView: {str(e)}")
             return JsonResponse({
                 'success': False,
-                'error': f'Błąd serwera: {str(e)}'
+                'error': 'Błąd serwera'
             }, status=500)
 
 
@@ -457,7 +457,7 @@ class VariantBulkCreateView(View):
             logger.error(f"Błąd w VariantBulkCreateView: {str(e)}")
             return JsonResponse({
                 'success': False,
-                'error': f'Błąd serwera: {str(e)}'
+                'error': 'Błąd serwera'
             }, status=500)
 
 
@@ -566,7 +566,7 @@ class VariantBulkUpdateView(View):
             logger.error(f"Błąd w VariantBulkUpdateView: {str(e)}")
             return JsonResponse({
                 'success': False,
-                'error': f'Błąd serwera: {str(e)}'
+                'error': 'Błąd serwera'
             }, status=500)
 
 
@@ -663,7 +663,7 @@ class BrandBulkCreateView(View):
             logger.error(f"Błąd w BrandBulkCreateView: {str(e)}")
             return JsonResponse({
                 'success': False,
-                'error': f'Błąd serwera: {str(e)}'
+                'error': 'Błąd serwera'
             }, status=500)
 
 
@@ -760,7 +760,7 @@ class CategoryBulkCreateView(View):
             logger.error(f"Błąd w CategoryBulkCreateView: {str(e)}")
             return JsonResponse({
                 'success': False,
-                'error': f'Błąd serwera: {str(e)}'
+                'error': 'Błąd serwera'
             }, status=500)
 
 
@@ -875,7 +875,7 @@ class ImageBulkCreateView(View):
             logger.error(f"Błąd w ImageBulkCreateView: {str(e)}")
             return JsonResponse({
                 'success': False,
-                'error': f'Błąd serwera: {str(e)}'
+                'error': 'Błąd serwera'
             }, status=500)
 
 
@@ -1039,5 +1039,5 @@ def get_product_details(request, product_id):
         logger.error(f"Błąd podczas pobierania produktu: {str(e)}")
         return JsonResponse({
             'success': False,
-            'error': f'Błąd serwera: {str(e)}'
+            'error': 'Błąd serwera'
         }, status=500)

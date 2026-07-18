@@ -110,7 +110,7 @@ class AutomationRunViewSet(viewsets.ModelViewSet):
             logger.error(f"Błąd podczas uruchamiania automatyzacji: {e}")
             return Response({
                 'status': 'error',
-                'message': str(e)
+                'message': 'Wystąpił błąd'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=True, methods=['get'], url_path='logs')

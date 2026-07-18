@@ -109,7 +109,7 @@ def admin_update_producer_code(request):
         return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
     except Exception as e:
         logger.error(f"Błąd podczas aktualizacji kodu producenta: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
 
 
 # Dodaj URL do admina

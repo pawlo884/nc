@@ -35,7 +35,7 @@ class GenerateFullXMLSecure(APIView):
             return Response(
                 {
                     'status': 'error',
-                    'message': f'Błąd podczas generowania pełnego XML: {exc}',
+                    'message': 'Błąd podczas generowania pełnego XML',
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

@@ -104,7 +104,7 @@ def test_connection(request):
                 'permissions': permissions
             })
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Wystąpił błąd'}, status=500)
 
 
 def test_table_structure(request):
@@ -138,7 +138,7 @@ def test_table_structure(request):
                 ]
             })
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Wystąpił błąd'}, status=500)
 
 
 class ProductSetViewSet(viewsets.ModelViewSet):
@@ -200,9 +200,9 @@ def export_xml(request, source_name):
             return JsonResponse({'status': 'success', 'url': result['bucket_url']})
         return JsonResponse({'status': 'error', 'message': 'Nie udało się wygenerować pliku XML'}, status=500)
     except ValueError as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=404)
+        return JsonResponse({'status': 'error', 'message': 'Wystąpił błąd'}, status=404)
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Wystąpił błąd'}, status=500)
 
 
 def export_full_xml(request):
@@ -251,7 +251,7 @@ def get_xml_file(request, xml_type):
         else:
             return JsonResponse({'status': 'error', 'message': 'Nie znaleziono pliku XML'}, status=404)
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Wystąpił błąd'}, status=500)
 
 
 def get_gateway_xml(request):
@@ -271,7 +271,7 @@ def get_gateway_xml(request):
         else:
             return JsonResponse({'status': 'error', 'message': 'Nie znaleziono pliku XML'}, status=404)
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Wystąpił błąd'}, status=500)
 
 
 def update_all_gateways():
@@ -932,7 +932,7 @@ def create_product(request):
         return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
     except Exception as e:
         logger.error(f"Błąd podczas tworzenia produktu MPD: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
 
 
 @csrf_exempt
@@ -1051,7 +1051,7 @@ def update_product(request, product_id):
         return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
     except Exception as e:
         logger.error(f"Błąd podczas aktualizacji produktu MPD: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
 
 
 @csrf_exempt
@@ -1255,7 +1255,7 @@ def get_product(request, product_id):
 
     except Exception as e:
         logger.error(f"Błąd podczas pobierania produktu MPD: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
 
 
 @csrf_exempt
@@ -1361,7 +1361,7 @@ def update_product_retail_prices(request, product_id):
     except Exception as e:
         logger.error('Błąd zapisu cen detalicznych: %s', e)
         return JsonResponse(
-            {'status': 'error', 'message': f'Błąd serwera: {str(e)}'},
+            {'status': 'error', 'message': 'Błąd serwera'},
             status=500,
         )
 
@@ -1466,7 +1466,13 @@ def bulk_create_products(request):
 
             except Exception as e:
                 errors.append(
-                    f"Błąd tworzenia produktu {product_data.get('name', 'Unknown')}: {str(e)}")
+                    f"Błąd tworzenia produktu {product_data.get('name', 'Unknown')}"
+                )
+                logger.error(
+                    "Błąd tworzenia produktu %s: %s",
+                    product_data.get('name', 'Unknown'),
+                    str(e),
+                )
                 continue
 
         logger.info("🏁 MPD bulk_create_products: Zakończono przetwarzanie")
@@ -1486,7 +1492,7 @@ def bulk_create_products(request):
 
     except Exception as e:
         logger.error(f"❌ MPD bulk_create_products: Błąd: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Wystąpił błąd'}, status=500)
 
 
 def bulk_map_from_matterhorn1(request):
@@ -1622,7 +1628,7 @@ def bulk_map_from_matterhorn1(request):
 
                 except Exception as e:
                     errors.append({
-                        'error': f'Błąd podczas tworzenia produktu: {str(e)}',
+                        'error': 'Błąd podczas tworzenia produktu',
                         'data': product_data
                     })
                     logger.error(f"Błąd podczas mapowania produktu: {str(e)}")
@@ -1644,7 +1650,7 @@ def bulk_map_from_matterhorn1(request):
         return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
     except Exception as e:
         logger.error(f"Błąd podczas bulk mapowania produktów: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
 
 
 @csrf_exempt
@@ -1739,7 +1745,7 @@ def get_matterhorn1_products(request):
     except Exception as e:
         logger.error(
             f"Błąd podczas pobierania produktów matterhorn1: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
 
 
 @csrf_exempt
@@ -1783,4 +1789,4 @@ def update_producer_code(request):
         return JsonResponse({'status': 'error', 'message': 'Nieprawidłowy format JSON'}, status=400)
     except Exception as e:
         logger.error(f"Błąd podczas aktualizacji kodu producenta: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+        return JsonResponse({'status': 'error', 'message': 'Błąd serwera'}, status=500)
