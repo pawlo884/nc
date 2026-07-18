@@ -1,5 +1,12 @@
 # Zmiany
 
+## <small>1.21.3 (2026-07-18)</small>
+
+* Merge pull request #62 from pawlo884/dependabot/npm_and_yarn/handlebars-4.7.9 ([d9ae9e0](https://github.com/pawlo884/nc/commit/d9ae9e0)), closes [#62](https://github.com/pawlo884/nc/issues/62)
+* Merge pull request #64 from pawlo884/fix/dependabot-requirements-encoding ([8708911](https://github.com/pawlo884/nc/commit/8708911)), closes [#64](https://github.com/pawlo884/nc/issues/64)
+* fix(deps): napraw encoding requirements.txt i bump python-multipart ([fa52b0f](https://github.com/pawlo884/nc/commit/fa52b0f))
+* chore(deps-dev): bump handlebars from 4.7.8 to 4.7.9 ([a01156d](https://github.com/pawlo884/nc/commit/a01156d))
+
 ## <small>1.21.2 (2026-07-18)</small>
 
 * Merge pull request #61 from pawlo884/ci/paths-filter-node24 ([20afa52](https://github.com/pawlo884/nc/commit/20afa52)), closes [#61](https://github.com/pawlo884/nc/issues/61)
