@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.22.5 (2026-07-18)</small>
+
+* Merge pull request #73 from pawlo884/fix/openai-langchain-conflict ([b1d8225](https://github.com/pawlo884/nc/commit/b1d8225)), closes [#73](https://github.com/pawlo884/nc/issues/73)
+* fix(deps): bump openai to 2.46.0 for langchain-openai ([8d0f4c2](https://github.com/pawlo884/nc/commit/8d0f4c2))
+
 ## <small>1.22.4 (2026-07-18)</small>
 
 * Merge pull request #72 from pawlo884/fix/dependabot-batch-alerts ([4b22281](https://github.com/pawlo884/nc/commit/4b22281)), closes [#72](https://github.com/pawlo884/nc/issues/72)
