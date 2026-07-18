@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.22.8 (2026-07-18)</small>
+
+* Merge pull request #77 from pawlo884/fix/codeql-remaining-alerts ([c496e17](https://github.com/pawlo884/nc/commit/c496e17)), closes [#77](https://github.com/pawlo884/nc/issues/77)
+* fix(security): clear remaining CodeQL alerts ([affedc4](https://github.com/pawlo884/nc/commit/affedc4))
+
 ## <small>1.22.7 (2026-07-18)</small>
 
 * Merge pull request #76 from pawlo884/fix/codeql-high-alerts ([df877d2](https://github.com/pawlo884/nc/commit/df877d2)), closes [#76](https://github.com/pawlo884/nc/issues/76) [pawlo884/fix/codeql-hi#alerts](https://github.com/pawlo884/fix/codeql-hi/issues/alerts)
