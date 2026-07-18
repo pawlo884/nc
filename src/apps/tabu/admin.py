@@ -361,7 +361,16 @@ class TabuProductAdmin(admin.ModelAdmin):
                 'mpd_product_id': result['mpd_product_id'],
             })
         status_code = 404 if (result.get('error_message') or '').find('nie istnieje') >= 0 else 400
-        return JsonResponse({'success': False, 'error': result['error_message']}, status=status_code)
+        # Tylko znane komunikaty biznesowe — bez surowych wyjątków (py/stack-trace-exposure)
+        err = result.get('error_message') or ''
+        safe = {
+            'Produkt Tabu nie istnieje',
+            'Produkt jest już zmapowany do MPD',
+            'Saga zakończona kompensacją',
+        }
+        if err not in safe:
+            err = 'Nie udało się utworzyć produktu w MPD'
+        return JsonResponse({'success': False, 'error': err}, status=status_code)
 
     @method_decorator(csrf_exempt)
     @method_decorator(require_http_methods(["POST"]))
@@ -428,7 +437,7 @@ class TabuProductAdmin(admin.ModelAdmin):
                 logger.info("Wynik uploadu zdjęć Tabu→MPD: %s", upload_result)
             except Exception as e:
                 logger.exception("Błąd podczas uploadu zdjęć Tabu→MPD: %s", e)
-                mapping_info['upload_error'] = str(e)
+                mapping_info['upload_error'] = 'Błąd uploadu zdjęć'
 
             if not size_category and not mapping_info.get('error'):
                 mapping_info['error'] = 'Brak kategorii rozmiarowej w MPD (produkt bez wariantów z rozmiarem?).'

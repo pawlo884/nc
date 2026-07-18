@@ -11,6 +11,9 @@ on:
       - 'scripts/k8s-test/**'
       - 'src/**'
 
+permissions:
+  contents: read
+
 jobs:
   deploy-test:
     runs-on: ubuntu-latest

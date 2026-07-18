@@ -11,6 +11,9 @@ on:
   #   branches: [ main ]
   workflow_dispatch:  # Tylko ręczne uruchomienie (jeśli potrzebne)
 
+permissions:
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
