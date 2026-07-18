@@ -266,7 +266,7 @@ class MPDProductDetailAPI(APIView):
             return Response(
                 {
                     'status': 'error',
-                    'message': f'Nie udało się usunąć produktu: {exc}',
+                    'message': 'Nie udało się usunąć produktu.',
                 },
                 status=500,
             )

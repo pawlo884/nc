@@ -10,6 +10,7 @@ from django.urls import path
 from django.utils.html import format_html
 import json
 import logging
+from urllib.parse import urlparse
 import requests
 from rapidfuzz import fuzz
 from .models import (
@@ -264,12 +265,16 @@ class ProductAdmin(admin.ModelAdmin):
             display_url = normalized_url
         elif normalized_url.startswith('//'):
             display_url = f"https:{normalized_url}"
-        elif normalized_url.startswith('matterhorn-wholesale.com/'):
-            display_url = f"https://{normalized_url}"
         elif normalized_url.startswith(storage_prefixes):
             display_url = resolve_image_url(normalized_url) or normalized_url
         else:
-            display_url = f"https://matterhorn-wholesale.com/{normalized_url.lstrip('/')}"
+            # Hostname przez urlparse (nie substring) — py/incomplete-url-substring-sanitization
+            candidate = normalized_url if '://' in normalized_url else f'https://{normalized_url.lstrip("/")}'
+            host = (urlparse(candidate).hostname or '').lower()
+            if host == 'matterhorn-wholesale.com' or host.endswith('.matterhorn-wholesale.com'):
+                display_url = candidate if candidate.startswith('http') else f'https://{normalized_url.lstrip("/")}'
+            else:
+                display_url = f"https://matterhorn-wholesale.com/{normalized_url.lstrip('/')}"
 
         return format_html(
             '<a href="{}" target="_blank" title="{}">'
@@ -770,7 +775,7 @@ class ProductAdmin(admin.ModelAdmin):
 
             except Exception as e:
                 logger.error("Błąd podczas tworzenia produktu MPD: %s", e)
-                return JsonResponse({'success': False, 'error': str(e)})
+                return JsonResponse({'success': False, 'error': 'Wystąpił błąd'})
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
@@ -882,7 +887,7 @@ class ProductAdmin(admin.ModelAdmin):
 
             except Exception as e:
                 logger.error("Błąd podczas aktualizacji produktu MPD: %s", e)
-                return JsonResponse({'success': False, 'error': str(e)})
+                return JsonResponse({'success': False, 'error': 'Wystąpił błąd'})
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
@@ -980,7 +985,7 @@ class ProductAdmin(admin.ModelAdmin):
 
             except Exception as e:
                 logger.error("Błąd podczas przypisywania mapowania: %s", e)
-                return JsonResponse({'success': False, 'error': str(e)})
+                return JsonResponse({'success': False, 'error': 'Wystąpił błąd'})
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
@@ -1023,7 +1028,7 @@ class ProductAdmin(admin.ModelAdmin):
 
             except Exception as e:
                 logger.error("Błąd podczas aktualizacji pola MPD: %s", e)
-                return JsonResponse({'success': False, 'error': str(e)})
+                return JsonResponse({'success': False, 'error': 'Wystąpił błąd'})
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
@@ -1153,7 +1158,7 @@ class ProductAdmin(admin.ModelAdmin):
             except Exception as e:
                 return JsonResponse({
                     'success': False,
-                    'error': str(e)
+                    'error': 'Wystąpił błąd'
                 })
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
@@ -1208,7 +1213,7 @@ class ProductAdmin(admin.ModelAdmin):
             except Exception as e:
                 return JsonResponse({
                     'success': False,
-                    'error': str(e)
+                    'error': 'Wystąpił błąd'
                 })
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
@@ -1256,7 +1261,7 @@ class ProductAdmin(admin.ModelAdmin):
             except Exception as e:
                 return JsonResponse({
                     'success': False,
-                    'error': str(e)
+                    'error': 'Wystąpił błąd'
                 })
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
@@ -1284,7 +1289,7 @@ class ProductAdmin(admin.ModelAdmin):
             except Exception as e:
                 return JsonResponse({
                     'success': False,
-                    'error': str(e)
+                    'error': 'Wystąpił błąd'
                 })
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
@@ -1323,7 +1328,7 @@ class ProductAdmin(admin.ModelAdmin):
             except Exception as e:
                 return JsonResponse({
                     'success': False,
-                    'error': str(e)
+                    'error': 'Wystąpił błąd'
                 })
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
@@ -1775,7 +1780,7 @@ class ProductAdmin(admin.ModelAdmin):
         except Exception as e:
             logger.error(
                 f"Błąd dodawania wariantów dla produktu {product_id}: {e}")
-            return JsonResponse({'success': False, 'error': str(e)})
+            return JsonResponse({'success': False, 'error': 'Wystąpił błąd'})
 
 
 @admin.register(ProductDetails)

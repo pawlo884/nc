@@ -3864,7 +3864,8 @@ class BrowserAutomation:
             # Wzorzec 2: Materiał XX % (bez HTML tagów)
             # Najpierw usuń tagi HTML
             text_content = re.sub(r'<[^>]+>', ' ', html_content)
-            pattern2 = r'([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+(?:[a-ząćęłńóśźż]+)*)\s+(\d+)\s*%'
+            # Bez zagnieżdżonego kwantyfikatora (ReDoS / py/redos)
+            pattern2 = r'([A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]+)\s+(\d+)\s*%'
             matches2 = re.findall(pattern2, text_content)
 
             # Słowa do pominięcia (nie są materiałami)

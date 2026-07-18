@@ -6,7 +6,9 @@ import mimetypes
 from pathlib import Path
 
 from django.conf import settings
+from django.core.exceptions import SuspiciousFileOperation
 from django.http import FileResponse, Http404, HttpResponse
+from django.utils._os import safe_join
 
 
 def mpd_spa(request, path: str = ''):
@@ -21,15 +23,15 @@ def mpd_spa(request, path: str = ''):
     relative = (path or '').lstrip('/')
 
     if relative:
-        candidate = (root / relative).resolve()
         try:
-            candidate.relative_to(root_resolved)
-        except ValueError as exc:
+            # safe_join blokuje path traversal (.., absolutne ścieżki)
+            filepath = Path(safe_join(str(root_resolved), relative))
+        except SuspiciousFileOperation as exc:
             raise Http404 from exc
-        if candidate.is_file():
-            content_type, _ = mimetypes.guess_type(str(candidate))
+        if filepath.is_file():
+            content_type, _ = mimetypes.guess_type(str(filepath))
             return FileResponse(
-                candidate.open('rb'),
+                filepath.open('rb'),
                 content_type=content_type or 'application/octet-stream',
             )
 

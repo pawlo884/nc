@@ -96,7 +96,7 @@ class ProductBulkCreateAPI(BulkThrottleMixin, APIView):
                     errors.append(
                         {
                             'product_id': product_data.get('product_id', 'unknown'),
-                            'errors': [str(exc)],
+                            'errors': ['Błąd przetwarzania rekordu'],
                         }
                     )
 
@@ -196,7 +196,7 @@ class ProductBulkUpdateAPI(BulkThrottleMixin, APIView):
                     errors.append(
                         {
                             'product_id': product_id,
-                            'errors': [str(exc)],
+                            'errors': ['Błąd przetwarzania rekordu'],
                         }
                     )
 
@@ -295,7 +295,7 @@ class VariantBulkCreateAPI(BulkThrottleMixin, APIView):
                     errors.append(
                         {
                             'variant_uid': variant_data.get('variant_uid', 'unknown'),
-                            'errors': [str(exc)],
+                            'errors': ['Błąd przetwarzania rekordu'],
                         }
                     )
 
@@ -392,7 +392,7 @@ class VariantBulkUpdateAPI(BulkThrottleMixin, APIView):
                     errors.append(
                         {
                             'variant_uid': variant_uid,
-                            'errors': [str(exc)],
+                            'errors': ['Błąd przetwarzania rekordu'],
                         }
                     )
 
@@ -619,7 +619,7 @@ class ImageBulkCreateAPI(BulkThrottleMixin, APIView):
                     errors.append(
                         {
                             'image_url': resolve_image_url(image_data.get('image_url')) or image_data.get('image_url', 'unknown'),
-                            'errors': [str(exc)],
+                            'errors': ['Błąd przetwarzania rekordu'],
                         }
                     )
 

@@ -415,7 +415,7 @@ class TabuProductAdmin(admin.ModelAdmin):
                     logger.info("Wynik dodawania wariantów Tabu→MPD: %s", mapping_info)
                 except Exception as e:
                     logger.exception("Błąd podczas dodawania wariantów Tabu→MPD: %s", e)
-                    mapping_info = {'error': str(e)}
+                    mapping_info = {'error': 'Wystąpił błąd'}
 
             # Upload zdjęć do bucketa i MPD (jak w Matterhorn1)
             try:
@@ -443,7 +443,7 @@ class TabuProductAdmin(admin.ModelAdmin):
             })
         except Exception as e:
             logger.exception("Błąd assign_mapping Tabu: %s", e)
-            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            return JsonResponse({'success': False, 'error': 'Wystąpił błąd'}, status=500)
 
     def image_preview(self, obj):
         if obj and obj.image_url:
