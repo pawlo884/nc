@@ -1,5 +1,6 @@
 import os
 from .base import *
+from .base import _strip_env_value
 
 # Produkcja używa baz bez przedrostka zzz_ (zdefiniowanych w base.py)
 # Development (dev.py) nadpisuje je na wersje z zzz_
