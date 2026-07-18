@@ -7,7 +7,11 @@ type ProductThumbnailProps = {
   size?: number;
 };
 
-export function ProductThumbnail({ src, alt = 'Obraz produktu', size = 56 }: ProductThumbnailProps) {
+export function ProductThumbnail({
+  src,
+  alt = 'Obraz produktu',
+  size = 56,
+}: ProductThumbnailProps) {
   if (!src) {
     return <span className="product-thumb product-thumb--empty">—</span>;
   }
