@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.21.0 (2026-07-18)
+
+* Merge pull request #58 from pawlo884/feat/mpd-default-sort-id-desc ([691591d](https://github.com/pawlo884/nc/commit/691591d)), closes [#58](https://github.com/pawlo884/nc/issues/58)
+* feat(mpd): domyślne sortowanie listy po ID malejąco ([18d00be](https://github.com/pawlo884/nc/commit/18d00be))
+
 ## 1.20.0 (2026-07-18)
 
 * Merge pull request #57 from pawlo884/feat/mpd-products-column-sort ([194c3f0](https://github.com/pawlo884/nc/commit/194c3f0)), closes [#57](https://github.com/pawlo884/nc/issues/57)
