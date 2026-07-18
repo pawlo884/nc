@@ -193,6 +193,7 @@ class ProductsAdmin(admin.ModelAdmin):
         'product_image_thumbnail', 'id', 'name', 'description',
         'brand', 'collection', 'season', 'updated_at', 'visibility', 'open_in_react',
     ]
+    list_display_links = ['id', 'name']
     list_filter = [
         'brand',
         'collection',
