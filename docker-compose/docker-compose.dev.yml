@@ -40,6 +40,7 @@ services:
       - PYTHONUNBUFFERED=1
       - DJANGO_DEBUG=1
       - REDIS_PASSWORD=dev_password
+      - MPD_SPA_ROOT=/mpd_spa
       # Override DB hosts - w Docker łączymy się przez postgres-ssh-tunnel
       - DEFAULT_DB_HOST=postgres-ssh-tunnel
       - MPD_DB_HOST=postgres-ssh-tunnel

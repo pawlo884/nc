@@ -17,7 +17,9 @@ npm run dev
 
 Frontend (ta sama ścieżka co prod): **http://localhost:5173/mpd-app/**  
 LAN: `http://<IP-PC>:5173/mpd-app/`  
-Skrót w adminie: `MPD_REACT_FRONTEND_URL` (domyślnie `http://localhost:5173/mpd-app`).
+Przez internet (`nc-dev`): **https://nc-dev.sowa.ch/mpd-app/** — nie `:5173` (Cloudflare nie proxy’uje tego portu; SPA serwuje Django po rebuild obrazu).
+
+Skrót w adminie: lokalnie/LAN → Vite; na `*.sowa.ch` → `/mpd-app`.
 
 ## Produkcja
 
