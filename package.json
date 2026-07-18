@@ -21,9 +21,16 @@
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "glob": "^13.0.6",
     "husky": "^9.1.7",
     "prettier": "^3.6.2",
     "semantic-release": "^25.0.2",
     "typescript-eslint": "^8.46.4"
+  },
+  "overrides": {
+    "glob": "$glob",
+    "@semantic-release/npm": {
+      "npm": "11.12.1"
+    }
   }
 }
