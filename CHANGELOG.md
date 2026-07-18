@@ -1,5 +1,13 @@
 # Zmiany
 
+## <small>1.21.1 (2026-07-18)</small>
+
+* Merge pull request #59 from pawlo884/ci/path-filter-check-branch ([b0048d5](https://github.com/pawlo884/nc/commit/b0048d5)), closes [#59](https://github.com/pawlo884/nc/issues/59)
+* Merge pull request #60 from pawlo884/fix/tabu-import-syntax-and-verify-ci ([d0531ea](https://github.com/pawlo884/nc/commit/d0531ea)), closes [#60](https://github.com/pawlo884/nc/issues/60)
+* fix(tabu): napraw SyntaxError w import_tabu_by_id (wa""") ([51a83b4](https://github.com/pawlo884/nc/commit/51a83b4))
+* ci: tylko PR, bez duplikatów push; joby wg ścieżek; Django bez Postgresa ([049c313](https://github.com/pawlo884/nc/commit/049c313))
+* ci: uruchamiaj Django/React/lint tylko przy zmianach w odpowiednich ścieżkach ([4b8eb5b](https://github.com/pawlo884/nc/commit/4b8eb5b))
+
 ## 1.21.0 (2026-07-18)
 
 * Merge pull request #58 from pawlo884/feat/mpd-default-sort-id-desc ([691591d](https://github.com/pawlo884/nc/commit/691591d)), closes [#58](https://github.com/pawlo884/nc/issues/58)
