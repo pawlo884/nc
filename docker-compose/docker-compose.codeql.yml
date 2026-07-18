@@ -1,12 +1,15 @@
 # Lokalny CodeQL w Dockerze — BEZ GitHub Actions (bez minut CI).
 #
-# Uzycie (z roota repo):
-#   docker compose -f docker-compose/docker-compose.codeql.yml run --rm codeql
-#   CODEQL_LANGS=python,javascript docker compose -f docker-compose/docker-compose.codeql.yml run --rm codeql
+# WAZNE: name: nc-codeql — osobny projekt Compose, zeby NIE kasowac
+# kontenerow z docker-compose.dev.yml (ten sam katalog = ten sam project).
 #
-# Albo: .\scripts\codeql-docker.ps1
+# Uzycie:
+#   .\scripts\codeql-docker.ps1
+#   docker compose -p nc-codeql -f docker-compose/docker-compose.codeql.yml run --rm codeql
 #
-# Wyniki: .codeql/*.sarif (rozszerzenie SARIF Viewer w Cursor/VS Code)
+# Wyniki: .codeql/*.sarif
+
+name: nc-codeql
 
 services:
   codeql:

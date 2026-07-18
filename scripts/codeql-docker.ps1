@@ -24,7 +24,9 @@ if ($Pull) {
 }
 
 Write-Host "CodeQL langs=$Langs -> wyniki w .codeql\"
-docker compose -f $Compose run --rm --remove-orphans codeql
+# NIE uzywaj --remove-orphans: ten sam katalog compose = ten sam project name co dev,
+# i orphans kasuje kontenery web/redis/postgres.
+docker compose -p nc-codeql -f $Compose run --rm codeql
 
 if (Test-Path (Join-Path $Root ".codeql\python.sarif")) {
     Write-Host "Otworz .codeql\*.sarif w Cursor (SARIF Viewer)."
