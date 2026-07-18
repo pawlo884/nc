@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.19.0 (2026-07-18)
+
+* Merge pull request #55 from pawlo884/feat/mpd-products-infinite-scroll ([4e97b1d](https://github.com/pawlo884/nc/commit/4e97b1d)), closes [#55](https://github.com/pawlo884/nc/issues/55)
+* feat(mpd): infinite scroll na liście produktów w mpd-app ([03f8476](https://github.com/pawlo884/nc/commit/03f8476))
+
 ## 1.18.0 (2026-07-18)
 
 * Merge pull request #54 from pawlo884/feat/mpd-product-thumbnails ([6435254](https://github.com/pawlo884/nc/commit/6435254)), closes [#54](https://github.com/pawlo884/nc/issues/54)
