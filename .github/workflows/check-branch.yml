@@ -8,7 +8,48 @@ on:
     branches:
       - main
 
+# Przy push do brancha z otwartym PR unikaj podwójnych runów (push + pull_request)
+concurrency:
+  group: check-branch-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    name: Wykryj zmienione ścieżki
+    runs-on: ubuntu-latest
+    outputs:
+      django: ${{ steps.filter.outputs.django }}
+      code_quality: ${{ steps.filter.outputs.code_quality }}
+      frontend_mpd: ${{ steps.filter.outputs.frontend_mpd }}
+    steps:
+      - name: Checkout kod
+        uses: actions/checkout@v6
+
+      - name: Filtr ścieżek
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            django:
+              - 'src/**'
+              - '**/requirements*.txt'
+              - 'requirements*.txt'
+              - '.github/workflows/check-branch.yml'
+            code_quality:
+              - '**/*.{js,jsx,ts,tsx,css,scss}'
+              - 'frontend/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.prettierrc'
+              - '.prettierrc.*'
+              - '.prettierignore'
+              - 'eslint.config.*'
+              - '.eslintrc*'
+              - '.github/workflows/check-branch.yml'
+            frontend_mpd:
+              - 'frontend/mpd/**'
+              - '.github/workflows/check-branch.yml'
+
   check-merge-conflicts:
     name: Sprawdź konflikty z main
     runs-on: ubuntu-latest
@@ -63,6 +104,8 @@ jobs:
 
   check-django:
     name: Sprawdź Django (testy i migracje)
+    needs: changes
+    if: needs.changes.outputs.django == 'true'
     runs-on: ubuntu-latest
 
     services:
@@ -190,6 +233,8 @@ jobs:
 
   check-code-quality:
     name: Sprawdź jakość kodu (linting i formatowanie)
+    needs: changes
+    if: needs.changes.outputs.code_quality == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -263,6 +308,8 @@ jobs:
 
   check-mpd-frontend:
     name: Sprawdź MPD React (tsc + vite build)
+    needs: changes
+    if: needs.changes.outputs.frontend_mpd == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -288,24 +335,48 @@ jobs:
   summary:
     name: Podsumowanie
     runs-on: ubuntu-latest
-    needs: [check-merge-conflicts, check-django, check-code-quality, check-mpd-frontend]
+    needs:
+      [
+        changes,
+        check-merge-conflicts,
+        check-django,
+        check-code-quality,
+        check-mpd-frontend,
+      ]
     if: always()
 
     steps:
       - name: Podsumowanie sprawdzeń
         run: |
           echo "📊 Podsumowanie sprawdzeń brancha:"
+          echo "🔎 Zmiany Django: ${{ needs.changes.outputs.django }}"
+          echo "🔎 Zmiany code quality: ${{ needs.changes.outputs.code_quality }}"
+          echo "🔎 Zmiany MPD React: ${{ needs.changes.outputs.frontend_mpd }}"
           echo "✅ Sprawdzanie konfliktów: ${{ needs.check-merge-conflicts.result }}"
           echo "✅ Sprawdzanie Django: ${{ needs.check-django.result }}"
           echo "✅ Sprawdzanie jakości kodu: ${{ needs.check-code-quality.result }}"
           echo "✅ Sprawdzanie MPD React: ${{ needs.check-mpd-frontend.result }}"
 
-          if [ "${{ needs.check-merge-conflicts.result }}" != "success" ] || \
-             [ "${{ needs.check-django.result }}" != "success" ] || \
-             [ "${{ needs.check-code-quality.result }}" != "success" ] || \
-             [ "${{ needs.check-mpd-frontend.result }}" != "success" ]; then
+          check_ok() {
+            local name="$1"
+            local result="$2"
+            # skipped = job celowo pominięty (brak zmian w ścieżkach)
+            if [ "$result" = "success" ] || [ "$result" = "skipped" ]; then
+              return 0
+            fi
+            echo "❌ $name nie przeszło ($result)"
+            return 1
+          }
+
+          FAILED=0
+          check_ok "konflikty" "${{ needs.check-merge-conflicts.result }}" || FAILED=1
+          check_ok "Django" "${{ needs.check-django.result }}" || FAILED=1
+          check_ok "jakość kodu" "${{ needs.check-code-quality.result }}" || FAILED=1
+          check_ok "MPD React" "${{ needs.check-mpd-frontend.result }}" || FAILED=1
+
+          if [ "$FAILED" -ne 0 ]; then
             echo "❌ Niektóre sprawdzenia nie przeszły!"
             exit 1
           fi
 
-          echo "✅ Wszystkie sprawdzenia przeszły pomyślnie!"
+          echo "✅ Wszystkie wymagane sprawdzenia przeszły (pominięte joby = OK)!"
