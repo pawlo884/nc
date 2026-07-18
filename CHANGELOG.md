@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.22.0 (2026-07-18)
+
+* Merge pull request #65 from pawlo884/feat/mpd-product-list-filters ([b60a076](https://github.com/pawlo884/nc/commit/b60a076)), closes [#65](https://github.com/pawlo884/nc/issues/65)
+* feat(mpd): filtry listy produktów — marka, widoczność, kategoria ([de91545](https://github.com/pawlo884/nc/commit/de91545))
+
 ## <small>1.21.3 (2026-07-18)</small>
 
 * Merge pull request #62 from pawlo884/dependabot/npm_and_yarn/handlebars-4.7.9 ([d9ae9e0](https://github.com/pawlo884/nc/commit/d9ae9e0)), closes [#62](https://github.com/pawlo884/nc/issues/62)
