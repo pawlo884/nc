@@ -1,0 +1,21 @@
+# Traefik Ingress (wbudowany w k3s) — punkt wejscia zamiast nginx-router
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nc-web
+  namespace: nc-test
+  labels:
+    app: nc-web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: nc-test.sowa.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nc-web
+                port:
+                  number: 8000

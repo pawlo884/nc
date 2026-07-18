@@ -32,10 +32,16 @@ else:
 # Dodaj konkretne IP/domeny do .env.dev jako DJANGO_ALLOWED_HOSTS (oddzielone przecinkami)
 allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS', '')
 if allowed_hosts_env:
-    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',')]
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
 else:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1',
-                     '192.168.50.63', '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch']
+                     '192.168.50.4', '192.168.50.63', '192.168.50.150',
+                     '83.168.79.109', '212.127.93.27', 'nc-dev.sowa.ch']
+
+# LAN healthcheck / dostęp z sieci lokalnej
+for _lan_host in ('192.168.50.4', '192.168.50.150'):
+    if _lan_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_lan_host)
 
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'https://nc-dev.sowa.ch')
@@ -84,6 +90,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8090',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'http://192.168.50.4',
+    'http://192.168.50.4:8000',
     'http://192.168.50.63',
     'http://192.168.50.63:8000',
     'http://192.168.50.150',
@@ -112,7 +120,10 @@ INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.50.63'] + \
 
 
 def show_debug_toolbar(request):
-    """Callback dla debug toolbar - pokazuje się tylko dla localhost."""
+    """Callback dla debug toolbar - pokazuje się tylko dla localhost (nie w testach)."""
+    # django-debug-toolbar 7.x psuje reverse('djdt') w APIClient jeśli toolbar jest aktywny w testach
+    if 'test' in sys.argv:
+        return False
     return get_debug() and request.META.get('REMOTE_ADDR') in INTERNAL_IPS
 
 
@@ -121,7 +132,7 @@ DEBUG_TOOLBAR_CONFIG = {
     'SHOW_TEMPLATE_CONTEXT': True,
     'ENABLE_STACKTRACES': True,
     'SQL_WARNING_THRESHOLD': 500,  # milliseconds
-    'IS_RUNNING_TESTS': False,  # bypass debug toolbar check during manage.py test
+    'IS_RUNNING_TESTS': False,  # custom callback obsługuje testy (powyżej)
 }
 
 # CORS Configuration
@@ -137,7 +148,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8090",
     "http://127.0.0.1:8090",
+    "http://192.168.50.4:8000",
     "http://192.168.50.63:8000",
+    "http://192.168.50.150:8000",
     "http://83.168.79.109:8000",
     "http://212.127.93.27:8090",
     "http://212.127.93.27:8000",

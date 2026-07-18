@@ -177,11 +177,11 @@ def create_mpd_variants(
                 with connections[mpd_db].cursor() as cursor:
                     cursor.execute(
                         """
-                        INSERT INTO product_variants (product_id, color_id, producer_color_id, size_id)
-                        VALUES (%s, %s, %s, %s)
+                        INSERT INTO product_variants (product_id, color_id, producer_color_id, size_id, exported_to_iai)
+                        VALUES (%s, %s, %s, %s, %s)
                         RETURNING variant_id
                         """,
-                        [mpd_product_id, color_id, producer_color_id, size.id],
+                        [mpd_product_id, color_id, producer_color_id, size.id, False],
                     )
                     row = cursor.fetchone()
                     variant_id = row[0]

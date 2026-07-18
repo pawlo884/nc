@@ -1,4 +1,22 @@
 {% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {% if mpd_react_product_url %}
+  <li>
+    <a href="{{ mpd_react_product_url }}" target="_blank" rel="noopener noreferrer" class="historylink">
+      Otwórz w React
+    </a>
+  </li>
+  {% elif mpd_react_url %}
+  <li>
+    <a href="{{ mpd_react_url }}/" target="_blank" rel="noopener noreferrer" class="historylink">
+      Panel React MPD
+    </a>
+  </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
 {% block content %}
   {{ block.super }}
   <h3>Aktualne drzewo ścieżek</h3>

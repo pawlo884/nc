@@ -144,7 +144,7 @@ jobs:
 
 ### requirements.txt (wspólne):
 ```txt
-Django==5.2.4
+Django==6.0.7
 celery==5.5.0
 kombu==5.5.2
 redis==5.2.1

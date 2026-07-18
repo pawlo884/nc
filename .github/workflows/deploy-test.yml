@@ -1,0 +1,48 @@
+name: Deploy Test (k3s)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'deployments/k8s/nc-test/**'
+      - 'deployments/docker/Dockerfile.prod'
+      - 'scripts/k8s-test/**'
+      - 'src/**'
+
+jobs:
+  deploy-test:
+    runs-on: ubuntu-latest
+    environment: test
+
+    steps:
+      - name: Deploy nc-test on VPS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 25m
+          script: |
+            set -e
+            echo "Deploy nc-test (k3s)..."
+            cd /home/pawel/apps/nc
+            git fetch origin main
+            git reset --hard origin/main
+
+            chmod +x scripts/k8s-test/*.sh
+
+            if [[ ! -f .env.test ]]; then
+              echo "Brak .env.test na serwerze — utworz recznie przed pierwszym deployem."
+              exit 1
+            fi
+
+            ./scripts/k8s-test/create-secret.sh
+            ./scripts/k8s-test/build-image.sh
+            ./scripts/k8s-test/deploy.sh --migrate
+
+            kubectl get pods,ingress -n nc-test
+            echo "Deploy nc-test zakonczony."

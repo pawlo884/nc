@@ -3,6 +3,12 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
+from ._legacy_pk_utils import ensure_primary_key_on_tables
+
+
+def ensure_brands_primary_key(apps, schema_editor):
+    ensure_primary_key_on_tables(schema_editor, ['brands'])
+
 
 class Migration(migrations.Migration):
 
@@ -11,6 +17,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(ensure_brands_primary_key, migrations.RunPython.noop),
         migrations.AlterModelOptions(
             name='productseries',
             options={'managed': True, 'ordering': ['brand', 'name'], 'verbose_name': 'Seria', 'verbose_name_plural': 'Serie'},

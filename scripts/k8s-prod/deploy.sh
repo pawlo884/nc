@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Deploy produkcji na k3s (zamiast blue-green)
+# Uzycie: ./scripts/k8s-prod/deploy.sh [--migrate] [--skip-migrate]
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=ensure-kubectl.sh
+source "$SCRIPT_DIR/ensure-kubectl.sh"
+
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+MANIFEST_DIR="$REPO_ROOT/deployments/k8s/nc-prod"
+RUN_MIGRATE=false
+SKIP_MIGRATE=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --migrate) RUN_MIGRATE=true ;;
+    --skip-migrate) SKIP_MIGRATE=true ;;
+  esac
+done
+
+cd "$REPO_ROOT"
+
+ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env.prod}"
+
+echo "=== Namespace nc-prod ==="
+kubectl apply -f "$MANIFEST_DIR/00-namespace.yaml"
+
+if ! kubectl get secret nc-env -n nc-prod &>/dev/null; then
+  if [[ -f "$ENV_FILE" ]]; then
+    echo "Brak secret nc-env — tworze z $ENV_FILE..."
+    "$SCRIPT_DIR/create-secret.sh"
+  else
+    echo "Brak secret nc-env i brak pliku $ENV_FILE"
+    echo "Utworz .env.prod na serwerze, potem: ./scripts/k8s-prod/create-secret.sh"
+    exit 1
+  fi
+fi
+
+echo "=== Apply redis (bez restartu aplikacji) ==="
+kubectl apply -f "$MANIFEST_DIR/redis.yaml"
+
+# Migracje PRZED apply web/celery — stary web nadal obsluguje ruch (brak 504)
+if [[ "$RUN_MIGRATE" == true && "$SKIP_MIGRATE" != true ]]; then
+  echo "=== Job migracji (przed rolloutem web) ==="
+  kubectl delete job nc-migrate -n nc-prod --ignore-not-found
+  kubectl apply -f "$MANIFEST_DIR/migrate-job.yaml"
+  if ! kubectl wait --for=condition=complete job/nc-migrate -n nc-prod --timeout=300s; then
+    echo "BLAD: Job migracji nie zakonczyl sie sukcesem w 300s"
+    kubectl logs job/nc-migrate -n nc-prod --tail=40 || true
+    exit 1
+  fi
+  kubectl logs job/nc-migrate -n nc-prod --tail=20
+fi
+
+echo "=== Apply manifestow aplikacji nc-prod ==="
+kubectl apply -f "$MANIFEST_DIR/web.yaml"
+kubectl apply -f "$MANIFEST_DIR/celery.yaml"
+kubectl apply -f "$MANIFEST_DIR/flower.yaml"
+kubectl apply -f "$MANIFEST_DIR/ingress.yaml"
+
+echo "=== Rollout nc-web ==="
+if kubectl get deployment nc-web -n nc-prod &>/dev/null; then
+  kubectl rollout restart deployment/nc-web -n nc-prod
+  kubectl rollout status deployment/nc-web -n nc-prod --timeout=600s
+else
+  echo "Pierwszy deploy — czekam na utworzenie deployment nc-web..."
+  kubectl rollout status deployment/nc-web -n nc-prod --timeout=600s
+fi
+kubectl rollout restart deployment/celery-default deployment/celery-import deployment/celery-beat deployment/flower -n nc-prod 2>/dev/null || true
+
+"$SCRIPT_DIR/expose-traefik.sh"
+
+POD_COUNT="$(kubectl get pods -n nc-prod --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+if [[ "${POD_COUNT:-0}" -lt 1 ]]; then
+  echo "BLAD: Brak podow w nc-prod po deploy!"
+  kubectl get events -n nc-prod --sort-by='.lastTimestamp' | tail -20
+  exit 1
+fi
+
+echo ""
+kubectl get pods,svc,ingress -n nc-prod
+echo ""
+echo "Health: curl -H 'Host: nc.sowa.ch' http://127.0.0.1:30080/health/"

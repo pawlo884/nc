@@ -29,6 +29,7 @@ from .serializers import (
     BulkBrandSerializer,
     BulkCategorySerializer,
     BulkVariantSerializer,
+    BulkVariantUpdateSerializer,
     BulkImageSerializer,
 )
 from .defs_db import resolve_image_url
@@ -335,7 +336,7 @@ class VariantBulkUpdateAPI(BulkThrottleMixin, APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        bulk_serializer = BulkVariantSerializer(data={'variants': data})
+        bulk_serializer = BulkVariantUpdateSerializer(data={'variants': data})
         if not bulk_serializer.is_valid():
             return Response(
                 {
@@ -578,7 +579,7 @@ class ImageBulkCreateAPI(BulkThrottleMixin, APIView):
 
         with transaction.atomic():
             for image_data in data:
-                product_id = image_data.get('product_id')
+                product_id = image_data.get('product_id') or image_data.get('product_uid')
                 if not product_id:
                     errors.append(
                         {

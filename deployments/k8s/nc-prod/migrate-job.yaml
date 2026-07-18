@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nc-migrate
+  namespace: nc-prod
+  labels:
+    app: nc-migrate
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: nc-migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: nc-django-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Migracje nc-prod..."
+              python manage.py shell -c "
+              from django.db import connections
+              with connections['default'].cursor() as c:
+                  c.execute(
+                      \"DELETE FROM django_migrations WHERE app IN ('MPD', 'matterhorn1', 'web_agent', 'tabu')\"
+                  )
+                  print('Wyczyszczono bledne wpisy migracji aplikacji z bazy default')
+              "
+              python manage.py migrate --database=default --noinput
+              python manage.py migrate admin_interface --database=default --noinput
+              python manage.py migrate matterhorn1 --database=matterhorn1 --noinput
+              python manage.py migrate MPD --database=MPD --noinput
+              python manage.py migrate web_agent --database=web_agent --noinput
+              python manage.py migrate django_celery_beat --database=default --noinput
+              python manage.py migrate django_celery_results --database=default --noinput
+              python manage.py migrate tabu --database=tabu --noinput || true
+              echo "Migracje zakonczone."
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: core.settings.prod
+            - name: TZ
+              value: Europe/Warsaw
+            - name: REDIS_HOST
+              value: redis
+            - name: CELERY_BROKER_URL
+              value: ""
+            - name: CELERY_RESULT_BACKEND
+              value: ""
+          envFrom:
+            - secretRef:
+                name: nc-env

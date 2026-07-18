@@ -28,7 +28,7 @@ services:
         'python manage.py makemigrations && python manage.py migrate --database=zzz_default && gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 1 --timeout 300 --keep-alive 5 --reload',
       ]
     ports:
-      - '127.0.0.1:8000:8000'  # Dostępny tylko lokalnie, nginx używa wewnętrznej sieci
+      - '8000:8000'  # Dostępny w LAN (landing healthcheck nc-dev)
     volumes:
       - ../src:/app
       - static_volume:/app/staticfiles

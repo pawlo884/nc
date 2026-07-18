@@ -1,0 +1,43 @@
+# Job migracji — uruchom PRZED rolloutem nowej wersji (kubectl apply -f migrate-job.yaml)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nc-migrate
+  namespace: nc-test
+  labels:
+    app: nc-migrate
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: nc-migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: nc-django-app:test
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Migracje nc-test..."
+              python manage.py migrate --database=default --noinput
+              python manage.py migrate admin_interface --database=default --noinput
+              python manage.py migrate matterhorn1 --database=matterhorn1 --noinput
+              python manage.py migrate MPD --database=MPD --noinput
+              python manage.py migrate web_agent --database=web_agent --noinput
+              python manage.py migrate django_celery_beat --database=default --noinput
+              python manage.py migrate django_celery_results --database=default --noinput
+              echo "Migracje zakonczone."
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: core.settings.test
+            - name: TZ
+              value: Europe/Warsaw
+          envFrom:
+            - secretRef:
+                name: nc-env

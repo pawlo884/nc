@@ -2,6 +2,8 @@
 Testy dla aplikacji web_agent
 Testy modeli i API endpoints
 """
+from unittest.mock import MagicMock, patch
+
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -461,8 +463,10 @@ class AutomationRunStartAPITest(APITestCase):
             status.HTTP_403_FORBIDDEN
         ])
 
-    def test_start_automation_endpoint_exists(self):
+    @patch('web_agent.views.automate_mpd_form_filling.delay')
+    def test_start_automation_endpoint_exists(self, mock_delay):
         """Test czy endpoint start-automation istnieje"""
+        mock_delay.return_value = MagicMock(id='test-task-id')
         url = '/api/web-agent/automation-runs/start-automation/'
         # Może zwrócić 400 (błąd walidacji) lub 202 (zaakceptowane), ale nie 404
         response = self.client.post(url, {}, format='json')
@@ -472,8 +476,10 @@ class AutomationRunStartAPITest(APITestCase):
             status.HTTP_500_INTERNAL_SERVER_ERROR
         ])
 
-    def test_start_automation_with_params(self):
+    @patch('web_agent.views.automate_mpd_form_filling.delay')
+    def test_start_automation_with_params(self, mock_delay):
         """Test uruchomienia automatyzacji z parametrami"""
+        mock_delay.return_value = MagicMock(id='test-task-id')
         url = '/api/web-agent/automation-runs/start-automation/'
         data = {
             'brand_id': 1,
@@ -481,7 +487,7 @@ class AutomationRunStartAPITest(APITestCase):
             'filters': {'active': True}
         }
 
-        # Może zwrócić 202 (zaakceptowane) lub błąd jeśli Celery nie działa
+        # Może zwrócić 202 (zaakceptowane) lub błąd walidacji
         response = self.client.post(url, data, format='json')
         self.assertIn(response.status_code, [
             status.HTTP_202_ACCEPTED,

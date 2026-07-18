@@ -1,6 +1,8 @@
 """
 Views for nc project.
 """
+import socket
+
 from django.shortcuts import render
 from django.http import HttpResponse
 
@@ -11,5 +13,8 @@ def index(request):
 
 
 def health_check(request):
-    """Health check endpoint dla Docker health checks."""
-    return HttpResponse("OK", content_type="text/plain")
+    """Health check dla Docker/k3s — w odpowiedzi widać hostname poda."""
+    return HttpResponse(
+        f"OK pod={socket.gethostname()}",
+        content_type="text/plain",
+    )

@@ -1,0 +1,12 @@
+# Wspolne nadpisania env dla podow k3s (maja pierwszenstwo nad secret nc-env).
+# Uzyj w sekcji containers[].env po envFrom.
+#
+# Redis: Service w namespace nc-prod
+# DB: hosty z .env.prod (secret nc-env) — np. 172.17.0.1 dla postgres w Dockerze na VPS
+#
+# - name: REDIS_HOST
+#   value: redis
+# - name: CELERY_BROKER_URL
+#   value: ""
+# - name: CELERY_RESULT_BACKEND
+#   value: ""

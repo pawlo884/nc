@@ -1,0 +1,115 @@
+# Flower — monitoring Celery (zamiast nc-flower w Docker blue-green)
+# Wymaga: Secret nc-env (FLOWER_USER, FLOWER_PASSWORD, REDIS_PASSWORD)
+# Uwaga: Service musi nazywac sie nc-flower — K8s wstrzykuje FLOWER_* dla Service "flower"
+# Dostep: Ingress flower.nc.sowa.ch (NPM -> Traefik :80) lub port-forward
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flower
+  namespace: nc-prod
+  labels:
+    app: flower
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flower
+  template:
+    metadata:
+      labels:
+        app: flower
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: flower
+          image: nc-django-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - |
+              sleep 20
+              exec celery -A core.celery flower \
+                --port=5555 \
+                --basic_auth="${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower}" \
+                --persistent=True \
+                --db=/var/lib/flower/flower.db \
+                --inspect_timeout=30
+          ports:
+            - containerPort: 5555
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: core.settings.prod
+            - name: TZ
+              value: Europe/Warsaw
+            - name: DJANGO_ENV
+              value: prod
+            - name: REDIS_HOST
+              value: redis
+            - name: CELERY_BROKER_URL
+              value: ""
+            - name: CELERY_RESULT_BACKEND
+              value: ""
+          envFrom:
+            - secretRef:
+                name: nc-env
+          volumeMounts:
+            - name: flower-data
+              mountPath: /var/lib/flower
+          readinessProbe:
+            tcpSocket:
+              port: 5555
+            initialDelaySeconds: 25
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5555
+            initialDelaySeconds: 45
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: flower-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nc-flower
+  namespace: nc-prod
+  labels:
+    app: flower
+spec:
+  type: ClusterIP
+  selector:
+    app: flower
+  ports:
+    - name: http
+      port: 5555
+      targetPort: 5555
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flower
+  namespace: nc-prod
+  labels:
+    app: flower
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: flower.nc.sowa.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nc-flower
+                port:
+                  number: 5555

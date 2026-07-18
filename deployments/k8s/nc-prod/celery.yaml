@@ -1,0 +1,168 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-default
+  namespace: nc-prod
+  labels:
+    app: celery-default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-default
+  template:
+    metadata:
+      labels:
+        app: celery-default
+    spec:
+      containers:
+        - name: worker
+          image: nc-django-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - >
+              sleep 20 &&
+              celery -A core.celery worker -Q default --loglevel=info --concurrency=1
+              --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: core.settings.prod
+            - name: TZ
+              value: Europe/Warsaw
+            - name: DJANGO_ENV
+              value: prod
+            - name: CELERY_STATE_DB
+              value: /var/lib/celery/worker_state_default
+            - name: REDIS_HOST
+              value: redis
+            - name: CELERY_BROKER_URL
+              value: ""
+            - name: CELERY_RESULT_BACKEND
+              value: ""
+          envFrom:
+            - secretRef:
+                name: nc-env
+          volumeMounts:
+            - name: celery-state
+              mountPath: /var/lib/celery
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: celery-state
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-import
+  namespace: nc-prod
+  labels:
+    app: celery-import
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-import
+  template:
+    metadata:
+      labels:
+        app: celery-import
+    spec:
+      containers:
+        - name: worker
+          image: nc-django-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - >
+              sleep 20 &&
+              celery -A core.celery worker -Q import --loglevel=info --concurrency=1
+              --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: core.settings.prod
+            - name: TZ
+              value: Europe/Warsaw
+            - name: DJANGO_ENV
+              value: prod
+            - name: CELERY_STATE_DB
+              value: /var/lib/celery/worker_state_import
+            - name: REDIS_HOST
+              value: redis
+            - name: CELERY_BROKER_URL
+              value: ""
+            - name: CELERY_RESULT_BACKEND
+              value: ""
+          envFrom:
+            - secretRef:
+                name: nc-env
+          volumeMounts:
+            - name: celery-state
+              mountPath: /var/lib/celery
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: celery-state
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-beat
+  namespace: nc-prod
+  labels:
+    app: celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-beat
+  template:
+    metadata:
+      labels:
+        app: celery-beat
+    spec:
+      containers:
+        - name: beat
+          image: nc-django-app:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - sleep 20 && celery -A core.celery beat --loglevel=info
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: core.settings.prod
+            - name: TZ
+              value: Europe/Warsaw
+            - name: DJANGO_ENV
+              value: prod
+            - name: REDIS_HOST
+              value: redis
+            - name: CELERY_BROKER_URL
+              value: ""
+            - name: CELERY_RESULT_BACKEND
+              value: ""
+          envFrom:
+            - secretRef:
+                name: nc-env
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

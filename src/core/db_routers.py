@@ -4,6 +4,7 @@ import os
 _MPD_DB = None
 _MATTERHORN1_DB = None
 _DEFAULT_DB = None
+_TABU_DB = None
 
 
 def _get_mpd_db():
@@ -36,6 +37,15 @@ def _get_default_db():
         else:
             _DEFAULT_DB = False  # Używamy False zamiast None dla cache'owania
     return _DEFAULT_DB if _DEFAULT_DB is not False else None
+
+
+def _get_tabu_db():
+    """Lazy evaluation dla bazy tabu"""
+    global _TABU_DB
+    if _TABU_DB is None:
+        from django.conf import settings
+        _TABU_DB = 'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu'
+    return _TABU_DB
 
 
 class MPDRouter:
@@ -136,20 +146,12 @@ class TabuRouter:
 
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'tabu':
-            from django.conf import settings
-            # Development używa zzz_tabu, produkcja tabu
-            if 'zzz_tabu' in settings.DATABASES:
-                return 'zzz_tabu'
-            return 'tabu'
+            return _get_tabu_db()
         return None
 
     def db_for_write(self, model, **hints):
         if model._meta.app_label == 'tabu':
-            from django.conf import settings
-            # Development używa zzz_tabu, produkcja tabu
-            if 'zzz_tabu' in settings.DATABASES:
-                return 'zzz_tabu'
-            return 'tabu'
+            return _get_tabu_db()
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -160,11 +162,7 @@ class TabuRouter:
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'tabu':
-            from django.conf import settings
-            # Development używa zzz_tabu, produkcja tabu
-            if 'zzz_tabu' in settings.DATABASES:
-                return db == 'zzz_tabu'
-            return db == 'tabu'
+            return db == _get_tabu_db()
         return None
 
 

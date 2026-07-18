@@ -1,5 +1,74 @@
 # Zmiany
 
+## 1.14.0 (2026-07-18)
+
+* Merge pull request #46 from pawlo884/feat/mpd-admin-react-shortcut ([1eff37a](https://github.com/pawlo884/nc/commit/1eff37a)), closes [#46](https://github.com/pawlo884/nc/issues/46)
+* feat(mpd): add django admin shortcuts to react panel ([cd41ab7](https://github.com/pawlo884/nc/commit/cd41ab7))
+
+## <small>1.13.6 (2026-07-17)</small>
+
+* fix(dev): allow lan host 192.168.50.4 ([4fa5794](https://github.com/pawlo884/nc/commit/4fa5794))
+
+## <small>1.13.5 (2026-07-16)</small>
+
+* fix(dev): lan healthcheck and pod hostname in /health/ ([ce6a706](https://github.com/pawlo884/nc/commit/ce6a706))
+
+## <small>1.13.4 (2026-07-16)</small>
+
+* Merge pull request #44 from pawlo884/chore/django-upgrade-compat ([fe2abbd](https://github.com/pawlo884/nc/commit/fe2abbd)), closes [#44](https://github.com/pawlo884/nc/issues/44)
+* Merge pull request #45 from pawlo884/cursor/fix-admin-changelist-django6 ([80bca5b](https://github.com/pawlo884/nc/commit/80bca5b)), closes [#45](https://github.com/pawlo884/nc/issues/45)
+* fix(admin): napraw layout changelist po Django 6 ([5d95b31](https://github.com/pawlo884/nc/commit/5d95b31))
+* chore: upgrade Django 5.2.4 → 6.0.7 z poprawkami kompatybilności ([3be5179](https://github.com/pawlo884/nc/commit/3be5179))
+
+## <small>1.13.3 (2026-07-15)</small>
+
+* fix(MPD): idempotentne usuniecie iai_product_id w 0016 ([b84ea3f](https://github.com/pawlo884/nc/commit/b84ea3f))
+
+## <small>1.13.2 (2026-07-15)</small>
+
+* fix(MPD): idempotentny drop unique_together w 0015 dla product_path ([afb34aa](https://github.com/pawlo884/nc/commit/afb34aa))
+* fix(k8s,MPD): migracje legacy PK, deploy bez 504 i Traefik NodePort ([ff85eb2](https://github.com/pawlo884/nc/commit/ff85eb2))
+
+## <small>1.13.1 (2026-07-14)</small>
+
+* fix(k8s): usun sowa.ch z Ingress prod — tylko nc.sowa.ch ([744757c](https://github.com/pawlo884/nc/commit/744757c))
+
+## 1.13.0 (2026-07-14)
+
+* feat(k8s): dodaj Flower do nc-prod zamiast kontenera Docker ([72de808](https://github.com/pawlo884/nc/commit/72de808))
+
+## <small>1.12.1 (2026-07-14)</small>
+
+* fix(k8s): ustaw bit wykonywalności na skryptach k8s-test ([6f966b4](https://github.com/pawlo884/nc/commit/6f966b4))
+
+## 1.12.0 (2026-07-14)
+
+* fix(k8s): deduplikacja kluczy w .env.prod przy tworzeniu secretu ([e1a683a](https://github.com/pawlo884/nc/commit/e1a683a))
+* fix(k8s): deploy.sh automatycznie tworzy secret z .env.prod ([933052b](https://github.com/pawlo884/nc/commit/933052b))
+* fix(k8s): nadpisz REDIS_HOST i DB_HOST dla podow w nc-prod ([02bf75d](https://github.com/pawlo884/nc/commit/02bf75d))
+* fix(k8s): setup kubeconfig dla uzytkownika bez sudo kubectl ([ab97d0e](https://github.com/pawlo884/nc/commit/ab97d0e))
+* fix(k8s): ustaw bit wykonywalności na skryptach k8s-prod ([ce8430e](https://github.com/pawlo884/nc/commit/ce8430e))
+* fix(k8s): weryfikacja deployu i set -e w workflow SSH ([2fe3e70](https://github.com/pawlo884/nc/commit/2fe3e70))
+* ci: upgrade GitHub Actions to v6/v5 to fix punycode deprecation ([74b1f81](https://github.com/pawlo884/nc/commit/74b1f81))
+* ci(k8s): trigger deploy-vps on push to k8s-nc-test ([b322c7a](https://github.com/pawlo884/nc/commit/b322c7a))
+* chore(k8s): merge main przed deployem k3s ([04a1297](https://github.com/pawlo884/nc/commit/04a1297))
+* chore(npm): upgrade ESLint 9 and remove deprecated standard-version ([2b633d5](https://github.com/pawlo884/nc/commit/2b633d5))
+* feat(k8s): produkcja na k3s zamiast blue-green ([fee778f](https://github.com/pawlo884/nc/commit/fee778f))
+
+## <small>1.11.5 (2026-07-14)</small>
+
+* fix(docker): dodaj aplikację tabu do obrazu produkcyjnego ([0eac617](https://github.com/pawlo884/nc/commit/0eac617))
+* ci: upgrade checkout and setup-node to v5 for Node.js 24 ([508379f](https://github.com/pawlo884/nc/commit/508379f))
+* chore: usun JavaScript Playground ze strony glownej ([23c43ce](https://github.com/pawlo884/nc/commit/23c43ce))
+
+## <small>1.11.4 (2026-07-07)</small>
+
+* Docker compose: wymuś TCP dla bazy Tabu (web + celery-default). ([7f677dd](https://github.com/pawlo884/nc/commit/7f677dd))
+* Merge pull request #43 from pawlo884/fix/tabu-stock-update-skip-same-count-clean ([c3f92a6](https://github.com/pawlo884/nc/commit/c3f92a6)), closes [#43](https://github.com/pawlo884/nc/issues/43)
+* Tabu API: load_dotenv z /app/.env.prod + mount pliku env w compose. ([cf100c5](https://github.com/pawlo884/nc/commit/cf100c5))
+* Tabu API: normalizacja wartości z env + dokumentacja składni env_file Dockera ([5596ea2](https://github.com/pawlo884/nc/commit/5596ea2))
+* fix(tabu): skip stock update processing when count unchanged ([d9942d1](https://github.com/pawlo884/nc/commit/d9942d1))
+
 ## <small>1.11.3 (2026-05-02)</small>
 
 * fix(tabu): lock na sync stanów, nowy check_range dla nowych produktów, miniatura w adminie ([10d751f](https://github.com/pawlo884/nc/commit/10d751f))
