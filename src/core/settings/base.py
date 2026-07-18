@@ -66,6 +66,12 @@ TABU_API_BASE_URL = (
 ).rstrip('/')
 TABU_API_KEY = _strip_env_value(os.getenv('TABU_API_KEY', ''))
 
+# React SPA MPD (dev: Vite, prod: ustaw MPD_REACT_FRONTEND_URL)
+MPD_REACT_FRONTEND_URL = (
+    _strip_env_value(os.getenv('MPD_REACT_FRONTEND_URL'))
+    or 'http://localhost:5173'
+).rstrip('/')
+
 # Konfiguracja logowania - tylko console logging
 LOGGING = {
     'version': 1,
