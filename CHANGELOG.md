@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.22.7 (2026-07-18)</small>
+
+* Merge pull request #76 from pawlo884/fix/codeql-high-alerts ([df877d2](https://github.com/pawlo884/nc/commit/df877d2)), closes [#76](https://github.com/pawlo884/nc/issues/76) [pawlo884/fix/codeql-hi#alerts](https://github.com/pawlo884/fix/codeql-hi/issues/alerts)
+* fix(security): address CodeQL code scanning alerts ([822d33d](https://github.com/pawlo884/nc/commit/822d33d))
+
 ## <small>1.22.6 (2026-07-18)</small>
 
 * Merge pull request #74 from pawlo884/fix/prod-strip-env-value ([12378e6](https://github.com/pawlo884/nc/commit/12378e6)), closes [#74](https://github.com/pawlo884/nc/issues/74)
