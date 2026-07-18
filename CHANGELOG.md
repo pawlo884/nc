@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.16.1 (2026-07-18)</small>
+
+* Merge pull request #50 from pawlo884/fix/mpd-spa-root-nc-dev ([c180cf0](https://github.com/pawlo884/nc/commit/c180cf0)), closes [#50](https://github.com/pawlo884/nc/issues/50)
+* fix(mpd): montuj dist SPA w docker-compose.dev ([26d7331](https://github.com/pawlo884/nc/commit/26d7331))
+
 ## 1.16.0 (2026-07-18)
 
 * Merge pull request #48 from pawlo884:feat/mpd-react-prod-serve ([0895426](https://github.com/pawlo884/nc/commit/0895426)), closes [#48](https://github.com/pawlo884/nc/issues/48)
