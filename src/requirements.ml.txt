@@ -3,9 +3,9 @@
 
 # Core ML dependencies
 # PyTorch - najnowsze wersje kompatybilne z Python 3.13
-torch==2.8.0  # ~2-3GB
-torchvision==0.23.0
-torchaudio==2.8.0
+torch==2.13.0  # ~2-3GB
+torchvision==0.28.0
+torchaudio==2.11.0  # latest on PyPI; no 2.13 wheel yet
 
 # Sentence Transformers - instaluje się z PyTorch
 sentence-transformers==3.3.1
