@@ -39,7 +39,9 @@ class ProductSerializer(serializers.ModelSerializer):
 class ProductListSerializer(serializers.ModelSerializer):
     """Serializer listy produktów MPD do endpointu /api/mpd/products/."""
 
-    brand_name = serializers.CharField(source='brand.name', read_only=True)
+    brand_name = serializers.CharField(
+        source='brand.name', read_only=True, allow_null=True, default=None
+    )
 
     class Meta:
         model = Products

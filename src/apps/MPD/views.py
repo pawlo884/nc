@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from .models import Products, ProductSet, ProductSetItem, ProductPaths, ProductAttribute
 from .models import Brands, Colors, Sizes, ProductVariants, ProductVariantsRetailPrice, ProductvariantsSources
-from .models import FabricComponent, ProductFabric, Attributes
+from .models import FabricComponent, ProductFabric, Attributes, ProductImage, StockAndPrices, Paths, Vat
 from django.http import JsonResponse
 from django.db import connections, transaction
 from django.utils import timezone
@@ -19,6 +19,7 @@ from matterhorn1.defs_db import BUCKET_PUBLIC_BASE_URL, resolve_image_url
 from django.urls import reverse
 
 from django.views.decorators.csrf import csrf_exempt
+import decimal
 import json
 
 logger = logging.getLogger(__name__)
@@ -959,11 +960,15 @@ def update_product(request, product_id):
         if 'short_description' in data:
             product.short_description = data['short_description']
         if 'brand_id' in data:
-            product.brand_id = data['brand_id']
+            product.brand_id = data['brand_id'] or None
+        if 'collection_id' in data:
+            product.collection_id = data['collection_id'] or None
         if 'unit_id' in data:
-            product.unit_id = data['unit_id']
+            product.unit_id = data['unit_id'] or None
         if 'series_id' in data:
-            product.series_id = data['series_id']
+            product.series_id = data['series_id'] or None
+        if 'season_id' in data:
+            product.season_id = data['season_id'] or None
         if 'visibility' in data:
             product.visibility = data['visibility']
 
@@ -1058,48 +1063,165 @@ def get_product(request, product_id):
         return JsonResponse({'status': 'error', 'message': 'Tylko metoda GET jest obsługiwana'}, status=405)
 
     try:
-        # Sprawdź czy produkt istnieje
         try:
-            product = Products.objects.using('MPD').get(id=product_id)
+            product = Products.objects.using('MPD').select_related(
+                'brand', 'collection', 'series', 'season', 'unit',
+            ).get(id=product_id)
         except Products.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Produkt nie istnieje'}, status=404)
 
-        # Pobierz warianty
+        variants_qs = ProductVariants.objects.using('MPD').filter(
+            product_id=product_id,
+        ).select_related('color', 'size', 'producer_color').order_by('size__name', 'color__name')
+
+        variant_ids = [v.variant_id for v in variants_qs]
+        stock_by_variant = {}
+        if variant_ids:
+            for stock in StockAndPrices.objects.using('MPD').filter(
+                variant_id__in=variant_ids,
+                source_id=2,
+            ):
+                stock_by_variant[stock.variant_id] = stock
+
         variants = []
-        for variant in product.productvariants_set.all():
+        for variant in variants_qs:
             first_pvs = ProductvariantsSources.objects.using('MPD').filter(
-                variant_id=variant.variant_id
-            ).values_list('producer_code', flat=True).first()
+                variant_id=variant.variant_id,
+            ).values('producer_code', 'ean').first()
+            stock = stock_by_variant.get(variant.variant_id)
             variant_data = {
                 'variant_id': variant.variant_id,
                 'color_id': variant.color_id,
+                'color_name': variant.color.name if variant.color else None,
+                'hex_code': variant.color.hex_code if variant.color else None,
                 'producer_color_id': variant.producer_color_id,
+                'producer_color_name': (
+                    variant.producer_color.name if variant.producer_color else None
+                ),
                 'size_id': variant.size_id,
-                'producer_code': first_pvs or '',
-                'exported_to_iai': variant.exported_to_iai
+                'size_name': variant.size.name if variant.size else None,
+                'producer_code': (first_pvs or {}).get('producer_code') or '',
+                'ean': (first_pvs or {}).get('ean') or '',
+                'exported_to_iai': variant.exported_to_iai,
+                'stock': stock.stock if stock else None,
+                'warehouse_price': float(stock.price) if stock else None,
             }
 
-            # Pobierz cenę jeśli istnieje
             try:
                 price = variant.productvariantsretailprice
+                vat_id = None
+                vat_rate = None
+                if price.vat is not None:
+                    try:
+                        vat_id = int(price.vat)
+                        vat_row = Vat.objects.using('MPD').filter(id=vat_id).first()
+                        if vat_row:
+                            vat_rate = float(vat_row.vat_rate) if vat_row.vat_rate is not None else None
+                        else:
+                            # legacy: w kolumnie bywa stawka zamiast id
+                            vat_rate = float(price.vat)
+                            vat_id = None
+                    except (TypeError, ValueError):
+                        vat_rate = float(price.vat) if price.vat is not None else None
                 variant_data['price'] = {
                     'retail_price': float(price.retail_price) if price.retail_price else None,
-                    'vat': float(price.vat) if price.vat else None,
+                    'vat': vat_id,
+                    'vat_id': vat_id,
+                    'vat_rate': vat_rate,
                     'currency': price.currency,
-                    'net_price': float(price.net_price) if price.net_price else None
+                    'net_price': float(price.net_price) if price.net_price else None,
                 }
             except Exception:
                 variant_data['price'] = None
 
             variants.append(variant_data)
 
-        # Pobierz ścieżki
-        paths = list(ProductPaths.objects.using('MPD').filter(
-            product_id=product_id).values_list('path_id', flat=True))
+        path_rows = (
+            ProductPaths.objects.using('MPD')
+            .filter(product_id=product_id)
+            .select_related('path')
+        )
+        paths = [
+            {
+                'id': row.path_id,
+                'name': row.path.name if row.path else None,
+                'path': row.path.path if row.path else None,
+            }
+            for row in path_rows
+        ]
 
-        # Pobierz atrybuty
-        attributes = list(ProductAttribute.objects.using('MPD').filter(
-            product_id=product_id).values_list('attribute_id', flat=True))
+        attribute_rows = (
+            ProductAttribute.objects.using('MPD')
+            .filter(product_id=product_id)
+            .select_related('attribute')
+        )
+        attributes = [
+            {
+                'id': row.attribute_id,
+                'name': row.attribute.name if row.attribute else None,
+            }
+            for row in attribute_rows
+        ]
+
+        fabric_rows = (
+            ProductFabric.objects.using('MPD')
+            .filter(product_id=product_id)
+            .select_related('component')
+            .order_by('component__name')
+        )
+        fabric = [
+            {
+                'component_id': row.component_id,
+                'component_name': row.component.name if row.component else None,
+                'percentage': row.percentage,
+            }
+            for row in fabric_rows
+        ]
+
+        related_sets = []
+        set_items = list(
+            ProductSetItem.objects.using('MPD').filter(product_id=product_id)
+        )
+        for set_item in set_items:
+            try:
+                set_obj = ProductSet.objects.using('MPD').get(id=set_item.product_set_id)
+            except ProductSet.DoesNotExist:
+                continue
+            other_items = (
+                ProductSetItem.objects.using('MPD')
+                .filter(product_set_id=set_obj.id)
+                .exclude(product_id=product_id)
+                .select_related('product')
+            )
+            related_sets.append({
+                'id': set_obj.id,
+                'name': set_obj.name,
+                'products': [
+                    {'id': oi.product_id, 'name': oi.product.name if oi.product else None}
+                    for oi in other_items
+                ],
+            })
+
+        series_products = []
+        if product.series_id:
+            series_products = list(
+                Products.objects.using('MPD')
+                .filter(series_id=product.series_id)
+                .exclude(id=product_id)
+                .order_by('name')
+                .values('id', 'name')[:50]
+            )
+
+        images = [
+            {
+                'id': img.id,
+                'image_url': img.get_image_url(),
+                'file_path': img.file_path,
+            }
+            for img in ProductImage.objects.using('MPD').filter(
+                product_id=product_id,
+            ).order_by('id')
+        ]
 
         return JsonResponse({
             'status': 'success',
@@ -1109,20 +1231,139 @@ def get_product(request, product_id):
                 'description': product.description,
                 'short_description': product.short_description,
                 'brand_id': product.brand_id,
-                'unit_id': product.unit_id,
+                'brand_name': product.brand.name if product.brand else None,
+                'collection_id': product.collection_id,
+                'collection_name': product.collection.name if product.collection else None,
                 'series_id': product.series_id,
+                'series_name': product.series.name if product.series else None,
+                'season_id': product.season_id,
+                'season_name': product.season.name if product.season else None,
+                'unit_id': product.unit_id,
+                'unit_name': product.unit.name if product.unit else None,
                 'visibility': product.visibility,
                 'created_at': product.created_at.isoformat() if product.created_at else None,
                 'updated_at': product.updated_at.isoformat() if product.updated_at else None,
                 'variants': variants,
                 'paths': paths,
-                'attributes': attributes
-            }
+                'attributes': attributes,
+                'fabric': fabric,
+                'related_sets': related_sets,
+                'series_products': series_products,
+                'images': images,
+            },
         })
 
     except Exception as e:
         logger.error(f"Błąd podczas pobierania produktu MPD: {str(e)}")
         return JsonResponse({'status': 'error', 'message': f'Błąd serwera: {str(e)}'}, status=500)
+
+
+@csrf_exempt
+def update_product_retail_prices(request, product_id):
+    """Aktualizacja cen detalicznych wariantów produktu (jak w Django admin)."""
+    if request.method != 'POST':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'},
+            status=405,
+        )
+
+    def resolve_vat_id(vat_raw):
+        """Kolumna vat to FK do tabeli vat(id), nie stawka procentowa."""
+        if vat_raw in (None, ''):
+            return 1  # jak w adminie MPD
+        try:
+            val = decimal.Decimal(str(vat_raw))
+        except (decimal.InvalidOperation, TypeError, ValueError):
+            return 1
+
+        # Najpierw traktuj jako ID
+        if val == val.to_integral_value():
+            vat_id = int(val)
+            if Vat.objects.using('MPD').filter(id=vat_id).exists():
+                return vat_id
+
+        # Potem jako stawkę (np. 23 → rekord z vat_rate=23)
+        vat_row = Vat.objects.using('MPD').filter(vat_rate=val).first()
+        if vat_row:
+            return vat_row.id
+
+        # Fallback jak w adminie
+        if Vat.objects.using('MPD').filter(id=1).exists():
+            return 1
+        first = Vat.objects.using('MPD').order_by('id').first()
+        return first.id if first else 1
+
+    try:
+        data = json.loads(request.body)
+        prices = data.get('prices', [])
+        if not isinstance(prices, list):
+            return JsonResponse(
+                {'status': 'error', 'message': 'Pole prices musi być listą'},
+                status=400,
+            )
+
+        try:
+            Products.objects.using('MPD').get(id=product_id)
+        except Products.DoesNotExist:
+            return JsonResponse(
+                {'status': 'error', 'message': 'Produkt nie istnieje'},
+                status=404,
+            )
+
+        updated = 0
+        for item in prices:
+            variant_id = item.get('variant_id')
+            if not variant_id:
+                continue
+            try:
+                variant = ProductVariants.objects.using('MPD').get(
+                    variant_id=variant_id,
+                    product_id=product_id,
+                )
+            except ProductVariants.DoesNotExist:
+                continue
+
+            retail_raw = item.get('retail_price')
+            currency = (item.get('currency') or 'PLN').strip() or 'PLN'
+            vat_id = resolve_vat_id(item.get('vat_id', item.get('vat')))
+
+            try:
+                retail_price = (
+                    decimal.Decimal(str(retail_raw))
+                    if retail_raw not in (None, '')
+                    else None
+                )
+            except (decimal.InvalidOperation, TypeError, ValueError):
+                continue
+
+            obj_rp = ProductVariantsRetailPrice.objects.using('MPD').filter(
+                variant=variant,
+            ).first()
+            if obj_rp is None:
+                obj_rp = ProductVariantsRetailPrice(variant=variant)
+            obj_rp.retail_price = retail_price
+            obj_rp.vat = vat_id
+            obj_rp.currency = currency
+            obj_rp.updated_at = timezone.now()
+            obj_rp.save(using='MPD')
+            updated += 1
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Zapisano ceny dla {updated} wariantów',
+            'updated': updated,
+        })
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Nieprawidłowy format JSON'},
+            status=400,
+        )
+    except Exception as e:
+        logger.error('Błąd zapisu cen detalicznych: %s', e)
+        return JsonResponse(
+            {'status': 'error', 'message': f'Błąd serwera: {str(e)}'},
+            status=500,
+        )
 
 
 @csrf_exempt

@@ -1,8 +1,10 @@
 import logging
 
 from django.db.models import Q
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import views as mpd_views
@@ -46,6 +48,7 @@ class MPDProductCreateAPI(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
 
     @extend_schema(
         summary="Lista produktów MPD",
@@ -88,7 +91,7 @@ class MPDProductCreateAPI(APIView):
     )
     def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
         """Lista produktów MPD z prostym filtrowaniem i paginacją."""
-        queryset = Products.objects.using('MPD').all()
+        queryset = Products.objects.using('MPD').select_related('brand').all()
 
         search = request.query_params.get('search')
         if search:
@@ -146,6 +149,7 @@ class MPDProductDetailAPI(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
 
     @extend_schema(
         summary="Szczegóły produktu MPD",
@@ -207,7 +211,8 @@ class MPDManageProductPathsAPI(APIView):
     Deleguje do istniejącego widoku `manage_product_paths`.
     """
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
 
     @extend_schema(
         summary="Zarządzanie ścieżkami produktów",
@@ -230,7 +235,8 @@ class MPDManageProductFabricAPI(APIView):
     Deleguje do istniejącego widoku `manage_product_fabric`.
     """
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
 
     @extend_schema(
         summary="Zarządzanie składem materiałowym produktów",
@@ -253,7 +259,8 @@ class MPDManageProductAttributesAPI(APIView):
     Deleguje do istniejącego widoku `manage_product_attributes`.
     """
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
 
     @extend_schema(
         summary="Zarządzanie atrybutami produktów",
@@ -267,6 +274,72 @@ class MPDManageProductAttributesAPI(APIView):
     )
     def post(self, request, *args, **kwargs):  # pylint: disable=unused-argument
         return mpd_views.manage_product_attributes(request._request)
+
+
+class MPDProductRetailPricesAPI(APIView):
+    """API: zapis cen detalicznych wariantów produktu."""
+
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+
+    @extend_schema(
+        summary="Zapis cen detalicznych produktu",
+        tags=["Products"],
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    def post(self, request, product_id, *args, **kwargs):  # pylint: disable=unused-argument
+        return mpd_views.update_product_retail_prices(request._request, product_id=product_id)
+
+
+class MPDCatalogAttributesAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+
+    def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+        from .models import Attributes
+        rows = list(
+            Attributes.objects.using('MPD').order_by('name').values('id', 'name')
+        )
+        return Response({'results': rows})
+
+
+class MPDCatalogFabricComponentsAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+
+    def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+        from .models import FabricComponent
+        rows = list(
+            FabricComponent.objects.using('MPD').order_by('name').values('id', 'name')
+        )
+        return Response({'results': rows})
+
+
+class MPDCatalogPathsAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+
+    def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+        from .models import Paths
+        rows = list(
+            Paths.objects.using('MPD').order_by('path', 'name').values(
+                'id', 'name', 'path', 'parent_id'
+            )
+        )
+        return Response({'results': rows})
+
+
+class MPDCatalogVatsAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+
+    def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+        from .models import Vat
+        rows = list(
+            Vat.objects.using('MPD').order_by('id').values('id', 'vat_rate')
+        )
+        return Response({'results': rows})
 
 
 class MPDBulkMapFromMatterhorn1API(APIView):
