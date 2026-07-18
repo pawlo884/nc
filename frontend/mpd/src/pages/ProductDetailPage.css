@@ -373,3 +373,41 @@
   color: #999;
   font-size: 0.85rem;
 }
+
+.sortable-th {
+  padding: 0 !important;
+  vertical-align: middle;
+}
+
+.sortable-th__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sortable-th__btn:hover {
+  color: #667eea;
+}
+
+.sortable-th--active .sortable-th__btn {
+  color: #667eea;
+}
+
+.sortable-th__indicator {
+  font-size: 0.7rem;
+  opacity: 0.55;
+  line-height: 1;
+}
+
+.sortable-th--active .sortable-th__indicator {
+  opacity: 1;
+}

@@ -90,6 +90,15 @@
   background: #5a6fd6;
 }
 
+.btn-danger {
+  background: #dc3545;
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #c82333;
+}
+
 .btn-secondary {
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
