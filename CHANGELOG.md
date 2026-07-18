@@ -1,5 +1,14 @@
 # Zmiany
 
+## <small>1.22.2 (2026-07-18)</small>
+
+* Merge pull request #68 from pawlo884/dependabot/npm_and_yarn/lodash-es-4.18.1 ([bfea16e](https://github.com/pawlo884/nc/commit/bfea16e)), closes [#68](https://github.com/pawlo884/nc/issues/68)
+* Merge pull request #69 from pawlo884/dependabot/npm_and_yarn/lodash-4.18.1 ([3b4593d](https://github.com/pawlo884/nc/commit/3b4593d)), closes [#69](https://github.com/pawlo884/nc/issues/69)
+* Merge pull request #70 from pawlo884/fix/dependabot-pip-pillow-mako-tornado ([f4ac7f4](https://github.com/pawlo884/nc/commit/f4ac7f4)), closes [#70](https://github.com/pawlo884/nc/issues/70)
+* fix(deps): bump pillow, Mako, tornado, soupsieve for Dependabot ([f8dd73a](https://github.com/pawlo884/nc/commit/f8dd73a)), closes [hi#severity](https://github.com/hi/issues/severity)
+* chore(deps-dev): bump lodash-es from 4.17.21 to 4.18.1 ([45d1313](https://github.com/pawlo884/nc/commit/45d1313))
+* chore(deps): bump lodash from 4.17.21 to 4.18.1 ([2009758](https://github.com/pawlo884/nc/commit/2009758))
+
 ## <small>1.22.1 (2026-07-18)</small>
 
 * Merge pull request #66 from pawlo884/ci/skip-redundant-lint-for-mpd ([3427471](https://github.com/pawlo884/nc/commit/3427471)), closes [#66](https://github.com/pawlo884/nc/issues/66)
