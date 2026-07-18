@@ -1,18 +1,16 @@
-# Lokalny CodeQL (bez GitHub Actions) — obraz Microsoft z CLI + query packs
+# Lokalny CodeQL w Dockerze — BEZ GitHub Actions (bez minut CI).
 #
-# Użycie (z roota repo):
+# Uzycie (z roota repo):
 #   docker compose -f docker-compose/docker-compose.codeql.yml run --rm codeql
-#   # tylko Python:
-#   CODEQL_LANGS=python docker compose -f docker-compose/docker-compose.codeql.yml run --rm codeql
-#   # Python + frontend MPD:
 #   CODEQL_LANGS=python,javascript docker compose -f docker-compose/docker-compose.codeql.yml run --rm codeql
 #
-# Wyniki: .codeql/*.sarif (otwórz w VS Code / Cursor: SARIF Viewer)
+# Albo: .\scripts\codeql-docker.ps1
+#
+# Wyniki: .codeql/*.sarif (rozszerzenie SARIF Viewer w Cursor/VS Code)
 
 services:
   codeql:
     image: mcr.microsoft.com/cstsectools/codeql-container
-    # Własny skrypt zamiast jednorazowego CODEQL_CLI_ARGS
     entrypoint: ['/bin/bash', '/opt/scripts/run.sh']
     working_dir: /workspace
     volumes:
@@ -22,8 +20,6 @@ services:
     environment:
       CODEQL_WORKSPACE: /workspace
       CODEQL_RESULTS_DIR: /opt/results
-      # python | javascript | python,javascript
       CODEQL_LANGS: ${CODEQL_LANGS:-python}
       CODEQL_SUITE: ${CODEQL_SUITE:-security-and-quality}
-    # Analiza bywa RAM-heavy
     mem_limit: 8g

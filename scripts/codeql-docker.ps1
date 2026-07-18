@@ -1,7 +1,6 @@
-# Lokalny CodeQL w Dockerze (Windows / PowerShell)
+# Lokalny CodeQL w Dockerze — bez GitHub Actions / bez minut CI.
 # Wymaga: Docker Desktop
 #
-# Przykłady:
 #   .\scripts\codeql-docker.ps1
 #   .\scripts\codeql-docker.ps1 -Langs python,javascript
 #   .\scripts\codeql-docker.ps1 -Pull
@@ -24,5 +23,9 @@ if ($Pull) {
     docker compose -f $Compose pull codeql
 }
 
-Write-Host "CodeQL langs=$Langs → wyniki w .codeql\"
+Write-Host "CodeQL langs=$Langs -> wyniki w .codeql\"
 docker compose -f $Compose run --rm --remove-orphans codeql
+
+if (Test-Path (Join-Path $Root ".codeql\python.sarif")) {
+    Write-Host "Otworz .codeql\*.sarif w Cursor (SARIF Viewer)."
+}

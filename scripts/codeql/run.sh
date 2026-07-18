@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# CodeQL w kontenerze: baza + analiza → .codeql/*.sarif
+# CodeQL w kontenerze: baza + analiza -> .codeql/*.sarif
+# Bez GitHub Actions — tylko lokalny Docker.
 set -euo pipefail
 
 RESULTS="${CODEQL_RESULTS_DIR:-/opt/results}"
@@ -20,20 +21,19 @@ run_one() {
     return 0
   fi
 
-  echo "==> CodeQL database create (${lang}) ← ${source_root}"
+  echo "==> CodeQL database create (${lang}) <- ${source_root}"
   rm -rf "$db"
   codeql database create "$db" \
     --language="$lang" \
     --source-root="$source_root" \
     --overwrite
 
-  echo "==> CodeQL database analyze (${lang}) → ${out}"
-  # Precompiled suites w obrazie MCR; fallback z --download
+  echo "==> CodeQL database analyze (${lang}) -> ${out}"
   if ! codeql database analyze "$db" \
       --format=sarif-latest \
       --output="$out" \
       "${lang}-${SUITE_SUFFIX}.qls"; then
-    echo "Suite lokalna niedostępna — pobieram packi (--download)…"
+    echo "Suite lokalna niedostepna — pobieram packi (--download)..."
     codeql database analyze "$db" \
       --format=sarif-latest \
       --output="$out" \
@@ -51,11 +51,10 @@ for lang in "${LANG_ARR[@]}"; do
       run_one python "${WORKSPACE}/src"
       ;;
     javascript|javascript-typescript|js)
-      # extractor JS obejmuje też TypeScript
       run_one javascript "${WORKSPACE}/frontend/mpd"
       ;;
     *)
-      echo "Nieznany język: ${lang} (obsługiwane: python, javascript)"
+      echo "Nieznany jezyk: ${lang} (obslugiwane: python, javascript)"
       exit 1
       ;;
   esac
