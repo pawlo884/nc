@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import ProductSet, ProductSetItem, Products
+from matterhorn1.defs_db import resolve_image_url
+from .models import ProductImage, ProductSet, ProductSetItem, Products
 
 # Import drf_spectacular tylko jeśli jest dostępny
 try:
@@ -42,6 +43,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     brand_name = serializers.CharField(
         source='brand.name', read_only=True, allow_null=True, default=None
     )
+    thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Products
@@ -49,10 +51,26 @@ class ProductListSerializer(serializers.ModelSerializer):
             'id',
             'name',
             'brand_name',
+            'thumbnail_url',
             'visibility',
             'created_at',
             'updated_at',
         ]
+
+    def get_thumbnail_url(self, obj):
+        """Publiczny URL pierwszego zdjęcia (annotate first_image_path lub fallback)."""
+        path = getattr(obj, 'first_image_path', None)
+        if not path:
+            path = (
+                ProductImage.objects.using('MPD')
+                .filter(product_id=obj.pk)
+                .order_by('id')
+                .values_list('file_path', flat=True)
+                .first()
+            )
+        if not path:
+            return None
+        return resolve_image_url(path) or path
 
 
 @extend_schema_serializer(

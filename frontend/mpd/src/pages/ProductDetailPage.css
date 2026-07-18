@@ -329,3 +329,35 @@
 .products-table tbody tr:hover td {
   background: #fafbff;
 }
+
+.products-table__thumb-cell {
+  padding: 0.35rem 0.5rem !important;
+  vertical-align: middle;
+  line-height: 0;
+}
+
+.product-thumb {
+  width: 56px;
+  height: 56px;
+  max-width: 56px;
+  max-height: 56px;
+  object-fit: contain;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  background: #fafafa;
+  display: block;
+}
+
+.product-thumb--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  color: #bbb;
+  font-size: 0.85rem;
+  line-height: 1;
+  border: 1px dashed #e0e0e0;
+  border-radius: 4px;
+  background: #fafafa;
+}

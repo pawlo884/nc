@@ -1,6 +1,6 @@
 import logging
 
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import views as mpd_views
-from .models import Products
+from .models import ProductImage, Products
 from .serializers import ProductListSerializer
 
 # Import drf_spectacular tylko jeśli jest dostępny
@@ -91,7 +91,16 @@ class MPDProductCreateAPI(APIView):
     )
     def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
         """Lista produktów MPD z prostym filtrowaniem i paginacją."""
-        queryset = Products.objects.using('MPD').select_related('brand').all()
+        first_image_path_subquery = (
+            ProductImage.objects.filter(product_id=OuterRef('pk'))
+            .order_by('id')
+            .values('file_path')[:1]
+        )
+        queryset = (
+            Products.objects.using('MPD')
+            .select_related('brand')
+            .annotate(first_image_path=Subquery(first_image_path_subquery))
+        )
 
         search = request.query_params.get('search')
         if search:

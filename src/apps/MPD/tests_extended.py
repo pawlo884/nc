@@ -780,7 +780,10 @@ class ProductListSerializerTest(TestCase):
 
     def test_serializer_contains_expected_fields(self):
         serializer = ProductListSerializer(instance=self.product)
-        expected = {'id', 'name', 'brand_name', 'visibility', 'created_at', 'updated_at'}
+        expected = {
+            'id', 'name', 'brand_name', 'thumbnail_url',
+            'visibility', 'created_at', 'updated_at',
+        }
         self.assertEqual(set(serializer.data.keys()), expected)
 
     def test_serializer_brand_name_computed(self):
@@ -811,6 +814,10 @@ class ProductListSerializerTest(TestCase):
         serializer = ProductListSerializer(instance=self.product)
         self.assertIsNotNone(serializer.data['created_at'])
         self.assertIsNotNone(serializer.data['updated_at'])
+
+    def test_serializer_thumbnail_url_null_without_images(self):
+        serializer = ProductListSerializer(instance=self.product)
+        self.assertIsNone(serializer.data['thumbnail_url'])
 
 
 # ==============================================================
