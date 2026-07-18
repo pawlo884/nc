@@ -20,8 +20,9 @@ logger = logging.getLogger(__name__)
 
 def _mpd_react_base_url(request=None) -> str:
     """
-    Dev: localhost w settingu → podmień host na ten z requestu (LAN IP),
-    zachowaj ścieżkę /mpd-app. Prod: względne /mpd-app zostaje same-origin.
+    - Względne /mpd-app → same-origin (prod / nc-dev przez Cloudflare).
+    - localhost:5173 + request z LAN → Vite na IP LAN.
+    - localhost:5173 + request z publicznej domeny → /mpd-app (nie :5173).
     """
     from urllib.parse import urlparse
 
@@ -40,10 +41,29 @@ def _mpd_react_base_url(request=None) -> str:
         return configured
 
     host = request.get_host().split(':')[0]
+    # Cloudflare / publiczna domena — Vite :5173 nie jest wystawione
+    if not _is_local_or_lan_host(host):
+        return '/mpd-app'
+
     port = parsed.port or 5173
     scheme = parsed.scheme or 'http'
     path = (parsed.path or '').rstrip('/')
     return f'{scheme}://{host}:{port}{path}'
+
+
+def _is_local_or_lan_host(host: str) -> bool:
+    if host in ('localhost', '127.0.0.1', '::1'):
+        return True
+    if host.startswith('192.168.') or host.startswith('10.'):
+        return True
+    # prywatne 172.16.0.0/12 (nie Cloudflare 172.64+)
+    if host.startswith('172.'):
+        try:
+            second = int(host.split('.')[1])
+        except (IndexError, ValueError):
+            return False
+        return 16 <= second <= 31
+    return False
 
 
 def _mpd_react_product_url(product_id, request=None) -> str:
