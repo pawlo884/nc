@@ -1,12 +1,12 @@
-import { Outlet } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
-import './Layout.css'
+import { Outlet } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import './Layout.css';
 
 export function Layout() {
-  const { logout, isAuthenticated } = useAuth()
+  const { logout, isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
-    return null
+    return null;
   }
 
   return (
@@ -24,5 +24,5 @@ export function Layout() {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }

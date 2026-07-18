@@ -1,66 +1,66 @@
-import axios from 'axios'
-import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
-import '../components/Layout.css'
+import axios from 'axios';
+import { useState, type FormEvent } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import '../components/Layout.css';
 
 function loginErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as
       | { non_field_errors?: string[]; detail?: string; username?: string[]; password?: string[] }
       | string
-      | undefined
+      | undefined;
 
     if (typeof data === 'string' && data.trim()) {
-      return data
+      return data;
     }
     if (data && typeof data === 'object') {
       if (data.non_field_errors?.[0]) {
-        return data.non_field_errors[0]
+        return data.non_field_errors[0];
       }
       if (data.detail) {
-        return data.detail
+        return data.detail;
       }
       if (data.username?.[0] || data.password?.[0]) {
-        return [data.username?.[0], data.password?.[0]].filter(Boolean).join(' ')
+        return [data.username?.[0], data.password?.[0]].filter(Boolean).join(' ');
       }
     }
     if (error.code === 'ERR_NETWORK') {
-      return 'Brak połączenia z API (sprawdź Django na :8000).'
+      return 'Brak połączenia z API (sprawdź Django na :8000).';
     }
     if (error.response?.status === 400) {
-      return 'Nieprawidłowa nazwa użytkownika lub hasło.'
+      return 'Nieprawidłowa nazwa użytkownika lub hasło.';
     }
     if (error.response?.status) {
-      return `Błąd logowania (HTTP ${error.response.status}).`
+      return `Błąd logowania (HTTP ${error.response.status}).`;
     }
   }
-  return 'Nie udało się zalogować.'
+  return 'Nie udało się zalogować.';
 }
 
 export function LoginPage() {
-  const { login, isAuthenticated } = useAuth()
-  const navigate = useNavigate()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const { login, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/" replace />;
   }
 
   async function handleSubmit(event: FormEvent) {
-    event.preventDefault()
-    setError(null)
-    setLoading(true)
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
     try {
-      await login(username.trim(), password)
-      navigate('/', { replace: true })
+      await login(username.trim(), password);
+      navigate('/', { replace: true });
     } catch (err) {
-      setError(loginErrorMessage(err))
+      setError(loginErrorMessage(err));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -77,7 +77,7 @@ export function LoginPage() {
               id="username"
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={e => setUsername(e.target.value)}
               autoComplete="username"
               required
             />
@@ -88,7 +88,7 @@ export function LoginPage() {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               autoComplete="current-password"
               required
             />
@@ -99,5 +99,5 @@ export function LoginPage() {
         </form>
       </div>
     </div>
-  )
+  );
 }

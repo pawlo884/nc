@@ -1,29 +1,29 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { clearStoredToken, getStoredToken, setStoredToken } from '../api/client'
-import { login as loginApi } from '../api/mpd'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { clearStoredToken, getStoredToken, setStoredToken } from '../api/client';
+import { login as loginApi } from '../api/mpd';
 
 interface AuthContextValue {
-  token: string | null
-  isAuthenticated: boolean
-  login: (username: string, password: string) => Promise<void>
-  logout: () => void
+  token: string | null;
+  isAuthenticated: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null)
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => getStoredToken())
+  const [token, setToken] = useState<string | null>(() => getStoredToken());
 
   const login = useCallback(async (username: string, password: string) => {
-    const response = await loginApi(username, password)
-    setStoredToken(response.token)
-    setToken(response.token)
-  }, [])
+    const response = await loginApi(username, password);
+    setStoredToken(response.token);
+    setToken(response.token);
+  }, []);
 
   const logout = useCallback(() => {
-    clearStoredToken()
-    setToken(null)
-  }, [])
+    clearStoredToken();
+    setToken(null);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -32,16 +32,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
     }),
-    [token, login, logout],
-  )
+    [token, login, logout]
+  );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth musi być używany wewnątrz AuthProvider')
+    throw new Error('useAuth musi być używany wewnątrz AuthProvider');
   }
-  return context
+  return context;
 }

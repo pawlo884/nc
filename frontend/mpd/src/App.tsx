@@ -1,10 +1,10 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { Layout } from './components/Layout'
-import { ProtectedRoute } from './components/ProtectedRoute'
-import { AuthProvider } from './hooks/useAuth'
-import { LoginPage } from './pages/LoginPage'
-import { ProductDetailPage } from './pages/ProductDetailPage'
-import { ProductsPage } from './pages/ProductsPage'
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { Layout } from './components/Layout';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { AuthProvider } from './hooks/useAuth';
+import { LoginPage } from './pages/LoginPage';
+import { ProductDetailPage } from './pages/ProductDetailPage';
+import { ProductsPage } from './pages/ProductsPage';
 
 export default function App() {
   return (
@@ -21,5 +21,5 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
-  )
+  );
 }

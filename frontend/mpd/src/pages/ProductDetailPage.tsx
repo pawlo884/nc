@@ -1,20 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import axios from 'axios'
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { fetchProduct, updateProduct } from '../api/mpd'
-import { ProductExtrasPanels } from '../components/ProductExtrasPanels'
-import type { MpdProductDetail, MpdProductUpdatePayload } from '../types/mpd'
-import '../components/Layout.css'
-import './ProductDetailPage.css'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { fetchProduct, updateProduct } from '../api/mpd';
+import { ProductExtrasPanels } from '../components/ProductExtrasPanels';
+import type { MpdProductDetail, MpdProductUpdatePayload } from '../types/mpd';
+import '../components/Layout.css';
+import './ProductDetailPage.css';
 
 function parseOptionalId(value: string): number | null {
-  const trimmed = value.trim()
+  const trimmed = value.trim();
   if (!trimmed) {
-    return null
+    return null;
   }
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function buildFormState(product: MpdProductDetail) {
@@ -28,19 +28,19 @@ function buildFormState(product: MpdProductDetail) {
     season_id: product.season_id != null ? String(product.season_id) : '',
     unit_id: product.unit_id != null ? String(product.unit_id) : '',
     visibility: Boolean(product.visibility),
-  }
+  };
 }
 
-type FormState = ReturnType<typeof buildFormState>
+type FormState = ReturnType<typeof buildFormState>;
 
 function formsEqual(a: FormState, b: FormState): boolean {
-  return JSON.stringify(a) === JSON.stringify(b)
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export function ProductDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const productId = Number(id)
-  const queryClient = useQueryClient()
+  const { id } = useParams<{ id: string }>();
+  const productId = Number(id);
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(() => ({
     name: '',
     short_description: '',
@@ -51,49 +51,49 @@ export function ProductDetailPage() {
     season_id: '',
     unit_id: '',
     visibility: true,
-  }))
-  const [baseline, setBaseline] = useState<FormState | null>(null)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [saveOk, setSaveOk] = useState<string | null>(null)
+  }));
+  const [baseline, setBaseline] = useState<FormState | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveOk, setSaveOk] = useState<string | null>(null);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['mpd-product', productId],
     queryFn: () => fetchProduct(productId),
     enabled: Number.isFinite(productId) && productId > 0,
-  })
+  });
 
   useEffect(() => {
     if (data?.product) {
-      const next = buildFormState(data.product)
-      setForm(next)
-      setBaseline(next)
+      const next = buildFormState(data.product);
+      setForm(next);
+      setBaseline(next);
     }
-  }, [data?.product])
+  }, [data?.product]);
 
   const saveMutation = useMutation({
     mutationFn: (payload: MpdProductUpdatePayload) => updateProduct(productId, payload),
-    onSuccess: async (result) => {
+    onSuccess: async result => {
       if (result.status === 'error') {
-        setSaveError(result.message || 'Nie udało się zapisać produktu.')
-        return
+        setSaveError(result.message || 'Nie udało się zapisać produktu.');
+        return;
       }
-      setSaveError(null)
-      setSaveOk('Zapisano zmiany.')
-      await queryClient.invalidateQueries({ queryKey: ['mpd-product', productId] })
-      await queryClient.invalidateQueries({ queryKey: ['mpd-products'] })
+      setSaveError(null);
+      setSaveOk('Zapisano zmiany.');
+      await queryClient.invalidateQueries({ queryKey: ['mpd-product', productId] });
+      await queryClient.invalidateQueries({ queryKey: ['mpd-products'] });
     },
-    onError: (err) => {
+    onError: err => {
       if (axios.isAxiosError(err)) {
         const message =
           (err.response?.data as { message?: string; detail?: string } | undefined)?.message ||
           (err.response?.data as { detail?: string } | undefined)?.detail ||
-          err.message
-        setSaveError(message || 'Nie udało się zapisać produktu.')
-        return
+          err.message;
+        setSaveError(message || 'Nie udało się zapisać produktu.');
+        return;
       }
-      setSaveError('Nie udało się zapisać produktu.')
+      setSaveError('Nie udało się zapisać produktu.');
     },
-  })
+  });
 
   if (!Number.isFinite(productId) || productId <= 0) {
     return (
@@ -103,11 +103,11 @@ export function ProductDetailPage() {
           ← Wróć do listy
         </Link>
       </div>
-    )
+    );
   }
 
   if (isLoading) {
-    return <div className="loading">Ładowanie produktu…</div>
+    return <div className="loading">Ładowanie produktu…</div>;
   }
 
   if (isError || data?.status === 'error' || !data?.product) {
@@ -120,27 +120,27 @@ export function ProductDetailPage() {
           ← Wróć do listy
         </Link>
       </div>
-    )
+    );
   }
 
-  const product = data.product
-  const dirty = baseline ? !formsEqual(form, baseline) : false
+  const product = data.product;
+  const dirty = baseline ? !formsEqual(form, baseline) : false;
 
   function handleReset() {
     if (!baseline) {
-      return
+      return;
     }
-    setForm(baseline)
-    setSaveError(null)
-    setSaveOk(null)
+    setForm(baseline);
+    setSaveError(null);
+    setSaveOk(null);
   }
 
   function handleSave() {
-    setSaveError(null)
-    setSaveOk(null)
+    setSaveError(null);
+    setSaveOk(null);
     if (!form.name.trim()) {
-      setSaveError('Nazwa produktu jest wymagana.')
-      return
+      setSaveError('Nazwa produktu jest wymagana.');
+      return;
     }
     saveMutation.mutate({
       name: form.name.trim(),
@@ -152,7 +152,7 @@ export function ProductDetailPage() {
       season_id: parseOptionalId(form.season_id),
       unit_id: parseOptionalId(form.unit_id),
       visibility: form.visibility,
-    })
+    });
   }
 
   return (
@@ -195,9 +195,9 @@ export function ProductDetailPage() {
                   id="product-name"
                   className="search-input"
                   value={form.name}
-                  onChange={(e) => {
-                    setSaveOk(null)
-                    setForm((prev) => ({ ...prev, name: e.target.value }))
+                  onChange={e => {
+                    setSaveOk(null);
+                    setForm(prev => ({ ...prev, name: e.target.value }));
                   }}
                 />
               </div>
@@ -207,9 +207,9 @@ export function ProductDetailPage() {
                   id="product-short"
                   className="search-input"
                   value={form.short_description}
-                  onChange={(e) => {
-                    setSaveOk(null)
-                    setForm((prev) => ({ ...prev, short_description: e.target.value }))
+                  onChange={e => {
+                    setSaveOk(null);
+                    setForm(prev => ({ ...prev, short_description: e.target.value }));
                   }}
                 />
               </div>
@@ -219,9 +219,9 @@ export function ProductDetailPage() {
             <input
               type="checkbox"
               checked={form.visibility}
-              onChange={(e) => {
-                setSaveOk(null)
-                setForm((prev) => ({ ...prev, visibility: e.target.checked }))
+              onChange={e => {
+                setSaveOk(null);
+                setForm(prev => ({ ...prev, visibility: e.target.checked }));
               }}
             />
             Widoczny
@@ -238,9 +238,9 @@ export function ProductDetailPage() {
               className="search-input"
               inputMode="numeric"
               value={form.brand_id}
-              onChange={(e) => {
-                setSaveOk(null)
-                setForm((prev) => ({ ...prev, brand_id: e.target.value }))
+              onChange={e => {
+                setSaveOk(null);
+                setForm(prev => ({ ...prev, brand_id: e.target.value }));
               }}
             />
           </div>
@@ -253,9 +253,9 @@ export function ProductDetailPage() {
               className="search-input"
               inputMode="numeric"
               value={form.collection_id}
-              onChange={(e) => {
-                setSaveOk(null)
-                setForm((prev) => ({ ...prev, collection_id: e.target.value }))
+              onChange={e => {
+                setSaveOk(null);
+                setForm(prev => ({ ...prev, collection_id: e.target.value }));
               }}
             />
           </div>
@@ -268,9 +268,9 @@ export function ProductDetailPage() {
               className="search-input"
               inputMode="numeric"
               value={form.series_id}
-              onChange={(e) => {
-                setSaveOk(null)
-                setForm((prev) => ({ ...prev, series_id: e.target.value }))
+              onChange={e => {
+                setSaveOk(null);
+                setForm(prev => ({ ...prev, series_id: e.target.value }));
               }}
             />
           </div>
@@ -283,9 +283,9 @@ export function ProductDetailPage() {
               className="search-input"
               inputMode="numeric"
               value={form.season_id}
-              onChange={(e) => {
-                setSaveOk(null)
-                setForm((prev) => ({ ...prev, season_id: e.target.value }))
+              onChange={e => {
+                setSaveOk(null);
+                setForm(prev => ({ ...prev, season_id: e.target.value }));
               }}
             />
           </div>
@@ -298,9 +298,9 @@ export function ProductDetailPage() {
               className="search-input"
               inputMode="numeric"
               value={form.unit_id}
-              onChange={(e) => {
-                setSaveOk(null)
-                setForm((prev) => ({ ...prev, unit_id: e.target.value }))
+              onChange={e => {
+                setSaveOk(null);
+                setForm(prev => ({ ...prev, unit_id: e.target.value }));
               }}
             />
           </div>
@@ -312,7 +312,7 @@ export function ProductDetailPage() {
           <div className="page-card product-detail__images">
             <h3 className="section-title">Zdjęcia</h3>
             <div className="image-gallery">
-              {product.images.map((img) => (
+              {product.images.map(img => (
                 <a
                   key={img.id}
                   href={img.image_url || undefined}
@@ -337,9 +337,9 @@ export function ProductDetailPage() {
             className="description-editor"
             rows={12}
             value={form.description}
-            onChange={(e) => {
-              setSaveOk(null)
-              setForm((prev) => ({ ...prev, description: e.target.value }))
+            onChange={e => {
+              setSaveOk(null);
+              setForm(prev => ({ ...prev, description: e.target.value }));
             }}
           />
         </div>
@@ -371,7 +371,7 @@ export function ProductDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {product.variants.map((variant) => (
+                {product.variants.map(variant => (
                   <tr key={variant.variant_id}>
                     <td>{variant.variant_id}</td>
                     <td>
@@ -419,5 +419,5 @@ export function ProductDetailPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
