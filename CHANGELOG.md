@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.20.0 (2026-07-18)
+
+* Merge pull request #57 from pawlo884/feat/mpd-products-column-sort ([194c3f0](https://github.com/pawlo884/nc/commit/194c3f0)), closes [#57](https://github.com/pawlo884/nc/issues/57)
+* feat(mpd): sortowanie kolumn i usuwanie produktów w mpd-app ([c63464e](https://github.com/pawlo884/nc/commit/c63464e))
+
 ## <small>1.19.1 (2026-07-18)</small>
 
 * Merge pull request #56 from pawlo884/fix/mpd-admin-thumbnail-list-links ([5b4118a](https://github.com/pawlo884/nc/commit/5b4118a)), closes [#56](https://github.com/pawlo884/nc/issues/56)
