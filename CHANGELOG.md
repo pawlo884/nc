@@ -1,5 +1,12 @@
 # Zmiany
 
+## <small>1.21.2 (2026-07-18)</small>
+
+* Merge pull request #61 from pawlo884/ci/paths-filter-node24 ([20afa52](https://github.com/pawlo884/nc/commit/20afa52)), closes [#61](https://github.com/pawlo884/nc/issues/61)
+* Merge pull request #63 from pawlo884/fix/urllib3-dependabot ([e577dff](https://github.com/pawlo884/nc/commit/e577dff)), closes [#63](https://github.com/pawlo884/nc/issues/63)
+* fix(ci): upgrade urllib3 to 2.7.0 for Dependabot alerts ([e71e7d9](https://github.com/pawlo884/nc/commit/e71e7d9))
+* ci: bump dorny/paths-filter v3 → v4 (Node 24) ([c75f043](https://github.com/pawlo884/nc/commit/c75f043))
+
 ## <small>1.21.1 (2026-07-18)</small>
 
 * Merge pull request #59 from pawlo884/ci/path-filter-check-branch ([b0048d5](https://github.com/pawlo884/nc/commit/b0048d5)), closes [#59](https://github.com/pawlo884/nc/issues/59)
