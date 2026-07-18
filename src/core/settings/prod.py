@@ -30,6 +30,12 @@ SECRET_KEY = os.getenv(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
+# Admin → React SPA (same-origin); nadpisz MPD_REACT_FRONTEND_URL w env jeśli trzeba
+MPD_REACT_FRONTEND_URL = (
+    _strip_env_value(os.getenv('MPD_REACT_FRONTEND_URL'))
+    or '/mpd-app'
+).rstrip('/')
+
 # Bezpieczniejsza konfiguracja ALLOWED_HOSTS
 ALLOWED_HOSTS = [
     'localhost',

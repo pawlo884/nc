@@ -2,7 +2,7 @@
 
 Panel React wyłącznie dla bazy MPD (Master Product Database).
 
-## Uruchomienie
+## Uruchomienie (dev)
 
 ```powershell
 # Terminal 1 — Django
@@ -15,15 +15,25 @@ npm install
 npm run dev
 ```
 
-Frontend: http://localhost:5173
+Frontend (ta sama ścieżka co prod): **http://localhost:5173/mpd-app/**  
+LAN: `http://<IP-PC>:5173/mpd-app/`  
+Skrót w adminie: `MPD_REACT_FRONTEND_URL` (domyślnie `http://localhost:5173/mpd-app`).
+
+## Produkcja
+
+Build jest wbudowany w `Dockerfile.prod` i serwowany przez Django pod:
+
+- https://nc.sowa.ch/mpd-app/
+
+API same-origin (`/api/...`). W prod `MPD_REACT_FRONTEND_URL` = `/mpd-app`.
 
 ## Strony
 
 | Ścieżka | Opis |
 |---------|------|
-| `/login` | Logowanie |
-| `/` | Lista produktów MPD |
-| `/products/:id` | Szczegóły produktu (warianty, zdjęcia, opis) |
+| `/mpd-app/login` | Logowanie |
+| `/mpd-app/` | Lista produktów MPD |
+| `/mpd-app/products/:id` | Szczegóły produktu |
 
 ## API (tylko MPD)
 

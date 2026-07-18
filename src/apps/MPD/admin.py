@@ -18,12 +18,36 @@ import decimal
 logger = logging.getLogger(__name__)
 
 
-def _mpd_react_base_url() -> str:
-    return getattr(settings, 'MPD_REACT_FRONTEND_URL', 'http://localhost:5173').rstrip('/')
+def _mpd_react_base_url(request=None) -> str:
+    """
+    Dev: localhost w settingu → podmień host na ten z requestu (LAN IP),
+    zachowaj ścieżkę /mpd-app. Prod: względne /mpd-app zostaje same-origin.
+    """
+    from urllib.parse import urlparse
+
+    configured = getattr(
+        settings, 'MPD_REACT_FRONTEND_URL', 'http://localhost:5173/mpd-app'
+    ).rstrip('/')
+
+    if configured.startswith('/'):
+        return configured
+
+    if request is None:
+        return configured
+
+    parsed = urlparse(configured)
+    if parsed.hostname not in ('localhost', '127.0.0.1'):
+        return configured
+
+    host = request.get_host().split(':')[0]
+    port = parsed.port or 5173
+    scheme = parsed.scheme or 'http'
+    path = (parsed.path or '').rstrip('/')
+    return f'{scheme}://{host}:{port}{path}'
 
 
-def _mpd_react_product_url(product_id) -> str:
-    return f'{_mpd_react_base_url()}/products/{product_id}'
+def _mpd_react_product_url(product_id, request=None) -> str:
+    return f'{_mpd_react_base_url(request)}/products/{product_id}'
 
 
 @csrf_exempt
@@ -172,20 +196,25 @@ class ProductsAdmin(admin.ModelAdmin):
     def open_in_react(self, obj):
         if not obj or not obj.pk:
             return '—'
+        request = getattr(self, '_mpd_react_request', None)
         return format_html(
             '<a href="{}" target="_blank" rel="noopener noreferrer">Otwórz</a>',
-            _mpd_react_product_url(obj.pk),
+            _mpd_react_product_url(obj.pk, request),
         )
 
     def changelist_view(self, request, extra_context=None):
+        self._mpd_react_request = request
         extra_context = extra_context or {}
-        extra_context['mpd_react_url'] = _mpd_react_base_url()
+        extra_context['mpd_react_url'] = _mpd_react_base_url(request)
         return super().changelist_view(request, extra_context=extra_context)
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
+        self._mpd_react_request = request
         extra_context = extra_context or {}
-        extra_context['mpd_react_url'] = _mpd_react_base_url()
-        extra_context['mpd_react_product_url'] = _mpd_react_product_url(object_id)
+        extra_context['mpd_react_url'] = _mpd_react_base_url(request)
+        extra_context['mpd_react_product_url'] = _mpd_react_product_url(
+            object_id, request
+        )
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
         )
