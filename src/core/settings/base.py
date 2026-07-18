@@ -72,16 +72,16 @@ MPD_REACT_FRONTEND_URL = (
     or 'http://localhost:5173/mpd-app'
 ).rstrip('/')
 
-# Build Vite (frontend/mpd) kopiowany do obrazu Docker jako /app/mpd_spa
+# Build Vite (frontend/mpd) — Docker: /mpd_spa, lokalnie: frontend/mpd/dist
 _mpd_spa_env = _strip_env_value(os.getenv('MPD_SPA_ROOT'))
+_mpd_spa_candidates = [
+    BASE_DIR / 'mpd_spa',
+    BASE_DIR / 'frontend' / 'mpd' / 'dist',
+    Path('/mpd_spa'),
+]
 if _mpd_spa_env:
-    MPD_SPA_ROOT = Path(_mpd_spa_env)
-else:
-    _mpd_spa_candidates = (
-        BASE_DIR / 'mpd_spa',
-        BASE_DIR / 'frontend' / 'mpd' / 'dist',
-    )
-    MPD_SPA_ROOT = next((p for p in _mpd_spa_candidates if p.is_dir()), _mpd_spa_candidates[0])
+    _mpd_spa_candidates.insert(0, Path(_mpd_spa_env))
+MPD_SPA_ROOT = next((p for p in _mpd_spa_candidates if p.is_dir()), _mpd_spa_candidates[0])
 
 # Konfiguracja logowania - tylko console logging
 LOGGING = {
