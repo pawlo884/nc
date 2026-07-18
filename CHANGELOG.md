@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.19.1 (2026-07-18)</small>
+
+* Merge pull request #56 from pawlo884/fix/mpd-admin-thumbnail-list-links ([5b4118a](https://github.com/pawlo884/nc/commit/5b4118a)), closes [#56](https://github.com/pawlo884/nc/issues/56)
+* fix(mpd): przywróć linki do karty produktu na liście admina ([b2fbf19](https://github.com/pawlo884/nc/commit/b2fbf19))
+
 ## 1.19.0 (2026-07-18)
 
 * Merge pull request #55 from pawlo884/feat/mpd-products-infinite-scroll ([4e97b1d](https://github.com/pawlo884/nc/commit/4e97b1d)), closes [#55](https://github.com/pawlo884/nc/issues/55)
