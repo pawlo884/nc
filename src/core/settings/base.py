@@ -66,10 +66,10 @@ TABU_API_BASE_URL = (
 ).rstrip('/')
 TABU_API_KEY = _strip_env_value(os.getenv('TABU_API_KEY', ''))
 
-# React SPA MPD (dev: Vite, prod: relative /mpd-app lub MPD_REACT_FRONTEND_URL)
+# React SPA MPD — ta sama ścieżka w dev (Vite) i prod (Django): /mpd-app
 MPD_REACT_FRONTEND_URL = (
     _strip_env_value(os.getenv('MPD_REACT_FRONTEND_URL'))
-    or 'http://localhost:5173'
+    or 'http://localhost:5173/mpd-app'
 ).rstrip('/')
 
 # Build Vite (frontend/mpd) kopiowany do obrazu Docker jako /app/mpd_spa

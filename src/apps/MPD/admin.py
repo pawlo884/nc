@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 
 def _mpd_react_base_url(request=None) -> str:
     """
-    Dev: localhost w settingu → podmień host na ten z requestu (LAN IP).
-    Prod: względne /mpd-app zostaje same-origin.
+    Dev: localhost w settingu → podmień host na ten z requestu (LAN IP),
+    zachowaj ścieżkę /mpd-app. Prod: względne /mpd-app zostaje same-origin.
     """
     from urllib.parse import urlparse
 
     configured = getattr(
-        settings, 'MPD_REACT_FRONTEND_URL', 'http://localhost:5173'
+        settings, 'MPD_REACT_FRONTEND_URL', 'http://localhost:5173/mpd-app'
     ).rstrip('/')
 
     if configured.startswith('/'):
@@ -42,7 +42,8 @@ def _mpd_react_base_url(request=None) -> str:
     host = request.get_host().split(':')[0]
     port = parsed.port or 5173
     scheme = parsed.scheme or 'http'
-    return f'{scheme}://{host}:{port}'
+    path = (parsed.path or '').rstrip('/')
+    return f'{scheme}://{host}:{port}{path}'
 
 
 def _mpd_react_product_url(product_id, request=None) -> str:
