@@ -1,5 +1,12 @@
 # Zmiany
 
+## 1.18.0 (2026-07-18)
+
+* Merge pull request #54 from pawlo884/feat/mpd-product-thumbnails ([6435254](https://github.com/pawlo884/nc/commit/6435254)), closes [#54](https://github.com/pawlo884/nc/issues/54)
+* style(mpd): popraw formatowanie Prettier w ProductThumbnail ([26749ec](https://github.com/pawlo884/nc/commit/26749ec))
+* chore(cursor): zakaz commitów bezpośrednio na main ([6137f69](https://github.com/pawlo884/nc/commit/6137f69))
+* feat(mpd): miniaturki produktów z lazy loadingiem na liście i w mpd-app ([5aac76a](https://github.com/pawlo884/nc/commit/5aac76a))
+
 ## <small>1.17.1 (2026-07-18)</small>
 
 * Merge branch 'main' into feat/mpd-react-prod-serve ([d4929af](https://github.com/pawlo884/nc/commit/d4929af))
