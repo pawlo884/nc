@@ -1,0 +1,13 @@
+---
+description: Nigdy nie commitować ani nie pracować bezpośrednio na main
+alwaysApply: true
+---
+
+# Zakaz pracy na main
+
+- **NIGDY** nie commituj bezpośrednio na `main` / `master`
+- **NIGDY** nie pushuj bezpośrednio na `main` / `master`
+- Przed commitem zawsze sprawdź: `git branch --show-current`
+- Jeśli jesteś na `main`: najpierw utwórz branch (`git checkout -b feat/...` / `fix/...`) i dopiero potem commit
+- PR zawsze z brancha feature → `main`, nigdy odwrotnie
+- Jeśli przez pomyłkę commit wyląduje na `main` (i nie jest wypushowany): przenieś na feature branch i cofnij lokalny `main` do `origin/main`
