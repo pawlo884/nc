@@ -1,5 +1,15 @@
 # Zmiany
 
+## <small>1.17.1 (2026-07-18)</small>
+
+* Merge branch 'main' into feat/mpd-react-prod-serve ([d4929af](https://github.com/pawlo884/nc/commit/d4929af))
+* Merge pull request #51 from pawlo884/feat/mpd-ci-frontend-build ([6197a88](https://github.com/pawlo884/nc/commit/6197a88)), closes [#51](https://github.com/pawlo884/nc/issues/51)
+* Merge pull request #52 from pawlo884/feat/mpd-build-watch ([8ee045e](https://github.com/pawlo884/nc/commit/8ee045e)), closes [#52](https://github.com/pawlo884/nc/issues/52)
+* Merge pull request #53 from pawlo884/feat/mpd-react-prod-serve ([4bd2d22](https://github.com/pawlo884/nc/commit/4bd2d22)), closes [#53](https://github.com/pawlo884/nc/issues/53)
+* ci(mpd): buduj frontend React przy check-branch ([6048e23](https://github.com/pawlo884/nc/commit/6048e23))
+* chore(mpd): dodaj vite build --watch dla dist/nc-dev ([25ce911](https://github.com/pawlo884/nc/commit/25ce911))
+* fix(mpd): nc-dev SPA pod /mpd-app zamiast :5173 ([fac6cb4](https://github.com/pawlo884/nc/commit/fac6cb4))
+
 ## 1.17.0 (2026-07-18)
 
 * Merge pull request #49 from pawlo884/feat/mpd-react-attrs-fabric-grid ([88a26aa](https://github.com/pawlo884/nc/commit/88a26aa)), closes [#49](https://github.com/pawlo884/nc/issues/49)
