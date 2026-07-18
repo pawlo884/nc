@@ -1,5 +1,13 @@
 # Zmiany
 
+## 1.15.0 (2026-07-18)
+
+* Merge pull request #47 from pawlo884:feat/mpd-react-frontend ([2bf07bb](https://github.com/pawlo884/nc/commit/2bf07bb)), closes [#47](https://github.com/pawlo884/nc/issues/47)
+* style(mpd): format react frontend with prettier ([ea95b4f](https://github.com/pawlo884/nc/commit/ea95b4f))
+* merge(main): resolve CSRF trusted origins conflict for react vite ([b5d35c9](https://github.com/pawlo884/nc/commit/b5d35c9))
+* feat(mpd): editable react product detail with admin-like panels ([339c82f](https://github.com/pawlo884/nc/commit/339c82f))
+* feat(mpd): React frontend z lista i widokiem produktu ([f81d679](https://github.com/pawlo884/nc/commit/f81d679))
+
 ## 1.14.0 (2026-07-18)
 
 * Merge pull request #46 from pawlo884/feat/mpd-admin-react-shortcut ([1eff37a](https://github.com/pawlo884/nc/commit/1eff37a)), closes [#46](https://github.com/pawlo884/nc/issues/46)
