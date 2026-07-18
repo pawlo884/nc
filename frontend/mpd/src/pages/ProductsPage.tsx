@@ -29,7 +29,7 @@ export function ProductsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('id');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [listError, setListError] = useState<string | null>(null);
   const searchTimerRef = useRef<number | undefined>(undefined);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -103,7 +103,7 @@ export function ProductsPage() {
       return;
     }
     setSortField(field);
-    setSortDir(field === 'updated_at' ? 'desc' : 'asc');
+    setSortDir(field === 'id' || field === 'updated_at' ? 'desc' : 'asc');
   }
 
   function handleDelete(productId: number, productName: string) {
