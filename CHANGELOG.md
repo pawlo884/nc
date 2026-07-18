@@ -1,5 +1,13 @@
 # Zmiany
 
+## 1.16.0 (2026-07-18)
+
+* Merge pull request #48 from pawlo884:feat/mpd-react-prod-serve ([0895426](https://github.com/pawlo884/nc/commit/0895426)), closes [#48](https://github.com/pawlo884/nc/issues/48)
+* feat(mpd): serwuj React SPA w prod pod /mpd-app/ ([9a63b86](https://github.com/pawlo884/nc/commit/9a63b86))
+* feat(mpd): uzywaj /mpd-app/ takze w Vite dev ([8a5333f](https://github.com/pawlo884/nc/commit/8a5333f))
+* fix(mpd): link React w adminie uzywa hosta z requestu ([49d3503](https://github.com/pawlo884/nc/commit/49d3503))
+* fix(mpd): stabilny Vite dev na 0.0.0.0:5173 ([085ca08](https://github.com/pawlo884/nc/commit/085ca08))
+
 ## 1.15.0 (2026-07-18)
 
 * Merge pull request #47 from pawlo884:feat/mpd-react-frontend ([2bf07bb](https://github.com/pawlo884/nc/commit/2bf07bb)), closes [#47](https://github.com/pawlo884/nc/issues/47)
