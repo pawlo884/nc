@@ -389,7 +389,7 @@ def create_mpd_product_from_tabu(
         return {
             'success': False,
             'mpd_product_id': None,
-            'error_message': str(e),
+            'error_message': 'Nie udało się utworzyć produktu w MPD',
         }
 
 

@@ -957,7 +957,7 @@ class ProductAdmin(admin.ModelAdmin):
                             f"Wynik dodawania wariantów: {mapping_info}")
                     except Exception as e:
                         logger.error(f"Błąd podczas dodawania wariantów: {e}")
-                        mapping_info = {'error': f'Błąd wariantów: {str(e)}'}
+                        mapping_info = {'error': 'Błąd mapowania wariantów'}
 
                     # Upload zdjęć do bucketa
                     try:
@@ -970,7 +970,7 @@ class ProductAdmin(admin.ModelAdmin):
                             'uploaded_images', 0)
                     except Exception as e:
                         logger.error(f"Błąd podczas uploadu zdjęć: {e}")
-                        mapping_info['upload_error'] = str(e)
+                        mapping_info['upload_error'] = 'Błąd uploadu zdjęć'
 
                     # Task linkowania uruchamiany przez sygnał MPD (ProductvariantsSources post_save)
                 else:
@@ -1147,7 +1147,11 @@ class ProductAdmin(admin.ModelAdmin):
 
                         except Exception as e:
                             errors.append(
-                                f"Błąd mapowania produktu {product_id}: {str(e)}")
+                                f"Błąd mapowania produktu {product_id}"
+                            )
+                            logger.error(
+                                "Błąd mapowania produktu %s: %s", product_id, e
+                            )
 
                 return JsonResponse({
                     'success': True,

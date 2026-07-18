@@ -10,6 +10,10 @@ concurrency:
   group: check-branch-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   changes:
     name: Wykryj zmienione ścieżki
