@@ -1,5 +1,13 @@
 # Zmiany
 
+## <small>1.22.1 (2026-07-18)</small>
+
+* Merge pull request #66 from pawlo884/ci/skip-redundant-lint-for-mpd ([3427471](https://github.com/pawlo884/nc/commit/3427471)), closes [#66](https://github.com/pawlo884/nc/issues/66)
+* Merge pull request #67 from pawlo884/fix/dependabot-glob-upgrade ([b28fd96](https://github.com/pawlo884/nc/commit/b28fd96)), closes [#67](https://github.com/pawlo884/nc/issues/67)
+* fix(deps): upgrade glob to fix Dependabot alerts ([84c8d8d](https://github.com/pawlo884/nc/commit/84c8d8d))
+* ci: nie dubluj lintu przy zmianach frontend/mpd ([b89ab11](https://github.com/pawlo884/nc/commit/b89ab11))
+* ci: wyłącz husky przy npm ci (HUSKY=0) ([ed6d320](https://github.com/pawlo884/nc/commit/ed6d320))
+
 ## 1.22.0 (2026-07-18)
 
 * Merge pull request #65 from pawlo884/feat/mpd-product-list-filters ([b60a076](https://github.com/pawlo884/nc/commit/b60a076)), closes [#65](https://github.com/pawlo884/nc/issues/65)
