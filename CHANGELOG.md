@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.22.6 (2026-07-18)</small>
+
+* Merge pull request #74 from pawlo884/fix/prod-strip-env-value ([12378e6](https://github.com/pawlo884/nc/commit/12378e6)), closes [#74](https://github.com/pawlo884/nc/issues/74)
+* fix(settings): import _strip_env_value in prod.py ([c6d5b88](https://github.com/pawlo884/nc/commit/c6d5b88))
+
 ## <small>1.22.5 (2026-07-18)</small>
 
 * Merge pull request #73 from pawlo884/fix/openai-langchain-conflict ([b1d8225](https://github.com/pawlo884/nc/commit/b1d8225)), closes [#73](https://github.com/pawlo884/nc/issues/73)
