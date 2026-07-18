@@ -212,6 +212,25 @@
   gap: 1rem;
 }
 
+/* Para paneli obok siebie (np. atrybuty + skład) — tabele nie powinny łamać layoutu */
+.product-detail__grid--pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.product-detail__grid--pair > .page-card {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+@media (max-width: 900px) {
+  .product-detail__grid--pair {
+    grid-template-columns: 1fr;
+  }
+}
+
 .section-title {
   margin: 0 0 1rem;
   font-size: 1.1rem;

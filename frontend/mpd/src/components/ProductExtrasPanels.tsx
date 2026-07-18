@@ -175,165 +175,165 @@ export function ProductExtrasPanels({
     <>
       {sectionError && <div className="alert alert-error">{sectionError}</div>}
       {sectionOk && <div className="alert alert-success">{sectionOk}</div>}
-
-      <div className="page-card">
-        <h3 className="section-title">Atrybuty</h3>
-        <div className="inline-add">
-          <select
-            className="search-input"
-            value={attrToAdd}
-            onChange={e => setAttrToAdd(e.target.value)}
-          >
-            <option value="">Wybierz atrybut…</option>
-            {availableAttributes.map(a => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!attrToAdd || attrMutation.isPending}
-            onClick={() => {
-              setSectionOk(null);
-              attrMutation.mutate({
-                product_id: productId,
-                action: 'add',
-                attribute_ids: [Number(attrToAdd)],
-              });
-            }}
-          >
-            Dodaj
-          </button>
-        </div>
-        {(product.attributes || []).length === 0 ? (
-          <div className="empty-state">Brak atrybutów.</div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: 80 }}>ID</th>
-                <th>Nazwa</th>
-                <th style={{ width: 100 }}>Akcje</th>
-              </tr>
-            </thead>
-            <tbody>
-              {product.attributes.map(attr => (
-                <tr key={attr.id}>
-                  <td>{attr.id}</td>
-                  <td>{attr.name || '—'}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-danger-sm"
-                      disabled={attrMutation.isPending}
-                      onClick={() => {
-                        setSectionOk(null);
-                        attrMutation.mutate({
-                          product_id: productId,
-                          action: 'remove',
-                          attribute_id: attr.id,
-                        });
-                      }}
-                    >
-                      Usuń
-                    </button>
-                  </td>
-                </tr>
+      <div className="product-detail__grid product-detail__grid--pair">
+        <div className="page-card">
+          <h3 className="section-title">Atrybuty</h3>
+          <div className="inline-add">
+            <select
+              className="search-input"
+              value={attrToAdd}
+              onChange={e => setAttrToAdd(e.target.value)}
+            >
+              <option value="">Wybierz atrybut…</option>
+              {availableAttributes.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
               ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="page-card">
-        <h3 className="section-title">
-          Skład materiałowy
-          <span className={`section-count ${fabricTotal === 100 ? '' : 'section-count--warn'}`}>
-            {fabricTotal}%
-          </span>
-        </h3>
-        <div className="inline-add">
-          <select
-            className="search-input"
-            value={fabricToAdd}
-            onChange={e => setFabricToAdd(e.target.value)}
-          >
-            <option value="">Wybierz komponent…</option>
-            {availableFabric.map(f => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className="search-input"
-            style={{ maxWidth: 100 }}
-            type="number"
-            min={1}
-            max={100}
-            value={fabricPct}
-            onChange={e => setFabricPct(e.target.value)}
-            placeholder="%"
-          />
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!fabricToAdd || fabricMutation.isPending}
-            onClick={() => {
-              setSectionOk(null);
-              fabricMutation.mutate({
-                product_id: productId,
-                action: 'add',
-                component_id: Number(fabricToAdd),
-                percentage: Number(fabricPct) || 1,
-              });
-            }}
-          >
-            Dodaj
-          </button>
-        </div>
-        {(product.fabric || []).length === 0 ? (
-          <div className="empty-state">Brak składu materiałowego.</div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Komponent</th>
-                <th style={{ width: 100 }}>%</th>
-                <th style={{ width: 100 }}>Akcje</th>
-              </tr>
-            </thead>
-            <tbody>
-              {product.fabric.map(item => (
-                <tr key={item.component_id}>
-                  <td>{item.component_name || item.component_id}</td>
-                  <td>{item.percentage}%</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-danger-sm"
-                      disabled={fabricMutation.isPending}
-                      onClick={() => {
-                        setSectionOk(null);
-                        fabricMutation.mutate({
-                          product_id: productId,
-                          action: 'remove',
-                          component_id: item.component_id,
-                        });
-                      }}
-                    >
-                      Usuń
-                    </button>
-                  </td>
+            </select>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!attrToAdd || attrMutation.isPending}
+              onClick={() => {
+                setSectionOk(null);
+                attrMutation.mutate({
+                  product_id: productId,
+                  action: 'add',
+                  attribute_ids: [Number(attrToAdd)],
+                });
+              }}
+            >
+              Dodaj
+            </button>
+          </div>
+          {(product.attributes || []).length === 0 ? (
+            <div className="empty-state">Brak atrybutów.</div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 80 }}>ID</th>
+                  <th>Nazwa</th>
+                  <th style={{ width: 100 }}>Akcje</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {product.attributes.map(attr => (
+                  <tr key={attr.id}>
+                    <td>{attr.id}</td>
+                    <td>{attr.name || '—'}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-danger-sm"
+                        disabled={attrMutation.isPending}
+                        onClick={() => {
+                          setSectionOk(null);
+                          attrMutation.mutate({
+                            product_id: productId,
+                            action: 'remove',
+                            attribute_id: attr.id,
+                          });
+                        }}
+                      >
+                        Usuń
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
 
+        <div className="page-card">
+          <h3 className="section-title">
+            Skład materiałowy
+            <span className={`section-count ${fabricTotal === 100 ? '' : 'section-count--warn'}`}>
+              {fabricTotal}%
+            </span>
+          </h3>
+          <div className="inline-add">
+            <select
+              className="search-input"
+              value={fabricToAdd}
+              onChange={e => setFabricToAdd(e.target.value)}
+            >
+              <option value="">Wybierz komponent…</option>
+              {availableFabric.map(f => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+            <input
+              className="search-input"
+              style={{ maxWidth: 100 }}
+              type="number"
+              min={1}
+              max={100}
+              value={fabricPct}
+              onChange={e => setFabricPct(e.target.value)}
+              placeholder="%"
+            />
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!fabricToAdd || fabricMutation.isPending}
+              onClick={() => {
+                setSectionOk(null);
+                fabricMutation.mutate({
+                  product_id: productId,
+                  action: 'add',
+                  component_id: Number(fabricToAdd),
+                  percentage: Number(fabricPct) || 1,
+                });
+              }}
+            >
+              Dodaj
+            </button>
+          </div>
+          {(product.fabric || []).length === 0 ? (
+            <div className="empty-state">Brak składu materiałowego.</div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Komponent</th>
+                  <th style={{ width: 100 }}>%</th>
+                  <th style={{ width: 100 }}>Akcje</th>
+                </tr>
+              </thead>
+              <tbody>
+                {product.fabric.map(item => (
+                  <tr key={item.component_id}>
+                    <td>{item.component_name || item.component_id}</td>
+                    <td>{item.percentage}%</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-danger-sm"
+                        disabled={fabricMutation.isPending}
+                        onClick={() => {
+                          setSectionOk(null);
+                          fabricMutation.mutate({
+                            product_id: productId,
+                            action: 'remove',
+                            component_id: item.component_id,
+                          });
+                        }}
+                      >
+                        Usuń
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
       <div className="page-card">
         <h3 className="section-title">Ścieżki</h3>
         <div className="inline-add">
