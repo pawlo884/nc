@@ -93,7 +93,7 @@ class MPDProductCreateAPI(APIView):
                 description=(
                     "Sortowanie listy. Dozwolone: id, name, brand_name, "
                     "visibility, updated_at, created_at. Prefiks `-` = malejąco "
-                    "(np. `-updated_at`). Domyślnie: id."
+                    "(np. `-updated_at`). Domyślnie: `-id`."
                 ),
             ),
         ],
@@ -139,7 +139,7 @@ class MPDProductCreateAPI(APIView):
             'updated_at': 'updated_at',
             'created_at': 'created_at',
         }
-        ordering_param = (request.query_params.get('ordering') or 'id').strip()
+        ordering_param = (request.query_params.get('ordering') or '-id').strip()
         descending = ordering_param.startswith('-')
         ordering_key = ordering_param.lstrip('-')
         order_field = ordering_map.get(ordering_key, 'id')
@@ -156,7 +156,14 @@ class MPDProductCreateAPI(APIView):
         else:
             paginator.page_size = 50
 
-        page = paginator.paginate_queryset(queryset.order_by(order_field, 'id'), request)
+        # Stabilny tie-breaker: przy sortowaniu po id nie dubluj kolumny
+        if order_field in ('id', '-id'):
+            order_by_fields = (order_field,)
+        else:
+            order_by_fields = (order_field, '-id')
+        page = paginator.paginate_queryset(
+            queryset.order_by(*order_by_fields), request
+        )
         serializer = ProductListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
