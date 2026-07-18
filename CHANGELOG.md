@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.22.3 (2026-07-18)</small>
+
+* Merge pull request #71 from pawlo884/fix/dependabot-mcp-fast-uri ([7edd7aa](https://github.com/pawlo884/nc/commit/7edd7aa)), closes [#71](https://github.com/pawlo884/nc/issues/71)
+* fix(deps): bump mcp and override fast-uri for Dependabot ([b36f26c](https://github.com/pawlo884/nc/commit/b36f26c))
+
 ## <small>1.22.2 (2026-07-18)</small>
 
 * Merge pull request #68 from pawlo884/dependabot/npm_and_yarn/lodash-es-4.18.1 ([bfea16e](https://github.com/pawlo884/nc/commit/bfea16e)), closes [#68](https://github.com/pawlo884/nc/issues/68)
