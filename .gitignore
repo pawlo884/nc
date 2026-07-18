@@ -46,3 +46,6 @@ nginx-blue-green.conf
 # React MPD build (w obrazie Docker: /app/mpd_spa)
 mpd_spa/
 frontend/mpd/dist/
+
+# CodeQL (lokalny Docker)
+.codeql/
