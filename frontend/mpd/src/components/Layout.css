@@ -53,6 +53,31 @@
   flex-wrap: wrap;
 }
 
+.toolbar--filters {
+  align-items: center;
+}
+
+.filter-select {
+  min-width: 160px;
+  max-width: 240px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #333;
+}
+
+.filter-select--wide {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
 .search-input {
   flex: 1;
   min-width: 220px;

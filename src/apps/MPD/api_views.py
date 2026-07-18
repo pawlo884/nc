@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import views as mpd_views
-from .models import ProductImage, Products
+from .models import ProductImage, ProductPaths, Products
 from .serializers import ProductListSerializer
 
 # Import drf_spectacular tylko jeśli jest dostępny
@@ -54,8 +54,8 @@ class MPDProductCreateAPI(APIView):
         summary="Lista produktów MPD",
         description=(
             "Zwraca listę produktów MPD z możliwością filtrowania po nazwie, "
-            "marce (`brand_id`) oraz widoczności (`visibility`). "
-            "Obsługuje paginację poprzez parametry `page` i `page_size`."
+            "marce (`brand_id`), widoczności (`visibility`) oraz kategorii/ścieżce "
+            "(`path_id`). Obsługuje paginację poprzez parametry `page` i `page_size`."
         ),
         tags=["Products"],
         parameters=[
@@ -79,6 +79,12 @@ class MPDProductCreateAPI(APIView):
                     "Filtr widoczności produktu. Akceptowane wartości: "
                     "`true/1/yes/y` lub `false/0/no/n`."
                 ),
+            ),
+            OpenApiParameter(
+                name="path_id",
+                type=OpenApiTypes.INT,
+                required=False,
+                description="ID ścieżki/kategorii (product_path) — produkty przypisane do tej ścieżki.",
             ),
             OpenApiParameter(
                 name="page_size",
@@ -130,6 +136,20 @@ class MPDProductCreateAPI(APIView):
                 queryset = queryset.filter(visibility=True)
             elif visibility in ('false', '0', 'no', 'n'):
                 queryset = queryset.filter(visibility=False)
+
+        path_id = request.query_params.get('path_id')
+        if path_id:
+            try:
+                path_id_int = int(path_id)
+            except (TypeError, ValueError):
+                path_id_int = None
+            if path_id_int is not None:
+                product_ids = (
+                    ProductPaths.objects.using('MPD')
+                    .filter(path_id=path_id_int)
+                    .values('product_id')
+                )
+                queryset = queryset.filter(id__in=product_ids)
 
         ordering_map = {
             'id': 'id',
@@ -378,6 +398,18 @@ class MPDCatalogAttributesAPI(APIView):
         from .models import Attributes
         rows = list(
             Attributes.objects.using('MPD').order_by('name').values('id', 'name')
+        )
+        return Response({'results': rows})
+
+
+class MPDCatalogBrandsAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [TokenAuthentication]
+
+    def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+        from .models import Brands
+        rows = list(
+            Brands.objects.using('MPD').order_by('name').values('id', 'name')
         )
         return Response({'results': rows})
 
