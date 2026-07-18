@@ -35,9 +35,8 @@ jobs:
               - 'src/**'
               - '**/requirements*.txt'
               - 'requirements*.txt'
+            # Osobny lint root/innych frontów — NIE frontend/mpd (tam jest job MPD React)
             code_quality:
-              - '**/*.{js,jsx,ts,tsx,css,scss}'
-              - 'frontend/**'
               - 'package.json'
               - 'package-lock.json'
               - '.prettierrc'
@@ -45,6 +44,8 @@ jobs:
               - '.prettierignore'
               - 'eslint.config.*'
               - '.eslintrc*'
+              - '**/*.{js,jsx,ts,tsx,css,scss}'
+              - '!frontend/mpd/**'
             frontend_mpd:
               - 'frontend/mpd/**'
 
@@ -130,6 +131,7 @@ jobs:
   check-code-quality:
     name: Sprawdź jakość kodu (linting i formatowanie)
     needs: changes
+    # Tylko gdy zmieniono JS poza frontend/mpd (albo CI). Przy samym mpd → job React.
     if: needs.changes.outputs.code_quality == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
 
@@ -221,6 +223,14 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint (oxlint)
+        run: npm run lint
+
+      - name: Prettier (frontend/mpd)
+        working-directory: ${{ github.workspace }}
+        run: |
+          npx --yes prettier@3.6.2 --check "frontend/mpd/src/**/*.{ts,tsx,css}" --ignore-path .gitignore
 
       - name: Build (tsc -b && vite build)
         run: npm run build
