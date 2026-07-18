@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.22.4 (2026-07-18)</small>
+
+* Merge pull request #72 from pawlo884/fix/dependabot-batch-alerts ([4b22281](https://github.com/pawlo884/nc/commit/4b22281)), closes [#72](https://github.com/pawlo884/nc/issues/72)
+* fix(deps): patch open Dependabot alerts (pip + npm) ([74791f6](https://github.com/pawlo884/nc/commit/74791f6))
+
 ## <small>1.22.3 (2026-07-18)</small>
 
 * Merge pull request #71 from pawlo884/fix/dependabot-mcp-fast-uri ([7edd7aa](https://github.com/pawlo884/nc/commit/7edd7aa)), closes [#71](https://github.com/pawlo884/nc/issues/71)
