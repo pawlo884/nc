@@ -321,7 +321,20 @@ export function ProductDetailPage() {
                   className="image-gallery__item"
                 >
                   {img.image_url ? (
-                    <img src={img.image_url} alt={`Produkt ${product.id}`} loading="lazy" />
+                    <img
+                      src={img.image_url}
+                      alt={`Produkt ${product.id}`}
+                      loading="lazy"
+                      decoding="async"
+                      width={120}
+                      height={120}
+                      onError={e => {
+                        const el = e.currentTarget;
+                        el.onerror = null;
+                        el.src =
+                          'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5icmFrIHpkajwvdGV4dD48L3N2Zz4=';
+                      }}
+                    />
                   ) : (
                     <span className="image-gallery__fallback">Brak URL</span>
                   )}

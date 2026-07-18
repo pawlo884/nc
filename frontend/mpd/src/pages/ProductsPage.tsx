@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchProducts } from '../api/mpd';
+import { ProductThumbnail } from '../components/ProductThumbnail';
 import '../components/Layout.css';
 import './ProductDetailPage.css';
 
@@ -64,6 +65,7 @@ export function ProductsPage() {
           <table className="data-table products-table">
             <thead>
               <tr>
+                <th style={{ width: 72 }}>Zdjęcie</th>
                 <th style={{ width: 70 }}>ID</th>
                 <th>Nazwa</th>
                 <th style={{ width: 180 }}>Marka</th>
@@ -74,13 +76,19 @@ export function ProductsPage() {
             <tbody>
               {data.results.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="empty-state">
+                  <td colSpan={6} className="empty-state">
                     Brak produktów spełniających kryteria.
                   </td>
                 </tr>
               ) : (
                 data.results.map(product => (
                   <tr key={product.id} onClick={() => navigate(`/products/${product.id}`)}>
+                    <td className="products-table__thumb-cell">
+                      <ProductThumbnail
+                        src={product.thumbnail_url}
+                        alt={product.name || `Produkt ${product.id}`}
+                      />
+                    </td>
                     <td>{product.id}</td>
                     <td>
                       <Link

@@ -9,6 +9,7 @@ export interface MpdProduct {
   id: number;
   name: string;
   brand_name: string | null;
+  thumbnail_url: string | null;
   visibility: boolean;
   created_at: string;
   updated_at: string;

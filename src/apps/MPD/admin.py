@@ -2,7 +2,7 @@ from django.contrib import admin  # type: ignore
 from django.conf import settings
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html, escape
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Subquery
 from django.contrib.admin import DateFieldListFilter, SimpleListFilter
 from django.urls import path
 from django.http import JsonResponse
@@ -189,8 +189,10 @@ class ProductsAdmin(admin.ModelAdmin):
             'description': 'Informacje o dacie utworzenia i ostatniej aktualizacji'
         }),
     )
-    list_display = ['id', 'name', 'description',
-                    'brand', 'collection', 'season', 'updated_at', 'visibility', 'open_in_react']  # widok listy produktów
+    list_display = [
+        'product_image_thumbnail', 'id', 'name', 'description',
+        'brand', 'collection', 'season', 'updated_at', 'visibility', 'open_in_react',
+    ]
     list_filter = [
         'brand',
         'collection',
@@ -210,7 +212,38 @@ class ProductsAdmin(admin.ModelAdmin):
     actions = ['make_visible', 'make_hidden']
 
     def get_queryset(self, request):
-        return super().get_queryset(request).using('MPD').select_related('brand', 'series', 'unit')
+        first_image_path_subquery = (
+            ProductImage.objects.filter(product_id=OuterRef('pk'))
+            .order_by('id')
+            .values('file_path')[:1]
+        )
+        return (
+            super()
+            .get_queryset(request)
+            .using('MPD')
+            .select_related('brand', 'series', 'unit')
+            .annotate(first_image_path=Subquery(first_image_path_subquery))
+        )
+
+    @admin.display(description='Zdjęcie')
+    def product_image_thumbnail(self, obj):
+        """Miniatura pierwszego zdjęcia produktu na liście (lazy loading)."""
+        original_path = getattr(obj, 'first_image_path', None)
+        if not original_path:
+            return '-'
+        display_url = resolve_image_url(original_path) or original_path
+        if not display_url.startswith(('http://', 'https://')):
+            return '-'
+        return format_html(
+            '<a href="{}" target="_blank" title="{}">'
+            '<img src="{}" alt="Obraz produktu" loading="lazy" width="56" height="56" '
+            'style="object-fit: contain; width: 56px; height: 56px; max-width: 56px; max-height: 56px;" '
+            'onerror="this.onerror=null; this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiBmaWxsPSIjZWVlIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSI4IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+YnJhayB6ZGo8L3RleHQ+PC9zdmc+\';" />'
+            '</a>',
+            display_url,
+            original_path,
+            display_url,
+        )
 
     @admin.display(description='React')
     def open_in_react(self, obj):
@@ -1326,7 +1359,8 @@ class ProductImageAdmin(admin.ModelAdmin):
             if url and url.startswith(('http://', 'https://')):
                 return format_html(
                     '<a href="{}" target="_blank" title="Kliknij, aby otworzyć pełny obraz">'
-                    '<img src="{}" style="max-width:150px; max-height:150px; border:1px solid #ddd; border-radius:4px; cursor:pointer;" />'
+                    '<img src="{}" alt="Obraz" loading="lazy" width="150" height="150" '
+                    'style="max-width:150px; max-height:150px; object-fit:contain; border:1px solid #ddd; border-radius:4px; cursor:pointer;" />'
                     '</a>',
                     url, url
                 )
