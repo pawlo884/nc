@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.17.0 (2026-07-18)
+
+* Merge pull request #49 from pawlo884/feat/mpd-react-attrs-fabric-grid ([88a26aa](https://github.com/pawlo884/nc/commit/88a26aa)), closes [#49](https://github.com/pawlo884/nc/issues/49)
+* feat(mpd): atrybuty i sklad obok siebie w React ([f265d14](https://github.com/pawlo884/nc/commit/f265d14))
+
 ## <small>1.16.1 (2026-07-18)</small>
 
 * Merge pull request #50 from pawlo884/fix/mpd-spa-root-nc-dev ([c180cf0](https://github.com/pawlo884/nc/commit/c180cf0)), closes [#50](https://github.com/pawlo884/nc/issues/50)
