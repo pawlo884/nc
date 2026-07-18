@@ -9,15 +9,18 @@ Panel React wyłącznie dla bazy MPD (Master Product Database).
 cd src
 ..\.venv\Scripts\python.exe manage.py runserver --settings=core.settings.dev
 
-# Terminal 2 — React
+# Terminal 2 — React (HMR)
 cd frontend/mpd
 npm install
 npm run dev
+
+# Terminal 3 (opcjonalnie) — aktualizuj dist pod nc-dev / Docker
+npm run build:watch
 ```
 
 Frontend (ta sama ścieżka co prod): **http://localhost:5173/mpd-app/**  
 LAN: `http://<IP-PC>:5173/mpd-app/`  
-Przez internet (`nc-dev`): **https://nc-dev.sowa.ch/mpd-app/** — nie `:5173` (Cloudflare nie proxy’uje tego portu; SPA serwuje Django po rebuild obrazu).
+Przez internet (`nc-dev`): **https://nc-dev.sowa.ch/mpd-app/** — nie `:5173` (Cloudflare nie proxy’uje tego portu; SPA z `dist`, trzymaj `npm run build:watch` albo ręczny `npm run build`).
 
 Skrót w adminie: lokalnie/LAN → Vite; na `*.sowa.ch` → `/mpd-app`.
 
