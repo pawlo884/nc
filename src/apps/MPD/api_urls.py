@@ -17,6 +17,11 @@ urlpatterns = [
         name="products-detail",
     ),
     path(
+        "products/<int:product_id>/retail-prices/",
+        api_views.MPDProductRetailPricesAPI.as_view(),
+        name="products-retail-prices",
+    ),
+    path(
         "products/bulk-create/",
         api_views.MPDBulkCreateProductsAPI.as_view(),
         name="products-bulk-create",
@@ -36,6 +41,26 @@ urlpatterns = [
         "products/manage-attributes/",
         api_views.MPDManageProductAttributesAPI.as_view(),
         name="products-manage-attributes",
+    ),
+    path(
+        "catalog/attributes/",
+        api_views.MPDCatalogAttributesAPI.as_view(),
+        name="catalog-attributes",
+    ),
+    path(
+        "catalog/fabric-components/",
+        api_views.MPDCatalogFabricComponentsAPI.as_view(),
+        name="catalog-fabric-components",
+    ),
+    path(
+        "catalog/paths/",
+        api_views.MPDCatalogPathsAPI.as_view(),
+        name="catalog-paths",
+    ),
+    path(
+        "catalog/vats/",
+        api_views.MPDCatalogVatsAPI.as_view(),
+        name="catalog-vats",
     ),
     # Integracja z matterhorn1
     path(

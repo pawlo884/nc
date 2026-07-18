@@ -15,6 +15,152 @@
   text-decoration: underline;
 }
 
+.product-detail__nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.product-detail__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-muted {
+  background: #eef0f5;
+  color: #333;
+}
+
+.btn-muted:hover:not(:disabled) {
+  background: #e2e5ee;
+}
+
+.alert-success {
+  background: #e8f8ef;
+  color: #1e7a45;
+  border: 1px solid #b7ebc9;
+}
+
+.form-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.form-grid--meta {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-group label {
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.visibility-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.75rem;
+  background: #f5f6fa;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.description-editor {
+  width: 100%;
+  min-height: 220px;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.description-editor:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.inline-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  align-items: center;
+}
+
+.btn-danger-sm {
+  background: #dc3545;
+  color: #fff;
+  padding: 0.25rem 0.55rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-danger-sm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.section-count--warn {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.muted-note {
+  color: #777;
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
+.paths-list {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.path-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.3rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.path-row--on {
+  background: #d4edda;
+}
+
+.related-block {
+  margin-bottom: 1rem;
+}
+
+.related-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin-top: 0.4rem;
+}
+
+.related-links a {
+  color: #667eea;
+}
+
 .product-detail__title-row {
   display: flex;
   justify-content: space-between;
