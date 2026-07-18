@@ -23,6 +23,7 @@ from django.views.generic import TemplateView
 import os
 
 from core.views import index, health_check
+from core.mpd_spa import mpd_spa
 from core.auth_views import CustomObtainAuthToken
 
 # Import drf_spectacular tylko jeśli jest dostępny
@@ -39,6 +40,8 @@ urlpatterns = [
         template_name='robots.txt',
         content_type='text/plain'
     ), name='robots'),
+    path('mpd-app/', mpd_spa, {'path': ''}, name='mpd-spa'),
+    path('mpd-app/<path:path>', mpd_spa, name='mpd-spa-path'),
     path('', index, name='index'),
 ]
 

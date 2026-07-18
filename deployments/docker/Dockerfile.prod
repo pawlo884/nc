@@ -1,5 +1,16 @@
 # syntax=docker/dockerfile:1.4
 # Zoptymalizowany Dockerfile dla produkcji z cache'owaniem
+
+# --- React MPD SPA ---
+FROM node:22-alpine AS mpd-frontend
+WORKDIR /frontend
+COPY frontend/mpd/package.json frontend/mpd/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+COPY frontend/mpd/ ./
+RUN npm run build
+
+# --- Django ---
 FROM python:3.13-slim
 
 # Argument dla daty budowania (wymusza rebuild)
@@ -44,6 +55,9 @@ COPY deployments/redis.conf ./redis.conf
 COPY package.json .
 COPY deployments/docker/docker-entrypoint.sh ./docker-entrypoint.sh
 
+# Build React SPA → /app/mpd_spa (osobno od staticfiles, żeby collectstatic --clear nie usuwał)
+COPY --from=mpd-frontend /frontend/dist /app/mpd_spa/
+
 # Utwórz katalogi
 RUN mkdir -p /app/staticfiles /app/logs/matterhorn /var/lib/celery /var/lib/flower
 
@@ -59,12 +73,13 @@ RUN chown -R celery:celery /app /var/lib/celery /var/lib/flower && \
 
 # Ustaw zmienną środowiskową PRZED collectstatic
 ENV DJANGO_SETTINGS_MODULE=core.settings.prod
+ENV MPD_SPA_ROOT=/app/mpd_spa
 
 # Zbierz pliki statyczne
 RUN python manage.py collectstatic --noinput --clear
 
 # Zmień właściciela plików statycznych
-RUN chown -R celery:celery /app/staticfiles
+RUN chown -R celery:celery /app/staticfiles /app/mpd_spa
 
 # Przełącz na użytkownika celery
 USER celery

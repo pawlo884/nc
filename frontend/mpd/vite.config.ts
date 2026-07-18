@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // Prod: SPA pod /mpd-app/ (Django/nginx). Dev: root Vite (localhost:5173).
+  base: mode === 'production' ? '/mpd-app/' : '/',
   plugins: [react()],
   server: {
     port: 5173,
@@ -12,4 +14,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

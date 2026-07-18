@@ -28,13 +28,21 @@ apiClient.interceptors.request.use(config => {
   return config;
 });
 
+function loginHref(): string {
+  return `${import.meta.env.BASE_URL}login`;
+}
+
+function isLoginPath(pathname: string): boolean {
+  return pathname === '/login' || pathname.endsWith('/login') || pathname.endsWith('/login/');
+}
+
 apiClient.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
       clearStoredToken();
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (!isLoginPath(window.location.pathname)) {
+        window.location.href = loginHref();
       }
     }
     return Promise.reject(error);
