@@ -465,9 +465,7 @@ export function ProductDetailPage() {
                         <span className="muted">—</span>
                       )}
                     </td>
-                    <td>
-                      {variant.producer_color_name || <span className="muted">—</span>}
-                    </td>
+                    <td>{variant.producer_color_name || <span className="muted">—</span>}</td>
                     <td>{variant.size_name || <span className="muted">—</span>}</td>
                     <td>{variant.stock ?? <span className="muted">0</span>}</td>
                     <td>

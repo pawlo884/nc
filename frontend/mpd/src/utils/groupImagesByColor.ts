@@ -22,7 +22,7 @@ function basenameLower(filePath: string): string {
  */
 export function groupImagesByColor(
   images: MpdProductImage[],
-  variants: MpdProductVariant[],
+  variants: MpdProductVariant[]
 ): ImageColorGroup[] {
   const producerMap = new Map<string, string>();
   const colorMap = new Map<string, string>();
@@ -45,11 +45,9 @@ export function groupImagesByColor(
     .sort((a, b) => b.key.length - a.key.length);
 
   const byProducer = new Map<string, MpdProductImage[]>(
-    [...producerMap.keys()].map(id => [id, []]),
+    [...producerMap.keys()].map(id => [id, []])
   );
-  const byColor = new Map<string, MpdProductImage[]>(
-    [...colorMap.keys()].map(id => [id, []]),
-  );
+  const byColor = new Map<string, MpdProductImage[]>([...colorMap.keys()].map(id => [id, []]));
   const other: MpdProductImage[] = [];
 
   for (const img of images) {
