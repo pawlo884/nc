@@ -1,5 +1,11 @@
 # Zmiany
 
+## 1.23.0 (2026-07-19)
+
+* Merge pull request #78 from pawlo884/feat/mpd-images-by-color ([4f9c4ca](https://github.com/pawlo884/nc/commit/4f9c4ca)), closes [#78](https://github.com/pawlo884/nc/issues/78)
+* style(mpd): format ProductDetailPage and groupImagesByColor ([e05d9b1](https://github.com/pawlo884/nc/commit/e05d9b1))
+* feat(mpd): grupuj zdjęcia według koloru w mpd-app ([733392f](https://github.com/pawlo884/nc/commit/733392f))
+
 ## <small>1.22.8 (2026-07-18)</small>
 
 * Merge pull request #77 from pawlo884/fix/codeql-remaining-alerts ([c496e17](https://github.com/pawlo884/nc/commit/c496e17)), closes [#77](https://github.com/pawlo884/nc/issues/77)
