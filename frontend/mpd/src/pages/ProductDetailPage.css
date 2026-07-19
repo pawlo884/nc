@@ -254,6 +254,32 @@
   gap: 0.75rem;
 }
 
+.image-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.image-group__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.image-group__badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #667eea;
+  background: #eef0ff;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+}
+
 .image-gallery__item {
   display: block;
   border: 1px solid #eee;

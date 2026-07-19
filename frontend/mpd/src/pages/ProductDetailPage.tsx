@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { deleteProduct, fetchProduct, updateProduct } from '../api/mpd';
 import { ProductExtrasPanels } from '../components/ProductExtrasPanels';
 import type { MpdProductDetail, MpdProductUpdatePayload } from '../types/mpd';
+import { groupImagesByColor } from '../utils/groupImagesByColor';
 import '../components/Layout.css';
 import './ProductDetailPage.css';
 
@@ -118,6 +119,14 @@ export function ProductDetailPage() {
       setSaveError('Nie udało się usunąć produktu.');
     },
   });
+
+  const imageGroups = useMemo(() => {
+    const product = data?.product;
+    if (!product?.images?.length) {
+      return [];
+    }
+    return groupImagesByColor(product.images, product.variants ?? []);
+  }, [data?.product]);
 
   if (!Number.isFinite(productId) || productId <= 0) {
     return (
@@ -353,34 +362,47 @@ export function ProductDetailPage() {
         {product.images.length > 0 && (
           <div className="page-card product-detail__images">
             <h3 className="section-title">Zdjęcia</h3>
-            <div className="image-gallery">
-              {product.images.map(img => (
-                <a
-                  key={img.id}
-                  href={img.image_url || undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="image-gallery__item"
-                >
-                  {img.image_url ? (
-                    <img
-                      src={img.image_url}
-                      alt={`Produkt ${product.id}`}
-                      loading="lazy"
-                      decoding="async"
-                      width={120}
-                      height={120}
-                      onError={e => {
-                        const el = e.currentTarget;
-                        el.onerror = null;
-                        el.src =
-                          'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5icmFrIHpkajwvdGV4dD48L3N2Zz4=';
-                      }}
-                    />
-                  ) : (
-                    <span className="image-gallery__fallback">Brak URL</span>
-                  )}
-                </a>
+            <div className="image-groups">
+              {imageGroups.map(group => (
+                <div key={group.key} className="image-group">
+                  <h4 className="image-group__title">
+                    {group.label}
+                    {group.kind === 'producer' && (
+                      <span className="image-group__badge">kolor producenta</span>
+                    )}
+                    <span className="section-count">{group.images.length}</span>
+                  </h4>
+                  <div className="image-gallery">
+                    {group.images.map(img => (
+                      <a
+                        key={img.id}
+                        href={img.image_url || undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="image-gallery__item"
+                      >
+                        {img.image_url ? (
+                          <img
+                            src={img.image_url}
+                            alt={`${group.label} — produkt ${product.id}`}
+                            loading="lazy"
+                            decoding="async"
+                            width={120}
+                            height={120}
+                            onError={e => {
+                              const el = e.currentTarget;
+                              el.onerror = null;
+                              el.src =
+                                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5icmFrIHpkajwvdGV4dD48L3N2Zz4=';
+                            }}
+                          />
+                        ) : (
+                          <span className="image-gallery__fallback">Brak URL</span>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -417,6 +439,7 @@ export function ProductDetailPage() {
                 <tr>
                   <th style={{ width: 70 }}>ID</th>
                   <th>Kolor</th>
+                  <th>Kolor prod.</th>
                   <th style={{ width: 120 }}>Rozmiar</th>
                   <th style={{ width: 80 }}>Stan</th>
                   <th style={{ width: 110 }}>Cena mag.</th>
@@ -442,6 +465,7 @@ export function ProductDetailPage() {
                         <span className="muted">—</span>
                       )}
                     </td>
+                    <td>{variant.producer_color_name || <span className="muted">—</span>}</td>
                     <td>{variant.size_name || <span className="muted">—</span>}</td>
                     <td>{variant.stock ?? <span className="muted">0</span>}</td>
                     <td>
