@@ -1,0 +1,176 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'change' product.pk %}">{{ product.name }}</a>
+  &rsaquo; {% trans 'Historia stanów magazynowych' %}
+</div>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  .sh-header { margin-bottom: 16px; }
+  .sh-header h1 { margin-bottom: 4px; }
+  .sh-filters { margin-bottom: 16px; }
+  .sh-filters select { padding: 4px 8px; }
+  .sh-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+  .sh-badge {
+    border: 1px solid #ccc; border-radius: 6px; padding: 8px 12px;
+    background: #fff; min-width: 90px; text-align: center;
+  }
+  .sh-badge .sh-badge-label { font-size: 11px; color: #666; text-transform: uppercase; }
+  .sh-badge .sh-badge-value { font-size: 18px; font-weight: bold; color: #333; }
+  .sh-badge.sh-total { background: #417690; border-color: #417690; }
+  .sh-badge.sh-total .sh-badge-label, .sh-badge.sh-total .sh-badge-value { color: #fff; }
+  .sh-chart-wrap { background: #fff; border: 1px solid #eee; border-radius: 6px; padding: 16px; margin-bottom: 24px; }
+  .sh-empty { padding: 20px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; color: #666; }
+  table.sh-table { width: 100%; border-collapse: collapse; }
+  table.sh-table th, table.sh-table td { border: 1px solid #ddd; padding: 6px 8px; font-size: 12px; text-align: left; }
+  table.sh-table th { background: #f8f9fa; }
+  .sh-change-increase { color: #1a7f37; font-weight: bold; }
+  .sh-change-decrease { color: #cf222e; font-weight: bold; }
+  .sh-change-no_change { color: #999; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sh-header">
+  <h1>{{ product.name }}</h1>
+  <div>UID: {{ product.product_uid }} &middot; <a href="{% url opts|admin_urlname:'change' product.pk %}">&larr; Wróć do produktu</a></div>
+</div>
+
+<form class="sh-filters" method="get">
+  <label for="days-select">Okres:</label>
+  <select id="days-select" name="days" onchange="this.form.submit()">
+    <option value="7" {% if days == '7' %}selected{% endif %}>7 dni</option>
+    <option value="30" {% if days == '30' %}selected{% endif %}>30 dni</option>
+    <option value="90" {% if days == '90' %}selected{% endif %}>90 dni</option>
+    <option value="180" {% if days == '180' %}selected{% endif %}>180 dni</option>
+    <option value="365" {% if days == '365' %}selected{% endif %}>365 dni</option>
+    <option value="all" {% if days == 'all' %}selected{% endif %}>Cała historia</option>
+  </select>
+</form>
+
+<div class="sh-summary">
+  <div class="sh-badge sh-total">
+    <div class="sh-badge-label">Suma teraz</div>
+    <div class="sh-badge-value">{{ product.stock_total }}</div>
+  </div>
+  {% for variant in current_variants %}
+  <div class="sh-badge">
+    <div class="sh-badge-label">{{ variant.name }}</div>
+    <div class="sh-badge-value">{{ variant.stock }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if has_history %}
+<div class="sh-chart-wrap">
+  <canvas id="stock-history-chart" height="90"></canvas>
+</div>
+
+<table class="sh-table">
+  <thead>
+    <tr>
+      <th>Data</th>
+      <th>Wariant</th>
+      <th>Stary stan</th>
+      <th>Nowy stan</th>
+      <th>Zmiana</th>
+      <th>Typ</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in records %}
+    <tr>
+      <td>{{ r.timestamp }}</td>
+      <td>{{ r.variant_name|default:r.variant_uid }}</td>
+      <td>{{ r.old_stock|default:'-' }}</td>
+      <td>{{ r.new_stock|default:'-' }}</td>
+      <td class="sh-change-{{ r.change_type }}">{{ r.stock_change|default:'-' }}</td>
+      <td>{{ r.change_type|default:'-' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="sh-empty">Brak zarejestrowanych zmian stanu magazynowego w wybranym okresie.</div>
+{% endif %}
+
+<script>
+(function () {
+  var datasets = {{ chart_datasets_json|safe }};
+  var totalSeries = {{ total_series_json|safe }};
+  var canvas = document.getElementById('stock-history-chart');
+  if (!canvas || !window.Chart) return;
+
+  var palette = ['#417690', '#e67e22', '#1a7f37', '#cf222e', '#8e44ad', '#16a085', '#c0392b', '#2980b9'];
+
+  var chartDatasets = datasets.map(function (ds, i) {
+    return {
+      label: ds.label,
+      data: ds.data.map(function (p) { return { x: new Date(p.x).getTime(), y: p.y }; }),
+      borderColor: palette[i % palette.length],
+      backgroundColor: palette[i % palette.length],
+      borderWidth: 1.5,
+      pointRadius: 2,
+      tension: 0.1,
+      spanGaps: true,
+    };
+  });
+
+  chartDatasets.push({
+    label: 'Suma (wszystkie warianty)',
+    data: totalSeries.map(function (p) { return { x: new Date(p.x).getTime(), y: p.y }; }),
+    borderColor: '#111',
+    backgroundColor: '#111',
+    borderWidth: 2.5,
+    borderDash: [6, 3],
+    pointRadius: 0,
+    tension: 0.1,
+    spanGaps: true,
+  });
+
+  new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { datasets: chartDatasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      scales: {
+        x: {
+          type: 'linear',
+          ticks: {
+            callback: function (value) {
+              return new Date(value).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            },
+          },
+        },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Stan magazynowy' },
+        },
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            title: function (items) {
+              if (!items.length) return '';
+              return new Date(items[0].parsed.x).toLocaleString('pl-PL');
+            },
+          },
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endblock %}

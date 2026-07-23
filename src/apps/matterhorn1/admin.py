@@ -202,7 +202,7 @@ class ProductVariantInline(admin.TabularInline):
 class ProductAdmin(admin.ModelAdmin):
     list_display = [
         'product_image_thumbnail', 'product_uid', 'name', 'brand', 'category', 'active',
-        'stock_total', 'is_mapped', 'mapped_product_uid', 'created_at', 'updated_at'
+        'stock_total', 'stock_history_link', 'is_mapped', 'mapped_product_uid', 'created_at', 'updated_at'
     ]
     list_display_links = ['product_uid', 'name']
     list_filter = [
@@ -251,6 +251,13 @@ class ProductAdmin(admin.ModelAdmin):
         return obj.stock_total
     stock_total.short_description = 'Stan magazynowy'
     stock_total.admin_order_field = 'productvariant__stock'
+
+    def stock_history_link(self, obj):
+        """Link do widoku historii stanów magazynowych produktu"""
+        from django.urls import reverse
+        url = reverse('admin:stock-history', args=[obj.pk])
+        return format_html('<a href="{}">📈 Historia</a>', url)
+    stock_history_link.short_description = 'Historia stanów'
 
     def product_image_thumbnail(self, obj):
         """Wyświetl miniaturę pierwszego zdjęcia produktu na liście."""
@@ -325,6 +332,8 @@ class ProductAdmin(admin.ModelAdmin):
                  self.admin_site.admin_view(self.sync_with_mpd), name='sync-with-mpd'),
             path('add-variants/<int:product_id>/',
                  self.admin_site.admin_view(self.add_variants), name='add-variants'),
+            path('stock-history/<int:product_id>/',
+                 self.admin_site.admin_view(self.stock_history_view), name='stock-history'),
         ]
         return custom_urls + urls
 
@@ -1786,6 +1795,80 @@ class ProductAdmin(admin.ModelAdmin):
                 f"Błąd dodawania wariantów dla produktu {product_id}: {e}")
             return JsonResponse({'success': False, 'error': 'Wystąpił błąd'})
 
+    def stock_history_view(self, request, product_id):
+        """Widok historii stanów magazynowych dla pojedynczego produktu (wykres + tabelka per wariant)"""
+        from collections import defaultdict
+        from datetime import timedelta
+
+        from django.shortcuts import get_object_or_404
+        from django.utils import timezone
+
+        product = get_object_or_404(Product, pk=product_id)
+
+        days_param = request.GET.get('days', '90')
+        days = None if days_param == 'all' else int(days_param)
+
+        history_qs = StockHistory.objects.using('matterhorn1').filter(
+            product_uid=product.product_uid
+        )
+        if days:
+            cutoff = timezone.now() - timedelta(days=days)
+            history_qs = history_qs.filter(timestamp__gte=cutoff)
+        records = list(history_qs.order_by('timestamp'))
+
+        variants = {v.variant_uid: v for v in product.variants.all()}
+
+        # Punkt startowy dla każdego wariantu = old_stock pierwszego zdarzenia w oknie
+        # (albo aktualny stan, jeśli w oknie nie ma żadnych zdarzeń).
+        running_stock = {
+            vu: v.stock for vu, v in variants.items()
+        }
+        first_seen = set()
+        for r in records:
+            if r.variant_uid not in first_seen:
+                first_seen.add(r.variant_uid)
+                if r.old_stock is not None:
+                    running_stock[r.variant_uid] = r.old_stock
+
+        variant_series = defaultdict(list)
+        variant_names = {vu: v.name for vu, v in variants.items()}
+        total_points = []
+        for r in records:
+            variant_names.setdefault(r.variant_uid, r.variant_name or r.variant_uid)
+            variant_series[r.variant_uid].append({
+                'x': r.timestamp.isoformat(),
+                'y': r.new_stock,
+            })
+            if r.new_stock is not None:
+                running_stock[r.variant_uid] = r.new_stock
+            total_points.append({
+                'x': r.timestamp.isoformat(),
+                'y': sum(v for v in running_stock.values() if v is not None),
+            })
+
+        chart_datasets = [
+            {'label': variant_names.get(vu, vu), 'data': pts}
+            for vu, pts in sorted(variant_series.items(), key=lambda kv: variant_names.get(kv[0], kv[0]))
+        ]
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title': f'Historia stanów magazynowych — {product.name}',
+            'product': product,
+            'opts': self.model._meta,
+            'days': days_param,
+            'chart_datasets_json': json.dumps(chart_datasets),
+            'total_series_json': json.dumps(total_points),
+            'current_variants': sorted(variants.values(), key=lambda v: v.name),
+            'records': list(reversed(records)),
+            'has_history': bool(records),
+        }
+        return render(
+            request,
+            'admin/matterhorn1/stock_history/product_detail.html',
+            context,
+        )
+
 
 @admin.register(ProductDetails)
 class ProductDetailsAdmin(admin.ModelAdmin):
@@ -2167,6 +2250,8 @@ class StockHistoryAdmin(admin.ModelAdmin):
         """Zezwól na usuwanie starych rekordów"""
         return True
 
+    change_list_template = 'admin/matterhorn1/stock_history/change_list.html'
+
     def get_urls(self):
         """Dodaj custom URLs dla stock history"""
         from django.urls import path
@@ -2178,8 +2263,30 @@ class StockHistoryAdmin(admin.ModelAdmin):
                 self.stock_statistics_view), name='stock-statistics'),
             path('clean-history/', self.admin_site.admin_view(self.clean_history_view),
                  name='clean-history'),
+            path('bestsellers/', self.admin_site.admin_view(self.bestsellers_view),
+                 name='matterhorn1_stockhistory_bestsellers'),
         ]
         return custom_urls + urls
+
+    def bestsellers_view(self, request):
+        """Dashboard bestsellerów: top produkty/marki/kategorie, trend, braki
+        magazynowe i wygaszane marki, liczone na żywo z bazy przy każdym wejściu."""
+        from django.shortcuts import render
+        from .bestsellers_data import get_dashboard_data
+
+        days = int(request.GET.get('days', 90))
+        if days not in (30, 90, 180):
+            days = 90
+        data = get_dashboard_data(days=days)
+
+        context = {
+            **self.admin_site.each_context(request),
+            'data': data,
+            'days': days,
+            'opts': self.model._meta,
+            'title': 'Bestsellery — Matterhorn',
+        }
+        return render(request, 'admin/matterhorn1/stock_history/bestsellers.html', context)
 
     def popular_products_view(self, request):
         """Widok popularnych produktów"""

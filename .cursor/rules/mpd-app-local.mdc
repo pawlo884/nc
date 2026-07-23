@@ -1,0 +1,17 @@
+---
+description: Lokalne URL-e mpd-app (Vite + Django) — nie pytaj użytkownika o link
+alwaysApply: true
+---
+
+# mpd-app — lokalny podgląd
+
+## Vite (dev, HMR)
+- **URL:** http://localhost:5173/mpd-app/
+- Start: `cd frontend/mpd && npm run dev`
+- Proxy API: `/api` → `http://127.0.0.1:8000`
+
+## Django / Docker (build z dist)
+- **URL:** http://localhost:8000/mpd-app/
+- Build: `cd frontend/mpd && npm run build` (volume `frontend/mpd/dist` → `/mpd_spa`)
+
+Gdy użytkownik chce „pokazać lokalnie” mpd-app — od razu podaj Vite URL i ewentualnie odpal `npm run dev`. Nie pytaj o adres.
