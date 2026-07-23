@@ -45,8 +45,11 @@ class TabuBrandFilter(SimpleListFilter):
                 qs = qs.filter(category_id=int(request.GET['category']))
             except (ValueError, TypeError):
                 pass
+        # .order_by() czyści odziedziczone sortowanie (-api_id z TabuProductAdmin) —
+        # inaczej Postgres musi dołączyć api_id do DISTINCT (bo jest w ORDER BY) i
+        # zamiast garstki unikalnych marek zwraca wiersz na każdy produkt.
         brands = Brand.objects.filter(
-            id__in=qs.exclude(brand__isnull=True).values_list('brand_id', flat=True).distinct()
+            id__in=qs.exclude(brand__isnull=True).order_by().values_list('brand_id', flat=True).distinct()
         ).order_by('name')
         return [(str(b.id), b.name) for b in brands]
 
@@ -70,8 +73,9 @@ class TabuCategoryFilter(SimpleListFilter):
                 qs = qs.filter(brand_id=int(request.GET['brand']))
             except (ValueError, TypeError):
                 pass
+        # .order_by() czyści odziedziczone sortowanie — patrz komentarz w TabuBrandFilter.
         categories = Category.objects.filter(
-            id__in=qs.exclude(category__isnull=True).values_list('category_id', flat=True).distinct()
+            id__in=qs.exclude(category__isnull=True).order_by().values_list('category_id', flat=True).distinct()
         ).order_by('name')
         return [(str(c.id), c.name) for c in categories]
 
