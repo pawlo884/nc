@@ -4,7 +4,6 @@ pokrywają istniejące testy widoków API (tests.py).
 """
 from django.test import TestCase
 
-from .models import Brand, Category, Product
 from .serializers import (
     BrandSerializer,
     BulkBrandSerializer,
