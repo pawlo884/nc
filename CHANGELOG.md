@@ -1,5 +1,11 @@
 # Zmiany
 
+## <small>1.24.5 (2026-07-23)</small>
+
+* Merge pull request #84 from pawlo884/fix/tests-serializers-unused-imports ([e068e84](https://github.com/pawlo884/nc/commit/e068e84)), closes [#84](https://github.com/pawlo884/nc/issues/84)
+* fix(tests): usuń nieużywane importy w matterhorn1/tests_serializers.py ([d9854df](https://github.com/pawlo884/nc/commit/d9854df))
+* test: dodaj testy serializerów dla MPD, matterhorn1, tabu i web_agent ([5f6688e](https://github.com/pawlo884/nc/commit/5f6688e))
+
 ## <small>1.24.4 (2026-07-23)</small>
 
 * Merge pull request #83 from pawlo884/fix/tabu-filter-distinct-ordering ([03c2d49](https://github.com/pawlo884/nc/commit/03c2d49)), closes [#83](https://github.com/pawlo884/nc/issues/83)
