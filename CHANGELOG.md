@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.24.4 (2026-07-23)</small>
+
+* Merge pull request #83 from pawlo884/fix/tabu-filter-distinct-ordering ([03c2d49](https://github.com/pawlo884/nc/commit/03c2d49)), closes [#83](https://github.com/pawlo884/nc/issues/83)
+* fix(admin): usuń masowe pobieranie wierszy w filtrach marki/kategorii (tabu) ([9ffa28c](https://github.com/pawlo884/nc/commit/9ffa28c)), closes [#82](https://github.com/pawlo884/nc/issues/82)
+
 ## <small>1.24.3 (2026-07-23)</small>
 
 * Merge pull request #82 from pawlo884/fix/product-filter-distinct-ordering ([48b0034](https://github.com/pawlo884/nc/commit/48b0034)), closes [#82](https://github.com/pawlo884/nc/issues/82)
