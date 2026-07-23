@@ -1,5 +1,12 @@
 # Zmiany
 
+## 1.24.0 (2026-07-23)
+
+* Merge pull request #79 from pawlo884/feat/stock-history-product-view ([29da54d](https://github.com/pawlo884/nc/commit/29da54d)), closes [#79](https://github.com/pawlo884/nc/issues/79)
+* chore: dodaj skrót dev:open i regułę Cursora z lokalnymi URL-ami mpd-app ([7afebd2](https://github.com/pawlo884/nc/commit/7afebd2))
+* feat(admin): dodaj dashboard bestsellerów per dostawca (matterhorn1, tabu) ([f7c0982](https://github.com/pawlo884/nc/commit/f7c0982))
+* feat(admin): dodaj widok historii stanów magazynowych per produkt (matterhorn1, tabu) ([54da1a9](https://github.com/pawlo884/nc/commit/54da1a9))
+
 ## 1.23.0 (2026-07-19)
 
 * Merge pull request #78 from pawlo884/feat/mpd-images-by-color ([4f9c4ca](https://github.com/pawlo884/nc/commit/4f9c4ca)), closes [#78](https://github.com/pawlo884/nc/issues/78)
