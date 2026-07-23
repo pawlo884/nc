@@ -1,0 +1,442 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; {% trans 'Bestsellery' %}
+</div>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6;
+    --series-1-wash:  rgba(42,120,214,0.10);
+    --status-critical:#d03b3b;
+    --status-warning: #fab219;
+    --status-good:    #0ca30c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --series-1-wash:  rgba(57,135,229,0.14);
+      --status-critical:#e66767;
+      --status-warning: #fab219;
+      --status-good:    #0ca30c;
+    }
+  }
+
+  #content { max-width: none; }
+  .viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 20px 0 48px;
+    max-width: 1180px;
+  }
+  .page-head { margin-bottom: 24px; }
+  .page-head p { color: var(--text-secondary); font-size: 14px; margin: 8px 0 0; max-width: 760px; line-height: 1.5; }
+  .filter-row { margin: 12px 0 0; font-size: 12.5px; color: var(--text-secondary); }
+  .filter-row a { margin-right: 10px; color: var(--series-1); text-decoration: none; }
+  .filter-row a.active { font-weight: 700; text-decoration: underline; }
+  .caveat {
+    margin-top: 14px; padding: 10px 14px; border-radius: 8px;
+    background: var(--series-1-wash); color: var(--text-secondary);
+    font-size: 12.5px; line-height: 1.5; border: 1px solid var(--border);
+  }
+
+  .stat-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 32px;
+  }
+  .stat-tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-tile .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .stat-tile .value { font-size: 24px; font-weight: 650; }
+  .stat-tile .value.critical { color: var(--status-critical); }
+  .stat-tile .value.warning { color: var(--status-warning); }
+
+  .viz-root section { margin-bottom: 36px; }
+  .viz-root section > h2 { font-size: 15px; font-weight: 650; margin: 0 0 4px; border: none; padding: 0; }
+  .viz-root section > .section-sub { font-size: 12.5px; color: var(--text-muted); margin: 0 0 14px; }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .hbar-row { display: grid; grid-template-columns: 200px 1fr 64px; align-items: center; gap: 10px; padding: 5px 0; }
+  .hbar-row .name { font-size: 12.5px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar-row .name .sub { color: var(--text-muted); font-size: 11px; display: block; }
+  .hbar-track { position: relative; height: 16px; background: transparent; }
+  .hbar-fill { height: 16px; background: var(--series-1); border-radius: 4px; min-width: 4px; }
+  .hbar-row .val { font-size: 12px; color: var(--text-secondary); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .linechart-wrap { width: 100%; overflow-x: auto; }
+  svg.linechart { display: block; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .baseline { stroke: var(--baseline); stroke-width: 1; }
+  .trend-line { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .trend-dot { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
+  .axis-label { fill: var(--text-muted); font-size: 10.5px; font-family: system-ui, sans-serif; }
+  .value-label { fill: var(--text-secondary); font-size: 10.5px; font-family: system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+
+  .viz-root table.data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: transparent; }
+  .viz-root table.data-table th {
+    text-align: left; font-weight: 600; color: var(--text-muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.02em; padding: 8px 10px; border-bottom: 1px solid var(--grid);
+    background: transparent;
+  }
+  .viz-root table.data-table td { padding: 8px 10px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+  .viz-root table.data-table tr:last-child td { border-bottom: none; }
+  .viz-root table.data-table td.num, .viz-root table.data-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .viz-root table.data-table .muted { color: var(--text-muted); font-size: 11.5px; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 6px;
+    border-radius: 999px; font-size: 11px; font-weight: 600;
+  }
+  .badge.critical { background: color-mix(in srgb, var(--status-critical) 16%, transparent); color: var(--status-critical); }
+  .badge.warning  { background: color-mix(in srgb, var(--status-warning) 22%, transparent); color: color-mix(in srgb, var(--status-warning) 70%, var(--text-primary)); }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .reco-list { display: flex; flex-direction: column; gap: 10px; }
+  .reco-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .reco-item .icon {
+    width: 28px; height: 28px; border-radius: 8px; flex: none;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .reco-item.critical .icon { background: color-mix(in srgb, var(--status-critical) 16%, transparent); }
+  .reco-item.warning .icon { background: color-mix(in srgb, var(--status-warning) 22%, transparent); }
+  .reco-item.good .icon { background: color-mix(in srgb, var(--status-good) 16%, transparent); }
+  .reco-item .body h3 { font-size: 13.5px; margin: 0 0 3px; font-weight: 650; }
+  .reco-item .body p { font-size: 12.5px; color: var(--text-secondary); margin: 0; line-height: 1.5; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tab-btn {
+    font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer;
+  }
+  .tab-btn.active { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="viz-root">
+  <div class="page-head">
+    <h1>{{ title }}</h1>
+    <p>Ranking produktów, marek i kategorii oparty o historię stanów magazynowych (matterhorn1_stock_history), dane na żywo z bazy.</p>
+    <div class="filter-row">
+      Okno:
+      <a href="?days=30" {% if days == 30 %}class="active"{% endif %}>30 dni</a>
+      <a href="?days=90" {% if days == 90 %}class="active"{% endif %}>90 dni</a>
+      <a href="?days=180" {% if days == 180 %}class="active"{% endif %}>180 dni</a>
+    </div>
+    <div class="caveat">
+      ⚠️ Sprzedaż jest przybliżana spadkami stanu magazynowego — baza Matterhorn nie ma zamówień/faktur. Zdarzenia masowego zerowania stanu (&gt;100 produktów marki jednego dnia, śr. &gt;8 szt./produkt — sygnatura wygaszania oferty przez dostawcę) są automatycznie wykluczane z liczb poniżej.
+    </div>
+  </div>
+
+  <div class="stat-row" id="statRow"></div>
+
+  <section>
+    <h2>Rekomendacje</h2>
+    <p class="section-sub">Najpilniejsze wnioski z ostatnich 30 dni sprzedaży zestawione z aktualnym stanem magazynowym</p>
+    <div class="reco-list" id="recoList"></div>
+  </section>
+
+  <section>
+    <h2>Top 12 produktów</h2>
+    <p class="section-sub">Suma sztuk „sprzedanych” (spadek stanu) na produkt</p>
+    <div class="card" id="topProductsChart"></div>
+  </section>
+
+  <section>
+    <div class="grid-2">
+      <div>
+        <h2>Top marki</h2>
+        <p class="section-sub">12 marek z największą sprzedażą</p>
+        <div class="card" id="topBrandsChart"></div>
+      </div>
+      <div>
+        <h2>Top kategorie</h2>
+        <p class="section-sub">8 kategorii z największą sprzedażą</p>
+        <div class="card" id="topCategoriesChart"></div>
+      </div>
+    </div>
+  </section>
+
+  {% if discontinued_brands or winding_down_brands %}
+  <section>
+    <h2>Marki wygaszane przez dostawcę</h2>
+    <p class="section-sub">Wykryte po sygnaturze masowego zerowania stanu — to nie bestsellery, to marki znikające z oferty</p>
+    <div class="card" id="discontinuedCard"></div>
+  </section>
+  {% endif %}
+
+  <section>
+    <h2>Trend miesięczny</h2>
+    <p class="section-sub">Sztuki „sprzedane” miesięcznie, cały dostępny okres historii</p>
+    <div class="card">
+      <div class="linechart-wrap" id="trendChart"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Braki magazynowe u bestsellerów</h2>
+    <p class="section-sub">Produkty, które dobrze się sprzedawały w ostatnich 30 dniach, a teraz mają stan bliski zeru</p>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="oos">Wyprzedane</button>
+      <button class="tab-btn" data-tab="low">Poniżej 14 dni zapasu</button>
+    </div>
+    <div class="card">
+      <div class="tab-panel active" id="tab-oos"></div>
+      <div class="tab-panel" id="tab-low"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pełny ranking — top 20 produktów</h2>
+    <div class="card" style="overflow-x:auto">
+      <table class="data-table" id="fullTable"></table>
+    </div>
+  </section>
+</div>
+
+{{ data|json_script:"dashboard-data" }}
+<script>
+const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);
+
+function fmt(n) { return n.toLocaleString('pl-PL'); }
+
+const stats = DATA.stats;
+const statTiles = [
+  { label: 'Sprzedano sztuk', value: fmt(stats.sold_90d) },
+  { label: 'Unikalnych produktów', value: fmt(stats.unique_products_90d) },
+  { label: 'Aktywnych marek', value: fmt(stats.active_brands_90d) },
+  { label: 'Sprzedano sztuk (30 dni)', value: fmt(stats.sold_30d) },
+  { label: 'Bestsellery wyprzedane', value: fmt(stats.out_of_stock_count), cls: 'critical' },
+  { label: 'Bestsellery < 14 dni zapasu', value: fmt(stats.low_stock_count), cls: 'warning' },
+];
+document.getElementById('statRow').innerHTML = statTiles.map(s => `
+  <div class="stat-tile">
+    <div class="label">${s.label}</div>
+    <div class="value ${s.cls || ''}">${s.value}</div>
+  </div>
+`).join('');
+
+const topBrand = DATA.top_brands[0];
+const topCategory = DATA.top_categories[0];
+const recos = [];
+if (DATA.discontinued_brands.length > 0) {
+  const names = DATA.discontinued_brands.map(b => b.brand).join(', ');
+  recos.push({
+    cls: 'warning', icon: '🛠️',
+    title: `${DATA.discontinued_brands.length} marek zniknęło z oferty — nie mylić z bestsellerami`,
+    body: `${names} mają dziś 0 aktywnych produktów, 0 stanu i 0 uzupełnień od 90 dni — to wygaszenie marki przez dostawcę, nie realna sprzedaż. Automatycznie wykluczone z rankingu.`
+  });
+}
+if (DATA.out_of_stock.length > 0) {
+  recos.push({
+    cls: 'critical', icon: '⛔',
+    title: `${stats.out_of_stock_count} bestsellerów jest wyprzedanych`,
+    body: `Produkty jak „${DATA.out_of_stock[0].name}” (${DATA.out_of_stock[0].brand}, ${DATA.out_of_stock[0].sold30} szt. sprzedanych w 30 dni) mają teraz stan 0 — to utracona sprzedaż. Uzupełnij zamówienie u dostawcy w pierwszej kolejności dla tej listy.`
+  });
+}
+if (DATA.low_stock.length > 0) {
+  recos.push({
+    cls: 'warning', icon: '⚠️',
+    title: `${stats.low_stock_count} produktów wyprzeda się w mniej niż 2 tygodnie`,
+    body: `Przy obecnym tempie sprzedaży te pozycje skończą się w ciągu najbliższych dni (np. „${DATA.low_stock[0].name}” — ${DATA.low_stock[0].stock} szt. na stanie przy ${DATA.low_stock[0].sold30} sprzedanych w 30 dni).`
+  });
+}
+if (topBrand) {
+  recos.push({
+    cls: 'good', icon: '📈',
+    title: `Marka ${topBrand.name} prowadzi sprzedaż`,
+    body: `${topBrand.name} odpowiada za ${fmt(topBrand.sold)} sprzedanych sztuk (${topBrand.products} produktów w ruchu) — najwięcej z ${stats.active_brands_90d} marek z realną sprzedażą.`
+  });
+}
+if (topCategory) {
+  recos.push({
+    cls: 'good', icon: '🏷️',
+    title: `Kategoria „${topCategory.name}” najmocniejsza`,
+    body: `${fmt(topCategory.sold)} sprzedanych sztuk z ${topCategory.products} produktów — kategoria warta priorytetowego zatowarowania.`
+  });
+}
+document.getElementById('recoList').innerHTML = recos.map(r => `
+  <div class="reco-item ${r.cls}">
+    <div class="icon">${r.icon}</div>
+    <div class="body"><h3>${r.title}</h3><p>${r.body}</p></div>
+  </div>
+`).join('');
+
+function renderHBar(containerId, items, labelKey, valueKey, subKey) {
+  const el = document.getElementById(containerId);
+  if (!items.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:12.5px">Brak danych.</p>'; return; }
+  const max = Math.max(...items.map(i => i[valueKey]));
+  el.innerHTML = items.map(i => {
+    const pct = Math.max((i[valueKey] / max) * 100, 2);
+    const sub = subKey ? `<span class="sub">${i[subKey]}</span>` : '';
+    return `
+      <div class="hbar-row" title="${i[labelKey]}: ${fmt(i[valueKey])} szt.">
+        <div class="name">${i[labelKey]}${sub}</div>
+        <div class="hbar-track"><div class="hbar-fill" style="width:${pct}%"></div></div>
+        <div class="val">${fmt(i[valueKey])}</div>
+      </div>`;
+  }).join('');
+}
+renderHBar('topProductsChart', DATA.top_products, 'name', 'sold', 'brand');
+renderHBar('topBrandsChart', DATA.top_brands, 'name', 'sold');
+renderHBar('topCategoriesChart', DATA.top_categories, 'name', 'sold');
+
+function renderLineChart(containerId, points) {
+  const el = document.getElementById(containerId);
+  if (!points.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:12.5px">Brak danych.</p>'; return; }
+  const w = 1100, h = 260, padL = 56, padR = 20, padT = 20, padB = 32;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  const maxV = Math.max(...points.map(p => p.sold));
+  const niceMax = Math.ceil(maxV / 50000) * 50000 || 1;
+  const x = i => points.length > 1 ? padL + (i / (points.length - 1)) * plotW : padL + plotW / 2;
+  const y = v => padT + plotH - (v / niceMax) * plotH;
+
+  const gridSteps = 4;
+  let gridLines = '', axisLabels = '';
+  for (let s = 0; s <= gridSteps; s++) {
+    const v = (niceMax / gridSteps) * s;
+    const yy = y(v);
+    gridLines += `<line class="grid-line" x1="${padL}" x2="${w - padR}" y1="${yy}" y2="${yy}" />`;
+    axisLabels += `<text class="axis-label" x="${padL - 8}" y="${yy + 3}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(p.sold)}`).join(' ');
+  const monthLabels = points.map((p, i) => {
+    const short = p.month.slice(2).replace('-', '’');
+    return `<text class="axis-label" x="${x(i)}" y="${h - 8}" text-anchor="middle">${short}</text>`;
+  }).join('');
+  const dots = points.map((p, i) => {
+    const isMax = p.sold === maxV;
+    return `<circle class="trend-dot" cx="${x(i)}" cy="${y(p.sold)}" r="${isMax ? 5 : 4}" />
+      ${isMax ? `<text class="value-label" x="${x(i)}" y="${y(p.sold) - 12}" text-anchor="middle">${fmt(p.sold)}</text>` : ''}`;
+  }).join('');
+  el.innerHTML = `
+    <svg class="linechart" viewBox="0 0 ${w} ${h}" width="100%" style="min-width:640px">
+      ${gridLines}
+      <line class="baseline" x1="${padL}" x2="${w - padR}" y1="${padT + plotH}" y2="${padT + plotH}" />
+      ${axisLabels}${monthLabels}
+      <path class="trend-line" d="${linePath}" />
+      ${dots}
+    </svg>`;
+}
+renderLineChart('trendChart', DATA.monthly);
+
+function renderRestockTable(containerId, items, kind) {
+  const el = document.getElementById(containerId);
+  if (!items.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:12.5px;padding:8px">Brak danych.</p>'; return; }
+  const rows = items.map(i => {
+    const badge = kind === 'oos'
+      ? `<span class="badge critical"><span class="dot"></span>Stan 0</span>`
+      : `<span class="badge warning"><span class="dot"></span>${i.days_left} dni zapasu</span>`;
+    return `
+      <tr>
+        <td>${i.name}</td>
+        <td class="muted">${i.brand}</td>
+        <td class="num">${fmt(i.sold30)}</td>
+        <td class="num">${fmt(i.stock)}</td>
+        <td>${badge}</td>
+      </tr>`;
+  }).join('');
+  el.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Produkt</th><th>Marka</th><th class="num">Sprzedano (30d)</th><th class="num">Stan teraz</th><th>Status</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+renderRestockTable('tab-oos', DATA.out_of_stock, 'oos');
+renderRestockTable('tab-low', DATA.low_stock, 'low');
+
+const discontinuedCard = document.getElementById('discontinuedCard');
+if (discontinuedCard) {
+  const discRows = DATA.discontinued_brands.map(b => `
+    <tr>
+      <td>${b.brand}</td><td class="num">${fmt(b.products)}</td><td class="num">${fmt(b.active)}</td>
+      <td class="num">${fmt(b.stock_now)}</td><td class="num">${fmt(b.increases_90d)}</td>
+      <td><span class="badge critical"><span class="dot"></span>Wygaszona</span></td>
+    </tr>`).join('');
+  const windRows = DATA.winding_down_brands.map(b => `
+    <tr>
+      <td>${b.brand}</td><td class="num">${fmt(b.products)}</td><td class="num">${fmt(b.active)}</td>
+      <td class="num">${fmt(b.stock_now)}</td><td class="num">${fmt(b.increases_90d)}</td>
+      <td><span class="badge warning"><span class="dot"></span>Wygaszana</span></td>
+    </tr>`).join('');
+  discontinuedCard.innerHTML = `
+    <table class="data-table">
+      <thead><tr>
+        <th>Marka</th><th class="num">Produktów</th><th class="num">Aktywnych</th>
+        <th class="num">Stan teraz</th><th class="num">Uzupełnień</th><th>Status</th>
+      </tr></thead>
+      <tbody>${discRows}${windRows}</tbody>
+    </table>`;
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+const fullRows = DATA.top_products_table.map((p, i) => `
+  <tr>
+    <td class="muted">${i + 1}</td>
+    <td>${p.name}</td>
+    <td class="muted">${p.brand}</td>
+    <td class="muted">${p.category}</td>
+    <td class="num">${fmt(p.sold)}</td>
+    <td class="num muted">${p.events}</td>
+  </tr>`).join('');
+document.getElementById('fullTable').innerHTML = `
+  <thead><tr>
+    <th>#</th><th>Produkt</th><th>Marka</th><th>Kategoria</th><th class="num">Sprzedano</th><th class="num">Zdarzeń</th>
+  </tr></thead>
+  <tbody>${fullRows}</tbody>`;
+</script>
+{% endblock %}
