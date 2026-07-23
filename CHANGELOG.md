@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.24.3 (2026-07-23)</small>
+
+* Merge pull request #82 from pawlo884/fix/product-filter-distinct-ordering ([48b0034](https://github.com/pawlo884/nc/commit/48b0034)), closes [#82](https://github.com/pawlo884/nc/issues/82)
+* fix(admin): usuń masowe pobieranie wierszy w filtrach marki/kategorii ([02ed9b6](https://github.com/pawlo884/nc/commit/02ed9b6))
+
 ## <small>1.24.2 (2026-07-23)</small>
 
 * Merge pull request #81 from pawlo884/fix/product-admin-list-perf ([d462d99](https://github.com/pawlo884/nc/commit/d462d99)), closes [#81](https://github.com/pawlo884/nc/issues/81)
