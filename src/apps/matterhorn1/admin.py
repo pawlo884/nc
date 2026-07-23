@@ -82,7 +82,10 @@ class BrandFilter(SimpleListFilter):
                 pass
 
         # Pobierz unikalne marki z przefiltrowanego querysetu (używamy ID obiektu Brand)
-        brand_pks = list(qs.exclude(brand__isnull=True).values_list(
+        # .order_by() czyści odziedziczone sortowanie (-product_uid z ProductAdmin) —
+        # inaczej Postgres musi dołączyć product_uid do DISTINCT (bo jest w ORDER BY),
+        # co zamiast ~190 wierszy zwraca ~108k (po jednym na produkt).
+        brand_pks = list(qs.exclude(brand__isnull=True).order_by().values_list(
             'brand_id', flat=True).distinct())
         if not brand_pks:
             return []
@@ -121,7 +124,8 @@ class CategoryFilter(SimpleListFilter):
                 pass
 
         # Pobierz unikalne kategorie z przefiltrowanego querysetu (używamy ID obiektu Category)
-        category_pks = list(qs.exclude(category__isnull=True).values_list(
+        # .order_by() czyści odziedziczone sortowanie — patrz komentarz w BrandFilter.
+        category_pks = list(qs.exclude(category__isnull=True).order_by().values_list(
             'category_id', flat=True).distinct())
         if not category_pks:
             return []
