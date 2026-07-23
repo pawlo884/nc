@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.24.2 (2026-07-23)</small>
+
+* Merge pull request #81 from pawlo884/fix/product-admin-list-perf ([d462d99](https://github.com/pawlo884/nc/commit/d462d99)), closes [#81](https://github.com/pawlo884/nc/issues/81)
+* fix(admin): przyspiesz listę produktów matterhorn1 i podnieś bufory nginx ([6469dd4](https://github.com/pawlo884/nc/commit/6469dd4))
+
 ## <small>1.24.1 (2026-07-23)</small>
 
 * Merge pull request #80 from pawlo884/fix/bestsellers-dashboard-perf ([0bbb3df](https://github.com/pawlo884/nc/commit/0bbb3df)), closes [#80](https://github.com/pawlo884/nc/issues/80)
