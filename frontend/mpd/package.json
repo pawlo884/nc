@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "dev:open": "vite --host --open /mpd-app/",
     "build": "tsc -b && vite build",
     "build:watch": "vite build --watch",
     "lint": "oxlint",
