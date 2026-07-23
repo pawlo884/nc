@@ -7,6 +7,7 @@ jest aktywny na wypadek przyszłych zdarzeń wygaszania marek u tego dostawcy.
 """
 from django.conf import settings
 from django.db import connections
+from django.urls import reverse
 from django.utils import timezone
 
 
@@ -14,21 +15,26 @@ def _tabu_db_alias():
     return 'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu'
 
 
-CONTAMINATION_CTE = """
-    WITH suspect_groups AS (
-        SELECT p.tabu_brand_fk_id AS brand_id, date(sh.timestamp) AS d
-        FROM tabu_stock_history sh
-        JOIN tabu_product_detail p ON p.api_id = sh.product_api_id
-        WHERE sh.change_type = 'decrease' AND sh.new_stock = 0 AND sh.old_stock > 0
-            AND sh.timestamp >= %(since_contamination)s
-        GROUP BY 1, 2
-        HAVING COUNT(DISTINCT sh.product_api_id) > 100
-           AND SUM(ABS(sh.stock_change))::numeric / COUNT(DISTINCT sh.product_api_id) > 8
-    )
+def _product_url(pk):
+    return reverse('admin:tabu_tabuproduct_change', args=[pk])
+
+
+SUSPECT_GROUPS_QUERY = """
+    SELECT p.tabu_brand_fk_id AS brand_id, date(sh.timestamp) AS d
+    FROM tabu_stock_history sh
+    JOIN tabu_product_detail p ON p.api_id = sh.product_api_id
+    WHERE sh.change_type = 'decrease' AND sh.new_stock = 0 AND sh.old_stock > 0
+        AND sh.timestamp >= %(since_contamination)s
+    GROUP BY 1, 2
+    HAVING COUNT(DISTINCT sh.product_api_id) > 100
+       AND SUM(ABS(sh.stock_change))::numeric / COUNT(DISTINCT sh.product_api_id) > 8
 """
+# suspect_groups liczone raz w get_dashboard_data i przekazywane dalej jako
+# tablice (sg_brand_ids, sg_dates) — unikamy powtarzania tego skanu w każdym
+# z kolejnych zapytań.
 NOT_CONTAM = """
     AND NOT EXISTS (
-        SELECT 1 FROM suspect_groups sg
+        SELECT 1 FROM unnest(%(sg_brand_ids)s::int[], %(sg_dates)s::date[]) AS sg(brand_id, d)
         WHERE sg.brand_id = p.tabu_brand_fk_id AND sg.d = date(sh.timestamp)
     )
 """
@@ -52,8 +58,13 @@ def get_dashboard_data(days=90):
     params_base = {'since_contamination': since_contamination}
 
     with connections[_tabu_db_alias()].cursor() as cur:
-        cur.execute(CONTAMINATION_CTE + """
-            SELECT p.api_id, p.name AS product_name, b.name AS brand_name, c.name AS category_name,
+        cur.execute(SUSPECT_GROUPS_QUERY, params_base)
+        suspect_rows = cur.fetchall()
+        params_base['sg_brand_ids'] = [r[0] for r in suspect_rows]
+        params_base['sg_dates'] = [r[1] for r in suspect_rows]
+
+        cur.execute("""
+            SELECT p.id AS pk, p.api_id, p.name AS product_name, b.name AS brand_name, c.name AS category_name,
                    SUM(ABS(sh.stock_change)) AS total_sold, COUNT(*) AS decrease_events
             FROM tabu_stock_history sh
             JOIN tabu_product_detail p ON p.api_id = sh.product_api_id
@@ -61,12 +72,12 @@ def get_dashboard_data(days=90):
             LEFT JOIN tabu_category c ON c.id = p.tabu_category_fk_id
             WHERE sh.change_type = 'decrease' AND sh.timestamp >= %(since)s
             """ + NOT_CONTAM + """
-            GROUP BY p.api_id, p.name, b.name, c.name
+            GROUP BY p.id, p.api_id, p.name, b.name, c.name
             ORDER BY total_sold DESC LIMIT 20
         """, {**params_base, 'since': since})
         top_products_raw = _rows_to_dicts(cur)
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT b.name AS brand_name, SUM(ABS(sh.stock_change)) AS total_sold,
                    COUNT(*) AS decrease_events, COUNT(DISTINCT sh.product_api_id) AS unique_products
             FROM tabu_stock_history sh
@@ -78,7 +89,7 @@ def get_dashboard_data(days=90):
         """, {**params_base, 'since': since})
         top_brands_raw = _rows_to_dicts(cur)
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT c.name AS category_name, SUM(ABS(sh.stock_change)) AS total_sold,
                    COUNT(*) AS decrease_events, COUNT(DISTINCT sh.product_api_id) AS unique_products
             FROM tabu_stock_history sh
@@ -90,7 +101,7 @@ def get_dashboard_data(days=90):
         """, {**params_base, 'since': since})
         top_categories_raw = _rows_to_dicts(cur)
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT to_char(date_trunc('month', sh.timestamp), 'YYYY-MM') AS month,
                    SUM(ABS(sh.stock_change)) AS total_sold
             FROM tabu_stock_history sh
@@ -101,7 +112,7 @@ def get_dashboard_data(days=90):
         """, params_base)
         monthly = [{'month': r['month'], 'sold': r['total_sold']} for r in _rows_to_dicts(cur)]
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT SUM(ABS(sh.stock_change)) AS total_sold, COUNT(DISTINCT sh.product_api_id) AS uniq_products,
                    COUNT(DISTINCT b.id) AS uniq_brands
             FROM tabu_stock_history sh
@@ -111,7 +122,7 @@ def get_dashboard_data(days=90):
             """ + NOT_CONTAM, {**params_base, 'since': since})
         grand = _rows_to_dicts(cur)[0]
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT SUM(ABS(sh.stock_change)) AS total_sold
             FROM tabu_stock_history sh
             JOIN tabu_product_detail p ON p.api_id = sh.product_api_id
@@ -119,8 +130,8 @@ def get_dashboard_data(days=90):
             """ + NOT_CONTAM, {**params_base, 'since_30': since_30})
         sold_30d = _rows_to_dicts(cur)[0]['total_sold'] or 0
 
-        cur.execute(CONTAMINATION_CTE + """
-            , sales_30d AS (
+        cur.execute("""
+            WITH sales_30d AS (
                 SELECT sh.product_api_id, SUM(ABS(sh.stock_change)) AS sold_30d
                 FROM tabu_stock_history sh
                 JOIN tabu_product_detail p ON p.api_id = sh.product_api_id
@@ -129,7 +140,7 @@ def get_dashboard_data(days=90):
                 GROUP BY sh.product_api_id
                 HAVING SUM(ABS(sh.stock_change)) >= 15
             )
-            SELECT p.api_id, p.name AS product_name, b.name AS brand_name,
+            SELECT p.id AS pk, p.api_id, p.name AS product_name, b.name AS brand_name,
                    s.sold_30d, p.store_total AS stock_now
             FROM sales_30d s
             JOIN tabu_product_detail p ON p.api_id = s.product_api_id
@@ -139,8 +150,8 @@ def get_dashboard_data(days=90):
         """, {**params_base, 'since_30': since_30})
         out_of_stock_raw = _rows_to_dicts(cur)
 
-        cur.execute(CONTAMINATION_CTE + """
-            , sales_30d AS (
+        cur.execute("""
+            WITH sales_30d AS (
                 SELECT sh.product_api_id, SUM(ABS(sh.stock_change)) AS sold_30d
                 FROM tabu_stock_history sh
                 JOIN tabu_product_detail p ON p.api_id = sh.product_api_id
@@ -149,7 +160,7 @@ def get_dashboard_data(days=90):
                 GROUP BY sh.product_api_id
                 HAVING SUM(ABS(sh.stock_change)) >= 15
             )
-            SELECT p.api_id, p.name AS product_name, b.name AS brand_name,
+            SELECT p.id AS pk, p.api_id, p.name AS product_name, b.name AS brand_name,
                    s.sold_30d, p.store_total AS stock_now,
                    ROUND(p.store_total::numeric / (s.sold_30d::numeric/30), 1) AS days_left
             FROM sales_30d s
@@ -165,18 +176,20 @@ def get_dashboard_data(days=90):
         out = []
         for i in items[:14]:
             item = {'name': _clean(i['product_name']), 'brand': i['brand_name'],
-                     'sold30': i['sold_30d'], 'stock': i['stock_now']}
+                     'sold30': i['sold_30d'], 'stock': i['stock_now'],
+                     'url': _product_url(i['pk'])}
             if 'days_left' in i:
                 item['days_left'] = float(i['days_left'])
             out.append(item)
         return out
 
     top_products = [{'name': _clean(p['product_name']), 'brand': p['brand_name'],
-                      'category': _clean(p['category_name']), 'sold': p['total_sold']}
+                      'category': _clean(p['category_name']), 'sold': p['total_sold'],
+                      'url': _product_url(p['pk'])}
                      for p in top_products_raw[:12]]
     top_products_table = [{'name': _clean(p['product_name']), 'brand': p['brand_name'],
                             'category': _clean(p['category_name']), 'sold': p['total_sold'],
-                            'events': p['decrease_events']}
+                            'events': p['decrease_events'], 'url': _product_url(p['pk'])}
                            for p in top_products_raw]
 
     return {

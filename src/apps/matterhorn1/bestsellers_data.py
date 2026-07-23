@@ -7,23 +7,29 @@ oferty przez dostawcę — patrz przypadek marki Teyli) są wykluczane z liczb,
 żeby nie zafałszowały rankingu.
 """
 from django.db import connections
+from django.urls import reverse
 from django.utils import timezone
 
-CONTAMINATION_CTE = """
-    WITH suspect_groups AS (
-        SELECT p.brand_id, date(sh.timestamp) AS d
-        FROM matterhorn1_stock_history sh
-        JOIN product p ON p.product_uid = sh.product_uid
-        WHERE sh.change_type = 'decrease' AND sh.new_stock = 0 AND sh.old_stock > 0
-            AND sh.timestamp >= %(since_contamination)s
-        GROUP BY 1, 2
-        HAVING COUNT(DISTINCT sh.product_uid) > 100
-           AND SUM(ABS(sh.stock_change))::numeric / COUNT(DISTINCT sh.product_uid) > 8
-    )
+
+def _product_url(pk):
+    return reverse('admin:matterhorn1_product_change', args=[pk])
+
+SUSPECT_GROUPS_QUERY = """
+    SELECT p.brand_id, date(sh.timestamp) AS d
+    FROM matterhorn1_stock_history sh
+    JOIN product p ON p.product_uid = sh.product_uid
+    WHERE sh.change_type = 'decrease' AND sh.new_stock = 0 AND sh.old_stock > 0
+        AND sh.timestamp >= %(since_contamination)s
+    GROUP BY 1, 2
+    HAVING COUNT(DISTINCT sh.product_uid) > 100
+       AND SUM(ABS(sh.stock_change))::numeric / COUNT(DISTINCT sh.product_uid) > 8
 """
+# suspect_groups liczone raz w get_dashboard_data i przekazywane dalej jako
+# tablice (sg_brand_ids, sg_dates) — unikamy powtarzania tego skanu w każdym
+# z kolejnych zapytań.
 NOT_CONTAM = """
     AND NOT EXISTS (
-        SELECT 1 FROM suspect_groups sg
+        SELECT 1 FROM unnest(%(sg_brand_ids)s::int[], %(sg_dates)s::date[]) AS sg(brand_id, d)
         WHERE sg.brand_id = p.brand_id AND sg.d = date(sh.timestamp)
     )
 """
@@ -55,8 +61,13 @@ def get_dashboard_data(days=90):
     params_base = {'since_contamination': since_contamination}
 
     with connections['matterhorn1'].cursor() as cur:
-        cur.execute(CONTAMINATION_CTE + """
-            SELECT p.product_uid, p.name AS product_name, b.name AS brand_name, c.name AS category_name,
+        cur.execute(SUSPECT_GROUPS_QUERY, params_base)
+        suspect_rows = cur.fetchall()
+        params_base['sg_brand_ids'] = [r[0] for r in suspect_rows]
+        params_base['sg_dates'] = [r[1] for r in suspect_rows]
+
+        cur.execute("""
+            SELECT p.id AS pk, p.product_uid, p.name AS product_name, b.name AS brand_name, c.name AS category_name,
                    SUM(ABS(sh.stock_change)) AS total_sold, COUNT(*) AS decrease_events
             FROM matterhorn1_stock_history sh
             JOIN product p ON p.product_uid = sh.product_uid
@@ -64,12 +75,12 @@ def get_dashboard_data(days=90):
             LEFT JOIN category c ON c.id = p.category_id
             WHERE sh.change_type = 'decrease' AND sh.timestamp >= %(since)s
             """ + NOT_CONTAM + """
-            GROUP BY p.product_uid, p.name, b.name, c.name
+            GROUP BY p.id, p.product_uid, p.name, b.name, c.name
             ORDER BY total_sold DESC LIMIT 20
         """, {**params_base, 'since': since})
         top_products_raw = _rows_to_dicts(cur)
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT b.name AS brand_name, SUM(ABS(sh.stock_change)) AS total_sold,
                    COUNT(*) AS decrease_events, COUNT(DISTINCT sh.product_uid) AS unique_products
             FROM matterhorn1_stock_history sh
@@ -81,7 +92,7 @@ def get_dashboard_data(days=90):
         """, {**params_base, 'since': since})
         top_brands_raw = _rows_to_dicts(cur)
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT c.name AS category_name, SUM(ABS(sh.stock_change)) AS total_sold,
                    COUNT(*) AS decrease_events, COUNT(DISTINCT sh.product_uid) AS unique_products
             FROM matterhorn1_stock_history sh
@@ -93,7 +104,7 @@ def get_dashboard_data(days=90):
         """, {**params_base, 'since': since})
         top_categories_raw = _rows_to_dicts(cur)
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT to_char(date_trunc('month', sh.timestamp), 'YYYY-MM') AS month,
                    SUM(ABS(sh.stock_change)) AS total_sold
             FROM matterhorn1_stock_history sh
@@ -104,7 +115,7 @@ def get_dashboard_data(days=90):
         """, params_base)
         monthly = [{'month': r['month'], 'sold': r['total_sold']} for r in _rows_to_dicts(cur)]
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT SUM(ABS(sh.stock_change)) AS total_sold, COUNT(DISTINCT sh.product_uid) AS uniq_products,
                    COUNT(DISTINCT b.id) AS uniq_brands
             FROM matterhorn1_stock_history sh
@@ -114,7 +125,7 @@ def get_dashboard_data(days=90):
             """ + NOT_CONTAM, {**params_base, 'since': since})
         grand = _rows_to_dicts(cur)[0]
 
-        cur.execute(CONTAMINATION_CTE + """
+        cur.execute("""
             SELECT SUM(ABS(sh.stock_change)) AS total_sold
             FROM matterhorn1_stock_history sh
             JOIN product p ON p.product_uid = sh.product_uid
@@ -122,8 +133,8 @@ def get_dashboard_data(days=90):
             """ + NOT_CONTAM, {**params_base, 'since_30': since_30})
         sold_30d = _rows_to_dicts(cur)[0]['total_sold'] or 0
 
-        cur.execute(CONTAMINATION_CTE + """
-            , sales_30d AS (
+        cur.execute("""
+            WITH sales_30d AS (
                 SELECT sh.product_uid, SUM(ABS(sh.stock_change)) AS sold_30d
                 FROM matterhorn1_stock_history sh
                 JOIN product p ON p.product_uid = sh.product_uid
@@ -136,7 +147,7 @@ def get_dashboard_data(days=90):
                 SELECT pv.product_id, SUM(pv.stock) AS stock_now
                 FROM productvariant pv GROUP BY pv.product_id
             )
-            SELECT p.product_uid, p.name AS product_name, b.name AS brand_name,
+            SELECT p.id AS pk, p.product_uid, p.name AS product_name, b.name AS brand_name,
                    s.sold_30d, COALESCE(cs.stock_now, 0) AS stock_now
             FROM sales_30d s
             JOIN product p ON p.product_uid = s.product_uid
@@ -147,8 +158,8 @@ def get_dashboard_data(days=90):
         """, {**params_base, 'since_30': since_30})
         out_of_stock_raw = _rows_to_dicts(cur)
 
-        cur.execute(CONTAMINATION_CTE + """
-            , sales_30d AS (
+        cur.execute("""
+            WITH sales_30d AS (
                 SELECT sh.product_uid, SUM(ABS(sh.stock_change)) AS sold_30d
                 FROM matterhorn1_stock_history sh
                 JOIN product p ON p.product_uid = sh.product_uid
@@ -161,7 +172,7 @@ def get_dashboard_data(days=90):
                 SELECT pv.product_id, SUM(pv.stock) AS stock_now
                 FROM productvariant pv GROUP BY pv.product_id
             )
-            SELECT p.product_uid, p.name AS product_name, b.name AS brand_name,
+            SELECT p.id AS pk, p.product_uid, p.name AS product_name, b.name AS brand_name,
                    s.sold_30d, cs.stock_now,
                    ROUND(cs.stock_now::numeric / (s.sold_30d::numeric/30), 1) AS days_left
             FROM sales_30d s
@@ -174,31 +185,42 @@ def get_dashboard_data(days=90):
         """, {**params_base, 'since_30': since_30})
         low_stock_raw = _rows_to_dicts(cur)
 
-        cur.execute(CONTAMINATION_CTE + """
-            SELECT DISTINCT b.id, b.name FROM suspect_groups sg JOIN brand b ON b.id = sg.brand_id
+        cur.execute("""
+            SELECT DISTINCT b.id, b.name FROM brand b
+            WHERE b.id = ANY(%(sg_brand_ids)s::int[])
         """, params_base)
         contaminated_brands = _rows_to_dicts(cur)
 
         discontinued, winding_down = [], []
-        for cb in contaminated_brands:
+        brand_ids = [cb['id'] for cb in contaminated_brands]
+        if brand_ids:
             cur.execute("""
-                SELECT COUNT(DISTINCT p.id), COUNT(DISTINCT p.id) FILTER (WHERE p.active), SUM(pv.stock)
+                SELECT p.brand_id, COUNT(DISTINCT p.id), COUNT(DISTINCT p.id) FILTER (WHERE p.active), SUM(pv.stock)
                 FROM product p LEFT JOIN productvariant pv ON pv.product_id = p.id
-                WHERE p.brand_id = %s
-            """, [cb['id']])
-            products, active, stock = cur.fetchone()
+                WHERE p.brand_id = ANY(%(brand_ids)s::int[])
+                GROUP BY p.brand_id
+            """, {'brand_ids': brand_ids})
+            stats_by_brand = {row[0]: (row[1], row[2], row[3]) for row in cur.fetchall()}
+
             cur.execute("""
-                SELECT COUNT(*) FROM matterhorn1_stock_history sh
+                SELECT p.brand_id, COUNT(*)
+                FROM matterhorn1_stock_history sh
                 JOIN product p ON p.product_uid = sh.product_uid
-                WHERE p.brand_id = %s AND sh.change_type='increase' AND sh.timestamp >= %s
-            """, [cb['id'], since])
-            increases = cur.fetchone()[0]
-            entry = {'brand': cb['name'], 'products': products, 'active': active or 0,
-                     'stock_now': stock or 0, 'increases_90d': increases}
-            if (active or 0) == 0 and (stock or 0) == 0:
-                discontinued.append(entry)
-            elif products and (active or 0) / products < 0.15:
-                winding_down.append(entry)
+                WHERE p.brand_id = ANY(%(brand_ids)s::int[]) AND sh.change_type = 'increase'
+                    AND sh.timestamp >= %(since)s
+                GROUP BY p.brand_id
+            """, {'brand_ids': brand_ids, 'since': since})
+            increases_by_brand = dict(cur.fetchall())
+
+            for cb in contaminated_brands:
+                products, active, stock = stats_by_brand.get(cb['id'], (0, 0, 0))
+                increases = increases_by_brand.get(cb['id'], 0)
+                entry = {'brand': cb['name'], 'products': products, 'active': active or 0,
+                         'stock_now': stock or 0, 'increases_90d': increases}
+                if (active or 0) == 0 and (stock or 0) == 0:
+                    discontinued.append(entry)
+                elif products and (active or 0) / products < 0.15:
+                    winding_down.append(entry)
         discontinued.sort(key=lambda b: b['products'], reverse=True)
         winding_down.sort(key=lambda b: b['active'] / b['products'] if b['products'] else 0)
 
@@ -208,6 +230,7 @@ def get_dashboard_data(days=90):
             item = {
                 'name': _strip_brand_suffix(i['product_name'], i['brand_name']),
                 'brand': i['brand_name'], 'sold30': i['sold_30d'], 'stock': i['stock_now'],
+                'url': _product_url(i['pk']),
             }
             if 'days_left' in i:
                 item['days_left'] = float(i['days_left'])
@@ -217,12 +240,14 @@ def get_dashboard_data(days=90):
     top_products = [{
         'name': _strip_brand_suffix(p['product_name'], p['brand_name']),
         'brand': p['brand_name'], 'category': _clean(p['category_name']), 'sold': p['total_sold'],
+        'url': _product_url(p['pk']),
     } for p in top_products_raw[:12]]
 
     top_products_table = [{
         'name': _strip_brand_suffix(p['product_name'], p['brand_name']),
         'brand': p['brand_name'], 'category': _clean(p['category_name']),
         'sold': p['total_sold'], 'events': p['decrease_events'],
+        'url': _product_url(p['pk']),
     } for p in top_products_raw]
 
     return {

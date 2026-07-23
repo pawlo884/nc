@@ -25,7 +25,7 @@ services:
       [
         '/bin/bash',
         '-c',
-        'python manage.py makemigrations && python manage.py migrate --database=zzz_default && gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 1 --timeout 300 --keep-alive 5 --reload',
+        'python manage.py makemigrations && python manage.py migrate --database=zzz_default && gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --reload',
       ]
     ports:
       - '8000:8000'  # Dostępny w LAN (landing healthcheck nc-dev)
