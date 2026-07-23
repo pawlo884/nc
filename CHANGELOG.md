@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.24.1 (2026-07-23)</small>
+
+* Merge pull request #80 from pawlo884/fix/bestsellers-dashboard-perf ([0bbb3df](https://github.com/pawlo884/nc/commit/0bbb3df)), closes [#80](https://github.com/pawlo884/nc/issues/80)
+* fix(admin): przyspiesz dashboard bestsellerów i odblokuj dev workera ([646c275](https://github.com/pawlo884/nc/commit/646c275))
+
 ## 1.24.0 (2026-07-23)
 
 * Merge pull request #79 from pawlo884/feat/stock-history-product-view ([29da54d](https://github.com/pawlo884/nc/commit/29da54d)), closes [#79](https://github.com/pawlo884/nc/issues/79)
