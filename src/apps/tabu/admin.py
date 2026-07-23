@@ -1,3 +1,4 @@
+import json
 import logging
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
@@ -110,7 +111,7 @@ class TabuProductVariantInline(admin.TabularInline):
 class TabuProductAdmin(admin.ModelAdmin):
     list_display = [
         'product_image_thumbnail', 'api_id', 'name', 'brand', 'category', 'symbol', 'price_gross',
-        'store_total', 'is_mapped_mpd', 'last_update'
+        'store_total', 'stock_history_link', 'is_mapped_mpd', 'last_update'
     ]
     list_display_links = ['api_id', 'name']
     list_filter = [TabuBrandFilter, TabuCategoryFilter, 'last_update']
@@ -157,11 +158,19 @@ class TabuProductAdmin(admin.ModelAdmin):
     is_mapped_mpd.boolean = True
     is_mapped_mpd.short_description = 'MPD'
 
+    def stock_history_link(self, obj):
+        """Link do widoku historii stanów magazynowych produktu"""
+        from django.urls import reverse
+        url = reverse('admin:tabu-stock-history', args=[obj.pk])
+        return format_html('<a href="{}">📈 Historia</a>', url)
+    stock_history_link.short_description = 'Historia stanów'
+
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
             path('mpd-create/<int:product_id>/', self.admin_site.admin_view(self.mpd_create), name='tabu-mpd-create'),
             path('assign-mapping/<int:product_id>/<int:mpd_product_id>/', self.admin_site.admin_view(self.assign_mapping), name='tabu-assign-mapping'),
+            path('stock-history/<int:product_id>/', self.admin_site.admin_view(self.stock_history_view), name='tabu-stock-history'),
         ]
         return custom_urls + urls
 
@@ -454,6 +463,84 @@ class TabuProductAdmin(admin.ModelAdmin):
             logger.exception("Błąd assign_mapping Tabu: %s", e)
             return JsonResponse({'success': False, 'error': 'Wystąpił błąd'}, status=500)
 
+    def stock_history_view(self, request, product_id):
+        """Widok historii stanów magazynowych dla pojedynczego produktu (wykres + tabelka per wariant)"""
+        from collections import defaultdict
+        from datetime import timedelta
+
+        from django.shortcuts import get_object_or_404, render
+        from django.utils import timezone
+
+        product = get_object_or_404(TabuProduct, pk=product_id)
+
+        days_param = request.GET.get('days', '90')
+        days = None if days_param == 'all' else int(days_param)
+
+        history_qs = StockHistory.objects.filter(product_api_id=product.api_id)
+        if days:
+            cutoff = timezone.now() - timedelta(days=days)
+            history_qs = history_qs.filter(timestamp__gte=cutoff)
+        records = list(history_qs.order_by('timestamp'))
+
+        variants = {v.api_id: v for v in product.api_variants.all()}
+
+        # Punkt startowy dla każdego wariantu = old_stock pierwszego zdarzenia w oknie
+        # (albo aktualny stan, jeśli w oknie nie ma żadnych zdarzeń).
+        running_stock = {
+            vid: v.store for vid, v in variants.items()
+        }
+        first_seen = set()
+        for r in records:
+            if r.variant_api_id not in first_seen:
+                first_seen.add(r.variant_api_id)
+                if r.old_stock is not None:
+                    running_stock[r.variant_api_id] = r.old_stock
+
+        def variant_label(vid):
+            v = variants.get(vid)
+            if v:
+                return v.symbol or f'{v.size} {v.color}'.strip() or str(vid)
+            return str(vid)
+
+        variant_series = defaultdict(list)
+        variant_labels = {vid: variant_label(vid) for vid in variants}
+        total_points = []
+        for r in records:
+            variant_labels.setdefault(r.variant_api_id, r.variant_symbol or str(r.variant_api_id))
+            variant_series[r.variant_api_id].append({
+                'x': r.timestamp.isoformat(),
+                'y': r.new_stock,
+            })
+            if r.new_stock is not None:
+                running_stock[r.variant_api_id] = r.new_stock
+            total_points.append({
+                'x': r.timestamp.isoformat(),
+                'y': sum(v for v in running_stock.values() if v is not None),
+            })
+
+        chart_datasets = [
+            {'label': variant_labels.get(vid, vid), 'data': pts}
+            for vid, pts in sorted(variant_series.items(), key=lambda kv: variant_labels.get(kv[0], kv[0]))
+        ]
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title': f'Historia stanów magazynowych — {product.name}',
+            'product': product,
+            'opts': self.model._meta,
+            'days': days_param,
+            'chart_datasets_json': json.dumps(chart_datasets),
+            'total_series_json': json.dumps(total_points),
+            'current_variants': sorted(variants.values(), key=lambda v: v.symbol),
+            'records': list(reversed(records)),
+            'has_history': bool(records),
+        }
+        return render(
+            request,
+            'admin/tabu/stock_history/product_detail.html',
+            context,
+        )
+
     def image_preview(self, obj):
         if obj and obj.image_url:
             return format_html(
@@ -548,3 +635,32 @@ class StockHistoryAdmin(admin.ModelAdmin):
     readonly_fields = ['timestamp']
     ordering = ['-timestamp']
     list_per_page = 50
+    change_list_template = 'admin/tabu/stock_history/change_list.html'
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('bestsellers/', self.admin_site.admin_view(self.bestsellers_view),
+                 name='tabu_stockhistory_bestsellers'),
+        ]
+        return custom_urls + urls
+
+    def bestsellers_view(self, request):
+        """Dashboard bestsellerów: top produkty/marki/kategorie, trend i braki
+        magazynowe, liczone na żywo z bazy przy każdym wejściu."""
+        from django.shortcuts import render
+        from .bestsellers_data import get_dashboard_data
+
+        days = int(request.GET.get('days', 90))
+        if days not in (30, 90, 180):
+            days = 90
+        data = get_dashboard_data(days=days)
+
+        context = {
+            **self.admin_site.each_context(request),
+            'data': data,
+            'days': days,
+            'opts': self.model._meta,
+            'title': 'Bestsellery — Tabu',
+        }
+        return render(request, 'admin/tabu/stock_history/bestsellers.html', context)

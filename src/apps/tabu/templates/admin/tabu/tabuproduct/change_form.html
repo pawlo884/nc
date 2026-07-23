@@ -27,6 +27,22 @@
 {% endblock %}
 
 {% block content %}
+<div style="margin: 10px 0">
+  <a
+    class="button"
+    href="{% url 'admin:tabu-stock-history' original.id %}"
+    style="
+      display: inline-block;
+      background: #417690;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 12px;
+    "
+    >📈 Historia stanów magazynowych</a
+  >
+</div>
 <div class="tabu-mpd-container">
   <div class="tabu-mpd-column tabu-mpd-left">{{ block.super }}</div>
   <div class="tabu-mpd-column tabu-mpd-right">
