@@ -500,9 +500,13 @@ export function ProductDetailPage() {
                               className="badge source-badge"
                               title={`EAN: ${source.ean || '—'}`}
                             >
-                              {source.source_short_name || source.source_name || `#${source.source_id}`}
+                              {source.source_short_name ||
+                                source.source_name ||
+                                `#${source.source_id}`}
                               {source.stock != null ? `: ${source.stock}szt` : ''}
-                              {source.price != null ? ` / ${source.price} ${source.currency || 'PLN'}` : ''}
+                              {source.price != null
+                                ? ` / ${source.price} ${source.currency || 'PLN'}`
+                                : ''}
                             </span>
                           ))}
                         </div>
