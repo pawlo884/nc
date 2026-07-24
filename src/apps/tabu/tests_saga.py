@@ -4,10 +4,12 @@ Testy Sagi Tabu → MPD: sukces oraz kompensacja przy błędzie kroku 2.
 from unittest.mock import patch
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
-from tabu.models import Brand, TabuProduct, TabuProductVariant
+from tabu.models import Brand, Saga, SagaStep, TabuProduct, TabuProductVariant
 from tabu.services import create_mpd_product_from_tabu
 
 from MPD.models import Products
@@ -84,6 +86,19 @@ class TabuSagaTest(TestCase):
             'Wariant Tabu powinien mieć mapped_variant_uid',
         )
 
+        # Postęp Sagi zapisany do bazy (tabu_saga_logs/tabu_saga_steps)
+        saga_row = Saga.objects.using(tabu_db).latest('created_at')
+        self.assertEqual(saga_row.status, 'completed')
+        self.assertEqual(saga_row.saga_type, 'generic')
+        self.assertEqual(saga_row.total_steps, 2)
+        self.assertEqual(saga_row.completed_steps, 2)
+
+        steps = list(
+            SagaStep.objects.using(tabu_db).filter(saga=saga_row).order_by('step_order')
+        )
+        self.assertEqual([s.step_name for s in steps], ['create_mpd', 'update_tabu_mapping'])
+        self.assertTrue(all(s.status == 'completed' for s in steps))
+
     def test_saga_compensation_when_step2_fails(self):
         """Gdy krok 2 (zapis w Tabu) rzuci błąd, kompensacja usuwa produkt z MPD."""
         tabu_db = _tabu_db()
@@ -108,3 +123,41 @@ class TabuSagaTest(TestCase):
             self.tabu_product.mapped_product_uid,
             'Tabu produkt nie powinien mieć mapped_product_uid po kompensacji',
         )
+
+        # Postęp Sagi zapisany do bazy: cała Saga skompensowana, krok 1
+        # skompensowany, krok 2 (który rzucił wyjątek) oznaczony jako failed.
+        saga_row = Saga.objects.using(tabu_db).latest('created_at')
+        self.assertEqual(saga_row.status, 'compensated')
+        self.assertEqual(saga_row.failed_step, 'update_tabu_mapping')
+        self.assertEqual(saga_row.completed_steps, 1)
+
+        steps = {
+            s.step_name: s
+            for s in SagaStep.objects.using(tabu_db).filter(saga=saga_row)
+        }
+        self.assertEqual(steps['create_mpd'].status, 'compensated')
+        self.assertTrue(steps['create_mpd'].compensation_attempted)
+        self.assertTrue(steps['create_mpd'].compensation_successful)
+        self.assertEqual(steps['update_tabu_mapping'].status, 'failed')
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+class TabuSagaAdminTest(TestCase):
+    """Sagi/Kroki Sagi powinny być widoczne w panelu admina tabu (parytet z matterhorn1)."""
+
+    databases = '__all__'
+
+    def setUp(self):
+        User = get_user_model()
+        self.superuser = User.objects.create_superuser(
+            username='saga_admin_test', email='saga_admin_test@example.com', password='pass1234',
+        )
+        self.client.force_login(self.superuser)
+
+    def test_saga_changelist_reachable(self):
+        response = self.client.get(reverse('admin:tabu_saga_changelist'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_sagastep_changelist_reachable(self):
+        response = self.client.get(reverse('admin:tabu_sagastep_changelist'))
+        self.assertEqual(response.status_code, 200)

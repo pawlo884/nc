@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.contrib.admin import SimpleListFilter
 from django.http import JsonResponse
 from django.db import connections, transaction
 from django.db.models import OuterRef, Subquery
@@ -10,7 +9,6 @@ from django.urls import path
 from django.utils.html import format_html
 import json
 import logging
-from urllib.parse import urlparse
 import requests
 from rapidfuzz import fuzz
 from .models import (
@@ -19,6 +17,13 @@ from .models import (
 )
 from .transaction_logger import logged_transaction
 from .defs_db import resolve_image_url
+from . import bestsellers_data
+from core.db_routers import _get_mpd_db, _get_matterhorn1_db
+from core.wholesaler_admin import (
+    make_scoped_filter, render_product_thumbnail, fuzzy_suggest_mpd_products,
+    build_mpd_change_context, StockHistoryAdminBase,
+    ReadOnlyLogAdminMixin, RouterScopedQuerysetMixin,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,87 +66,14 @@ class CategoryAdmin(admin.ModelAdmin):
     )
 
 
-class BrandFilter(SimpleListFilter):
-    """Filtr marki, który filtruje opcje na podstawie wybranej kategorii"""
-    title = 'Marka'
-    parameter_name = 'brand'
-
-    def lookups(self, request, model_admin):
-        """Generuje opcje filtrów marki na podstawie wybranej kategorii"""
-        # Pobierz wybraną kategorię z parametrów URL (używamy ID obiektu Category, nie category_id)
-        category_pk = request.GET.get('category')
-
-        # Bazowy queryset produktów
-        qs = model_admin.get_queryset(request)
-
-        # Jeśli wybrano kategorię, filtruj produkty tylko z tą kategorią
-        if category_pk:
-            try:
-                qs = qs.filter(category_id=int(category_pk))
-            except (ValueError, TypeError):
-                pass
-
-        # Pobierz unikalne marki z przefiltrowanego querysetu (używamy ID obiektu Brand)
-        # .order_by() czyści odziedziczone sortowanie (-product_uid z ProductAdmin) —
-        # inaczej Postgres musi dołączyć product_uid do DISTINCT (bo jest w ORDER BY),
-        # co zamiast ~190 wierszy zwraca ~108k (po jednym na produkt).
-        brand_pks = list(qs.exclude(brand__isnull=True).order_by().values_list(
-            'brand_id', flat=True).distinct())
-        if not brand_pks:
-            return []
-        brands = Brand.objects.filter(id__in=brand_pks).order_by('name')
-
-        return [(str(brand.id), brand.name) for brand in brands]
-
-    def queryset(self, request, queryset):
-        """Filtruje queryset na podstawie wybranej marki"""
-        if self.value():
-            try:
-                return queryset.filter(brand_id=int(self.value()))
-            except (ValueError, TypeError):
-                return queryset
-        return queryset
-
-
-class CategoryFilter(SimpleListFilter):
-    """Filtr kategorii, który filtruje opcje na podstawie wybranej marki"""
-    title = 'Kategoria'
-    parameter_name = 'category'
-
-    def lookups(self, request, model_admin):
-        """Generuje opcje filtrów kategorii na podstawie wybranej marki"""
-        # Pobierz wybraną markę z parametrów URL (używamy ID obiektu Brand, nie brand_id)
-        brand_pk = request.GET.get('brand')
-
-        # Bazowy queryset produktów
-        qs = model_admin.get_queryset(request)
-
-        # Jeśli wybrano markę, filtruj produkty tylko z tą marką
-        if brand_pk:
-            try:
-                qs = qs.filter(brand_id=int(brand_pk))
-            except (ValueError, TypeError):
-                pass
-
-        # Pobierz unikalne kategorie z przefiltrowanego querysetu (używamy ID obiektu Category)
-        # .order_by() czyści odziedziczone sortowanie — patrz komentarz w BrandFilter.
-        category_pks = list(qs.exclude(category__isnull=True).order_by().values_list(
-            'category_id', flat=True).distinct())
-        if not category_pks:
-            return []
-        categories = Category.objects.filter(
-            id__in=category_pks).order_by('name')
-
-        return [(str(category.id), category.name) for category in categories]
-
-    def queryset(self, request, queryset):
-        """Filtruje queryset na podstawie wybranej kategorii"""
-        if self.value():
-            try:
-                return queryset.filter(category_id=int(self.value()))
-            except (ValueError, TypeError):
-                return queryset
-        return queryset
+BrandFilter = make_scoped_filter(
+    title='Marka', parameter_name='brand', counterpart_parameter_name='category',
+    related_model=Brand,
+)
+CategoryFilter = make_scoped_filter(
+    title='Kategoria', parameter_name='category', counterpart_parameter_name='brand',
+    related_model=Category,
+)
 
 
 class ProductDetailsInline(admin.StackedInline):
@@ -267,37 +199,11 @@ class ProductAdmin(admin.ModelAdmin):
 
     def product_image_thumbnail(self, obj):
         """Wyświetl miniaturę pierwszego zdjęcia produktu na liście."""
-        original_url = getattr(obj, 'first_image_url', None)
-        if not original_url:
-            return '-'
-        normalized_url = original_url.strip()
-        storage_prefixes = ('MPD/', 'MPD_test/')
-
-        if normalized_url.startswith(('http://', 'https://')):
-            # Zewnętrzne URL (np. matterhorn) pokazujemy bez przepisywania do MinIO.
-            display_url = normalized_url
-        elif normalized_url.startswith('//'):
-            display_url = f"https:{normalized_url}"
-        elif normalized_url.startswith(storage_prefixes):
-            display_url = resolve_image_url(normalized_url) or normalized_url
-        else:
-            # Hostname przez urlparse (nie substring) — py/incomplete-url-substring-sanitization
-            candidate = normalized_url if '://' in normalized_url else f'https://{normalized_url.lstrip("/")}'
-            host = (urlparse(candidate).hostname or '').lower()
-            if host == 'matterhorn-wholesale.com' or host.endswith('.matterhorn-wholesale.com'):
-                display_url = candidate if candidate.startswith('http') else f'https://{normalized_url.lstrip("/")}'
-            else:
-                display_url = f"https://matterhorn-wholesale.com/{normalized_url.lstrip('/')}"
-
-        return format_html(
-            '<a href="{}" target="_blank" title="{}">'
-            '<img src="{}" alt="Obraz produktu" loading="lazy" width="56" height="56" '
-            'style="object-fit: contain; width: 56px; height: 56px; max-width: 56px; max-height: 56px;" '
-            'onerror="this.onerror=null; this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiBmaWxsPSIjZWVlIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSI4IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+YnJhayB6ZGo8L3RleHQ+PC9zdmc+\';" />'
-            '</a>',
-            display_url,
-            original_url,
-            display_url,
+        return render_product_thumbnail(
+            getattr(obj, 'first_image_url', None),
+            fallback_host='matterhorn-wholesale.com',
+            storage_prefixes=('MPD/', 'MPD_test/'),
+            storage_resolver=resolve_image_url,
         )
     product_image_thumbnail.short_description = 'Zdjęcie'
 
@@ -346,318 +252,42 @@ class ProductAdmin(admin.ModelAdmin):
     def change_view(self, request, object_id, form_url='', extra_context=None):
         """Dodaj dane MPD do kontekstu"""
         extra_context = extra_context or {}
+        product = None
 
         try:
             product = Product.objects.get(id=object_id)
-            logger.info(
-                f"[matterhorn1_fuzzy] Found product: {product.name}, Brand: {product.brand}")
             is_mapped = bool(product.mapped_product_uid)
 
-            # Pobierz dane MPD jeśli produkt jest zmapowany
-            mpd_data = {}
-            suggested_products = []
-            main_colors = []
-            mpd_paths = []
-            selected_paths = []
-            units = []
-
-            # Inicjalizuj zmienne
-            producer_color_name = ''
-            producer_code = ''
-            series_name = ''
-
-            if is_mapped:
-                # Pobierz dane produktu z MPD
-                with connections['MPD'].cursor() as cursor:
-                    cursor.execute("""
-                        SELECT p.name, p.description, p.short_description, b.name as brand_name
-                        FROM products p 
-                        LEFT JOIN brands b ON p.brand_id = b.id 
-                        WHERE p.id = %s
-                    """, [product.mapped_product_uid])
-                    result = cursor.fetchone()
-                    if result:
-                        mpd_data = {
-                            'name': result[0] or '',
-                            'description': result[1] or '',
-                            'short_description': result[2] or '',
-                            'brand': result[3] or ''
-                        }
-
-                    # Pobierz główne kolory (bez parent_id)
-                    cursor.execute(
-                        "SELECT id, name FROM colors WHERE parent_id IS NULL ORDER BY name")
-                    main_colors = [{'id': row[0], 'name': row[1]}
-                                   for row in cursor.fetchall()]
-
-                    # Pobierz kolory producenta (z parent_id - podkolory)
-                    cursor.execute(
-                        "SELECT id, name, parent_id FROM colors WHERE parent_id IS NOT NULL ORDER BY name")
-                    producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]}
-                                       for row in cursor.fetchall()]
-
-                    # Pobierz producer_color_name i producer_code z pierwszego wariantu (producer_code z product_variants_sources)
-                    cursor.execute("""
-                        SELECT c.name,
-                            (SELECT pvs.producer_code FROM product_variants_sources pvs
-                             WHERE pvs.variant_id = pv.variant_id AND pvs.producer_code IS NOT NULL AND pvs.producer_code != ''
-                             LIMIT 1)
-                        FROM product_variants pv
-                        LEFT JOIN colors c ON pv.producer_color_id = c.id
-                        WHERE pv.product_id = %s
-                        LIMIT 1
-                    """, [product.mapped_product_uid])
-                    result = cursor.fetchone()
-                    if result:
-                        producer_color_name = result[0] or ''
-                        producer_code = result[1] or ''
-
-                    # Pobierz nazwę serii
-                    cursor.execute("""
-                        SELECT ps.name
-                        FROM products p
-                        LEFT JOIN product_series ps ON p.series_id = ps.id
-                        WHERE p.id = %s
-                    """, [product.mapped_product_uid])
-                    series_result = cursor.fetchone()
-                    if series_result:
-                        series_name = series_result[0] or ''
-            else:
-                # Jeśli produkt nie jest zmapowany, pobierz tylko kolory
-                with connections['MPD'].cursor() as cursor:
-                    # Pobierz główne kolory (bez parent_id)
-                    cursor.execute(
-                        "SELECT id, name FROM colors WHERE parent_id IS NULL ORDER BY name")
-                    main_colors = [{'id': row[0], 'name': row[1]}
-                                   for row in cursor.fetchall()]
-
-                    # Pobierz kolory producenta (z parent_id - podkolory)
-                    cursor.execute(
-                        "SELECT id, name, parent_id FROM colors WHERE parent_id IS NOT NULL ORDER BY name")
-                    producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]}
-                                       for row in cursor.fetchall()]
-
-            # Pobierz ścieżki (dla wszystkich produktów)
-            with connections['MPD'].cursor() as cursor:
-                cursor.execute(
-                    "SELECT id, name, path FROM path ORDER BY name")
-                mpd_paths = [{'id': row[0], 'name': row[1],
-                              'path': row[2]} for row in cursor.fetchall()]
-
-                # Pobierz przypisane ścieżki (tylko dla zmapowanych produktów)
-                if is_mapped:
-                    cursor.execute("SELECT path_id FROM product_path WHERE product_id = %s", [
-                                   product.mapped_product_uid])
-                    selected_paths = [row[0] for row in cursor.fetchall()]
-
-                    # Pobierz przypisane atrybuty
-                    cursor.execute("SELECT attribute_id FROM product_attributes WHERE product_id = %s", [
-                                   product.mapped_product_uid])
-                    selected_attributes = [row[0] for row in cursor.fetchall()]
-                else:
-                    selected_paths = []
-                    selected_attributes = []
-
-                # Pobierz jednostki
-                cursor.execute("SELECT unit_id, name FROM units ORDER BY name")
-                units = [{'id': row[0], 'name': row[1]}
-                         for row in cursor.fetchall()]
-
-                # Pobierz atrybuty
-                cursor.execute("SELECT id, name FROM attributes ORDER BY name")
-                mpd_attributes = [{'id': row[0], 'name': row[1]}
-                                  for row in cursor.fetchall()]
-
-                # Pobierz marki
-                cursor.execute("SELECT id, name FROM brands ORDER BY name")
-                mpd_brands = [{'id': row[0], 'name': row[1]}
-                              for row in cursor.fetchall()]
-
-                # Pobierz kategorie rozmiarów
-                cursor.execute(
-                    "SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
-                size_categories = [row[0] for row in cursor.fetchall()]
-
-                # Pobierz komponenty materiałów (fabric)
-                cursor.execute(
-                    "SELECT id, name FROM fabric_component ORDER BY name")
-                fabric_components = [{'id': row[0], 'name': row[1]}
-                                     for row in cursor.fetchall()]
-
-            # Pobierz sugerowane produkty z fuzzy search
-            try:
-                logger.info(
-                    f"[matterhorn1_fuzzy] Product: {product.name}, Brand: {product.brand}")
-                if not product.brand:
-                    logger.warning(
-                        f"[matterhorn1_fuzzy] Product {product.name} has no brand, skipping fuzzy search")
-                    suggested_products = []
-                else:
-                    # Użyj product.brand.name zamiast product.brand
-                    brand_name = product.brand.name if hasattr(
-                        product.brand, 'name') else str(product.brand)
-                    logger.info(
-                        f"[matterhorn1_fuzzy] Using brand name: {brand_name}")
-                    with connections['MPD'].cursor() as cursor:
-                        # Pobierz wszystkie produkty z MPD dla tej marki
-                        cursor.execute("""
-                            SELECT p.id, p.name, b.name as brand_name
-                            FROM products p 
-                            LEFT JOIN brands b ON p.brand_id = b.id 
-                            WHERE b.name = %s
-                            ORDER BY p.name
-                        """, [brand_name])
-                        all_products = cursor.fetchall()
-                        logger.info(
-                            f"[matterhorn1_fuzzy] Found {len(all_products)} products in MPD for brand: {brand_name}")
-
-                        # Oblicz podobieństwo dla każdego produktu
-                        scored = []
-                        for row in all_products:
-                            similarity = fuzz.token_sort_ratio(
-                                product.name, row[1])
-                            # Oblicz pokrycie słów
-                            suggested_words = set(row[1].lower().replace(
-                                '(', '').replace(')', '').replace('-', ' ').split())
-                            query_words = set(product.name.lower().replace(
-                                '(', '').replace(')', '').replace('-', ' ').split())
-                            if suggested_words:
-                                suggested_in_query = int(
-                                    100 * len(suggested_words & query_words) / len(suggested_words))
-                            else:
-                                suggested_in_query = 0
-
-                            scored.append({
-                                'id': row[0],
-                                'name': row[1],
-                                'brand': row[2] or '',
-                                'similarity': similarity,
-                                'suggested_in_query': suggested_in_query
-                            })
-
-                        # Sortuj według podobieństwa i weź top 5
-                        suggested_products = sorted(
-                            scored, key=lambda x: x['similarity'], reverse=True)[:5]
-                        logger.info(
-                            f"[matterhorn1_fuzzy] Final suggested_products count: {len(suggested_products)}")
-                        if suggested_products:
-                            logger.info(
-                                f"[matterhorn1_fuzzy] First suggested: {suggested_products[0]}")
-            except Exception as e:
-                logger.error(f"Błąd fuzzy search w matterhorn1: {e}")
-                suggested_products = []
-
-            # DEBUG: Sprawdź czy fuzzy search znalazł produkty
-            if not suggested_products:
-                logger.warning(
-                    "[matterhorn1_fuzzy] DEBUG: No suggested_products found from fuzzy search")
-            else:
-                logger.info(
-                    "[matterhorn1_fuzzy] DEBUG: Found %s real suggested_products", len(suggested_products))
-
-            extra_context.update({
-                'is_mapped': is_mapped,
-                'mpd_data': mpd_data,
-                'suggested_products': suggested_products,
-                'main_colors': main_colors,
-                'producer_colors': producer_colors,
-                'mpd_paths': mpd_paths,
-                'selected_paths': selected_paths,
-                'units': units,
-                'mpd_attributes': mpd_attributes,
-                'selected_attributes': selected_attributes,
-                'mpd_brands': mpd_brands,
-                'size_categories': size_categories,
-                'producer_color_name': producer_color_name,
-                'producer_code': producer_code,
-                'series_name': series_name,
-                'selected_unit_id': None,
-                'fabric_components': fabric_components
-            })
+            mpd_context = build_mpd_change_context(
+                product.mapped_product_uid if is_mapped else None,
+                mpd_db_alias=_get_mpd_db(),
+            )
+            mpd_context['is_mapped'] = is_mapped
+            mpd_context['suggested_products'] = fuzzy_suggest_mpd_products(
+                product.name, product.brand.name if product.brand else None,
+                mpd_db_alias=_get_mpd_db(),
+            )
+            extra_context.update(mpd_context)
 
         except Exception as e:
             logger.error("Błąd podczas pobierania danych MPD: %s", e)
-            # Pobierz kolory i jednostki dla niezmapowanych produktów
-            with connections['MPD'].cursor() as cursor:
-                # Pobierz główne kolory (bez parent_id)
-                cursor.execute(
-                    "SELECT id, name FROM colors WHERE parent_id IS NULL ORDER BY name")
-                main_colors = [{'id': row[0], 'name': row[1]}
-                               for row in cursor.fetchall()]
+            # Dociągnij referencyjne dane MPD nawet gdy coś wyżej się wysypało, żeby
+            # formularz nie został bez opcji w selectach (kolory/jednostki/atrybuty itd).
+            mpd_context = build_mpd_change_context(None, mpd_db_alias=_get_mpd_db())
+            mpd_context['is_mapped'] = False
+            mpd_context['suggested_products'] = []
 
-                # Pobierz kolory producenta (z parent_id - podkolory)
-                cursor.execute(
-                    "SELECT id, name, parent_id FROM colors WHERE parent_id IS NOT NULL ORDER BY name")
-                producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]}
-                                   for row in cursor.fetchall()]
+            variants_data = [
+                {'name': variant.name, 'stock': variant.stock, 'ean': variant.ean}
+                for variant in product.variants.all()
+            ] if product is not None else []
+            mpd_context['variants_json'] = json.dumps(variants_data)
 
-                # Pobierz jednostki
-                cursor.execute("SELECT unit_id, name FROM units ORDER BY name")
-                units = [{'id': row[0], 'name': row[1]}
-                         for row in cursor.fetchall()]
-
-                # Pobierz atrybuty
-                cursor.execute("SELECT id, name FROM attributes ORDER BY name")
-                mpd_attributes = [{'id': row[0], 'name': row[1]}
-                                  for row in cursor.fetchall()]
-
-                # Pobierz marki
-                cursor.execute("SELECT id, name FROM brands ORDER BY name")
-                mpd_brands = [{'id': row[0], 'name': row[1]}
-                              for row in cursor.fetchall()]
-
-                # Pobierz kategorie rozmiarów
-                cursor.execute(
-                    "SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
-                size_categories = [row[0] for row in cursor.fetchall()]
-
-                # Pobierz ścieżki
-                cursor.execute("SELECT id, name, path FROM path ORDER BY name")
-                mpd_paths = [{'id': row[0], 'name': row[1], 'path': row[2]}
-                             for row in cursor.fetchall()]
-
-                # Pobierz komponenty materiałów (fabric)
-                cursor.execute(
-                    "SELECT id, name FROM fabric_component ORDER BY name")
-                fabric_components = [{'id': row[0], 'name': row[1]}
-                                     for row in cursor.fetchall()]
-
-            # Przygotuj JSON dla wariantów
-            import json
-            variants_data = []
-            for variant in product.variants.all():
-                variants_data.append({
-                    'name': variant.name,
-                    'stock': variant.stock,
-                    'ean': variant.ean
-                })
-            variants_json = json.dumps(variants_data)
-
-            extra_context.update({
-                'is_mapped': False,
-                'mpd_data': {},
-                'suggested_products': [],
-                'main_colors': main_colors,
-                'producer_colors': producer_colors,
-                'mpd_paths': mpd_paths,
-                'selected_paths': [],
-                'units': units,
-                'mpd_attributes': mpd_attributes,
-                'selected_attributes': [],
-                'producer_color_name': producer_color_name,
-                'producer_code': '',
-                'series_name': '',
-                'selected_unit_id': None,
-                'fabric_components': fabric_components,
-                'variants_json': variants_json
-            })
+            extra_context.update(mpd_context)
 
         return super().change_view(request, object_id, form_url, extra_context)
 
     @method_decorator(csrf_exempt)
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
-
     def mpd_create(self, request, product_id):
         """Tworzy nowy produkt w bazie MPD przez API"""
         logger.info(f"🔄 mpd_create: Rozpoczynam dla produktu {product_id}")
@@ -794,6 +424,7 @@ class ProductAdmin(admin.ModelAdmin):
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
+    @method_decorator(csrf_exempt)
     def mpd_update(self, request, product_id):
         """Aktualizuje dane produktu w MPD"""
         if request.method == 'POST':
@@ -906,6 +537,7 @@ class ProductAdmin(admin.ModelAdmin):
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
+    @method_decorator(csrf_exempt)
     def assign_mapping(self, request, product_id, mpd_product_id):
         """Przypisuje istniejący produkt MPD do produktu matterhorn1"""
         if request.method == 'POST':
@@ -1004,6 +636,7 @@ class ProductAdmin(admin.ModelAdmin):
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
+    @method_decorator(csrf_exempt)
     def mpd_update_field(self, request, product_id, field_name):
         """Aktualizuje pojedyncze pole w MPD przez API"""
         if request.method == 'POST':
@@ -1130,6 +763,7 @@ class ProductAdmin(admin.ModelAdmin):
             request, f"Zsynchronizowano {synced_count} produktów z MPD.")
     sync_with_mpd_action.short_description = "Synchronizuj z MPD"
 
+    @method_decorator(csrf_exempt)
     def bulk_map_to_mpd(self, request):
         """Endpoint do masowego mapowania produktów"""
         if request.method == 'POST':
@@ -1182,6 +816,7 @@ class ProductAdmin(admin.ModelAdmin):
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
+    @method_decorator(csrf_exempt)
     def bulk_create_mpd(self, request):
         """Endpoint do masowego tworzenia produktów w MPD"""
         if request.method == 'POST':
@@ -1237,6 +872,7 @@ class ProductAdmin(admin.ModelAdmin):
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
+    @method_decorator(csrf_exempt)
     def upload_images(self, request, product_id):
         """Upload obrazów produktu do bucketa i zapis do MPD"""
         if request.method == 'POST':
@@ -1285,6 +921,7 @@ class ProductAdmin(admin.ModelAdmin):
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
+    @method_decorator(csrf_exempt)
     def auto_map_variants(self, request, product_id):
         """Automatyczne mapowanie wariantów produktu"""
         if request.method == 'POST':
@@ -1313,6 +950,7 @@ class ProductAdmin(admin.ModelAdmin):
 
         return JsonResponse({'success': False, 'error': 'Nieprawidłowa metoda'})
 
+    @method_decorator(csrf_exempt)
     def sync_with_mpd(self, request, product_id):
         """Synchronizacja produktu z MPD"""
         if request.method == 'POST':
@@ -1755,6 +1393,7 @@ class ProductAdmin(admin.ModelAdmin):
 
             return {'added': added_variants, 'skipped_existing': skipped_existing, 'missing_sizes': missing_sizes, 'missing_color': missing_colors, 'total': total_variants, 'iai_product_id': None}
 
+    @method_decorator(csrf_exempt)
     def add_variants(self, request, product_id):
         """Dodaje warianty do istniejącego produktu w MPD"""
         if request.method != 'POST':
@@ -1814,7 +1453,7 @@ class ProductAdmin(admin.ModelAdmin):
         days_param = request.GET.get('days', '90')
         days = None if days_param == 'all' else int(days_param)
 
-        history_qs = StockHistory.objects.using('matterhorn1').filter(
+        history_qs = StockHistory.objects.using(_get_matterhorn1_db()).filter(
             product_uid=product.product_uid
         )
         if days:
@@ -1988,7 +1627,7 @@ class ProductVariantAdmin(admin.ModelAdmin):
 
 
 @admin.register(ApiSyncLog)
-class ApiSyncLogAdmin(admin.ModelAdmin):
+class ApiSyncLogAdmin(ReadOnlyLogAdminMixin, admin.ModelAdmin):
     list_display = [
         'id', 'sync_type', 'status', 'started_at', 'completed_at',
         'duration', 'records_created', 'records_updated', 'records_errors'
@@ -2033,18 +1672,6 @@ class ApiSyncLogAdmin(admin.ModelAdmin):
                 return f"{seconds}s"
         return "-"
     duration.short_description = 'Czas trwania'
-
-    def has_add_permission(self, request):
-        """Wyłącz dodawanie nowych logów przez admin"""
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        """Wyłącz edycję logów przez admin"""
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        """Zezwól na usuwanie starych logów"""
-        return True
 
 
 # Konfiguracja admin site
@@ -2097,13 +1724,18 @@ def make_inactive(modeladmin, request, queryset):
         request, f"Oznaczono {queryset.count()} produktów jako nieaktywne.")
 
 
-ProductAdmin.actions = (make_active, make_inactive)
+# Dopisz do akcji zdefiniowanych w ciele klasy (bulk_map_to_mpd_action itd.) —
+# dawniej to przypisanie nadpisywało `actions` z ciała klasy, przez co 3 akcje MPD
+# były niewidoczne w dropdownie na liście zmian.
+ProductAdmin.actions = tuple(ProductAdmin.actions) + (make_active, make_inactive)
 
 
 # Saga Pattern Admin Interface
 @admin.register(Saga)
-class SagaAdmin(admin.ModelAdmin):
+class SagaAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
     """Admin interface dla Saga operations"""
+
+    db_alias_getter = staticmethod(_get_matterhorn1_db)
 
     list_display = [
         'saga_id', 'saga_type', 'status', 'created_at',
@@ -2118,33 +1750,31 @@ class SagaAdmin(admin.ModelAdmin):
     ordering = ['-created_at']
 
     fieldsets = (
-        ('Basic Info', {
+        ('Podstawowe informacje', {
             'fields': ('saga_id', 'saga_type', 'status')
         }),
-        ('Timestamps', {
+        ('Metadane', {
             'fields': ('created_at', 'started_at', 'completed_at')
         }),
-        ('Statistics', {
+        ('Statystyki', {
             'fields': ('total_steps', 'completed_steps', 'failed_step')
         }),
-        ('Data', {
+        ('Dane', {
             'fields': ('input_data', 'output_data'),
             'classes': ('collapse',)
         }),
-        ('Error Info', {
+        ('Błędy', {
             'fields': ('error_message',),
             'classes': ('collapse',)
         }),
     )
 
-    def get_queryset(self, request):
-        """Użyj bazy matterhorn1"""
-        return super().get_queryset(request).using('matterhorn1')
-
 
 @admin.register(SagaStep)
-class SagaStepAdmin(admin.ModelAdmin):
+class SagaStepAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
     """Admin interface dla Saga steps"""
+
+    db_alias_getter = staticmethod(_get_matterhorn1_db)
 
     list_display = [
         'saga', 'step_order', 'step_name', 'status',
@@ -2161,41 +1791,44 @@ class SagaStepAdmin(admin.ModelAdmin):
     ordering = ['saga', 'step_order']
 
     fieldsets = (
-        ('Step Info', {
+        ('Podstawowe informacje', {
             'fields': ('saga', 'step_order', 'step_name', 'status')
         }),
-        ('Timestamps', {
+        ('Metadane', {
             'fields': ('started_at', 'completed_at', 'compensated_at')
         }),
-        ('Compensation', {
+        ('Kompensacja', {
             'fields': ('compensation_attempted', 'compensation_successful')
         }),
-        ('Data', {
+        ('Dane', {
             'fields': ('input_data', 'output_data'),
             'classes': ('collapse',)
         }),
-        ('Error Info', {
+        ('Błędy', {
             'fields': ('error_message',),
             'classes': ('collapse',)
         }),
     )
-
-    def get_queryset(self, request):
-        """Użyj bazy matterhorn1"""
-        return super().get_queryset(request).using('matterhorn1')
 
     def has_add_permission(self, request):
         """Nie pozwalaj na ręczne dodawanie kroków"""
         return False
 
     def has_delete_permission(self, request, obj=None):
-        """Nie pozwalaj na usuwanie kroków"""
+        """Nie pozwalaj na usuwanie kroków — w odróżnieniu od innych logów/audytu,
+        kroki Sagi muszą zostać dla diagnostyki nieudanych operacji cross-DB."""
         return False
 
 
 @admin.register(StockHistory)
-class StockHistoryAdmin(admin.ModelAdmin):
+class StockHistoryAdmin(RouterScopedQuerysetMixin, ReadOnlyLogAdminMixin, StockHistoryAdminBase):
     """Admin interface dla historii stanów magazynowych"""
+
+    db_alias_getter = staticmethod(_get_matterhorn1_db)
+    bestsellers_data_module = bestsellers_data
+    bestsellers_template = 'admin/matterhorn1/stock_history/bestsellers.html'
+    bestsellers_url_name = 'matterhorn1_stockhistory_bestsellers'
+    bestsellers_title = 'Bestsellery — Matterhorn'
 
     list_display = [
         'id', 'product_uid_link', 'product_name', 'variant_uid', 'variant_name',
@@ -2224,8 +1857,6 @@ class StockHistoryAdmin(admin.ModelAdmin):
         'id', 'variant_uid', 'product_uid', 'product_name', 'variant_name',
         'old_stock', 'new_stock', 'stock_change', 'change_type', 'timestamp'
     ]
-    ordering = ['-timestamp']
-    list_per_page = 50
 
     fieldsets = (
         ('Podstawowe informacje', {
@@ -2240,27 +1871,11 @@ class StockHistoryAdmin(admin.ModelAdmin):
         }),
     )
 
-    def get_queryset(self, request):
-        """Użyj bazy matterhorn1"""
-        return super().get_queryset(request).using('matterhorn1')
-
-    def has_add_permission(self, request):
-        """Wyłącz dodawanie nowych rekordów przez admin"""
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        """Wyłącz edycję rekordów przez admin"""
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        """Zezwól na usuwanie starych rekordów"""
-        return True
-
     change_list_template = 'admin/matterhorn1/stock_history/change_list.html'
 
     def get_urls(self):
-        """Dodaj custom URLs dla stock history"""
-        from django.urls import path
+        """Dodaj custom URLs dla stock history (bestsellers/ jest już dodany przez
+        StockHistoryAdminBase.get_urls())"""
         urls = super().get_urls()
         custom_urls = [
             path('popular-products/', self.admin_site.admin_view(
@@ -2269,30 +1884,8 @@ class StockHistoryAdmin(admin.ModelAdmin):
                 self.stock_statistics_view), name='stock-statistics'),
             path('clean-history/', self.admin_site.admin_view(self.clean_history_view),
                  name='clean-history'),
-            path('bestsellers/', self.admin_site.admin_view(self.bestsellers_view),
-                 name='matterhorn1_stockhistory_bestsellers'),
         ]
         return custom_urls + urls
-
-    def bestsellers_view(self, request):
-        """Dashboard bestsellerów: top produkty/marki/kategorie, trend, braki
-        magazynowe i wygaszane marki, liczone na żywo z bazy przy każdym wejściu."""
-        from django.shortcuts import render
-        from .bestsellers_data import get_dashboard_data
-
-        days = int(request.GET.get('days', 90))
-        if days not in (30, 90, 180):
-            days = 90
-        data = get_dashboard_data(days=days)
-
-        context = {
-            **self.admin_site.each_context(request),
-            'data': data,
-            'days': days,
-            'opts': self.model._meta,
-            'title': 'Bestsellery — Matterhorn',
-        }
-        return render(request, 'admin/matterhorn1/stock_history/bestsellers.html', context)
 
     def popular_products_view(self, request):
         """Widok popularnych produktów"""

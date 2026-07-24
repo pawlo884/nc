@@ -1,5 +1,7 @@
 from django.db import models
 
+from core.saga_models import AbstractSaga, AbstractSagaStep
+
 
 class Brand(models.Model):
     """Model dla marek produktów"""
@@ -191,40 +193,10 @@ class ApiSyncLog(models.Model):
         return f"{self.sync_type} - {self.status} ({self.started_at})"
 
 
-# Saga Pattern Models
-class SagaStatus(models.TextChoices):
-    """Statusy Saga"""
-    PENDING = "pending", "Pending"
-    RUNNING = "running", "Running"
-    COMPLETED = "completed", "Completed"
-    FAILED = "failed", "Failed"
-    COMPENSATING = "compensating", "Compensating"
-    COMPENSATED = "compensated", "Compensated"
-
-
-class Saga(models.Model):
+# Saga Pattern Models — pola współdzielone z tabu przez core.saga_models
+# (AbstractSaga/AbstractSagaStep); logika wykonania/persystencji w core.saga.
+class Saga(AbstractSaga):
     """Model do logowania Saga operations"""
-
-    saga_id = models.CharField(max_length=100, unique=True, db_index=True)
-    # np. 'product_creation', 'variant_creation'
-    saga_type = models.CharField(max_length=100)
-    status = models.CharField(
-        max_length=20, choices=SagaStatus.choices, default=SagaStatus.PENDING)
-
-    # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    started_at = models.DateTimeField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-
-    # Metadata
-    input_data = models.JSONField(default=dict, blank=True)
-    output_data = models.JSONField(default=dict, blank=True)
-    error_message = models.TextField(blank=True, null=True)
-
-    # Stats
-    total_steps = models.IntegerField(default=0)
-    completed_steps = models.IntegerField(default=0)
-    failed_step = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
         db_table = 'saga_logs'
@@ -233,33 +205,12 @@ class Saga(models.Model):
         verbose_name_plural = 'Saga Logs'
         app_label = 'matterhorn1'
 
-    def __str__(self):
-        return f"Saga {self.saga_id} ({self.saga_type}) - {self.status}"
 
-
-class SagaStep(models.Model):
+class SagaStep(AbstractSagaStep):
     """Model do logowania poszczególnych kroków Saga"""
 
     saga = models.ForeignKey(
         Saga, on_delete=models.CASCADE, related_name='steps')
-    step_name = models.CharField(max_length=100)
-    step_order = models.IntegerField()
-
-    # Status i timestamps
-    status = models.CharField(
-        max_length=20, choices=SagaStatus.choices, default=SagaStatus.PENDING)
-    started_at = models.DateTimeField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    compensated_at = models.DateTimeField(null=True, blank=True)
-
-    # Data
-    input_data = models.JSONField(default=dict, blank=True)
-    output_data = models.JSONField(default=dict, blank=True)
-    error_message = models.TextField(blank=True, null=True)
-
-    # Compensation
-    compensation_attempted = models.BooleanField(default=False)
-    compensation_successful = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'saga_steps'
@@ -268,9 +219,6 @@ class SagaStep(models.Model):
         verbose_name = 'Saga Step'
         verbose_name_plural = 'Saga Steps'
         app_label = 'matterhorn1'
-
-    def __str__(self):
-        return f"{self.saga.saga_id} - Step {self.step_order}: {self.step_name} ({self.status})"
 
 
 class StockHistory(models.Model):

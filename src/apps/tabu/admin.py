@@ -1,7 +1,6 @@
 import json
 import logging
 from django.contrib import admin
-from django.contrib.admin import SimpleListFilter
 from django.http import JsonResponse
 from django.urls import path
 from django.utils.decorators import method_decorator
@@ -10,9 +9,18 @@ from django.views.decorators.http import require_http_methods
 from django.db import connections
 from django.db.models import OuterRef, Subquery
 from django.utils.html import format_html
-from rapidfuzz import fuzz
 
-from .models import Brand, Category, ApiSyncLog, TabuProduct, TabuProductImage, TabuProductVariant, StockHistory
+from .models import (
+    Brand, Category, ApiSyncLog, TabuProduct, TabuProductImage, TabuProductVariant,
+    StockHistory, Saga, SagaStep,
+)
+from . import bestsellers_data
+from core.db_routers import _get_mpd_db, _get_tabu_db
+from core.wholesaler_admin import (
+    make_scoped_filter, render_product_thumbnail, fuzzy_suggest_mpd_products,
+    build_mpd_change_context, StockHistoryAdminBase, ReadOnlyLogAdminMixin,
+    RouterScopedQuerysetMixin,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -20,72 +28,56 @@ logger = logging.getLogger(__name__)
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    list_display = ['name', 'brand_id', 'last_api_sync', 'created_at']
+    list_display = ['brand_id', 'name', 'last_api_sync', 'created_at', 'updated_at']
     list_filter = ['created_at', 'updated_at', 'last_api_sync']
-    search_fields = ['name', 'brand_id']
+    search_fields = ['brand_id', 'name']
     readonly_fields = ['created_at', 'updated_at', 'last_api_sync']
+    ordering = ['name']
+
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('brand_id', 'name', 'logo_url', 'description')
+        }),
+        ('Synchronizacja', {
+            'fields': ('last_api_sync',)
+        }),
+        ('Metadane', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category_id', 'parent', 'created_at']
+    list_display = ['category_id', 'name', 'parent', 'path', 'last_api_sync', 'created_at', 'updated_at']
     list_filter = ['created_at', 'updated_at', 'parent']
-    search_fields = ['name', 'category_id', 'path']
+    search_fields = ['category_id', 'name', 'path']
     readonly_fields = ['created_at', 'updated_at', 'last_api_sync']
+    ordering = ['name']
+
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('category_id', 'name', 'path', 'parent', 'description')
+        }),
+        ('Synchronizacja', {
+            'fields': ('last_api_sync',)
+        }),
+        ('Metadane', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
 
-class TabuBrandFilter(SimpleListFilter):
-    title = 'Marka'
-    parameter_name = 'brand'
-
-    def lookups(self, request, model_admin):
-        qs = model_admin.get_queryset(request)
-        if request.GET.get('category'):
-            try:
-                qs = qs.filter(category_id=int(request.GET['category']))
-            except (ValueError, TypeError):
-                pass
-        # .order_by() czyści odziedziczone sortowanie (-api_id z TabuProductAdmin) —
-        # inaczej Postgres musi dołączyć api_id do DISTINCT (bo jest w ORDER BY) i
-        # zamiast garstki unikalnych marek zwraca wiersz na każdy produkt.
-        brands = Brand.objects.filter(
-            id__in=qs.exclude(brand__isnull=True).order_by().values_list('brand_id', flat=True).distinct()
-        ).order_by('name')
-        return [(str(b.id), b.name) for b in brands]
-
-    def queryset(self, request, queryset):
-        if self.value():
-            try:
-                return queryset.filter(brand_id=int(self.value()))
-            except (ValueError, TypeError):
-                return queryset
-        return queryset
-
-
-class TabuCategoryFilter(SimpleListFilter):
-    title = 'Kategoria'
-    parameter_name = 'category'
-
-    def lookups(self, request, model_admin):
-        qs = model_admin.get_queryset(request)
-        if request.GET.get('brand'):
-            try:
-                qs = qs.filter(brand_id=int(request.GET['brand']))
-            except (ValueError, TypeError):
-                pass
-        # .order_by() czyści odziedziczone sortowanie — patrz komentarz w TabuBrandFilter.
-        categories = Category.objects.filter(
-            id__in=qs.exclude(category__isnull=True).order_by().values_list('category_id', flat=True).distinct()
-        ).order_by('name')
-        return [(str(c.id), c.name) for c in categories]
-
-    def queryset(self, request, queryset):
-        if self.value():
-            try:
-                return queryset.filter(category_id=int(self.value()))
-            except (ValueError, TypeError):
-                return queryset
-        return queryset
+TabuBrandFilter = make_scoped_filter(
+    title='Marka', parameter_name='brand', counterpart_parameter_name='category',
+    related_model=Brand,
+)
+TabuCategoryFilter = make_scoped_filter(
+    title='Kategoria', parameter_name='category', counterpart_parameter_name='brand',
+    related_model=Category,
+)
 
 
 class TabuProductImageInline(admin.TabularInline):
@@ -184,164 +176,23 @@ class TabuProductAdmin(admin.ModelAdmin):
             product = TabuProduct.objects.select_related('brand').get(pk=object_id)
             is_mapped = bool(product.mapped_product_uid)
 
-            # Pobierz dane MPD (kolory, ścieżki, atrybuty, marki, jednostki, rozmiary, fabric)
-            with connections['MPD'].cursor() as cursor:
-                cursor.execute("SELECT id, name FROM colors WHERE parent_id IS NULL ORDER BY name")
-                main_colors = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
-
-                cursor.execute("SELECT id, name, parent_id FROM colors WHERE parent_id IS NOT NULL ORDER BY name")
-                producer_colors = [{'id': row[0], 'name': row[1], 'parent_id': row[2]} for row in cursor.fetchall()]
-
-                cursor.execute("SELECT id, name, path FROM path ORDER BY name")
-                mpd_paths = [{'id': row[0], 'name': row[1], 'path': row[2] or ''} for row in cursor.fetchall()]
-
-                cursor.execute("SELECT id, name FROM attributes ORDER BY name")
-                mpd_attributes = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
-
-                cursor.execute("SELECT id, name FROM brands ORDER BY name")
-                mpd_brands = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
-
-                cursor.execute("SELECT unit_id, name FROM units ORDER BY name")
-                units = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
-
-                cursor.execute("SELECT DISTINCT category FROM sizes WHERE category IS NOT NULL ORDER BY category")
-                size_categories = [row[0] for row in cursor.fetchall()]
-
-                cursor.execute("SELECT id, name FROM fabric_component ORDER BY name")
-                fabric_components = [{'id': row[0], 'name': row[1]} for row in cursor.fetchall()]
-
-            selected_paths = []
-            selected_attributes = []
-            mpd_data = {}
-            producer_color_name = ''
-            producer_code = ''
-            series_name = ''
-            selected_unit_id = None
-
-            if is_mapped:
-                with connections['MPD'].cursor() as cursor:
-                    cursor.execute(
-                        "SELECT p.name, p.description, p.short_description, b.name FROM products p "
-                        "LEFT JOIN brands b ON p.brand_id = b.id WHERE p.id = %s",
-                        [product.mapped_product_uid]
-                    )
-                    r = cursor.fetchone()
-                    if r:
-                        mpd_data = {'name': r[0] or '', 'description': r[1] or '', 'short_description': r[2] or '', 'brand': r[3] or ''}
-
-                    cursor.execute(
-                        """SELECT c.name,
-                            (SELECT pvs.producer_code FROM product_variants_sources pvs
-                             WHERE pvs.variant_id = pv.variant_id AND pvs.producer_code IS NOT NULL AND pvs.producer_code != ''
-                             LIMIT 1)
-                            FROM product_variants pv
-                            LEFT JOIN colors c ON pv.producer_color_id = c.id
-                            WHERE pv.product_id = %s LIMIT 1""",
-                        [product.mapped_product_uid]
-                    )
-                    r = cursor.fetchone()
-                    if r:
-                        producer_color_name = r[0] or ''
-                        producer_code = r[1] or ''
-
-                    cursor.execute(
-                        "SELECT ps.name FROM products p LEFT JOIN product_series ps ON p.series_id = ps.id WHERE p.id = %s",
-                        [product.mapped_product_uid]
-                    )
-                    r = cursor.fetchone()
-                    if r:
-                        series_name = r[0] or ''
-
-                    cursor.execute("SELECT path_id FROM product_path WHERE product_id = %s", [product.mapped_product_uid])
-                    selected_paths = [row[0] for row in cursor.fetchall()]
-
-                    cursor.execute("SELECT attribute_id FROM product_attributes WHERE product_id = %s", [product.mapped_product_uid])
-                    selected_attributes = [row[0] for row in cursor.fetchall()]
-
-                    cursor.execute("SELECT unit FROM products WHERE id = %s", [product.mapped_product_uid])
-                    r = cursor.fetchone()
-                    if r and r[0] is not None:
-                        selected_unit_id = r[0]
-
-            # Sugerowane podobne produkty w MPD (fuzzy – jak w Matterhorn1)
-            suggested_products = []
-            try:
-                brand_name = product.brand.name if product.brand else None
-                if brand_name:
-                    with connections['MPD'].cursor() as cursor:
-                        cursor.execute("""
-                            SELECT p.id, p.name, b.name as brand_name
-                            FROM products p
-                            LEFT JOIN brands b ON p.brand_id = b.id
-                            WHERE b.name = %s
-                            ORDER BY p.name
-                        """, [brand_name])
-                        all_products = cursor.fetchall()
-                        scored = []
-                        for row in all_products:
-                            similarity = fuzz.token_sort_ratio(product.name or '', row[1] or '')
-                            suggested_words = set((row[1] or '').lower().replace('(', '').replace(')', '').replace('-', ' ').split())
-                            query_words = set((product.name or '').lower().replace('(', '').replace(')', '').replace('-', ' ').split())
-                            suggested_in_query = int(100 * len(suggested_words & query_words) / len(suggested_words)) if suggested_words else 0
-                            scored.append({
-                                'id': row[0],
-                                'name': row[1] or '',
-                                'brand': row[2] or '',
-                                'similarity': similarity,
-                                'suggested_in_query': suggested_in_query,
-                            })
-                        suggested_products = sorted(scored, key=lambda x: x['similarity'], reverse=True)[:5]
-            except Exception as e:
-                logger.warning("Tabu suggested_products (fuzzy): %s", e)
-
-            extra_context.update({
-                'is_mapped': is_mapped,
-                'mpd_data': mpd_data,
-                'suggested_products': suggested_products,
-                'main_colors': main_colors,
-                'producer_colors': producer_colors,
-                'mpd_paths': mpd_paths,
-                'mpd_attributes': mpd_attributes,
-                'mpd_brands': mpd_brands,
-                'units': units,
-                'size_categories': size_categories,
-                'fabric_components': fabric_components,
-                'selected_paths': selected_paths,
-                'selected_attributes': selected_attributes,
-                'producer_color_name': producer_color_name,
-                'producer_code': producer_code,
-                'series_name': series_name,
-                'selected_unit_id': selected_unit_id,
-            })
+            mpd_context = build_mpd_change_context(
+                product.mapped_product_uid if is_mapped else None,
+                mpd_db_alias=_get_mpd_db(),
+            )
+            mpd_context['is_mapped'] = is_mapped
+            mpd_context['suggested_products'] = fuzzy_suggest_mpd_products(
+                product.name, product.brand.name if product.brand else None,
+                mpd_db_alias=_get_mpd_db(),
+            )
+            extra_context.update(mpd_context)
         except TabuProduct.DoesNotExist:
             extra_context['is_mapped'] = False
-            extra_context['mpd_data'] = {}
             extra_context['suggested_products'] = []
-            extra_context['main_colors'] = []
-            extra_context['producer_colors'] = []
-            extra_context['mpd_paths'] = []
-            extra_context['mpd_attributes'] = []
-            extra_context['mpd_brands'] = []
-            extra_context['units'] = []
-            extra_context['size_categories'] = []
-            extra_context['fabric_components'] = []
-            extra_context['selected_paths'] = []
-            extra_context['selected_attributes'] = []
         except Exception as e:
             logger.exception("Błąd change_view Tabu: %s", e)
             extra_context['is_mapped'] = False
-            extra_context['mpd_data'] = {}
             extra_context['suggested_products'] = []
-            extra_context['main_colors'] = []
-            extra_context['producer_colors'] = []
-            extra_context['mpd_paths'] = []
-            extra_context['mpd_attributes'] = []
-            extra_context['mpd_brands'] = []
-            extra_context['units'] = []
-            extra_context['size_categories'] = []
-            extra_context['fabric_components'] = []
-            extra_context['selected_paths'] = []
-            extra_context['selected_attributes'] = []
 
         return super().change_view(request, object_id, form_url, extra_context)
 
@@ -394,8 +245,6 @@ class TabuProductAdmin(admin.ModelAdmin):
         except TabuProduct.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Produkt Tabu nie istnieje'}, status=404)
         try:
-            from django.db import connections
-            from core.db_routers import _get_mpd_db
             from MPD.models import ProductVariants
             from tabu.services import create_mpd_variants_from_tabu, upload_tabu_images_to_mpd
 
@@ -557,30 +406,7 @@ class TabuProductAdmin(admin.ModelAdmin):
     def product_image_thumbnail(self, obj):
         """Wyświetl miniaturę zdjęcia produktu na liście."""
         original_url = getattr(obj, 'image_url', None) or getattr(obj, 'first_gallery_image_url', None)
-        if not original_url:
-            return '-'
-
-        normalized_url = str(original_url).strip()
-        if not normalized_url:
-            return '-'
-
-        if normalized_url.startswith(('http://', 'https://')):
-            display_url = normalized_url
-        elif normalized_url.startswith('//'):
-            display_url = f'https:{normalized_url}'
-        else:
-            display_url = f'https://tabu.com.pl/{normalized_url.lstrip("/")}'
-
-        return format_html(
-            '<a href="{}" target="_blank" title="{}">'
-            '<img src="{}" alt="Obraz produktu" loading="lazy" width="56" height="56" '
-            'style="object-fit: contain; width: 56px; height: 56px; max-width: 56px; max-height: 56px;" '
-            'onerror="this.onerror=null; this.src=\'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiBmaWxsPSIjZWVlIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSI4IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+YnJhayB6ZGo8L3RleHQ+PC9zdmc+\';" />'
-            '</a>',
-            display_url,
-            normalized_url,
-            display_url,
-        )
+        return render_product_thumbnail(original_url, fallback_host='tabu.com.pl')
     product_image_thumbnail.short_description = 'Zdjęcie'
 
     def get_queryset(self, request):
@@ -600,17 +426,67 @@ class TabuProductAdmin(admin.ModelAdmin):
         )
 
 
+@admin.register(TabuProductImage)
+class TabuProductImageAdmin(admin.ModelAdmin):
+    list_display = ['product', 'image_preview', 'is_main', 'order']
+    list_filter = ['is_main']
+    search_fields = ['product__name', 'image_url']
+    readonly_fields = ['api_image_id', 'image_preview']
+    ordering = ['product', 'order']
+
+    fieldsets = (
+        ('Produkt', {
+            'fields': ('product', 'api_image_id')
+        }),
+        ('Obraz', {
+            'fields': ('image_preview', 'image_url', 'is_main', 'order')
+        }),
+    )
+
+    def image_preview(self, obj):
+        if obj and obj.image_url:
+            return format_html(
+                '<a href="{}" target="_blank"><img src="{}" style="max-width: 80px; max-height: 80px;" /></a>',
+                obj.image_url, obj.image_url
+            )
+        return '-'
+    image_preview.short_description = 'Podgląd'
+
+
 @admin.register(TabuProductVariant)
 class TabuProductVariantAdmin(admin.ModelAdmin):
-    list_display = ['api_id', 'product', 'symbol', 'color', 'size', 'store', 'price_gross']
-    list_filter = ['product__brand', 'product__category']
+    list_display = [
+        'api_id', 'product', 'symbol', 'color', 'size', 'store', 'price_gross',
+        'is_mapped', 'mapped_variant_uid',
+    ]
+    list_filter = ['is_mapped', 'product__brand', 'product__category']
     search_fields = ['symbol', 'ean', 'product__name']
-    readonly_fields = ['api_id']
+    readonly_fields = ['api_id', 'mapped_variant_uid']
     raw_id_fields = ['product']
+
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('api_id', 'product', 'symbol', 'color', 'size', 'ean')
+        }),
+        ('Ceny i VAT', {
+            'fields': ('price_net', 'price_gross', 'price_kind', 'vat_label', 'vat_id', 'vat_value')
+        }),
+        ('Stan magazynowy', {
+            'fields': ('store', 'weight')
+        }),
+        ('Mapowanie do MPD', {
+            'fields': ('is_mapped', 'mapped_variant_uid'),
+            'classes': ('collapse',)
+        }),
+        ('Dane API (backup)', {
+            'fields': ('items', 'stores', 'raw_data'),
+            'classes': ('collapse',)
+        }),
+    )
 
 
 @admin.register(ApiSyncLog)
-class ApiSyncLogAdmin(admin.ModelAdmin):
+class ApiSyncLogAdmin(ReadOnlyLogAdminMixin, admin.ModelAdmin):
     list_display = [
         'sync_type', 'status', 'started_at', 'completed_at',
         'products_processed', 'products_success', 'products_failed',
@@ -631,40 +507,103 @@ class ApiSyncLogAdmin(admin.ModelAdmin):
     stock_changes_display.short_description = 'Zmiany historii'
 
 
+@admin.register(Saga)
+class SagaAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
+    """Admin interface dla Saga operations"""
+
+    db_alias_getter = staticmethod(_get_tabu_db)
+
+    list_display = [
+        'saga_id', 'saga_type', 'status', 'created_at',
+        'completed_at', 'total_steps', 'completed_steps'
+    ]
+    list_filter = ['status', 'saga_type', 'created_at']
+    search_fields = ['saga_id', 'saga_type', 'error_message']
+    readonly_fields = [
+        'saga_id', 'created_at', 'started_at', 'completed_at',
+        'total_steps', 'completed_steps', 'failed_step'
+    ]
+    ordering = ['-created_at']
+
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('saga_id', 'saga_type', 'status')
+        }),
+        ('Metadane', {
+            'fields': ('created_at', 'started_at', 'completed_at')
+        }),
+        ('Statystyki', {
+            'fields': ('total_steps', 'completed_steps', 'failed_step')
+        }),
+        ('Dane', {
+            'fields': ('input_data', 'output_data'),
+            'classes': ('collapse',)
+        }),
+        ('Błędy', {
+            'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(SagaStep)
+class SagaStepAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
+    """Admin interface dla Saga steps"""
+
+    db_alias_getter = staticmethod(_get_tabu_db)
+
+    list_display = [
+        'saga', 'step_order', 'step_name', 'status',
+        'started_at', 'completed_at', 'compensation_attempted'
+    ]
+    list_filter = ['status', 'compensation_attempted', 'compensation_successful']
+    search_fields = ['step_name', 'error_message']
+    readonly_fields = [
+        'saga', 'step_order', 'step_name', 'started_at',
+        'completed_at', 'compensated_at', 'compensation_attempted',
+        'compensation_successful'
+    ]
+    ordering = ['saga', 'step_order']
+
+    fieldsets = (
+        ('Podstawowe informacje', {
+            'fields': ('saga', 'step_order', 'step_name', 'status')
+        }),
+        ('Metadane', {
+            'fields': ('started_at', 'completed_at', 'compensated_at')
+        }),
+        ('Kompensacja', {
+            'fields': ('compensation_attempted', 'compensation_successful')
+        }),
+        ('Dane', {
+            'fields': ('input_data', 'output_data'),
+            'classes': ('collapse',)
+        }),
+        ('Błędy', {
+            'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def has_add_permission(self, request):
+        """Nie pozwalaj na ręczne dodawanie kroków"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Nie pozwalaj na usuwanie kroków — w odróżnieniu od innych logów/audytu,
+        kroki Sagi muszą zostać dla diagnostyki nieudanych operacji cross-DB."""
+        return False
+
+
 @admin.register(StockHistory)
-class StockHistoryAdmin(admin.ModelAdmin):
+class StockHistoryAdmin(ReadOnlyLogAdminMixin, StockHistoryAdminBase):
     list_display = ['product_name', 'variant_symbol', 'old_stock', 'new_stock', 'stock_change', 'change_type', 'timestamp']
     list_filter = ['change_type', 'timestamp']
     search_fields = ['product_name', 'variant_symbol']
     readonly_fields = ['timestamp']
-    ordering = ['-timestamp']
-    list_per_page = 50
     change_list_template = 'admin/tabu/stock_history/change_list.html'
 
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path('bestsellers/', self.admin_site.admin_view(self.bestsellers_view),
-                 name='tabu_stockhistory_bestsellers'),
-        ]
-        return custom_urls + urls
-
-    def bestsellers_view(self, request):
-        """Dashboard bestsellerów: top produkty/marki/kategorie, trend i braki
-        magazynowe, liczone na żywo z bazy przy każdym wejściu."""
-        from django.shortcuts import render
-        from .bestsellers_data import get_dashboard_data
-
-        days = int(request.GET.get('days', 90))
-        if days not in (30, 90, 180):
-            days = 90
-        data = get_dashboard_data(days=days)
-
-        context = {
-            **self.admin_site.each_context(request),
-            'data': data,
-            'days': days,
-            'opts': self.model._meta,
-            'title': 'Bestsellery — Tabu',
-        }
-        return render(request, 'admin/tabu/stock_history/bestsellers.html', context)
+    bestsellers_data_module = bestsellers_data
+    bestsellers_template = 'admin/tabu/stock_history/bestsellers.html'
+    bestsellers_url_name = 'tabu_stockhistory_bestsellers'
+    bestsellers_title = 'Bestsellery — Tabu'
