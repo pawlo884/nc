@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.25.1 (2026-07-24)</small>
+
+* Merge pull request #86 from pawlo884/fix/mpd-ean-cross-source-linking ([e52dec0](https://github.com/pawlo884/nc/commit/e52dec0)), closes [#86](https://github.com/pawlo884/nc/issues/86)
+* fix(MPD): napraw dopinanie wariantów z innych hurtowni po EAN ([70ab0ce](https://github.com/pawlo884/nc/commit/70ab0ce))
+
 ## 1.25.0 (2026-07-24)
 
 * Merge pull request #85 from pawlo884/feature/tabu-saga-and-shared-admin ([26d6b8d](https://github.com/pawlo884/nc/commit/26d6b8d)), closes [#85](https://github.com/pawlo884/nc/issues/85)
