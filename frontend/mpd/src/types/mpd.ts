@@ -31,6 +31,17 @@ export interface MpdVariantPrice {
   net_price: number | null;
 }
 
+export interface MpdVariantSource {
+  source_id: number;
+  source_name: string | null;
+  source_short_name: string | null;
+  ean: string;
+  producer_code: string;
+  stock: number | null;
+  price: number | null;
+  currency: string | null;
+}
+
 export interface MpdProductVariant {
   variant_id: number;
   color_id: number | null;
@@ -46,6 +57,7 @@ export interface MpdProductVariant {
   stock: number | null;
   warehouse_price: number | null;
   price: MpdVariantPrice | null;
+  sources: MpdVariantSource[];
 }
 
 export interface MpdProductImage {

@@ -446,6 +446,7 @@ export function ProductDetailPage() {
                   <th style={{ width: 110 }}>Cena detal.</th>
                   <th style={{ width: 130 }}>Kod prod.</th>
                   <th style={{ width: 80 }}>IAI</th>
+                  <th style={{ width: 200 }}>Źródła</th>
                 </tr>
               </thead>
               <tbody>
@@ -489,6 +490,25 @@ export function ProductDetailPage() {
                       >
                         {variant.exported_to_iai ? 'Tak' : 'Nie'}
                       </span>
+                    </td>
+                    <td>
+                      {variant.sources.length > 0 ? (
+                        <div className="source-badges">
+                          {variant.sources.map(source => (
+                            <span
+                              key={source.source_id}
+                              className="badge source-badge"
+                              title={`EAN: ${source.ean || '—'}`}
+                            >
+                              {source.source_short_name || source.source_name || `#${source.source_id}`}
+                              {source.stock != null ? `: ${source.stock}szt` : ''}
+                              {source.price != null ? ` / ${source.price} ${source.currency || 'PLN'}` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
