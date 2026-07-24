@@ -1075,20 +1075,49 @@ def get_product(request, product_id):
         ).select_related('color', 'size', 'producer_color').order_by('size__name', 'color__name')
 
         variant_ids = [v.variant_id for v in variants_qs]
+
+        # Stan/cena ze WSZYSTKICH źródeł (hurtowni) na wariant, nie tylko jednego
+        # zahardkodowanego source_id — wariant może mieć ofertę z kilku hurtowni
+        # naraz po zlinkowaniu po EAN (patrz MPD/source_adapters/linking.py).
         stock_by_variant = {}
         if variant_ids:
-            for stock in StockAndPrices.objects.using('MPD').filter(
+            for sp in StockAndPrices.objects.using('MPD').filter(
                 variant_id__in=variant_ids,
-                source_id=2,
-            ):
-                stock_by_variant[stock.variant_id] = stock
+            ).select_related('source'):
+                stock_by_variant.setdefault(sp.variant_id, {})[sp.source_id] = sp
+
+        pvs_by_variant = {}
+        if variant_ids:
+            for pvs in ProductvariantsSources.objects.using('MPD').filter(
+                variant_id__in=variant_ids,
+            ).select_related('source').order_by('source_id'):
+                pvs_by_variant.setdefault(pvs.variant_id, []).append(pvs)
 
         variants = []
         for variant in variants_qs:
-            first_pvs = ProductvariantsSources.objects.using('MPD').filter(
-                variant_id=variant.variant_id,
-            ).values('producer_code', 'ean').first()
-            stock = stock_by_variant.get(variant.variant_id)
+            pvs_list = pvs_by_variant.get(variant.variant_id, [])
+            variant_stock = stock_by_variant.get(variant.variant_id, {})
+
+            variant_sources = []
+            for pvs in pvs_list:
+                sp = variant_stock.get(pvs.source_id)
+                variant_sources.append({
+                    'source_id': pvs.source_id,
+                    'source_name': pvs.source.name if pvs.source else None,
+                    'source_short_name': pvs.source.short_name if pvs.source else None,
+                    'ean': pvs.ean or '',
+                    'producer_code': pvs.producer_code or '',
+                    'stock': sp.stock if sp else None,
+                    'price': float(sp.price) if sp else None,
+                    'currency': sp.currency if sp else None,
+                })
+
+            stocks = [s['stock'] for s in variant_sources if s['stock'] is not None]
+            total_stock = sum(stocks) if stocks else None
+            priced_sources = [s for s in variant_sources if s['price'] is not None]
+            cheapest = min(priced_sources, key=lambda s: s['price']) if priced_sources else None
+            first_pvs = pvs_list[0] if pvs_list else None
+
             variant_data = {
                 'variant_id': variant.variant_id,
                 'color_id': variant.color_id,
@@ -1100,11 +1129,12 @@ def get_product(request, product_id):
                 ),
                 'size_id': variant.size_id,
                 'size_name': variant.size.name if variant.size else None,
-                'producer_code': (first_pvs or {}).get('producer_code') or '',
-                'ean': (first_pvs or {}).get('ean') or '',
+                'producer_code': (first_pvs.producer_code if first_pvs else '') or '',
+                'ean': (first_pvs.ean if first_pvs else '') or '',
                 'exported_to_iai': variant.exported_to_iai,
-                'stock': stock.stock if stock else None,
-                'warehouse_price': float(stock.price) if stock else None,
+                'stock': total_stock,
+                'warehouse_price': cheapest['price'] if cheapest else None,
+                'sources': variant_sources,
             }
 
             try:
