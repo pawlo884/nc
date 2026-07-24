@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.25.0 (2026-07-24)
+
+* Merge pull request #85 from pawlo884/feature/tabu-saga-and-shared-admin ([26d6b8d](https://github.com/pawlo884/nc/commit/26d6b8d)), closes [#85](https://github.com/pawlo884/nc/issues/85)
+* feat(tabu): dodaj Saga Pattern z zapisem do bazy i ujednolić panel admina z matterhorn1 ([754fd07](https://github.com/pawlo884/nc/commit/754fd07))
+
 ## <small>1.24.5 (2026-07-23)</small>
 
 * Merge pull request #84 from pawlo884/fix/tests-serializers-unused-imports ([e068e84](https://github.com/pawlo884/nc/commit/e068e84)), closes [#84](https://github.com/pawlo884/nc/issues/84)
