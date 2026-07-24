@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.25.2 (2026-07-24)</small>
+
+* Merge pull request #87 from pawlo884/fix/mpd-app-show-all-variant-sources ([6941f68](https://github.com/pawlo884/nc/commit/6941f68)), closes [#87](https://github.com/pawlo884/nc/issues/87)
+* fix(MPD): pokaż w mpd-app wszystkie źródła (hurtownie) wariantu ([323d1ec](https://github.com/pawlo884/nc/commit/323d1ec))
+
 ## <small>1.25.1 (2026-07-24)</small>
 
 * Merge pull request #86 from pawlo884/fix/mpd-ean-cross-source-linking ([e52dec0](https://github.com/pawlo884/nc/commit/e52dec0)), closes [#86](https://github.com/pawlo884/nc/issues/86)
