@@ -6,6 +6,7 @@ import { deleteProduct, fetchProduct, updateProduct } from '../api/mpd';
 import { ProductExtrasPanels } from '../components/ProductExtrasPanels';
 import type { MpdProductDetail, MpdProductUpdatePayload } from '../types/mpd';
 import { groupImagesByColor } from '../utils/groupImagesByColor';
+import { groupVariantsForDisplay } from '../utils/groupVariantsForDisplay';
 import '../components/Layout.css';
 import './ProductDetailPage.css';
 
@@ -126,6 +127,14 @@ export function ProductDetailPage() {
       return [];
     }
     return groupImagesByColor(product.images, product.variants ?? []);
+  }, [data?.product]);
+
+  const variantRows = useMemo(() => {
+    const product = data?.product;
+    if (!product?.variants?.length) {
+      return [];
+    }
+    return groupVariantsForDisplay(product.variants);
   }, [data?.product]);
 
   if (!Number.isFinite(productId) || productId <= 0) {
@@ -430,90 +439,85 @@ export function ProductDetailPage() {
           <span className="section-count">{product.variants.length}</span>
         </h3>
 
-        {product.variants.length === 0 ? (
+        {variantRows.length === 0 ? (
           <div className="empty-state">Brak wariantów dla tego produktu.</div>
         ) : (
           <div className="variants-table-wrap">
             <table className="data-table variants-table">
               <thead>
                 <tr>
-                  <th style={{ width: 70 }}>ID</th>
                   <th>Kolor</th>
-                  <th>Kolor prod.</th>
+                  <th>Kolor producenta</th>
                   <th style={{ width: 120 }}>Rozmiar</th>
-                  <th style={{ width: 80 }}>Stan</th>
-                  <th style={{ width: 110 }}>Cena mag.</th>
-                  <th style={{ width: 110 }}>Cena detal.</th>
-                  <th style={{ width: 130 }}>Kod prod.</th>
-                  <th style={{ width: 80 }}>IAI</th>
-                  <th style={{ width: 200 }}>Źródła</th>
+                  <th style={{ width: 160 }}>Kod producenta</th>
+                  <th style={{ width: 90 }}>Stan (suma)</th>
+                  <th style={{ width: 160 }}>Ceny</th>
+                  <th style={{ width: 110 }}>Cena detaliczna</th>
+                  <th style={{ width: 160 }}>Źródła</th>
+                  <th style={{ width: 140 }}>EAN</th>
                 </tr>
               </thead>
               <tbody>
-                {product.variants.map(variant => (
-                  <tr key={variant.variant_id}>
-                    <td>{variant.variant_id}</td>
+                {variantRows.map(row => (
+                  <tr key={row.key}>
                     <td>
-                      {variant.color_name ? (
+                      {row.colorName ? (
                         <div className="color-info">
                           <span
                             className="color-dot"
-                            style={{ backgroundColor: variant.hex_code || '#ccc' }}
+                            style={{ backgroundColor: row.hexCode || '#ccc' }}
                           />
-                          <span>{variant.color_name}</span>
+                          <span>{row.colorName}</span>
                         </div>
                       ) : (
                         <span className="muted">—</span>
                       )}
                     </td>
-                    <td>{variant.producer_color_name || <span className="muted">—</span>}</td>
-                    <td>{variant.size_name || <span className="muted">—</span>}</td>
-                    <td>{variant.stock ?? <span className="muted">0</span>}</td>
+                    <td>{row.producerColorName || <span className="muted">—</span>}</td>
+                    <td>{row.sizeName || <span className="muted">—</span>}</td>
                     <td>
-                      {variant.warehouse_price != null ? (
-                        `${variant.warehouse_price} PLN`
+                      {row.producerCodes.length > 0 ? (
+                        row.producerCodes.map((line, i) => (
+                          <div key={i}>
+                            {line.sourceName}: {line.value}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>{row.totalStock}</td>
+                    <td>
+                      {row.prices.length > 0 ? (
+                        row.prices.map((line, i) => (
+                          <div key={i}>
+                            {line.sourceName}: {line.value}
+                          </div>
+                        ))
                       ) : (
                         <span className="muted">—</span>
                       )}
                     </td>
                     <td>
-                      {variant.price?.retail_price != null ? (
-                        `${variant.price.retail_price} ${variant.price.currency || 'PLN'}`
+                      {row.retailPrice != null ? (
+                        `${row.retailPrice} ${row.retailCurrency || 'PLN'}`
                       ) : (
                         <span className="muted">—</span>
                       )}
                     </td>
-                    <td>{variant.producer_code || <span className="muted">—</span>}</td>
                     <td>
-                      <span
-                        className={`badge ${variant.exported_to_iai ? 'badge-visible' : 'badge-hidden'}`}
-                      >
-                        {variant.exported_to_iai ? 'Tak' : 'Nie'}
-                      </span>
-                    </td>
-                    <td>
-                      {variant.sources.length > 0 ? (
-                        <div className="source-badges">
-                          {variant.sources.map(source => (
-                            <span
-                              key={source.source_id}
-                              className="badge source-badge"
-                              title={`EAN: ${source.ean || '—'}`}
-                            >
-                              {source.source_short_name ||
-                                source.source_name ||
-                                `#${source.source_id}`}
-                              {source.stock != null ? `: ${source.stock}szt` : ''}
-                              {source.price != null
-                                ? ` / ${source.price} ${source.currency || 'PLN'}`
-                                : ''}
-                            </span>
-                          ))}
-                        </div>
+                      {row.stockBySource.length > 0 ? (
+                        row.stockBySource.map((line, i) => (
+                          <div key={i}>
+                            {line.sourceName}
+                            {line.value ? `: ${line.value}` : ''}
+                          </div>
+                        ))
                       ) : (
                         <span className="muted">—</span>
                       )}
                     </td>
+                    <td>{row.ean || <span className="muted">—</span>}</td>
                   </tr>
                 ))}
               </tbody>

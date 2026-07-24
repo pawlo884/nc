@@ -333,18 +333,6 @@
   color: #aaa;
 }
 
-.source-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.source-badge {
-  background: #e9ecef;
-  color: #495057;
-  white-space: nowrap;
-}
-
 .product-detail__variants .data-table td,
 .product-detail__variants .data-table th {
   font-size: 0.9rem;
