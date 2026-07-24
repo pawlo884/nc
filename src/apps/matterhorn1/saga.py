@@ -3,283 +3,31 @@ Saga Pattern Implementation for Cross-Database Operations
 
 Ten moduł implementuje Saga Pattern do bezpiecznego wykonywania operacji
 między różnymi bazami danych (matterhorn1, MPD) z automatyczną kompensacją.
+
+Sama logika wykonania kroków i persystencji do bazy (Saga/SagaStep) żyje we
+wspólnej bazie core.saga — SagaOrchestrator poniżej to tylko cienka podklasa
+wskazująca konkretne modele i bazę danych matterhorn1.
 """
 
-import uuid
 import logging
-from datetime import datetime
-from typing import Dict, List, Callable, Any, Optional
-from enum import Enum
-from dataclasses import dataclass
+from typing import Dict, List, Callable, Optional
 from django.db import connections
-from django.utils import timezone
+from core.saga import BaseSagaOrchestrator, SagaStatus, SagaStep, SagaResult
+from core.db_routers import _get_matterhorn1_db
 from . import saga_variants
 from .defs_db import resolve_image_url
+from .models import Saga, SagaStep as SagaStepModel
 
 logger = logging.getLogger(__name__)
 
 
-class SagaStatus(Enum):
-    """Statusy Saga"""
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    COMPENSATING = "compensating"
-    COMPENSATED = "compensated"
+class SagaOrchestrator(BaseSagaOrchestrator):
+    """Orchestrator dla Saga Pattern w matterhorn1 — zapisuje postęp do
+    matterhorn1.models.Saga/SagaStep w bazie 'matterhorn1'."""
 
-
-@dataclass
-class SagaStep:
-    """Pojedynczy krok w Saga"""
-    name: str
-    execute_func: Callable
-    compensate_func: Callable
-    data: Dict[str, Any] = None
-    status: SagaStatus = SagaStatus.PENDING
-    error: Optional[str] = None
-    executed_at: Optional[datetime] = None
-    compensated_at: Optional[datetime] = None
-    result: Optional[Dict[str, Any]] = None  # Wynik wykonania kroku
-
-
-@dataclass
-class SagaResult:
-    """Wynik wykonania Saga"""
-    saga_id: str
-    status: SagaStatus
-    steps: List[SagaStep]
-    error: Optional[str] = None
-    created_at: datetime = None
-    completed_at: Optional[datetime] = None
-
-
-class SagaOrchestrator:
-    """
-    Orchestrator dla Saga Pattern
-
-    Zarządza wykonywaniem kroków i kompensacją w przypadku błędów.
-    """
-
-    def __init__(self, saga_id: str = None, saga_type: str = "generic", enable_logging: bool = True):
-        self.saga_id = saga_id or str(uuid.uuid4())
-        self.saga_type = saga_type
-        self.enable_logging = enable_logging
-        self.steps: List[SagaStep] = []
-        self.status = SagaStatus.PENDING
-        self.created_at = timezone.now()
-        self.error = None
-        self.saga_log = None
-
-        # Utwórz log w bazie danych jeśli logging jest włączony
-        if self.enable_logging:
-            self._create_saga_log()
-
-    def add_step(self, name: str, execute_func: Callable, compensate_func: Callable, data: Dict[str, Any] = None):
-        """Dodaj krok do Saga"""
-        step = SagaStep(
-            name=name,
-            execute_func=execute_func,
-            compensate_func=compensate_func,
-            data=data or {}
-        )
-        self.steps.append(step)
-        logger.info(f"🔄 Saga {self.saga_id}: Dodano krok '{name}'")
-
-        # Utwórz log kroku w bazie danych
-        if self.enable_logging and self.saga_log:
-            self._create_step_log(step)
-
-        return self
-
-    def _create_saga_log(self):
-        """Utwórz log Saga w bazie danych"""
-        try:
-            from matterhorn1.models import Saga
-            self.saga_log = Saga.objects.using('matterhorn1').create(
-                saga_id=self.saga_id,
-                saga_type=self.saga_type,
-                status=SagaStatus.PENDING.value,
-                input_data={}
-            )
-            logger.info(f"📝 Saga {self.saga_id}: Utworzono log w bazie danych")
-        except Exception as e:
-            logger.warning(
-                f"⚠️ Saga {self.saga_id}: Nie udało się utworzyć logu: {e}")
-            self.enable_logging = False
-
-    def _create_step_log(self, step: SagaStep):
-        """Utwórz log kroku w bazie danych"""
-        try:
-            from matterhorn1.models import SagaStep as SagaStepModel
-            SagaStepModel.objects.using('matterhorn1').create(
-                saga=self.saga_log,
-                step_name=step.name,
-                step_order=len(self.steps),
-                status=SagaStatus.PENDING.value,
-                input_data=step.data or {}
-            )
-        except Exception as e:
-            logger.warning(
-                f"⚠️ Saga {self.saga_id}: Nie udało się utworzyć logu kroku '{step.name}': {e}")
-
-    def _update_saga_log(self, status: SagaStatus, error: str = None):
-        """Aktualizuj log Saga w bazie danych"""
-        if not self.enable_logging or not self.saga_log:
-            return
-
-        try:
-            self.saga_log.status = status.value
-            if error:
-                self.saga_log.error_message = error
-            if status == SagaStatus.RUNNING:
-                self.saga_log.started_at = timezone.now()
-            elif status in [SagaStatus.COMPLETED, SagaStatus.COMPENSATED]:
-                self.saga_log.completed_at = timezone.now()
-            self.saga_log.save()
-        except Exception as e:
-            logger.warning(
-                f"⚠️ Saga {self.saga_id}: Nie udało się zaktualizować logu: {e}")
-
-    def _update_step_log(self, step: SagaStep, status: SagaStatus, error: str = None, output_data: Dict = None):
-        """Aktualizuj log kroku w bazie danych"""
-        if not self.enable_logging or not self.saga_log:
-            return
-
-        try:
-            from matterhorn1.models import SagaStep as SagaStepModel
-            step_log = SagaStepModel.objects.using('matterhorn1').get(
-                saga=self.saga_log,
-                step_name=step.name
-            )
-            step_log.status = status.value
-            if error:
-                step_log.error_message = error
-            if output_data:
-                step_log.output_data = output_data
-            if status == SagaStatus.RUNNING:
-                step_log.started_at = timezone.now()
-            elif status == SagaStatus.COMPLETED:
-                step_log.completed_at = timezone.now()
-            elif status == SagaStatus.COMPENSATED:
-                step_log.compensated_at = timezone.now()
-                step_log.compensation_attempted = True
-                step_log.compensation_successful = True
-            step_log.save()
-        except Exception as e:
-            logger.warning(
-                f"⚠️ Saga {self.saga_id}: Nie udało się zaktualizować logu kroku '{step.name}': {e}")
-
-    def execute(self) -> SagaResult:
-        """
-        Wykonaj wszystkie kroki Saga
-
-        Jeśli któryś krok się nie powiedzie, wykonaj kompensację
-        dla wszystkich poprzednich kroków w odwrotnej kolejności.
-        """
-        logger.info(
-            f"🚀 Saga {self.saga_id}: Rozpoczynam wykonanie {len(self.steps)} kroków")
-        self.status = SagaStatus.RUNNING
-        self._update_saga_log(self.status)
-
-        try:
-            # Wykonaj wszystkie kroki
-            for i, step in enumerate(self.steps):
-                result = self._execute_step(step)
-                step.result = result
-
-                # Aktualizuj dane następnych kroków z wynikiem bieżącego
-                if result and i < len(self.steps) - 1:
-                    for next_step in self.steps[i + 1:]:
-                        # Aktualizuj wartości None w danych następnych kroków
-                        for key, value in result.items():
-                            if key in next_step.data and next_step.data[key] is None:
-                                next_step.data[key] = value
-                                logger.info(
-                                    f"🔄 Saga {self.saga_id}: Przekazuję {key}={value} do kroku '{next_step.name}'")
-
-            # Wszystkie kroki wykonane pomyślnie
-            self.status = SagaStatus.COMPLETED
-            self._update_saga_log(self.status)
-            logger.info(
-                f"✅ Saga {self.saga_id}: Wszystkie kroki wykonane pomyślnie")
-
-        except Exception as e:
-            # Błąd podczas wykonywania - wykonaj kompensację
-            logger.error(
-                f"❌ Saga {self.saga_id}: Błąd podczas wykonywania: {e}")
-            self.error = str(e)
-            self._update_saga_log(self.status, str(e))
-            self._compensate()
-
-        return self._create_result()
-
-    def _execute_step(self, step: SagaStep):
-        """Wykonaj pojedynczy krok"""
-        logger.info(f"🔄 Saga {self.saga_id}: Wykonuję krok '{step.name}'")
-        step.status = SagaStatus.RUNNING
-        self._update_step_log(step, step.status)
-
-        try:
-            # Wykonaj funkcję kroku
-            result = step.execute_func(**step.data)
-            step.status = SagaStatus.COMPLETED
-            step.executed_at = timezone.now()
-            self._update_step_log(step, step.status, output_data=result)
-
-            logger.info(
-                f"✅ Saga {self.saga_id}: Krok '{step.name}' wykonany pomyślnie")
-            return result
-
-        except Exception as e:
-            step.status = SagaStatus.FAILED
-            step.error = str(e)
-            self._update_step_log(step, step.status, str(e))
-            logger.error(
-                f"❌ Saga {self.saga_id}: Błąd w kroku '{step.name}': {e}")
-            raise e
-
-    def _compensate(self):
-        """Wykonaj kompensację dla wszystkich wykonanych kroków"""
-        logger.info(f"🔄 Saga {self.saga_id}: Rozpoczynam kompensację")
-        self.status = SagaStatus.COMPENSATING
-        self._update_saga_log(self.status)
-
-        # Wykonaj kompensację w odwrotnej kolejności
-        executed_steps = [
-            step for step in self.steps if step.status == SagaStatus.COMPLETED]
-
-        for step in reversed(executed_steps):
-            try:
-                logger.info(
-                    f"🔄 Saga {self.saga_id}: Kompensuję krok '{step.name}'")
-                step.compensate_func(**step.data)
-                step.compensated_at = timezone.now()
-                self._update_step_log(step, SagaStatus.COMPENSATED)
-                logger.info(
-                    f"✅ Saga {self.saga_id}: Krok '{step.name}' skompensowany")
-
-            except Exception as e:
-                logger.error(
-                    f"❌ Saga {self.saga_id}: Błąd kompensacji kroku '{step.name}': {e}")
-                self._update_step_log(step, SagaStatus.FAILED, str(e))
-                # Kontynuuj kompensację innych kroków
-
-        self.status = SagaStatus.COMPENSATED
-        self._update_saga_log(self.status)
-        logger.info(f"✅ Saga {self.saga_id}: Kompensacja zakończona")
-
-    def _create_result(self) -> SagaResult:
-        """Utwórz wynik Saga"""
-        return SagaResult(
-            saga_id=self.saga_id,
-            status=self.status,
-            steps=self.steps.copy(),
-            error=self.error,
-            created_at=self.created_at,
-            completed_at=datetime.now() if self.status in [
-                SagaStatus.COMPLETED, SagaStatus.COMPENSATED] else None
-        )
+    saga_model = Saga
+    step_model = SagaStepModel
+    db_alias_getter = staticmethod(_get_matterhorn1_db)
 
 
 class SagaService:

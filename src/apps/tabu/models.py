@@ -1,5 +1,7 @@
 from django.db import models
 
+from core.saga_models import AbstractSaga, AbstractSagaStep
+
 
 class Brand(models.Model):
     """Model dla marek produktów z API Tabu"""
@@ -186,8 +188,8 @@ class TabuProduct(models.Model):
 
     class Meta:
         db_table = 'tabu_product_detail'
-        verbose_name = 'Tabu produkt (szczegóły)'
-        verbose_name_plural = 'Tabu produkty (szczegóły)'
+        verbose_name = 'Produkt'
+        verbose_name_plural = 'Produkty'
         ordering = ['-api_id']
         indexes = [
             models.Index(fields=['api_id']),
@@ -216,8 +218,8 @@ class TabuProductImage(models.Model):
 
     class Meta:
         db_table = 'tabu_product_gallery'
-        verbose_name = 'Zdjęcie produktu Tabu'
-        verbose_name_plural = 'Zdjęcia produktów Tabu'
+        verbose_name = 'Obraz produktu'
+        verbose_name_plural = 'Obrazy produktów'
         ordering = ['order', 'api_image_id']
         unique_together = [['product', 'api_image_id']]
         indexes = [
@@ -272,8 +274,8 @@ class TabuProductVariant(models.Model):
 
     class Meta:
         db_table = 'tabu_product_variant'
-        verbose_name = 'Tabu wariant (API)'
-        verbose_name_plural = 'Tabu warianty (API)'
+        verbose_name = 'Wariant produktu'
+        verbose_name_plural = 'Warianty produktów'
         indexes = [
             models.Index(fields=['api_id']),
             models.Index(fields=['product']),
@@ -284,6 +286,34 @@ class TabuProductVariant(models.Model):
 
     def __str__(self) -> str:
         return f"{self.symbol} [Tabu #{self.api_id}]"
+
+
+# Saga Pattern Models — pola współdzielone z matterhorn1 przez core.saga_models
+# (AbstractSaga/AbstractSagaStep); logika wykonania/persystencji w core.saga.
+class Saga(AbstractSaga):
+    """Model do logowania Saga operations"""
+
+    class Meta:
+        db_table = 'tabu_saga_logs'
+        ordering = ['-created_at']
+        verbose_name = 'Saga Log'
+        verbose_name_plural = 'Saga Logs'
+        app_label = 'tabu'
+
+
+class SagaStep(AbstractSagaStep):
+    """Model do logowania poszczególnych kroków Saga"""
+
+    saga = models.ForeignKey(
+        Saga, on_delete=models.CASCADE, related_name='steps')
+
+    class Meta:
+        db_table = 'tabu_saga_steps'
+        ordering = ['saga', 'step_order']
+        unique_together = ['saga', 'step_order']
+        verbose_name = 'Saga Step'
+        verbose_name_plural = 'Saga Steps'
+        app_label = 'tabu'
 
 
 class StockHistory(models.Model):
