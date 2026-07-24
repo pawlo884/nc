@@ -1,5 +1,12 @@
 # Zmiany
 
+## <small>1.25.3 (2026-07-24)</small>
+
+* Merge pull request #88 from pawlo884/fix/mpd-app-prettier-format ([c202200](https://github.com/pawlo884/nc/commit/c202200)), closes [#88](https://github.com/pawlo884/nc/issues/88)
+* Merge pull request #89 from pawlo884/fix/mpd-app-variants-table-like-admin ([6ab516f](https://github.com/pawlo884/nc/commit/6ab516f)), closes [#89](https://github.com/pawlo884/nc/issues/89)
+* fix(mpd-app): ujednolić tabelę wariantów produktu ze starym adminem MPD ([ae7001c](https://github.com/pawlo884/nc/commit/ae7001c))
+* style(mpd-app): popraw formatowanie Prettier w ProductDetailPage.tsx ([d137812](https://github.com/pawlo884/nc/commit/d137812))
+
 ## <small>1.25.2 (2026-07-24)</small>
 
 * Merge pull request #87 from pawlo884/fix/mpd-app-show-all-variant-sources ([6941f68](https://github.com/pawlo884/nc/commit/6941f68)), closes [#87](https://github.com/pawlo884/nc/issues/87)
