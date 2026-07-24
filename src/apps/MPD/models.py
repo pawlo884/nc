@@ -270,6 +270,7 @@ class ProductvariantsSources(models.Model):
         app_label = 'MPD'
         verbose_name = 'Product Variant Source'
         verbose_name_plural = 'Product Variant Sources'
+        unique_together = [['variant', 'source']]
 
     def __str__(self):
         return f"Source {self.source_id} for variant {self.variant_id}"
@@ -432,6 +433,7 @@ class StockAndPrices(models.Model):
         db_table = 'stock_and_prices'
         verbose_name = 'Stan magazynowy'
         verbose_name_plural = 'Stany magazynowe'
+        unique_together = [['variant', 'source']]
 
     def __str__(self):
         return f"Stock {self.stock} @ {self.price} {self.currency} (variant {self.variant_id})"

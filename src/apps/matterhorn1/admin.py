@@ -1041,26 +1041,28 @@ class ProductAdmin(admin.ModelAdmin):
             name__icontains='matterhorn'
         ).first()
 
-        with connections['MPD'].cursor() as cursor:
+        with connections[mpd_db].cursor() as cursor:
             for variant in product.variants.all():
                 # Znajdź lub utwórz rozmiar
-                size_id = self._get_or_create_size(variant.name)
+                size_id = self._get_or_create_size(variant.name, mpd_db)
 
                 # Znajdź lub utwórz kolor
                 color_id = self._get_or_create_color(
-                    product.color or 'Brak koloru')
+                    product.color or 'Brak koloru', mpd_db)
 
                 # Utwórz wariant w MPD (producer_code tylko w product_variants_sources)
                 cursor.execute("""
-                    INSERT INTO product_variants (product_id, size_id, color_id)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO product_variants (product_id, size_id, color_id, exported_to_iai)
+                    VALUES (%s, %s, %s, false)
                     RETURNING variant_id
                 """, [mpd_product_id, size_id, color_id])
 
                 variant_id = cursor.fetchone()[0]
                 mapped_variants.append(variant_id)
 
-                # ProductvariantsSources - sygnał MPD uruchomi task linkowania z innych hurtowni
+                # ProductvariantsSources - wyzwala jawne wywołanie tasku linkowania niżej
+                # (produkt MPD tu już istnieje, więc sygnał Products.post_save(created=True)
+                # się nie odpali)
                 if mh_source and (variant.ean or variant.variant_uid):
                     try:
                         uid = int(variant.variant_uid) if variant.variant_uid and str(variant.variant_uid).isdigit() else None
@@ -1075,11 +1077,19 @@ class ProductAdmin(admin.ModelAdmin):
                         }
                     )
 
+        if mh_source:
+            from MPD.tasks import link_variants_from_other_sources_task
+            transaction.on_commit(
+                lambda: link_variants_from_other_sources_task.apply_async(
+                    args=(mpd_product_id, mh_source.id), queue='default'
+                )
+            )
+
         return mapped_variants
 
-    def _get_or_create_size(self, size_name):
+    def _get_or_create_size(self, size_name, mpd_db='MPD'):
         """Pobierz lub utwórz rozmiar w MPD"""
-        with connections['MPD'].cursor() as cursor:
+        with connections[mpd_db].cursor() as cursor:
             cursor.execute("SELECT id FROM sizes WHERE name = %s", [size_name])
             result = cursor.fetchone()
 
@@ -1093,9 +1103,9 @@ class ProductAdmin(admin.ModelAdmin):
                 """, [size_name, 'default', size_name.lower()])
                 return cursor.fetchone()[0]
 
-    def _get_or_create_color(self, color_name):
+    def _get_or_create_color(self, color_name, mpd_db='MPD'):
         """Pobierz lub utwórz kolor w MPD"""
-        with connections['MPD'].cursor() as cursor:
+        with connections[mpd_db].cursor() as cursor:
             cursor.execute(
                 "SELECT id FROM colors WHERE name = %s", [color_name])
             result = cursor.fetchone()

@@ -20,7 +20,7 @@ from MPD.models import (
     Sources,
 )
 from matterhorn1.models import Product as MhProduct
-from tabu.models import TabuProduct, Brand as TabuBrand
+from tabu.models import TabuProduct, TabuProductVariant, Brand as TabuBrand
 
 
 def _mpd_db():
@@ -152,7 +152,8 @@ class MPDSavePropagatesLinkTest(TestCase):
             variant_uid=70001,
         )
 
-        # Produkt Tabu z tym samym EAN (żeby link mógł dopiąć)
+        # Produkt Tabu z wariantem o tym samym EAN (żeby link mógł dopiąć — adapter Tabu
+        # dopasowuje po EAN WARIANTU, nie produktu, więc TabuProductVariant jest tu konieczny)
         TabuBrand.objects.using(tabu_db).create(
             brand_id='TABU_LINK',
             name='Tabu Link',
@@ -161,34 +162,93 @@ class MPDSavePropagatesLinkTest(TestCase):
             api_id=70001,
             symbol='LINK-001',
             name='Tabu do linkowania',
-            ean=self.ean,
             last_update=datetime.now(),
+        )
+        self.tabu_variant = TabuProductVariant.objects.using(tabu_db).create(
+            api_id=70001,
+            product=self.tabu_product,
+            symbol='LINK-001-S',
+            ean=self.ean,
+            size='S',
+            store=5,
+        )
+        # Dodatkowy rozmiar w Tabu, którego MPD jeszcze nie zna (inny EAN) — test
+        # ścieżki "pozostałe warianty" (backfill nowego wariantu w MPD)
+        self.tabu_variant_extra = TabuProductVariant.objects.using(tabu_db).create(
+            api_id=70002,
+            product=self.tabu_product,
+            symbol='LINK-001-M',
+            ean='5901234567900',
+            size='M',
+            store=3,
         )
 
     def test_link_sets_mapped_product_uid_in_tabu(self):
         """
-        link_variants_from_other_sources - gdy Tabu ma produkt z tym EAN,
-        ustawia mapped_product_uid po dopięciu ProductvariantsSources.
+        link_variants_from_other_sources - gdy Tabu ma wariant z tym EAN,
+        dopina go do istniejącego wariantu MPD i ustawia mapped_product_uid.
         Adapter Tabu zwraca VariantMatch z source_product_id.
         """
         from MPD.source_adapters.linking import link_variants_from_other_sources
+        from MPD.models import ProductvariantsSources
 
-        # Wywołujemy link - obecny source to Matterhorn, szukamy w Tabu
         result = link_variants_from_other_sources(
             mpd_product_id=self.mpd_product.id,
             current_source_id=self.mh_source.id,
         )
 
-        # Adapter Tabu musi zwrócić match z source_product_id - sprawdź czy
-        # registered adapters mają Tabu. W testach może nie być adapterów.
-        # Test weryfikuje że funkcja się wykonuje bez błędów
-        self.assertIn('linked_count', result)
-        self.assertIn('errors', result)
-        # Jeśli są 2 źródła (Matterhorn + Tabu), adapter Tabu może dopiąć
-        if result['linked_count'] > 0:
-            self.tabu_product.refresh_from_db(using=_tabu_db())
-            self.assertEqual(
-                self.tabu_product.mapped_product_uid,
-                self.mpd_product.id,
-                "mapped_product_uid powinien być ustawiony po linkowaniu",
-            )
+        self.assertEqual(result['errors'], [])
+        self.assertGreater(
+            result['linked_count'], 0,
+            "linking powinien dopiąć przynajmniej jeden wariant Tabu po EAN",
+        )
+
+        self.tabu_product.refresh_from_db(using=_tabu_db())
+        self.assertEqual(
+            self.tabu_product.mapped_product_uid,
+            self.mpd_product.id,
+            "mapped_product_uid powinien być ustawiony po linkowaniu",
+        )
+        self.assertTrue(
+            ProductvariantsSources.objects.using(_mpd_db()).filter(
+                variant=self.mpd_variant, source=self.tabu_source,
+            ).exists(),
+            "Powinien powstać wiersz ProductvariantsSources dla wariantu MPD ze źródłem Tabu",
+        )
+
+    def test_link_creates_new_mpd_variant_for_extra_size_from_other_source(self):
+        """
+        Rozmiar 'M' istnieje tylko w Tabu (inny EAN, nieznany jeszcze w MPD) — linking
+        powinien dla niego utworzyć NOWY wariant w MPD (backfill "pozostałych" wariantów),
+        a nie tylko dopiąć się do istniejącego wariantu 'S'.
+        """
+        from MPD.source_adapters.linking import link_variants_from_other_sources
+        from MPD.models import ProductvariantsSources
+
+        mpd_db = _mpd_db()
+        variants_before = set(
+            ProductVariants.objects.using(mpd_db)
+            .filter(product=self.mpd_product)
+            .values_list('variant_id', flat=True)
+        )
+
+        link_variants_from_other_sources(
+            mpd_product_id=self.mpd_product.id,
+            current_source_id=self.mh_source.id,
+        )
+
+        variants_after = list(
+            ProductVariants.objects.using(mpd_db)
+            .filter(product=self.mpd_product)
+            .values_list('variant_id', flat=True)
+        )
+        new_variant_ids = set(variants_after) - variants_before
+        self.assertEqual(
+            len(new_variant_ids), 1,
+            "Powinien powstać dokładnie jeden nowy wariant MPD dla rozmiaru 'M' z Tabu",
+        )
+        new_variant_id = new_variant_ids.pop()
+        pvs = ProductvariantsSources.objects.using(mpd_db).get(
+            variant_id=new_variant_id, source=self.tabu_source,
+        )
+        self.assertEqual(pvs.ean, self.tabu_variant_extra.ean)

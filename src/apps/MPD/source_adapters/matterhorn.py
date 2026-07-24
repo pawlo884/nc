@@ -2,12 +2,16 @@
 Adapter dla hurtowni Matterhorn.
 """
 import json
+import logging
 from decimal import Decimal
 from typing import List, Optional
 
 from django.db.models import Q
 
+from core.db_routers import _get_matterhorn1_db
 from .base import SourceAdapter, VariantMatch, normalize_ean
+
+logger = logging.getLogger(__name__)
 
 
 class MatterhornAdapter(SourceAdapter):
@@ -28,7 +32,10 @@ class MatterhornAdapter(SourceAdapter):
         q = Q()
         for e in ean_set:
             q |= Q(ean__iexact=e)
-        qs = ProductVariant.objects.filter(q).select_related('product')
+        # .using() jawnie – automatyczny routing przez DATABASE_ROUTERS bywa niezawodny
+        # tylko w normalnym request/shell, w środowisku testowym (manage.py test) łańcuch
+        # routerów bywa pusty i zapytanie bez .using() trafia do bazy 'default'.
+        qs = ProductVariant.objects.using(_get_matterhorn1_db()).filter(q).select_related('product')
         if mpd_product_id:
             qs = qs.filter(product__mapped_product_uid=mpd_product_id)
 
@@ -63,7 +70,9 @@ class MatterhornAdapter(SourceAdapter):
         """Wszystkie warianty produktu Matterhorn (do dopinania pozostałych rozmiarów)."""
         from matterhorn1.models import ProductVariant
 
-        qs = ProductVariant.objects.filter(product_id=source_product_id).select_related('product')
+        qs = ProductVariant.objects.using(_get_matterhorn1_db()).filter(
+            product_id=source_product_id
+        ).select_related('product')
         result = []
         for v in qs:
             ean_norm = normalize_ean(v.ean) if v.ean else ''
@@ -91,11 +100,22 @@ class MatterhornAdapter(SourceAdapter):
         source_product_id: int,
         mpd_product_id: int,
     ) -> None:
-        """Ustawia mapped_product_uid i is_mapped w Matterhorn Product."""
-        from django.conf import settings
+        """Ustawia mapped_product_uid i is_mapped w Matterhorn Product — pomija nadpisanie,
+        jeśli produkt jest już zmapowany do INNEGO produktu MPD (przypadkowy duplikat EAN
+        w danych źródłowych nie powinien po cichu przepinać istniejącego mapowania)."""
         from matterhorn1.models import Product
 
-        mh_db = 'zzz_matterhorn1' if 'zzz_matterhorn1' in settings.DATABASES else 'matterhorn1'
+        mh_db = _get_matterhorn1_db()
+        product = Product.objects.using(mh_db).filter(id=source_product_id).first()
+        if product is None:
+            return
+        if product.mapped_product_uid is not None and product.mapped_product_uid != mpd_product_id:
+            logger.warning(
+                "Pomijam nadpisanie mapped_product_uid produktu matterhorn %s: już zmapowany "
+                "do %s (próba przepięcia na %s przez dopasowanie EAN)",
+                source_product_id, product.mapped_product_uid, mpd_product_id,
+            )
+            return
         Product.objects.using(mh_db).filter(id=source_product_id).update(
             mapped_product_uid=mpd_product_id,
             is_mapped=True,
@@ -107,14 +127,26 @@ class MatterhornAdapter(SourceAdapter):
         source_variant_uid: Optional[str],
         mpd_variant_id: int,
     ) -> None:
-        """Ustawia mapped_variant_uid w Matterhorn productvariant (po linkowaniu)."""
+        """Ustawia mapped_variant_uid w Matterhorn productvariant (po linkowaniu) — pomija
+        nadpisanie, jeśli wariant jest już zmapowany do INNEGO wariantu MPD."""
         if not source_variant_uid or not str(source_variant_uid).strip():
             return
-        from django.conf import settings
         from matterhorn1.models import ProductVariant
 
-        mh_db = 'zzz_matterhorn1' if 'zzz_matterhorn1' in settings.DATABASES else 'matterhorn1'
-        ProductVariant.objects.using(mh_db).filter(
+        mh_db = _get_matterhorn1_db()
+        variant = ProductVariant.objects.using(mh_db).filter(
             product_id=source_product_id,
             variant_uid=str(source_variant_uid).strip(),
-        ).update(mapped_variant_uid=mpd_variant_id, is_mapped=True)
+        ).first()
+        if variant is None:
+            return
+        if variant.mapped_variant_uid is not None and variant.mapped_variant_uid != mpd_variant_id:
+            logger.warning(
+                "Pomijam nadpisanie mapped_variant_uid wariantu matterhorn %s: już zmapowany "
+                "do %s (próba przepięcia na %s przez dopasowanie EAN)",
+                variant.variant_uid, variant.mapped_variant_uid, mpd_variant_id,
+            )
+            return
+        ProductVariant.objects.using(mh_db).filter(pk=variant.pk).update(
+            mapped_variant_uid=mpd_variant_id, is_mapped=True,
+        )
