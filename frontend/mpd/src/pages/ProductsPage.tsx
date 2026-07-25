@@ -1,9 +1,11 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { deleteProduct, fetchCatalogBrands, fetchCatalogPaths, fetchProducts } from '../api/mpd';
+import { ProductCard } from '../components/ProductCard';
 import { ProductThumbnail } from '../components/ProductThumbnail';
+import { useActionMessages } from '../hooks/useActionMessages';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 import '../components/Layout.css';
 import './ProductDetailPage.css';
 
@@ -11,6 +13,7 @@ const PAGE_SIZE = 50;
 
 type SortField = 'id' | 'name' | 'brand_name' | 'visibility' | 'updated_at';
 type VisibilityFilter = '' | 'true' | 'false';
+type ViewMode = 'table' | 'grid';
 
 const SORTABLE_COLUMNS: { field: SortField; label: string; width?: number }[] = [
   { field: 'id', label: 'ID', width: 70 },
@@ -42,7 +45,8 @@ export function ProductsPage() {
   const [pathId, setPathId] = useState('');
   const [sortField, setSortField] = useState<SortField>('id');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [listError, setListError] = useState<string | null>(null);
+  const { setError: setListError, reportError: reportListError } = useActionMessages();
+  const [viewMode, setViewMode] = useLocalStorage<ViewMode>('mpd-products-view', 'table');
   const searchTimerRef = useRef<number | undefined>(undefined);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -100,17 +104,7 @@ export function ProductsPage() {
       setListError(null);
       await queryClient.invalidateQueries({ queryKey: ['mpd-products'] });
     },
-    onError: err => {
-      if (axios.isAxiosError(err)) {
-        const message =
-          (err.response?.data as { message?: string; detail?: string } | undefined)?.message ||
-          (err.response?.data as { detail?: string } | undefined)?.detail ||
-          err.message;
-        setListError(message || 'Nie udało się usunąć produktu.');
-        return;
-      }
-      setListError('Nie udało się usunąć produktu.');
-    },
+    onError: err => reportListError(err, 'Nie udało się usunąć produktu.'),
   });
 
   useEffect(() => {
@@ -224,6 +218,22 @@ export function ProductsPage() {
             Wyczyść filtry
           </button>
         )}
+        <div className="view-toggle" role="group" aria-label="Widok listy">
+          <button
+            type="button"
+            className={`view-toggle__btn${viewMode === 'table' ? ' view-toggle__btn--active' : ''}`}
+            onClick={() => setViewMode('table')}
+          >
+            ☰ Tabela
+          </button>
+          <button
+            type="button"
+            className={`view-toggle__btn${viewMode === 'grid' ? ' view-toggle__btn--active' : ''}`}
+            onClick={() => setViewMode('grid')}
+          >
+            ▦ Siatka
+          </button>
+        </div>
       </div>
 
       {isLoading && <div className="loading">Ładowanie produktów…</div>}
@@ -234,101 +244,114 @@ export function ProductsPage() {
         </div>
       )}
 
-      {listError && <div className="alert alert-error">{listError}</div>}
-
       {data && (
         <>
           <p style={{ color: '#666', marginBottom: '0.75rem' }}>
             Wyświetlono: <strong>{products.length}</strong> z <strong>{totalCount}</strong>{' '}
             produktów
           </p>
-          <table className="data-table products-table">
-            <thead>
-              <tr>
-                <th style={{ width: 72 }}>Zdjęcie</th>
-                {SORTABLE_COLUMNS.map(col => {
-                  const active = sortField === col.field;
-                  const ariaSort = active
-                    ? sortDir === 'asc'
-                      ? 'ascending'
-                      : 'descending'
-                    : 'none';
-                  return (
-                    <th
-                      key={col.field}
-                      style={col.width ? { width: col.width } : undefined}
-                      className={`sortable-th${active ? ' sortable-th--active' : ''}`}
-                      aria-sort={ariaSort}
-                    >
-                      <button
-                        type="button"
-                        className="sortable-th__btn"
-                        onClick={() => handleSort(col.field)}
-                      >
-                        <span>{col.label}</span>
-                        <span className="sortable-th__indicator" aria-hidden>
-                          {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
-                        </span>
-                      </button>
-                    </th>
-                  );
-                })}
-                <th style={{ width: 90 }}>Akcje</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.length === 0 ? (
+          {viewMode === 'table' ? (
+            <table className="data-table products-table">
+              <thead>
                 <tr>
-                  <td colSpan={7} className="empty-state">
-                    Brak produktów spełniających kryteria.
-                  </td>
+                  <th style={{ width: 72 }}>Zdjęcie</th>
+                  {SORTABLE_COLUMNS.map(col => {
+                    const active = sortField === col.field;
+                    const ariaSort = active
+                      ? sortDir === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none';
+                    return (
+                      <th
+                        key={col.field}
+                        style={col.width ? { width: col.width } : undefined}
+                        className={`sortable-th${active ? ' sortable-th--active' : ''}`}
+                        aria-sort={ariaSort}
+                      >
+                        <button
+                          type="button"
+                          className="sortable-th__btn"
+                          onClick={() => handleSort(col.field)}
+                        >
+                          <span>{col.label}</span>
+                          <span className="sortable-th__indicator" aria-hidden>
+                            {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                          </span>
+                        </button>
+                      </th>
+                    );
+                  })}
+                  <th style={{ width: 90 }}>Akcje</th>
                 </tr>
-              ) : (
-                products.map(product => (
-                  <tr key={product.id} onClick={() => navigate(`/products/${product.id}`)}>
-                    <td className="products-table__thumb-cell">
-                      <ProductThumbnail
-                        src={product.thumbnail_url}
-                        alt={product.name || `Produkt ${product.id}`}
-                      />
-                    </td>
-                    <td>{product.id}</td>
-                    <td>
-                      <Link
-                        to={`/products/${product.id}`}
-                        className="products-table__link"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        {product.name}
-                      </Link>
-                    </td>
-                    <td>{product.brand_name || '—'}</td>
-                    <td>
-                      <span
-                        className={`badge ${product.visibility ? 'badge-visible' : 'badge-hidden'}`}
-                      >
-                        {product.visibility ? 'Tak' : 'Nie'}
-                      </span>
-                    </td>
-                    <td>{new Date(product.updated_at).toLocaleString('pl-PL')}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-danger-sm"
-                        disabled={deleteMutation.isPending}
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleDelete(product.id, product.name);
-                        }}
-                      >
-                        Usuń
-                      </button>
+              </thead>
+              <tbody>
+                {products.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="empty-state">
+                      Brak produktów spełniających kryteria.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  products.map(product => (
+                    <tr key={product.id} onClick={() => navigate(`/products/${product.id}`)}>
+                      <td className="products-table__thumb-cell">
+                        <ProductThumbnail
+                          src={product.thumbnail_url}
+                          alt={product.name || `Produkt ${product.id}`}
+                        />
+                      </td>
+                      <td>{product.id}</td>
+                      <td>
+                        <Link
+                          to={`/products/${product.id}`}
+                          className="products-table__link"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          {product.name}
+                        </Link>
+                      </td>
+                      <td>{product.brand_name || '—'}</td>
+                      <td>
+                        <span
+                          className={`badge ${product.visibility ? 'badge-visible' : 'badge-hidden'}`}
+                        >
+                          {product.visibility ? 'Tak' : 'Nie'}
+                        </span>
+                      </td>
+                      <td>{new Date(product.updated_at).toLocaleString('pl-PL')}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-danger-sm"
+                          disabled={deleteMutation.isPending}
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleDelete(product.id, product.name);
+                          }}
+                        >
+                          Usuń
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          ) : products.length === 0 ? (
+            <div className="empty-state">Brak produktów spełniających kryteria.</div>
+          ) : (
+            <div className="products-grid">
+              {products.map(product => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onDelete={handleDelete}
+                  deleteDisabled={deleteMutation.isPending}
+                />
+              ))}
+            </div>
+          )}
 
           <div ref={loadMoreRef} className="infinite-scroll-sentinel" aria-hidden={!hasNextPage}>
             {isFetchingNextPage && <div className="loading">Ładowanie kolejnych…</div>}

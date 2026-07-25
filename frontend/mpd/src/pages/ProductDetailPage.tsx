@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { deleteProduct, fetchProduct, updateProduct } from '../api/mpd';
 import { ProductExtrasPanels } from '../components/ProductExtrasPanels';
+import { useActionMessages } from '../hooks/useActionMessages';
 import type { MpdProductDetail, MpdProductUpdatePayload } from '../types/mpd';
 import { groupImagesByColor } from '../utils/groupImagesByColor';
 import { groupVariantsForDisplay } from '../utils/groupVariantsForDisplay';
@@ -56,8 +56,11 @@ export function ProductDetailPage() {
     visibility: true,
   }));
   const [baseline, setBaseline] = useState<FormState | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveOk, setSaveOk] = useState<string | null>(null);
+  const {
+    setError: setSaveError,
+    setSuccess: setSaveOk,
+    reportError: reportSaveError,
+  } = useActionMessages();
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['mpd-product', productId],
@@ -85,17 +88,7 @@ export function ProductDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['mpd-product', productId] });
       await queryClient.invalidateQueries({ queryKey: ['mpd-products'] });
     },
-    onError: err => {
-      if (axios.isAxiosError(err)) {
-        const message =
-          (err.response?.data as { message?: string; detail?: string } | undefined)?.message ||
-          (err.response?.data as { detail?: string } | undefined)?.detail ||
-          err.message;
-        setSaveError(message || 'Nie udało się zapisać produktu.');
-        return;
-      }
-      setSaveError('Nie udało się zapisać produktu.');
-    },
+    onError: err => reportSaveError(err, 'Nie udało się zapisać produktu.'),
   });
 
   const deleteMutation = useMutation({
@@ -108,17 +101,7 @@ export function ProductDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['mpd-products'] });
       navigate('/');
     },
-    onError: err => {
-      if (axios.isAxiosError(err)) {
-        const message =
-          (err.response?.data as { message?: string; detail?: string } | undefined)?.message ||
-          (err.response?.data as { detail?: string } | undefined)?.detail ||
-          err.message;
-        setSaveError(message || 'Nie udało się usunąć produktu.');
-        return;
-      }
-      setSaveError('Nie udało się usunąć produktu.');
-    },
+    onError: err => reportSaveError(err, 'Nie udało się usunąć produktu.'),
   });
 
   const imageGroups = useMemo(() => {
@@ -240,9 +223,6 @@ export function ProductDetailPage() {
           </button>
         </div>
       </div>
-
-      {saveError && <div className="alert alert-error">{saveError}</div>}
-      {saveOk && <div className="alert alert-success">{saveOk}</div>}
 
       <div className="product-detail__header page-card">
         <div className="product-detail__title-row">
