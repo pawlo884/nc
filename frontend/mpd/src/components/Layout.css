@@ -253,15 +253,18 @@
 }
 
 .products-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
 }
 
 .product-card {
   position: relative;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
+  width: fit-content;
+  max-width: 280px;
   background: #fff;
   border: 1px solid #eee;
   border-radius: 10px;

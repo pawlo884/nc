@@ -409,9 +409,9 @@ export function ProductDetailPage() {
             }}
           />
         </div>
-      </div>
 
-      <ProductExtrasPanels productId={productId} product={product} />
+        <ProductExtrasPanels productId={productId} product={product} />
+      </div>
 
       <div className="page-card product-detail__variants">
         <h3 className="section-title">

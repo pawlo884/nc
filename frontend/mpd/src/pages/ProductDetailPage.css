@@ -206,29 +206,45 @@
   color: #333;
 }
 
+/* Kafelki "płyną" w kolumnach (jak masonry) i same wypełniają wolne miejsca — */
+/* stała liczba kolumn (nie column-width), bo przy krótkiej treści przeglądarka */
+/* potrafi zostawić większość szerokości pustą zamiast rozciągnąć kolumny.      */
 .product-detail__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1rem;
+  column-count: 4;
+  column-gap: 1rem;
 }
 
-/* Para paneli obok siebie (np. atrybuty + skład) — tabele nie powinny łamać layoutu */
-.product-detail__grid--pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  align-items: start;
-}
-
-.product-detail__grid--pair > .page-card {
-  min-width: 0;
-  overflow-x: auto;
-}
-
-@media (max-width: 900px) {
-  .product-detail__grid--pair {
-    grid-template-columns: 1fr;
+@media (max-width: 1600px) {
+  .product-detail__grid {
+    column-count: 3;
   }
+}
+
+@media (max-width: 1100px) {
+  .product-detail__grid {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-detail__grid {
+    column-count: 1;
+  }
+}
+
+.product-detail__grid > .page-card {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+}
+
+/* Kafelek, dla którego jedna kolumna to za mało (np. szeroka tabela) —      */
+/* zajmuje pełną szerokość i przerywa w tym miejscu przepływ kolumn.        */
+.product-detail__grid > .page-card.product-detail__wide {
+  column-span: all;
+}
+
+.table-scroll {
+  overflow-x: auto;
 }
 
 .section-title {
