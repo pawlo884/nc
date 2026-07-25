@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -12,15 +11,8 @@ import {
   manageProductPaths,
   updateRetailPrices,
 } from '../api/mpd';
+import { useActionMessages } from '../hooks/useActionMessages';
 import type { MpdProductDetail, MpdRetailPriceItem } from '../types/mpd';
-
-function errorMessage(err: unknown, fallback: string): string {
-  if (axios.isAxiosError(err)) {
-    const data = err.response?.data as { message?: string; detail?: string } | undefined;
-    return data?.message || data?.detail || err.message || fallback;
-  }
-  return fallback;
-}
 
 export function ProductExtrasPanels({
   productId,
@@ -30,8 +22,11 @@ export function ProductExtrasPanels({
   product: MpdProductDetail;
 }) {
   const queryClient = useQueryClient();
-  const [sectionError, setSectionError] = useState<string | null>(null);
-  const [sectionOk, setSectionOk] = useState<string | null>(null);
+  const {
+    setError: setSectionError,
+    setSuccess: setSectionOk,
+    reportError: reportSectionError,
+  } = useActionMessages();
 
   const [attrToAdd, setAttrToAdd] = useState('');
   const [fabricToAdd, setFabricToAdd] = useState('');
@@ -125,7 +120,7 @@ export function ProductExtrasPanels({
       setAttrToAdd('');
       await invalidateProduct();
     },
-    onError: err => setSectionError(errorMessage(err, 'Błąd atrybutów')),
+    onError: err => reportSectionError(err, 'Błąd atrybutów'),
   });
 
   const fabricMutation = useMutation({
@@ -140,7 +135,7 @@ export function ProductExtrasPanels({
       setFabricToAdd('');
       await invalidateProduct();
     },
-    onError: err => setSectionError(errorMessage(err, 'Błąd składu')),
+    onError: err => reportSectionError(err, 'Błąd składu'),
   });
 
   const pathMutation = useMutation({
@@ -154,7 +149,7 @@ export function ProductExtrasPanels({
       setSectionOk(res.message || 'Ścieżki zaktualizowane');
       await invalidateProduct();
     },
-    onError: err => setSectionError(errorMessage(err, 'Błąd ścieżek')),
+    onError: err => reportSectionError(err, 'Błąd ścieżek'),
   });
 
   const retailMutation = useMutation({
@@ -168,13 +163,11 @@ export function ProductExtrasPanels({
       setSectionOk(res.message || 'Ceny zapisane');
       await invalidateProduct();
     },
-    onError: err => setSectionError(errorMessage(err, 'Błąd cen')),
+    onError: err => reportSectionError(err, 'Błąd cen'),
   });
 
   return (
     <>
-      {sectionError && <div className="alert alert-error">{sectionError}</div>}
-      {sectionOk && <div className="alert alert-success">{sectionOk}</div>}
       <div className="product-detail__grid product-detail__grid--pair">
         <div className="page-card">
           <h3 className="section-title">Atrybuty</h3>
