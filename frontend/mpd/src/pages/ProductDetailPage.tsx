@@ -56,8 +56,11 @@ export function ProductDetailPage() {
     visibility: true,
   }));
   const [baseline, setBaseline] = useState<FormState | null>(null);
-  const { setError: setSaveError, setSuccess: setSaveOk, reportError: reportSaveError } =
-    useActionMessages();
+  const {
+    setError: setSaveError,
+    setSuccess: setSaveOk,
+    reportError: reportSaveError,
+  } = useActionMessages();
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['mpd-product', productId],
