@@ -93,9 +93,9 @@
     <tr>
       <td>{{ r.timestamp }}</td>
       <td>{{ r.variant_name|default:r.variant_uid }}</td>
-      <td>{{ r.old_stock|default:'-' }}</td>
-      <td>{{ r.new_stock|default:'-' }}</td>
-      <td class="sh-change-{{ r.change_type }}">{{ r.stock_change|default:'-' }}</td>
+      <td>{{ r.old_stock|default_if_none:'-' }}</td>
+      <td>{{ r.new_stock|default_if_none:'-' }}</td>
+      <td class="sh-change-{{ r.change_type }}">{{ r.stock_change|default_if_none:'-' }}</td>
       <td>{{ r.change_type|default:'-' }}</td>
     </tr>
     {% endfor %}
