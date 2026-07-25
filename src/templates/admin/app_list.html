@@ -1,5 +1,9 @@
 {% load i18n %}
 <style>
+  /* Django's admin/css/dashboard.css hardcodes `.dashboard #content { width: 600px; }`
+     on the index page — override it so the tile grid can use the full viewport.
+     The colMS/#content-related negative-margin sidebar layout is untouched. */
+  .dashboard #content { width: 100% !important; max-width: none !important; }
   :root {
     --tile-surface:   #fcfcfb;
     --tile-border:    rgba(11,11,11,0.10);
