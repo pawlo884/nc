@@ -1,5 +1,12 @@
 # Zmiany
 
+## <small>1.29.1 (2026-07-25)</small>
+
+* Merge pull request #93 from pawlo884/feat/admin-tiles-floating-shadow ([4ae969b](https://github.com/pawlo884/nc/commit/4ae969b)), closes [#93](https://github.com/pawlo884/nc/issues/93)
+* Merge pull request #94 from pawlo884/fix/admin-dashboard-full-width ([73e48d5](https://github.com/pawlo884/nc/commit/73e48d5)), closes [#94](https://github.com/pawlo884/nc/issues/94)
+* fix(admin): dashboard bestsellerów na pełną szerokość ekranu ([a2624b4](https://github.com/pawlo884/nc/commit/a2624b4)), closes [#content](https://github.com/pawlo884/nc/issues/content)
+* style(admin): kafelki "unoszące się" zamiast ciasno sklejonych ([da305aa](https://github.com/pawlo884/nc/commit/da305aa))
+
 ## 1.29.0 (2026-07-25)
 
 * feat(admin): zagnieżdżone kafelki modeli wewnątrz kafelka aplikacji ([cb7dbe5](https://github.com/pawlo884/nc/commit/cb7dbe5))
