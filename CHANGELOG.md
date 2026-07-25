@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.29.3 (2026-07-25)</small>
+
+* Merge pull request #96 from pawlo884/fix/stock-history-zero-stock-display ([7746cba](https://github.com/pawlo884/nc/commit/7746cba)), closes [#96](https://github.com/pawlo884/nc/issues/96)
+* fix(admin): popraw wyświetlanie stanu 0 w historii stanów magazynowych ([0676909](https://github.com/pawlo884/nc/commit/0676909))
+
 ## <small>1.29.2 (2026-07-25)</small>
 
 * Merge pull request #95 from pawlo884/fix/admin-index-dashboard-width ([b2ce6c2](https://github.com/pawlo884/nc/commit/b2ce6c2)), closes [#95](https://github.com/pawlo884/nc/issues/95)
