@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.27.0 (2026-07-25)
+
+* Merge pull request #91 from pawlo884/feat/mpd-app-detail-masonry-layout ([f974596](https://github.com/pawlo884/nc/commit/f974596)), closes [#91](https://github.com/pawlo884/nc/issues/91)
+* feat(mpd-app): kafelki na stronie produktu w układzie masonry ([be2ca92](https://github.com/pawlo884/nc/commit/be2ca92))
+
 ## 1.26.0 (2026-07-25)
 
 * Merge pull request #90 from pawlo884/feat/mpd-app-ux-improvements ([a41206a](https://github.com/pawlo884/nc/commit/a41206a)), closes [#90](https://github.com/pawlo884/nc/issues/90)
