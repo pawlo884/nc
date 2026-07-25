@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.29.2 (2026-07-25)</small>
+
+* Merge pull request #95 from pawlo884/fix/admin-index-dashboard-width ([b2ce6c2](https://github.com/pawlo884/nc/commit/b2ce6c2)), closes [#95](https://github.com/pawlo884/nc/issues/95)
+* fix(admin): kafelki na stronie głównej ignorowały szerokość ekranu ([a5caec1](https://github.com/pawlo884/nc/commit/a5caec1)), closes [#content](https://github.com/pawlo884/nc/issues/content) [#content-related](https://github.com/pawlo884/nc/issues/content-related)
+
 ## <small>1.29.1 (2026-07-25)</small>
 
 * Merge pull request #93 from pawlo884/feat/admin-tiles-floating-shadow ([4ae969b](https://github.com/pawlo884/nc/commit/4ae969b)), closes [#93](https://github.com/pawlo884/nc/issues/93)
