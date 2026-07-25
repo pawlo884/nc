@@ -1,5 +1,9 @@
 # Zmiany
 
+## 1.29.0 (2026-07-25)
+
+* feat(admin): zagnieżdżone kafelki modeli wewnątrz kafelka aplikacji ([cb7dbe5](https://github.com/pawlo884/nc/commit/cb7dbe5))
+
 ## 1.28.0 (2026-07-25)
 
 * Merge pull request #92 from pawlo884/feat/admin-app-list-tiles ([430fab1](https://github.com/pawlo884/nc/commit/430fab1)), closes [#92](https://github.com/pawlo884/nc/issues/92)
