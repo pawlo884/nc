@@ -1,5 +1,10 @@
 # Zmiany
 
+## 1.28.0 (2026-07-25)
+
+* Merge pull request #92 from pawlo884/feat/admin-app-list-tiles ([430fab1](https://github.com/pawlo884/nc/commit/430fab1)), closes [#92](https://github.com/pawlo884/nc/issues/92)
+* feat(admin): kafelki zamiast listy na stronie wyboru aplikacji ([8978ac9](https://github.com/pawlo884/nc/commit/8978ac9))
+
 ## 1.27.0 (2026-07-25)
 
 * Merge pull request #91 from pawlo884/feat/mpd-app-detail-masonry-layout ([f974596](https://github.com/pawlo884/nc/commit/f974596)), closes [#91](https://github.com/pawlo884/nc/issues/91)
