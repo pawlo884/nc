@@ -1,0 +1,116 @@
+{% load i18n %}
+<style>
+  :root {
+    --tile-surface:   #fcfcfb;
+    --tile-border:    rgba(11,11,11,0.10);
+    --tile-text:      #0b0b0b;
+    --tile-secondary: #52514e;
+    --tile-muted:     #898781;
+    --tile-accent:    #2a78d6;
+    --tile-accent-wash: rgba(42,120,214,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --tile-surface:   #1e1e1e;
+      --tile-border:    rgba(255,255,255,0.12);
+      --tile-text:      #ffffff;
+      --tile-secondary: #c3c2b7;
+      --tile-muted:     #898781;
+      --tile-accent:    #3987e5;
+      --tile-accent-wash: rgba(57,135,229,0.16);
+    }
+  }
+  .app-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    margin: 8px 0 24px;
+  }
+  .app-tile {
+    background: var(--tile-surface);
+    border: 1px solid var(--tile-border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .app-tile.current-app { border-color: var(--tile-accent); }
+  .app-tile-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 12px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--tile-border);
+  }
+  .app-tile-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: var(--tile-accent-wash);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex: none;
+  }
+  .app-tile-head a.section {
+    font-size: 15px; font-weight: 650; color: var(--tile-text);
+    text-decoration: none;
+  }
+  .app-tile-head a.section:hover { color: var(--tile-accent); }
+  .app-tile-models { display: flex; flex-direction: column; gap: 2px; }
+  .app-tile-model-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 4px; border-radius: 6px; font-size: 13px;
+  }
+  .app-tile-model-row.current-model { background: var(--tile-accent-wash); }
+  .app-tile-model-row a.model-link {
+    color: var(--tile-secondary); text-decoration: none; flex: 1;
+  }
+  .app-tile-model-row a.model-link:hover { color: var(--tile-text); }
+  .app-tile-model-row .model-actions a {
+    font-size: 11px; margin-left: 8px; color: var(--tile-muted); text-decoration: none;
+  }
+  .app-tile-model-row .model-actions a:hover { color: var(--tile-accent); }
+  .app-tile-model-row .no-link { color: var(--tile-muted); flex: 1; }
+</style>
+
+{% if app_list %}
+  <div class="app-tile-grid">
+    {% for app in app_list %}
+      <div class="app-{{ app.app_label }} app-tile{% if app.app_url in request.path|urlencode %} current-app{% endif %}">
+        <div class="app-tile-head">
+          <div class="app-tile-icon">
+            {% if app.app_label == 'matterhorn1' %}⛰️
+            {% elif app.app_label == 'tabu' %}🧦
+            {% elif app.app_label == 'MPD' %}🗂️
+            {% elif app.app_label == 'web_agent' %}🤖
+            {% elif app.app_label == 'auth' %}🔐
+            {% elif app.app_label == 'django_celery_beat' %}⏱️
+            {% elif app.app_label == 'django_celery_results' %}📋
+            {% elif app.app_label == 'rest_framework' or app.app_label == 'authtoken' %}🔑
+            {% elif app.app_label == 'admin_interface' %}🎨
+            {% else %}📦
+            {% endif %}
+          </div>
+          <a href="{{ app.app_url }}" class="section" title="{% blocktranslate with name=app.name %}Models in the {{ name }} application{% endblocktranslate %}">{{ app.name }}</a>
+        </div>
+        <div class="app-tile-models">
+          {% for model in app.models %}
+            {% with model_name=model.object_name|lower %}
+              <div class="app-tile-model-row model-{{ model_name }}{% if model.admin_url in request.path|urlencode %} current-model{% endif %}">
+                {% if model.admin_url %}
+                  <a href="{{ model.admin_url }}" class="model-link"{% if model.admin_url in request.path|urlencode %} aria-current="page"{% endif %}>{{ model.name }}</a>
+                {% else %}
+                  <span class="no-link">{{ model.name }}</span>
+                {% endif %}
+                <span class="model-actions">
+                  {% if model.add_url %}<a href="{{ model.add_url }}">{% translate 'Add' %}</a>{% endif %}
+                  {% if model.admin_url and show_changelinks %}
+                    {% if model.view_only %}<a href="{{ model.admin_url }}">{% translate 'View' %}</a>
+                    {% else %}<a href="{{ model.admin_url }}">{% translate 'Change' %}</a>{% endif %}
+                  {% endif %}
+                </span>
+              </div>
+            {% endwith %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p>{% translate 'You don’t have permission to view or edit anything.' %}</p>
+{% endif %}
