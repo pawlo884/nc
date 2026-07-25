@@ -1,5 +1,11 @@
 # Zmiany
 
+## 1.26.0 (2026-07-25)
+
+* Merge pull request #90 from pawlo884/feat/mpd-app-ux-improvements ([a41206a](https://github.com/pawlo884/nc/commit/a41206a)), closes [#90](https://github.com/pawlo884/nc/issues/90)
+* style(mpd-app): popraw formatowanie Prettier ([df0de9d](https://github.com/pawlo884/nc/commit/df0de9d))
+* feat(mpd-app): dodać toasty, wspólny hook błędów i przełącznik widoku listy ([df8275c](https://github.com/pawlo884/nc/commit/df8275c))
+
 ## <small>1.25.3 (2026-07-24)</small>
 
 * Merge pull request #88 from pawlo884/fix/mpd-app-prettier-format ([c202200](https://github.com/pawlo884/nc/commit/c202200)), closes [#88](https://github.com/pawlo884/nc/issues/88)
