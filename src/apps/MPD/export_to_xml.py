@@ -209,9 +209,14 @@ class FullXMLExporter(BaseXMLExporter):
             # Używamy daty ostatniego full.xml jako kryterium
             last_full_date = get_last_full_xml_date()
             if last_full_date:
+                from django.db.models import Q
+                # updated_at bywa NULL, gdy wariant powstał z pominięciem ORM (np. import
+                # bezpośrednim SQL-em) - taki wariant ma zostać złapany od razu, a nie
+                # pominięty na zawsze, bo NULL >= data jest zawsze fałszywe w SQL.
                 variants_with_iai = ProductVariants.objects.using('MPD').filter(
-                    exported_to_iai=False,
-                    updated_at__gte=last_full_date
+                    exported_to_iai=False
+                ).filter(
+                    Q(updated_at__gte=last_full_date) | Q(updated_at__isnull=True)
                 ).select_related('product', 'size', 'color', 'producer_color', 'product__brand')
             else:
                 # Pierwsze uruchomienie - wszystkie warianty
@@ -413,63 +418,62 @@ class FullXMLExporter(BaseXMLExporter):
                     if code_producer:
                         size_attrs.append(
                             f'code_producer="{escape(code_producer)}"')
-                        size_attrs_str = ' '.join(size_attrs)
-                        xml.append(
-                            f'        <size {size_attrs_str}>'
-                        )
-                        stock_price = StockAndPrices.objects.using(
-                            'MPD').filter(variant=variant).first()
-                        if stock_price:
-                            # Pobierz ceny detaliczne z product_variants_retail_price
-                            retail_price_obj = None
-                            try:
-                                from .models import ProductVariantsRetailPrice
-                                retail_price_obj = ProductVariantsRetailPrice.objects.using(
-                                    'MPD').filter(variant=variant).first()
-                            except Exception:
-                                pass
-                            gross = retail_price_obj.retail_price if retail_price_obj and hasattr(
-                                retail_price_obj, 'retail_price') else ''
-                            net = retail_price_obj.net_price if retail_price_obj and hasattr(
-                                retail_price_obj, 'net_price') else ''
-                            price_attrs = []
-                            if gross or net:
-                                if gross:
-                                    price_attrs.append(f'gross="{gross}"')
-                                if net:
-                                    price_attrs.append(f'net="{net}"')
+                    size_attrs_str = ' '.join(size_attrs)
+                    xml.append(
+                        f'        <size {size_attrs_str}>'
+                    )
+                    stock_price = StockAndPrices.objects.using(
+                        'MPD').filter(variant=variant).first()
+                    if stock_price:
+                        # Pobierz ceny detaliczne z product_variants_retail_price
+                        retail_price_obj = None
+                        try:
+                            from .models import ProductVariantsRetailPrice
+                            retail_price_obj = ProductVariantsRetailPrice.objects.using(
+                                'MPD').filter(variant=variant).first()
+                        except Exception:
+                            pass
+                        gross = retail_price_obj.retail_price if retail_price_obj and hasattr(
+                            retail_price_obj, 'retail_price') else ''
+                        net = retail_price_obj.net_price if retail_price_obj and hasattr(
+                            retail_price_obj, 'net_price') else ''
+                        price_attrs = []
+                        if gross or net:
+                            if gross:
+                                price_attrs.append(f'gross="{gross}"')
+                            if net:
+                                price_attrs.append(f'net="{net}"')
 
-                            if price_attrs:
-                                xml.append(
-                                    f'          <price {" ".join(price_attrs)}/>')
-                            else:
-                                # Brak ceny w bazie - dodaj cenę 0 jako fallback (jak w light.xml)
-                                # Zgodnie z dokumentacją full.md, @net jest wymagany
-                                xml.append(
-                                    '          <price gross="0" net="0"/>')
-
-                            # Dodaj stan magazynowy
-                            source = Sources.objects.filter(
-                                id=stock_price.source.id).first() if stock_price and stock_price.source else None
-                            stock_id = ""
-                            if source and hasattr(source, 'type'):
-                                if source.type == 'Magazyn główny':
-                                    stock_id = "1"
-                                elif source.type == 'Magazyn obcy':
-                                    stock_id = "0"
-                                elif source.type == 'Magazyn wymiany':
-                                    stock_id = "3"
-                                elif source.type == 'Magazyn pomocniczy':
-                                    stock_id = "2"
+                        if price_attrs:
                             xml.append(
-                                f'          <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
+                                f'          <price {" ".join(price_attrs)}/>')
+                        else:
+                            # Brak ceny w bazie - dodaj cenę 0 jako fallback (jak w light.xml)
+                            # Zgodnie z dokumentacją full.md, @net jest wymagany
+                            xml.append(
+                                '          <price gross="0" net="0"/>')
+
+                        # Dodaj stan magazynowy
+                        source = Sources.objects.filter(
+                            id=stock_price.source.id).first() if stock_price and stock_price.source else None
+                        stock_id = ""
+                        if source and hasattr(source, 'type'):
+                            if source.type == 'Magazyn główny':
+                                stock_id = "1"
+                            elif source.type == 'Magazyn obcy':
+                                stock_id = "0"
+                            elif source.type == 'Magazyn wymiany':
+                                stock_id = "3"
+                            elif source.type == 'Magazyn pomocniczy':
+                                stock_id = "2"
+                        xml.append(
+                            f'          <stock id="{stock_id}" quantity="{stock_price.stock}"/>')
                     xml.append('        </size>')
                 xml.append('      </sizes>')
 
-            # Dodaj obrazy produktu (obrazy przypisane do tego iai_product_id)
+            # Dodaj obrazy produktu
             images = ProductImage.objects.using('MPD').filter(
-                product=product,
-                iai_product_id=iai_product_id
+                product=product
             )
             if images:
                 xml.append('      <images>')
@@ -970,9 +974,9 @@ class LightXMLExporter(BaseXMLExporter):
             ).select_related('size', 'color', 'producer_color')
 
             if variants:
-                # Użyj iai_product_id z pierwszego wariantu
                 first_variant = variants.first()
-                iai_product_id = first_variant.iai_product_id if first_variant and first_variant.iai_product_id else product.id
+                iai_product_id = getattr(
+                    first_variant, "iai_product_id", None) or product.id
 
                 # Pobierz VAT z pierwszego wariantu który ma cenę detaliczną
                 vat_rate = None
@@ -1326,9 +1330,17 @@ class GatewayXMLExporter(BaseXMLExporter):
 
             # Sprawdź rzeczywiste pliki full_change.xml z bazy
 
-            # Pobierz ostatnie 25 plików full_change.xml z bazy
+            # Pobierz ostatnie 25 plików full_change.xml z bazy.
+            # Pomiń rekordy ze starego, zdekomisjonowanego bucketa (np. DigitalOcean Spaces
+            # sprzed migracji na MinIO) - ich URL-e są martwe i nie mają być wysyłane do IdoSell.
+            from django.db.models import Q
+            active_bucket_filter = Q(bucket_url__isnull=True) | Q(bucket_url='')
+            if BUCKET_PUBLIC_BASE_URL:
+                active_bucket_filter |= Q(
+                    bucket_url__startswith=BUCKET_PUBLIC_BASE_URL)
             recent_full_change_files = FullChangeFile.objects.using('MPD').filter(
-                filename__startswith='full_change'
+                active_bucket_filter,
+                filename__startswith='full_change',
             ).order_by('-created_at')[:25]
 
             # Zawsze utwórz podwęzeł changes
@@ -2161,10 +2173,10 @@ class FullChangeXMLExporter(BaseXMLExporter):
                 'product', 'size', 'color', 'producer_color', 'product__brand')
             logger.info("Pełny eksport full_change.xml - wszystkie warianty")
 
-        # Grupuj warianty po iai_product_id
+        # Grupuj warianty po identyfikatorze produktu (bez iai_product_id)
         grouped_variants = {}
         for variant in variants_with_iai:
-            iai_id = variant.iai_product_id
+            iai_id = getattr(variant, "iai_product_id", None) or variant.product_id
             if iai_id not in grouped_variants:
                 grouped_variants[iai_id] = []
             grouped_variants[iai_id].append(variant)
@@ -2397,10 +2409,9 @@ class FullChangeXMLExporter(BaseXMLExporter):
                     xml.append('        </size>')
                 xml.append('      </sizes>')
 
-            # Dodaj obrazy produktu (obrazy przypisane do tego iai_product_id)
+            # Dodaj obrazy produktu
             images = ProductImage.objects.using('MPD').filter(
-                product=product,
-                iai_product_id=iai_product_id
+                product=product
             )
             if images:
                 xml.append('      <images>')
