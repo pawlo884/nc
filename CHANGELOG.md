@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.29.4 (2026-07-26)</small>
+
+* Merge pull request #97 from pawlo884/fix/mpd-full-xml-export-iai-product-id ([51c5033](https://github.com/pawlo884/nc/commit/51c5033)), closes [#97](https://github.com/pawlo884/nc/issues/97)
+* fix(MPD): napraw eksport XML po migracji usuwającej iai_product_id ([4c1a83f](https://github.com/pawlo884/nc/commit/4c1a83f))
+
 ## <small>1.29.3 (2026-07-25)</small>
 
 * Merge pull request #96 from pawlo884/fix/stock-history-zero-stock-display ([7746cba](https://github.com/pawlo884/nc/commit/7746cba)), closes [#96](https://github.com/pawlo884/nc/issues/96)
