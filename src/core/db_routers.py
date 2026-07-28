@@ -5,6 +5,7 @@ _MPD_DB = None
 _MATTERHORN1_DB = None
 _DEFAULT_DB = None
 _TABU_DB = None
+_MADA_DB = None
 
 
 def _get_mpd_db():
@@ -46,6 +47,15 @@ def _get_tabu_db():
         from django.conf import settings
         _TABU_DB = 'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu'
     return _TABU_DB
+
+
+def _get_mada_db():
+    """Lazy evaluation dla bazy mada"""
+    global _MADA_DB
+    if _MADA_DB is None:
+        from django.conf import settings
+        _MADA_DB = 'zzz_mada' if 'zzz_mada' in settings.DATABASES else 'mada'
+    return _MADA_DB
 
 
 class MPDRouter:
@@ -163,6 +173,33 @@ class TabuRouter:
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label == 'tabu':
             return db == _get_tabu_db()
+        return None
+
+
+class MadaRouter:
+    """
+    Router dla aplikacji mada - dedykowana baza danych
+    """
+
+    def db_for_read(self, model, **hints):
+        if model._meta.app_label == 'mada':
+            return _get_mada_db()
+        return None
+
+    def db_for_write(self, model, **hints):
+        if model._meta.app_label == 'mada':
+            return _get_mada_db()
+        return None
+
+    def allow_relation(self, obj1, obj2, **hints):
+        # Zezwalamy na relacje między obiektami z różnych baz danych
+        if obj1._meta.app_label == 'mada' or obj2._meta.app_label == 'mada':
+            return True
+        return None
+
+    def allow_migrate(self, db, app_label, model_name=None, **hints):
+        if app_label == 'mada':
+            return db == _get_mada_db()
         return None
 
 

@@ -66,6 +66,14 @@ TABU_API_BASE_URL = (
 ).rstrip('/')
 TABU_API_KEY = _strip_env_value(os.getenv('TABU_API_KEY', ''))
 
+# Mada API configuration (GET {base}/get_xml.php?l=<login>&p=<password>[&file=<name>])
+MADA_API_BASE_URL = (
+    _strip_env_value(os.getenv('MADA_API_BASE_URL'))
+    or 'https://www.mada.pl'
+).rstrip('/')
+MADA_API_LOGIN = _strip_env_value(os.getenv('MADA_API_LOGIN', ''))
+MADA_API_PASSWORD = _strip_env_value(os.getenv('MADA_API_PASSWORD', ''))
+
 # React SPA MPD — ta sama ścieżka w dev (Vite) i prod (Django): /mpd-app
 MPD_REACT_FRONTEND_URL = (
     _strip_env_value(os.getenv('MPD_REACT_FRONTEND_URL'))
@@ -134,6 +142,7 @@ INSTALLED_APPS = [
     'matterhorn1.apps.Matterhorn1Config',
     'web_agent',
     'tabu',
+    'mada',
 ]
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
@@ -305,6 +314,24 @@ DATABASES = {
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
         }
     },
+    'mada': {
+        'ENGINE': 'core.db_backend',
+        'NAME': os.getenv('MADA_DB_NAME'),
+        'USER': os.getenv('MADA_DB_USER'),
+        'PASSWORD': os.getenv('MADA_DB_PASSWORD'),
+        'HOST': os.getenv('MADA_DB_HOST'),
+        'PORT': os.getenv('MADA_DB_PORT'),
+        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
+        'CONN_MAX_AGE': 0,
+        'OPTIONS': {
+            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
+            'keepalives': 1,       # Włącz TCP keepalive
+            'keepalives_idle': 60,  # Keepalive co 60s
+            'keepalives_interval': 10,  # Interval 10s
+            'keepalives_count': 5,  # 5 prób
+            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
+        }
+    },
 }
 
 # Database routers
@@ -313,6 +340,7 @@ DATABASE_ROUTERS = [
     'core.db_routers.Matterhorn1Router',
     'core.db_routers.WebAgentRouter',
     'core.db_routers.TabuRouter',
+    'core.db_routers.MadaRouter',
     'core.db_routers.DefaultRouter',
 ]
 
@@ -442,6 +470,7 @@ CELERY_TASK_ROUTES = {
     'matterhorn1.tasks.*': {'queue': 'default'},
     'MPD.tasks.*': {'queue': 'default'},
     'tabu.tasks.*': {'queue': 'default'},
+    'mada.tasks.*': {'queue': 'default'},
 }
 
 # Celery Beat Schedule - używaj Django periodic tasks zamiast tego

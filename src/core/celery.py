@@ -36,6 +36,7 @@ app.conf.task_routes = {
     'matterhorn1.tasks.*': {'queue': 'default'},
     'MPD.tasks.*': {'queue': 'default'},
     'tabu.tasks.*': {'queue': 'default'},
+    'mada.tasks.*': {'queue': 'default'},
 }
 
 # Konfiguracja retry
