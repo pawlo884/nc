@@ -1,3 +1,7 @@
+# DEPRECATED: produkcja działa teraz na k3s (deployments/k8s/nc-prod), nie na
+# blue-green przez docker-compose. Plik zostawiony do wglądu/awaryjnego
+# rollbacku, ale nie jest już częścią aktywnego procesu wdrożenia.
+#
 # docker-compose.blue-green.ml.yml - ML worker dla BLUE-GREEN (PROD)
 # Uruchamianie:
 #   docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml up -d celery-ml
