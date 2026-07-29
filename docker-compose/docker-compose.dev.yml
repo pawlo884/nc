@@ -48,6 +48,7 @@ services:
       - MATTERHORN1_DB_HOST=postgres-ssh-tunnel
       - WEB_AGENT_DB_HOST=postgres-ssh-tunnel
       - TABU_DB_HOST=postgres-ssh-tunnel
+      - MADA_DB_HOST=postgres-ssh-tunnel
     restart: always
     networks:
       - app_network
@@ -115,6 +116,7 @@ services:
       - MATTERHORN1_DB_HOST=postgres-ssh-tunnel
       - WEB_AGENT_DB_HOST=postgres-ssh-tunnel
       - TABU_DB_HOST=postgres-ssh-tunnel
+      - MADA_DB_HOST=postgres-ssh-tunnel
     depends_on:
       web:
         condition: service_started
@@ -169,6 +171,7 @@ services:
       - MATTERHORN1_DB_HOST=postgres-ssh-tunnel
       - WEB_AGENT_DB_HOST=postgres-ssh-tunnel
       - TABU_DB_HOST=postgres-ssh-tunnel
+      - MADA_DB_HOST=postgres-ssh-tunnel
     depends_on:
       web:
         condition: service_started
@@ -212,6 +215,7 @@ services:
       - MATTERHORN1_DB_HOST=postgres-ssh-tunnel
       - WEB_AGENT_DB_HOST=postgres-ssh-tunnel
       - TABU_DB_HOST=postgres-ssh-tunnel
+      - MADA_DB_HOST=postgres-ssh-tunnel
     depends_on:
       web:
         condition: service_started

@@ -80,5 +80,7 @@ def register_default_adapters() -> None:
     """
     from .tabu import TabuAdapter
     from .matterhorn import MatterhornAdapter
+    from .mada import MadaAdapter
     register_adapter('Tabu API', TabuAdapter)
     register_adapter('Matterhorn', MatterhornAdapter)
+    register_adapter('Mada API', MadaAdapter)
