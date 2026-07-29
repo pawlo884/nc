@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { deleteProduct, fetchProduct, updateProduct } from '../api/mpd';
 import { ProductExtrasPanels } from '../components/ProductExtrasPanels';
 import { useActionMessages } from '../hooks/useActionMessages';

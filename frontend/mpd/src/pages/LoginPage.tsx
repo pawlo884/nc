@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useState, type FormEvent } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
 import '../components/Layout.css';
 

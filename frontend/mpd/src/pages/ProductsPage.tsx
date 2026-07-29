@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { deleteProduct, fetchCatalogBrands, fetchCatalogPaths, fetchProducts } from '../api/mpd';
 import { ProductCard } from '../components/ProductCard';
 import { ProductThumbnail } from '../components/ProductThumbnail';
