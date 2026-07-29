@@ -1,5 +1,10 @@
 # Zmiany
 
+## <small>1.30.1 (2026-07-29)</small>
+
+* Merge pull request #100 from pawlo884/fix/upgrade-react-router-8 ([f5ca6a8](https://github.com/pawlo884/nc/commit/f5ca6a8)), closes [#100](https://github.com/pawlo884/nc/issues/100)
+* fix(frontend): upgrade react-router to 8.3.0 ([02e1836](https://github.com/pawlo884/nc/commit/02e1836))
+
 ## 1.30.0 (2026-07-29)
 
 * Merge pull request #98 from pawlo884/feature/mada-integration ([2efe128](https://github.com/pawlo884/nc/commit/2efe128)), closes [#98](https://github.com/pawlo884/nc/issues/98)
