@@ -1,5 +1,12 @@
 # Zmiany
 
+## 1.30.0 (2026-07-29)
+
+* Merge pull request #98 from pawlo884/feature/mada-integration ([2efe128](https://github.com/pawlo884/nc/commit/2efe128)), closes [#98](https://github.com/pawlo884/nc/issues/98)
+* Merge pull request #99 from pawlo884/chore/deprecate-blue-green-compose ([8c3e3ca](https://github.com/pawlo884/nc/commit/8c3e3ca)), closes [#99](https://github.com/pawlo884/nc/issues/99)
+* chore: mark blue-green docker-compose as deprecated ([d2fc98c](https://github.com/pawlo884/nc/commit/d2fc98c))
+* feat(mada): add Mada wholesaler integration module ([bf81b07](https://github.com/pawlo884/nc/commit/bf81b07))
+
 ## <small>1.29.4 (2026-07-26)</small>
 
 * Merge pull request #97 from pawlo884/fix/mpd-full-xml-export-iai-product-id ([51c5033](https://github.com/pawlo884/nc/commit/51c5033)), closes [#97](https://github.com/pawlo884/nc/issues/97)
