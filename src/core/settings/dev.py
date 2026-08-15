@@ -44,6 +44,17 @@ for _lan_host in ('192.168.50.4', '192.168.50.150'):
     if _lan_host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_lan_host)
 
+# Wewnętrzny IP kontenera w sieci bridge Dockera (np. 172.18.0.x) - zmienia się
+# przy każdym restarcie/rebuildzie, więc wykrywamy go dynamicznie zamiast
+# hardkodować. Bez tego requesty trafiające bezpośrednio na IP kontenera
+# (np. z innych kontenerów w tej samej sieci) kończą się DisallowedHost.
+try:
+    _docker_ip = socket.gethostbyname(socket.gethostname())
+    if _docker_ip not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_docker_ip)
+except OSError:
+    pass
+
 # API URL configuration for development
 API_BASE_URL = os.getenv('API_BASE_URL', 'https://nc-dev.sowa.ch')
 MPD_API_URL = os.getenv('MPD_API_URL', 'https://nc-dev.sowa.ch/mpd')
