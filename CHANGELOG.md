@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.30.3](https://github.com/pawlo884/nc/compare/v1.30.2...v1.30.3) (2026-08-15)
+
+### Bug Fixes
+
+* **settings:** allow container's dynamic docker bridge IP in ALLOWED_HOSTS ([b113848](https://github.com/pawlo884/nc/commit/b1138487643c4463437adfb48557ff7829957e77))
+
 ## <small>1.30.2 (2026-08-15)</small>
 
 * fix(tabu): auto-clear stale sync_tabu_stock lock after worker crash ([1f887d9](https://github.com/pawlo884/nc/commit/1f887d9))
