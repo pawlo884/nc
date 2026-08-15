@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.30.5](https://github.com/pawlo884/nc/compare/v1.30.4...v1.30.5) (2026-08-15)
+
+### Bug Fixes
+
+* **deps:** bump fast-uri override to >=4.1.2 ([fad244e](https://github.com/pawlo884/nc/commit/fad244ec6b17309ab80f39dd3391a8ed24daa674))
+
 ## [1.30.4](https://github.com/pawlo884/nc/compare/v1.30.3...v1.30.4) (2026-08-15)
 
 ### Bug Fixes
