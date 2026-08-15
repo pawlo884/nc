@@ -65,6 +65,56 @@ def sync_tabu_stock(self):
             cache.delete(lock_key)
 
 
+@shared_task(bind=True, name='tabu.tasks.watchdog_tabu_stock_lock')
+def watchdog_tabu_stock_lock(self):
+    """
+    Sprząta martwy lock sync_tabu_stock.
+
+    Lock ma awaryjny TTL 3h (patrz sync_tabu_stock), ale jeśli worker padnie
+    w trakcie (np. restart kontenera), `finally` nigdy się nie wykona i lock
+    blokuje kolejne uruchomienia przez cały TTL mimo że nic już nie działa.
+    Ten watchdog porównuje właściciela locka z listą active/reserved tasków
+    na workerach i usuwa lock, jeśli okaże się martwy.
+    Wywoływany co 5 minut przez Celery Beat.
+    """
+    lock_key = 'tabu:lock:sync_tabu_stock'
+    lock_owner = cache.get(lock_key)
+
+    if not lock_owner:
+        return {'status': 'ok', 'lock_present': False}
+
+    inspect = self.app.control.inspect(timeout=5)
+    active = inspect.active()
+    reserved = inspect.reserved()
+
+    if active is None and reserved is None:
+        # Workery nie odpowiedziały - nie wiemy nic pewnego, nie ryzykujemy usunięcia
+        logger.warning(
+            'Watchdog sync_tabu_stock: brak odpowiedzi od workerów, pomijam sprawdzanie locka.'
+        )
+        return {'status': 'skipped', 'reason': 'no_workers_responding'}
+
+    running_ids = {
+        task['id']
+        for tasks in (active or {}).values()
+        for task in tasks
+    } | {
+        task['id']
+        for tasks in (reserved or {}).values()
+        for task in tasks
+    }
+
+    if lock_owner in running_ids:
+        return {'status': 'ok', 'lock_present': True, 'lock_owner': lock_owner}
+
+    cache.delete(lock_key)
+    logger.warning(
+        f'🧹 Watchdog: usunięto martwy lock sync_tabu_stock '
+        f'(task {lock_owner} nie jest już active/reserved na żadnym workerze).'
+    )
+    return {'status': 'cleaned', 'stale_lock_owner': lock_owner}
+
+
 @shared_task(
     bind=True,
     name='tabu.tasks.sync_tabu_products_update',
