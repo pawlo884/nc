@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.30.6](https://github.com/pawlo884/nc/compare/v1.30.5...v1.30.6) (2026-08-15)
+
+### Bug Fixes
+
+* **deps:** pin js-yaml override to 4.3.1 ([d01f71a](https://github.com/pawlo884/nc/commit/d01f71ad9144813fef67eb2ecf0f09e9553b7cc2))
+
 ## [1.30.5](https://github.com/pawlo884/nc/compare/v1.30.4...v1.30.5) (2026-08-15)
 
 ### Bug Fixes
