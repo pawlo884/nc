@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.30.4](https://github.com/pawlo884/nc/compare/v1.30.3...v1.30.4) (2026-08-15)
+
+### Bug Fixes
+
+* **deps:** bump undici override to >=7.29.0 ([de17db3](https://github.com/pawlo884/nc/commit/de17db3eeffa7c9c8e2c8c0b048eb4b44af512fc))
+
 ## [1.30.3](https://github.com/pawlo884/nc/compare/v1.30.2...v1.30.3) (2026-08-15)
 
 ### Bug Fixes
