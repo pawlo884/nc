@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.30.7](https://github.com/pawlo884/nc/compare/v1.30.6...v1.30.7) (2026-08-15)
+
+### Bug Fixes
+
+* **frontend:** bump postcss to 8.5.26 ([bad6092](https://github.com/pawlo884/nc/commit/bad6092d7d3ee191a2e54211f6e54b916ca7c412))
+
 ## [1.30.6](https://github.com/pawlo884/nc/compare/v1.30.5...v1.30.6) (2026-08-15)
 
 ### Bug Fixes
