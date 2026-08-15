@@ -1,5 +1,9 @@
 # Zmiany
 
+## <small>1.30.2 (2026-08-15)</small>
+
+* fix(tabu): auto-clear stale sync_tabu_stock lock after worker crash ([1f887d9](https://github.com/pawlo884/nc/commit/1f887d9))
+
 ## <small>1.30.1 (2026-07-29)</small>
 
 * Merge pull request #100 from pawlo884/fix/upgrade-react-router-8 ([f5ca6a8](https://github.com/pawlo884/nc/commit/f5ca6a8)), closes [#100](https://github.com/pawlo884/nc/issues/100)
