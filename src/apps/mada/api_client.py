@@ -9,6 +9,7 @@ Auth przez parametry zapytania (nie nagłówki) - inny wzorzec niż matterhorn1/
 """
 import io
 import logging
+import re
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
@@ -19,6 +20,16 @@ import requests
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+# Auth (login `l` i hasło `p`) idzie przez query string, więc wyjątki requests/
+# urllib3 (np. ConnectionError, MaxRetryError) mają pełny URL - łącznie z
+# hasłem w plaintext - wpisany w swój str(). Trzeba to redagować, zanim
+# trafi do logów/Sentry.
+_CREDENTIAL_PARAM_RE = re.compile(r'([?&][lp]=)[^&\s\'"]*')
+
+
+def _redact_credentials(text: str) -> str:
+    return _CREDENTIAL_PARAM_RE.sub(r'\1***', text)
 
 
 class MadaApiError(Exception):
@@ -54,7 +65,9 @@ class MadaApiClient:
             response = requests.get(url, params=params, timeout=self.timeout)
             response.raise_for_status()
         except requests.exceptions.RequestException as exc:
-            raise MadaApiError(f'Błąd połączenia z API Mada: {exc}') from exc
+            raise MadaApiError(
+                f'Błąd połączenia z API Mada: {_redact_credentials(str(exc))}'
+            ) from exc
         return response.content
 
     def list_files(self) -> List[MadaFeedFile]:
