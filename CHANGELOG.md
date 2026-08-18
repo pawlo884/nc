@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.31.0](https://github.com/pawlo884/nc/compare/v1.30.7...v1.31.0) (2026-08-18)
+
+### Features
+
+* **mada:** add visible MADA wordmark banner to admin changelists ([019c243](https://github.com/pawlo884/nc/commit/019c2434b8bf2d948f7fcf2df595588732cb7854))
+
 ## [1.30.7](https://github.com/pawlo884/nc/compare/v1.30.6...v1.30.7) (2026-08-15)
 
 ### Bug Fixes
