@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.31.1](https://github.com/pawlo884/nc/compare/v1.31.0...v1.31.1) (2026-08-18)
+
+### Bug Fixes
+
+* **mada:** redact credentials from API error messages ([ecffc77](https://github.com/pawlo884/nc/commit/ecffc7770a62cb863ddc7a2e49bf650f215163e0))
+
 ## [1.31.0](https://github.com/pawlo884/nc/compare/v1.30.7...v1.31.0) (2026-08-18)
 
 ### Features
