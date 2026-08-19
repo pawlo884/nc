@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.31.3](https://github.com/pawlo884/nc/compare/v1.31.2...v1.31.3) (2026-08-19)
+
+### Bug Fixes
+
+* **mada:** hide multi-line comment leak and center wordmark banner ([2164975](https://github.com/pawlo884/nc/commit/2164975022d27ff0b291cef8dc9edeeb7ba1f4a7))
+
 ## [1.31.2](https://github.com/pawlo884/nc/compare/v1.31.1...v1.31.2) (2026-08-19)
 
 ### Bug Fixes
