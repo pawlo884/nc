@@ -1,5 +1,7 @@
 # 🚀 Quick Start - NC Project
 
+> ⚠️ **DEPRECATED (część blue-green)**: sekcje o deployu produkcyjnym przez blue-green (docker-compose) opisują nieaktywny mechanizm — produkcja działa na k3s (patrz `docs/K8S_PROD.md`). Sekcje o środowisku DEV pozostają aktualne.
+
 ## Pierwsze uruchomienie (5 minut)
 
 ### 1️⃣ Sklonuj projekt (już masz ✅)

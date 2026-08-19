@@ -1,5 +1,7 @@
 # Optymalizacja budowania obrazów Docker
 
+> ⚠️ **DEPRECATED (część blue-green)**: fragmenty dotyczące blue-green (docker-compose) opisują nieaktywny mechanizm — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`).
+
 ## 🚀 Problem
 Budowanie obrazów Docker trwało bardzo długo, ponieważ za każdym razem pobierane były pakiety systemowe (apt) i pakiety Python (pip).
 

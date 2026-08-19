@@ -1,5 +1,7 @@
 # 🔵🟢 Blue-Green Deployment - Zero Downtime
 
+> ⚠️ **DEPRECATED**: Blue-green (docker-compose) nie jest już mechanizmem produkcyjnym — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`). Ten dokument opisuje starą procedurę, zachowany do wglądu/awaryjnego rollbacku.
+
 ## Czym jest Blue-Green Deployment?
 
 Blue-Green deployment to strategia gdzie mamy **dwa identyczne środowiska produkcyjne**:

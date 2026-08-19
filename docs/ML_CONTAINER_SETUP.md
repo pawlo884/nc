@@ -1,5 +1,7 @@
 # 🤖 ML Container - Dokumentacja
 
+> ⚠️ **DEPRECATED (część blue-green)**: fragmenty o deployu ML workera przez `docker-compose.blue-green.ml.yml` opisują nieaktywny mechanizm — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`).
+
 ## 📋 Cel i uzasadnienie
 
 Osobny kontener Docker dla tasków ML (embeddings, semantic search) z PyTorch, aby **NIE spowalniać** standardowych deploymentów.

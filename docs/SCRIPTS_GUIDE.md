@@ -1,5 +1,7 @@
 # 📜 Przewodnik po skryptach projektu
 
+> ⚠️ **DEPRECATED (część blue-green)**: skrypty `scripts/deploy/*blue-green*` i `scripts/ops/*blue-green*` nie są już mechanizmem produkcyjnym — produkcja działa na k3s (`scripts/k8s-prod/*`, patrz `docs/K8S_PROD.md`).
+
 ## 🎯 Główne skrypty deployment
 
 ### 🚀 Production (GitHub Actions)

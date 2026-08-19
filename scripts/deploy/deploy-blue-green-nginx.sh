@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# ⚠️ DEPRECATED: produkcja działa teraz na k3s (deployments/k8s/nc-prod),
+# nie na blue-green przez docker-compose. Zachowany do wglądu/awaryjnego
+# rollbacku (patrz docs/K8S_PROD.md).
+#
 # Skrypt do wdrożenia/restartu blue-green deployment z nginx
 # Użycie: ./scripts/deploy/deploy-blue-green-nginx.sh
 

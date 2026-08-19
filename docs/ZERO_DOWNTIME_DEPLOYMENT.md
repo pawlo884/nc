@@ -1,6 +1,6 @@
 # Zero-Downtime Deployment - Orkiestracja
 
-> ⚠️ **HISTORYCZNE / NIEUŻYWANE (w części)**
+> ⚠️ **DEPRECATED**: cały mechanizm blue-green (docker-compose) opisany w tej dokumentacji nie jest już używany na produkcji — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`).
 >
 > Skrypty `deploy-zero-downtime.*` opisane w tej dokumentacji zostały wycofane z repo.
 > Produkcja działa **wyłącznie w trybie blue‑green**.

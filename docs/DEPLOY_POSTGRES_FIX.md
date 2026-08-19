@@ -1,5 +1,7 @@
 # ✅ Naprawa - PostgreSQL chroniony przed odtwarzaniem podczas deploy
 
+> ⚠️ **DEPRECATED (kontekst blue-green)**: opisuje naprawę w mechanizmie blue-green, który nie jest już używany na produkcji (obecnie k3s, patrz `docs/K8S_PROD.md`).
+
 ## Problem który był
 
 ```bash

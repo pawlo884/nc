@@ -1,6 +1,6 @@
 # NC (nc_project)
 
-Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa wyłącznie w trybie blue‑green** (`docker-compose.blue-green.yml`).
+Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa na k3s** (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`). Tryb blue‑green (`docker-compose.blue-green.yml`) jest **DEPRECATED** — zachowany tylko do wglądu/awaryjnego rollbacku.
 
 ## Wymagania
 - **Docker + Docker Compose** (w praktyce: Docker Desktop na Windows).
@@ -16,7 +16,7 @@ Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa wyłącznie w tr
 - `src/apps/` – aplikacje Django (poniżej opis)
 - **manage.py** – w katalogu `src/` (uruchomienie: `cd src && python manage.py ...` lub `python src/manage.py ...`)
 - `deployments/docker/` – Dockerfile dev/prod/ML + entrypoint
-- `docker-compose*.yml` – definicje usług (dev, dev+ML, blue‑green prod)
+- `docker-compose*.yml` – definicje usług (dev, dev+ML, blue‑green prod **[DEPRECATED]**)
 - `scripts/` – skrypty (build, deploy, migracje, security, monitoring)
 - `docs/` – dokumentacja (quick start, deploy, struktura, API itp.)
 
@@ -45,7 +45,7 @@ Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa wyłącznie w tr
 - **Inne elementy**
   - **Celery + Redis** – kolejki (`celery-default`, opcjonalnie ML worker), monitoring przez Flower.
   - **drf-spectacular** – dokumentacja REST API pod `/api/schema/`, `/api/docs/`, `/api/redoc/`.
-  - **Blue‑green deploy** – pełny pipeline deployu na VPS (`deployments/docker`, `scripts/deploy`, `.github/workflows/deploy-vps.yml`).
+  - **Deploy na k3s** – pełny pipeline deployu na VPS (`deployments/k8s/nc-prod`, `scripts/k8s-prod`, `.github/workflows/deploy-vps.yml`). Blue‑green (`scripts/deploy`) jest **DEPRECATED**.
 
 ## Konfiguracja środowiska (`.env.dev`)
 Plik **`.env.dev` nie jest wersjonowany** (jest ignorowany) – musisz go mieć lokalnie.
@@ -92,8 +92,10 @@ docker-compose -f docker-compose.dev.yml exec web bash
 docker-compose -f docker-compose.dev.yml down
 ```
 
-## Produkcja (tylko blue‑green)
-Deploy robimy przez GitHub Actions (`Release` → `deploy-vps.yml`) albo ręcznie na serwerze:
+## Produkcja (k3s)
+Deploy robimy przez GitHub Actions (`Release` → `deploy-vps.yml`), który uruchamia `scripts/k8s-prod/deploy.sh` na k3s. Szczegóły: `docs/K8S_PROD.md`.
+
+> ⚠️ **DEPRECATED**: poniższe skrypty blue‑green (`scripts/deploy/*`) nie są już używane na produkcji — zachowane do wglądu/awaryjnego rollbacku.
 
 ```bash
 export ENVIRONMENT=prod
@@ -102,12 +104,12 @@ export ENVIRONMENT=prod
 ./scripts/deploy/deploy-blue-green.sh rollback
 ```
 
-### Migracje na produkcji (blue/green)
+### Migracje na produkcji (blue/green, DEPRECATED)
 ```bash
 ./scripts/deploy/run-migrations.sh
 ```
 
-### ML worker na produkcji (opcjonalnie)
+### ML worker na produkcji (blue/green, DEPRECATED)
 ```bash
 docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml up -d celery-ml
 ```
@@ -116,5 +118,6 @@ docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.
 - `docs/QUICK_START.md`
 - `docs/DOCKER_QUICK_GUIDE.md`
 - `docs/SCRIPTS_GUIDE.md`
-- `docs/BLUE_GREEN_DEPLOYMENT.md`
+- `docs/K8S_PROD.md` (aktualny deploy produkcyjny)
+- `docs/BLUE_GREEN_DEPLOYMENT.md` (DEPRECATED)
 - **Zewnętrzne API:** `docs/IDOSELL_API.md` (linki do IdoSell: [Getting Started](https://idosell.readme.io/docs/getting-started), [developers](https://www.idosell.com/developers))
