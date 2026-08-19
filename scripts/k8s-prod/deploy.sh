@@ -37,9 +37,10 @@ if ! kubectl get secret nc-env -n nc-prod &>/dev/null; then
   fi
 fi
 
-# Redis / Celery / Flower zostają na Dockerze — na k3s tylko nc-web.
+echo "=== Apply redis (bez restartu aplikacji) ==="
+kubectl apply -f "$MANIFEST_DIR/redis.yaml"
 
-# Migracje PRZED apply web — stary web nadal obsluguje ruch (brak 504)
+# Migracje PRZED apply web/celery — stary web nadal obsluguje ruch (brak 504)
 if [[ "$RUN_MIGRATE" == true && "$SKIP_MIGRATE" != true ]]; then
   echo "=== Job migracji (przed rolloutem web) ==="
   kubectl delete job nc-migrate -n nc-prod --ignore-not-found
@@ -52,8 +53,10 @@ if [[ "$RUN_MIGRATE" == true && "$SKIP_MIGRATE" != true ]]; then
   kubectl logs job/nc-migrate -n nc-prod --tail=20
 fi
 
-echo "=== Apply manifestow nc-web (k3s tylko web) ==="
+echo "=== Apply manifestow aplikacji nc-prod ==="
 kubectl apply -f "$MANIFEST_DIR/web.yaml"
+kubectl apply -f "$MANIFEST_DIR/celery.yaml"
+kubectl apply -f "$MANIFEST_DIR/flower.yaml"
 kubectl apply -f "$MANIFEST_DIR/ingress.yaml"
 
 echo "=== Rollout nc-web ==="
@@ -64,6 +67,7 @@ else
   echo "Pierwszy deploy — czekam na utworzenie deployment nc-web..."
   kubectl rollout status deployment/nc-web -n nc-prod --timeout=600s
 fi
+kubectl rollout restart deployment/celery-default deployment/celery-import deployment/celery-beat deployment/flower -n nc-prod 2>/dev/null || true
 
 "$SCRIPT_DIR/expose-traefik.sh"
 

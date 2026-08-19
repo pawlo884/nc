@@ -48,7 +48,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8000:8000"  # Port dla blue (można zmienić na inny jeśli potrzebny)
+      - "8000:8000"  # Port dla blue (można zmienić na inny jeśli potrzebny)
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
       interval: 10s
@@ -106,7 +106,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8001:8000"  # Port dla green (aktywny)
+      - "8001:8000"  # Port dla green (aktywny)
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
       interval: 10s
@@ -184,7 +184,7 @@ services:
       retries: 5
       start_period: 10s
     ports:
-      - "127.0.0.1:5432:5432"
+      - "5432:5432"
     volumes:
       - /mnt/data2tb/docker/volumes/nc_postgres_data:/var/lib/postgresql/data
       - ./deployments/docker/postgres/initdb.d:/docker-entrypoint-initdb.d:ro
@@ -199,12 +199,9 @@ services:
     image: redis:7.2-alpine
     container_name: nc-redis-1
     command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-prod_password}
-    ports:
-      - "127.0.0.1:6379:6379"
-      - "172.17.0.1:6379:6379"
     volumes:
       - /mnt/data2tb/docker/volumes/nc_redis_data:/data
-      - ../deployments/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - nc_network
     healthcheck:
@@ -329,7 +326,7 @@ services:
         flower --port=5555 --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower} --persistent=True
         --db=/var/lib/flower/flower.db --inspect_timeout=30
     ports:
-      - "127.0.0.1:5555:5555"
+      - "5555:5555"
     volumes:
       - ../src:/app
       - /mnt/data2tb/docker/volumes/nc_flower_data:/var/lib/flower
