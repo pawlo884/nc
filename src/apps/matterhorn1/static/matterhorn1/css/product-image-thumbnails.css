@@ -1,0 +1,89 @@
+/* Style dla miniatur obrazów produktów w adminie - skalowanie w locie */
+.product-image-thumbnail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 5px;
+    max-width: 150px;
+}
+
+.thumbnail-link {
+    display: block;
+    text-decoration: none;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 3px;
+    background: #fff;
+    transition: all 0.2s ease;
+    overflow: hidden;
+    width: 120px;
+    height: 120px;
+    /* Kontener o stałym rozmiarze - obraz będzie skalowany w locie */
+}
+
+.thumbnail-link:hover {
+    border-color: #417690;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: scale(1.05);
+}
+
+.thumbnail-image {
+    display: block;
+    /* Skalowanie w locie - przeglądarka automatycznie przeskaluje obraz */
+    width: 120px !important;
+    height: 120px !important;
+    max-width: 120px !important;
+    max-height: 120px !important;
+    object-fit: contain;
+    background: #f5f5f5;
+    border-radius: 2px;
+    /* Wymuszenie skalowania w przeglądarce zamiast ładowania pełnego obrazu */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+.thumbnail-url {
+    font-size: 10px;
+    color: #666;
+    text-align: center;
+    word-break: break-all;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+/* Lazy loading placeholder */
+.thumbnail-image[loading="lazy"] {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Responsywność dla mniejszych ekranów */
+@media (max-width: 768px) {
+    .product-image-thumbnail {
+        max-width: 100px;
+    }
+    
+    .thumbnail-image {
+        max-width: 80px;
+        max-height: 80px;
+    }
+    
+    .thumbnail-url {
+        font-size: 9px;
+    }
+}
+
