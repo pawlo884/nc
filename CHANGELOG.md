@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.32.1](https://github.com/pawlo884/nc/compare/v1.32.0...v1.32.1) (2026-08-19)
+
+### Bug Fixes
+
+* **prod:** na k3s tylko nc-web, Celery i Redis wracają na Docker ([f6f61a1](https://github.com/pawlo884/nc/commit/f6f61a171f7d29d881b438b6df73fcecaa46b93d))
+
 ## [1.32.0](https://github.com/pawlo884/nc/compare/v1.31.3...v1.32.0) (2026-08-19)
 
 ### Features
