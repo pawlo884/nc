@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.32.2](https://github.com/pawlo884/nc/compare/v1.32.1...v1.32.2) (2026-08-19)
+
+### Bug Fixes
+
+* **deps:** patch Dependabot-flagged vulnerabilities ([f852d67](https://github.com/pawlo884/nc/commit/f852d67e00ee20e95faedb59ffde01a432ba11c8))
+
 ## [1.32.1](https://github.com/pawlo884/nc/compare/v1.32.0...v1.32.1) (2026-08-19)
 
 ### Bug Fixes
