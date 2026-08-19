@@ -1,0 +1,13 @@
+{% extends "admin/app_index.html" %}
+{% load i18n %}
+
+{% comment %}
+  This is the page you actually land on right after clicking "Matterhorn1" from
+  the admin dashboard (before picking a model) - the change_list.html banner
+  never covers it, so it needs the same logo too.
+{% endcomment %}
+
+{% block content_title %}
+  {% include "admin/matterhorn1/_banner.html" %}
+  {{ block.super }}
+{% endblock %}

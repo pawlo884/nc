@@ -1,0 +1,12 @@
+# robots.txt dla NC Project
+# Blokuje wszystkie boty i crawlery
+
+User-agent: *
+Disallow: /
+
+# Wyjątki dla dozwolonych botów (opcjonalnie)
+# User-agent: Googlebot
+# Allow: /
+
+# User-agent: Bingbot
+# Allow: /

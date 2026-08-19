@@ -1,0 +1,15 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% comment %}
+  App-level override (admin/tabu/change_list.html) - Django's template lookup
+  applies this to every model's changelist under the tabu app (tabuproduct,
+  stock_history, ...), not just one model. Purpose: a big, hard-to-miss logo so
+  it's obvious at a glance you're in Tabu and not matterhorn1/mada/MPD - those
+  look almost identical otherwise.
+{% endcomment %}
+
+{% block content_title %}
+  {% include "admin/tabu/_banner.html" %}
+  {{ block.super }}
+{% endblock %}

@@ -35,9 +35,9 @@ Thumbs.db
 # pliki .xml
 misc/MPD_test/*
 
-# statyczne pliki Django
+# statyczne pliki Django (katalog zbiorczy z collectstatic, nie źródłowe app/static/)
 staticfiles/
-static/
+/src/staticfiles/
 .env.dev1
 backups/*
 ..env.prod
