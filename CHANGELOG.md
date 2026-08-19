@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.31.2](https://github.com/pawlo884/nc/compare/v1.31.1...v1.31.2) (2026-08-19)
+
+### Bug Fixes
+
+* **mada:** show banner on the app-index page too, not just changelists ([1bb28e4](https://github.com/pawlo884/nc/commit/1bb28e4a5b6b3ea1f2ef71a1fca0140939b5ce82))
+
 ## [1.31.1](https://github.com/pawlo884/nc/compare/v1.31.0...v1.31.1) (2026-08-18)
 
 ### Bug Fixes
