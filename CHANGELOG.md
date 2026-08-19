@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.32.0](https://github.com/pawlo884/nc/compare/v1.31.3...v1.32.0) (2026-08-19)
+
+### Features
+
+* **matterhorn1,tabu:** add app logo banner to admin changelist/app_index ([050521d](https://github.com/pawlo884/nc/commit/050521db2fea87d94f601ea03de69ce3c0afbf54))
+
 ## [1.31.3](https://github.com/pawlo884/nc/compare/v1.31.2...v1.31.3) (2026-08-19)
 
 ### Bug Fixes
