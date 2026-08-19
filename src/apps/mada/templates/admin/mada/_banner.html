@@ -1,0 +1,22 @@
+{% load i18n %}
+{# Shared MADA wordmark, included from both change_list.html and app_index.html
+   overrides (the two entry points into the mada app) so the style lives in one place. #}
+<style>
+  .mada-app-banner {
+    margin: 0 0 20px;
+    padding: 18px 0 16px;
+    border-bottom: 1px solid rgba(11,11,11,0.12);
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 34px;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    color: #55534e;
+  }
+  @media (prefers-color-scheme: dark) {
+    .mada-app-banner {
+      border-bottom-color: rgba(255,255,255,0.14);
+      color: #d8d6cd;
+    }
+  }
+</style>
+<div class="mada-app-banner">MADA</div>
