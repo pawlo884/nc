@@ -1,6 +1,8 @@
 {% load i18n %}
-{# Shared MADA wordmark, included from both change_list.html and app_index.html
-   overrides (the two entry points into the mada app) so the style lives in one place. #}
+{% comment %}
+  Shared MADA wordmark, included from both change_list.html and app_index.html
+  overrides (the two entry points into the mada app) so the style lives in one place.
+{% endcomment %}
 <style>
   .mada-app-banner {
     margin: 0 0 20px;
@@ -11,6 +13,7 @@
     font-weight: 400;
     letter-spacing: 0.22em;
     color: #55534e;
+    text-align: center;
   }
   @media (prefers-color-scheme: dark) {
     .mada-app-banner {
