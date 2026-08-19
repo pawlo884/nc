@@ -1,5 +1,7 @@
 # 🎉 Upgrade do Zero-Downtime Deployment
 
+> ⚠️ **DEPRECATED**: opisany tu upgrade dotyczył blue-green (docker-compose), które nie jest już mechanizmem produkcyjnym — produkcja działa na k3s (patrz `docs/K8S_PROD.md`).
+
 ## Co się zmieniło?
 
 ### PRZED (tradycyjny deploy):

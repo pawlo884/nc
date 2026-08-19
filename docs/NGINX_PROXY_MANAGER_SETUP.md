@@ -1,5 +1,7 @@
 # Konfiguracja Nginx Proxy Manager dla produkcji
 
+> ⚠️ **DEPRECATED (część blue-green)**: fragmenty odnoszące się do routingu blue/green kontenerów opisują nieaktywny mechanizm — produkcja działa na k3s + Traefik (patrz `docs/K8S_PROD.md`).
+
 ## 🎯 Cel
 
 Skonfigurować Nginx Proxy Manager (NPM) do automatycznego zarządzania blue-green deployment bez ręcznego przełączania kontenerów przy każdym deploymencie.

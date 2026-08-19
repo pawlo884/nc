@@ -1,8 +1,13 @@
 #!/bin/bash
 
 ################################################################################
+# ⚠️ DEPRECATED: produkcja działa teraz na k3s (scripts/k8s-prod/deploy.sh,
+# deployments/k8s/nc-prod), nie na blue-green przez docker-compose.
+# Skrypt zachowany do wglądu/awaryjnego rollbacku, nie jest już częścią
+# aktywnego procesu wdrożenia (patrz docs/K8S_PROD.md).
+#
 # Blue-Green Deployment Script
-# 
+#
 # Ten skrypt wykonuje zero-downtime deployment używając strategii Blue-Green
 ################################################################################
 

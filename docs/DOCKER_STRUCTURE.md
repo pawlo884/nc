@@ -1,5 +1,7 @@
 # 🐳 Struktura plików Docker
 
+> ⚠️ **DEPRECATED (część blue-green)**: opisy plików `docker-compose.blue-green*.yml` dotyczą nieaktywnego mechanizmu produkcyjnego — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`).
+
 ## 📁 Uporządkowana struktura
 
 Projekt używa CZYTELNEJ struktury z osobnymi plikami dla dev i prod:

@@ -1,5 +1,7 @@
 # 🤖 ML Container - TODO List
 
+> ⚠️ **DEPRECATED (część blue-green)**: plan zakładał deploy ML workera przez blue-green (docker-compose), które nie jest już mechanizmem produkcyjnym (obecnie k3s, patrz `docs/K8S_PROD.md`).
+
 ## 📋 Plan implementacji osobnego kontenera ML
 
 ### Cel:

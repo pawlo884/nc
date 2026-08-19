@@ -1,5 +1,7 @@
 # 🚀 Przewodnik po skryptach deployment
 
+> ⚠️ **DEPRECATED**: skrypty blue-green opisane tutaj nie są już mechanizmem produkcyjnym — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`). Dokument zachowany do wglądu/awaryjnego rollbacku.
+
 ## Szybki wybór - który skrypt użyć?
 
 ### 🎯 Chcę zero-downtime deployment (ZALECANE)

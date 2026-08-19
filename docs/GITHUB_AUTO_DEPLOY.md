@@ -1,5 +1,7 @@
 # 🤖 Deployment z GitHub Actions
 
+> ⚠️ **DEPRECATED (część blue-green)**: opisany tu przepływ blue-green nie jest już aktywny — aktualny deploy przez `deploy-vps.yml` używa k3s (patrz `docs/K8S_PROD.md`).
+
 ## 🎯 Jak to działa?
 
 **Deployment NIE uruchamia się automatycznie przy każdym commicie!**
