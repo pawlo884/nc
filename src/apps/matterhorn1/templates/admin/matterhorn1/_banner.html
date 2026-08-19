@@ -1,0 +1,25 @@
+{% load i18n static %}
+{% comment %}
+  Shared Matterhorn logo, included from both change_list.html and app_index.html
+  overrides (the two entry points into the matterhorn1 app) so the style lives in one place.
+{% endcomment %}
+<style>
+  .matterhorn1-app-banner {
+    margin: 0 0 20px;
+    padding: 18px 0 16px;
+    border-bottom: 1px solid rgba(11,11,11,0.12);
+    text-align: center;
+  }
+  .matterhorn1-app-banner img {
+    max-height: 48px;
+    width: auto;
+  }
+  @media (prefers-color-scheme: dark) {
+    .matterhorn1-app-banner {
+      border-bottom-color: rgba(255,255,255,0.14);
+    }
+  }
+</style>
+<div class="matterhorn1-app-banner">
+  <img src="{% static 'matterhorn1/images/logo.png' %}" alt="Matterhorn">
+</div>

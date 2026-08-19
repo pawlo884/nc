@@ -1,0 +1,25 @@
+{% load i18n static %}
+{% comment %}
+  Shared Tabu logo, included from both change_list.html and app_index.html
+  overrides (the two entry points into the tabu app) so the style lives in one place.
+{% endcomment %}
+<style>
+  .tabu-app-banner {
+    margin: 0 0 20px;
+    padding: 18px 0 16px;
+    border-bottom: 1px solid rgba(11,11,11,0.12);
+    text-align: center;
+  }
+  .tabu-app-banner img {
+    max-height: 48px;
+    width: auto;
+  }
+  @media (prefers-color-scheme: dark) {
+    .tabu-app-banner {
+      border-bottom-color: rgba(255,255,255,0.14);
+    }
+  }
+</style>
+<div class="tabu-app-banner">
+  <img src="{% static 'tabu/images/logo.png' %}" alt="Tabu">
+</div>
