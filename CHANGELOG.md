@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.32.3](https://github.com/pawlo884/nc/compare/v1.32.2...v1.32.3) (2026-08-20)
+
+### Bug Fixes
+
+* lock down unauthenticated legacy API endpoints ([8b44f1e](https://github.com/pawlo884/nc/commit/8b44f1e2a597dde5d725919b42e7e6df66d47662))
+
 ## [1.32.2](https://github.com/pawlo884/nc/compare/v1.32.1...v1.32.2) (2026-08-19)
 
 ### Bug Fixes
