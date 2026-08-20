@@ -1,4 +1,5 @@
 import os
+from django.core.exceptions import ImproperlyConfigured
 from .base import *
 from .base import _strip_env_value
 
@@ -25,8 +26,13 @@ GUNICORN_KEEPALIVE = 5  # 5 sekund
 GUNICORN_MAX_REQUESTS = 500  # Restart workera po 500 requestach
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv(
-    'DJANGO_SECRET_KEY', 'django-insecure-zlntqh&x6vv%$+87ycj-)=#isuos^f_h4w%e#9+&w%xd5mph)!')
+# Brak fallbacku: jeśli DJANGO_SECRET_KEY nie jest ustawione w środowisku,
+# aplikacja ma się nie uruchomić, zamiast po cichu użyć klucza zapisanego w repo.
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        'Zmienna środowiskowa DJANGO_SECRET_KEY musi być ustawiona w produkcji.'
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -200,7 +206,10 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ALLOW_ALL_ORIGINS=True razem z CORS_ALLOW_CREDENTIALS=True pozwalało
+# dowolnej stronie wysyłać żądania z ciasteczkami sesji zalogowanego użytkownika
+# i odczytywać odpowiedzi — wyłączone na rzecz jawnej listy dozwolonych originów.
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -209,7 +218,14 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://212.127.93.27:8001",
     "http://192.168.50.31:8001",
+    "https://nc.sowa.ch",
+    "https://sowa.ch",
 ]
+# Dodatkowe dozwolone źródła z zmiennej środowiskowej (bez zmiany kodu przy deployu)
+cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if cors_origins_env:
+    CORS_ALLOWED_ORIGINS.extend([origin.strip()
+                                for origin in cors_origins_env.split(',') if origin.strip()])
 
 # Redis Configuration - wspólne dla Celery i Cache
 # W Dockerze nazwa serwisu Redis to 'redis' (w trybie blue-green: docker-compose.blue-green.yml)

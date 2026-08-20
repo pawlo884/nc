@@ -113,9 +113,12 @@ def admin_update_producer_code(request):
 
 
 # Dodaj URL do admina
+# WAŻNE: owinięcie przez admin.site.admin_view() jest konieczne — bez niego
+# widok nie przechodzi przez standardową kontrolę logowania/uprawnień admina
+# i byłby dostępny publicznie mimo rejestracji pod /admin/.
 original_get_urls = admin.site.get_urls
 admin.site.get_urls = lambda: original_get_urls() + [
-    path('mpd/update-producer-code/', admin_update_producer_code,
+    path('mpd/update-producer-code/', admin.site.admin_view(admin_update_producer_code),
          name='admin_update_producer_code'),
 ]
 

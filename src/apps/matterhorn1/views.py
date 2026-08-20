@@ -8,6 +8,8 @@ import json
 import logging
 from datetime import datetime
 
+from core.legacy_auth import admin_required, AdminRequiredMixin
+
 # Import drf_spectacular tylko jeśli jest dostępny
 try:
     from drf_spectacular.utils import extend_schema, OpenApiExample
@@ -37,7 +39,7 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
-class BaseBulkView(View):
+class BaseBulkView(AdminRequiredMixin, View):
     """Bazowa klasa dla bulk operations"""
 
     def get_model(self):
@@ -362,7 +364,7 @@ class VariantBulkView(BaseBulkView):
         500: {'description': 'Błąd serwera'}
     }
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
-class VariantBulkCreateView(View):
+class VariantBulkCreateView(AdminRequiredMixin, View):
     """Bulk create dla wariantów"""
 
     @method_decorator(csrf_exempt)
@@ -461,7 +463,7 @@ class VariantBulkCreateView(View):
             }, status=500)
 
 
-class VariantBulkUpdateView(View):
+class VariantBulkUpdateView(AdminRequiredMixin, View):
     """Bulk update dla wariantów"""
 
     @method_decorator(csrf_exempt)
@@ -587,7 +589,7 @@ class BrandBulkView(BaseBulkView):
         500: {'description': 'Błąd serwera'}
     }
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
-class BrandBulkCreateView(View):
+class BrandBulkCreateView(AdminRequiredMixin, View):
     """Bulk create dla marek"""
 
     @method_decorator(csrf_exempt)
@@ -684,7 +686,7 @@ class CategoryBulkView(BaseBulkView):
         500: {'description': 'Błąd serwera'}
     }
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
-class CategoryBulkCreateView(View):
+class CategoryBulkCreateView(AdminRequiredMixin, View):
     """Bulk create dla kategorii"""
 
     @method_decorator(csrf_exempt)
@@ -781,7 +783,7 @@ class ImageBulkView(BaseBulkView):
         500: {'description': 'Błąd serwera'}
     }
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
-class ImageBulkCreateView(View):
+class ImageBulkCreateView(AdminRequiredMixin, View):
     """Bulk create dla obrazów"""
 
     @method_decorator(csrf_exempt)
@@ -888,7 +890,7 @@ class ImageBulkCreateView(View):
         200: {'description': 'Synchronizacja została uruchomiona'}
     }
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
-class APISyncView(View):
+class APISyncView(AdminRequiredMixin, View):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
         return super().dispatch(*args, **kwargs)
@@ -906,7 +908,7 @@ class APISyncView(View):
         200: {'description': 'Synchronizacja produktów została uruchomiona'}
     }
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
-class ProductSyncView(View):
+class ProductSyncView(AdminRequiredMixin, View):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
         return super().dispatch(*args, **kwargs)
@@ -924,7 +926,7 @@ class ProductSyncView(View):
         200: {'description': 'Synchronizacja wariantów została uruchomiona'}
     }
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
-class VariantSyncView(View):
+class VariantSyncView(AdminRequiredMixin, View):
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
         return super().dispatch(*args, **kwargs)
@@ -942,7 +944,7 @@ class VariantSyncView(View):
         200: {'description': 'Status API został pobrany pomyślnie'}
     }
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
-class APIStatusView(View):
+class APIStatusView(AdminRequiredMixin, View):
     def get(self, request):
         return JsonResponse({'message': 'APIStatusView - do implementacji'})
 
@@ -956,12 +958,13 @@ class APIStatusView(View):
         200: {'description': 'Logi zostały pobrane pomyślnie'}
     }
 ) if DRF_SPECTACULAR_AVAILABLE else extend_schema()
-class APILogsView(View):
+class APILogsView(AdminRequiredMixin, View):
     def get(self, request):
         return JsonResponse({'message': 'APILogsView - do implementacji'})
 
 
 @csrf_exempt
+@admin_required
 def get_product_details(request, product_id):
     """
     API endpoint do pobierania szczegółów produktu z matterhorn1
