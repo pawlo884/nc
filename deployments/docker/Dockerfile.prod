@@ -48,6 +48,7 @@ COPY src/apps/matterhorn1/ ./matterhorn1/
 COPY src/apps/MPD/ ./MPD/
 COPY src/apps/web_agent/ ./web_agent/
 COPY src/apps/tabu/ ./tabu/
+COPY src/apps/mada/ ./mada/
 # COPY static/ ./static/  # Nie kopiujemy - zostanie utworzony przez collectstatic
 COPY deployments/nginx/nginx.conf ./nginx.conf
 COPY deployments/redis.conf ./redis.conf
