@@ -87,6 +87,29 @@ echo 'export KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
 
 Kolejne wersje: tylko merge + tag — reszta robi CI.
 
+## Rotacja sekretów w `.env.prod` (np. DJANGO_SECRET_KEY)
+
+`deploy.sh` po deployu robi `kubectl rollout restart` **tylko** dla `nc-web`
+(`deployments/k8s/nc-prod/web.yaml` + `ingress.yaml` — patrz sekcja Workflow CI).
+`celery.yaml` (`celery-default`, `celery-import`, `celery-beat`) i `flower.yaml`
+(`flower`) czytają ten sam Secret `nc-env`, ale nie są aplikowane/restartowane
+automatycznie przy każdym tagu — po zmianie wartości w `.env.prod` (np. rotacji
+`DJANGO_SECRET_KEY`) trzeba je zrestartować ręcznie, inaczej dalej działają na
+starej wartości wczytanej przy starcie poda:
+
+```bash
+# 1. .env.prod na VPS ma już nową wartość (np. DJANGO_SECRET_KEY)
+./scripts/k8s-prod/create-secret.sh   # przebudowuje Secret nc-env
+kubectl rollout restart deployment/nc-web deployment/celery-default \
+  deployment/celery-import deployment/celery-beat deployment/flower -n nc-prod
+kubectl rollout status deployment/nc-web -n nc-prod
+```
+
+`nc-web` i tak dostanie restart automatycznie przy zwykłym tagowanym deployu —
+powyższe jest potrzebne głównie gdy zmieniasz `.env.prod` **bez** nowego tagu,
+albo chcesz mieć pewność, że wszystkie pody (w tym Celery/Flower) mają tę samą,
+aktualną wartość sekretu od razu.
+
 ## Flower (monitoring Celery)
 
 Manifest: `deployments/k8s/nc-prod/flower.yaml` (Deployment + Service + Ingress).

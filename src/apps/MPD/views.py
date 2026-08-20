@@ -19,6 +19,7 @@ from matterhorn1.defs_db import BUCKET_PUBLIC_BASE_URL, resolve_image_url
 from django.urls import reverse
 
 from django.views.decorators.csrf import csrf_exempt
+from core.legacy_auth import admin_required
 import decimal
 import json
 
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Create your views here.
 
 
+@admin_required
 def products(request):
     products = list(Products.objects.all())
     product_ids = [p.id for p in products]
@@ -69,6 +71,7 @@ def products(request):
     return render(request, 'MPD/mpd.html', {'products': products})
 
 
+@admin_required
 def product_mapping(request):
     """
     Widok do mapowania produktów z matterhorn1 do MPD
@@ -76,6 +79,7 @@ def product_mapping(request):
     return render(request, 'MPD/product_mapping.html')
 
 
+@admin_required
 def test_connection(request):
     try:
         with connections['MPD'].cursor() as cursor:
@@ -107,6 +111,7 @@ def test_connection(request):
         return JsonResponse({'status': 'error', 'message': 'Wystąpił błąd'}, status=500)
 
 
+@admin_required
 def test_table_structure(request):
     try:
         with connections['MPD'].cursor() as cursor:
@@ -285,6 +290,7 @@ def update_all_gateways():
 
 
 @csrf_exempt
+@admin_required
 def generate_full_xml(request):
     exporter = FullXMLExporter()
     # Używa metody z zapisem rekordu do bazy - eksport przyrostowy (tylko nowe produkty)
@@ -311,6 +317,7 @@ def generate_full_xml(request):
 
 
 @csrf_exempt
+@admin_required
 def generate_full_change_xml(request):
     exporter = FullChangeXMLExporter()
     exporter_result = exporter.export()
@@ -344,6 +351,7 @@ def generate_full_change_xml(request):
 
 
 @csrf_exempt
+@admin_required
 def generate_gateway_xml(request, source_name):
     try:
         # Zawsze używa Matterhorn (id=2), ignoruje source_name
@@ -358,6 +366,7 @@ def generate_gateway_xml(request, source_name):
 
 
 @csrf_exempt
+@admin_required
 def generate_light_xml(request):
     exporter = LightXMLExporter()
     exporter_result = exporter.export()
@@ -371,6 +380,7 @@ def generate_light_xml(request):
 
 
 @csrf_exempt
+@admin_required
 def generate_producers_xml(request):
     exporter = ProducersXMLExporter()
     exporter_result = exporter.export()
@@ -384,6 +394,7 @@ def generate_producers_xml(request):
 
 
 @csrf_exempt
+@admin_required
 def generate_stocks_xml(request):
     exporter = StocksXMLExporter()
     exporter_result = exporter.export()
@@ -397,6 +408,7 @@ def generate_stocks_xml(request):
 
 
 @csrf_exempt
+@admin_required
 def generate_units_xml(request):
     exporter = UnitsXMLExporter()
     exporter_result = exporter.export()
@@ -415,6 +427,7 @@ def empty_xml(request):
 
 
 @csrf_exempt
+@admin_required
 def generate_categories_xml(request):
     """Generuje XML z kategoriami zgodnie ze schematem categories.xsd"""
     exporter = CategoriesXMLExporter()
@@ -429,6 +442,7 @@ def generate_categories_xml(request):
 
 
 @csrf_exempt
+@admin_required
 def generate_sizes_xml(request):
     """Generuje XML z rozmiarami zgodnie ze schematem sizes.xsd"""
     exporter = SizesXMLExporter()
@@ -443,30 +457,35 @@ def generate_sizes_xml(request):
 
 
 @csrf_exempt
+@admin_required
 def generate_parameters_xml(request):
     """Generuje XML z parametrami - tymczasowo puste"""
     return HttpResponse('<parameters file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste parametry --></parameters>', content_type='application/xml')
 
 
 @csrf_exempt
+@admin_required
 def generate_series_xml(request):
     """Generuje XML z seriami - tymczasowo puste"""
     return HttpResponse('<series file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste serie --></series>', content_type='application/xml')
 
 
 @csrf_exempt
+@admin_required
 def generate_warranties_xml(request):
     """Generuje XML z gwarancjami - tymczasowo puste"""
     return HttpResponse('<warranties file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste gwarancje --></warranties>', content_type='application/xml')
 
 
 @csrf_exempt
+@admin_required
 def generate_preset_xml(request):
     """Generuje XML z presetami - tymczasowo puste"""
     return HttpResponse('<preset file_format="IOF" version="3.0" generated_by="nc" language="pol"><!-- Puste presety --></preset>', content_type='application/xml')
 
 
 @csrf_exempt
+@admin_required
 def generate_gateway_xml_api(request):
     """Generuje gateway.xml z endpointami API"""
     try:
@@ -534,6 +553,7 @@ def xml_links(request):
 
 
 @csrf_exempt
+@admin_required
 def manage_product_paths(request):
     """
     Endpoint do zarządzania przypisaniami ścieżek do produktów
@@ -599,6 +619,7 @@ def manage_product_paths(request):
 
 
 @csrf_exempt
+@admin_required
 def manage_product_fabric(request):
     """
     Endpoint do zarządzania składem materiałowym produktów
@@ -713,6 +734,7 @@ def manage_product_fabric(request):
 
 
 @csrf_exempt
+@admin_required
 def manage_product_attributes(request):
     """
     Endpoint do zarządzania atrybutami produktów
@@ -824,6 +846,7 @@ def manage_product_attributes(request):
 
 
 @csrf_exempt
+@admin_required
 def create_product(request):
     """
     Endpoint do tworzenia nowego produktu w MPD
@@ -936,6 +959,7 @@ def create_product(request):
 
 
 @csrf_exempt
+@admin_required
 def update_product(request, product_id):
     """
     Endpoint do aktualizacji produktu w MPD
@@ -1055,6 +1079,7 @@ def update_product(request, product_id):
 
 
 @csrf_exempt
+@admin_required
 def get_product(request, product_id):
     """
     Endpoint do pobierania danych produktu z MPD
@@ -1397,6 +1422,7 @@ def update_product_retail_prices(request, product_id):
 
 
 @csrf_exempt
+@admin_required
 def bulk_create_products(request):
     """
     Endpoint do bulk tworzenia produktów w MPD
@@ -1525,6 +1551,7 @@ def bulk_create_products(request):
         return JsonResponse({'status': 'error', 'message': 'Wystąpił błąd'}, status=500)
 
 
+@admin_required
 def bulk_map_from_matterhorn1(request):
     """
     Endpoint do bulk mapowania produktów z matterhorn1 do MPD
@@ -1684,6 +1711,7 @@ def bulk_map_from_matterhorn1(request):
 
 
 @csrf_exempt
+@admin_required
 def get_matterhorn1_products(request):
     """
     Endpoint do pobierania produktów z matterhorn1 do mapowania
@@ -1779,6 +1807,7 @@ def get_matterhorn1_products(request):
 
 
 @csrf_exempt
+@admin_required
 def update_producer_code(request):
     """
     Endpoint do aktualizacji kodu producenta wariantu

@@ -1,3 +1,8 @@
+# WYMAGANE w core.settings.prod (i .test) — bez tego aplikacja nie wystartuje.
+# Wygeneruj osobny, losowy klucz dla KAŻDEGO środowiska (dev/test/prod), nigdy nie
+# współdziel z tym w repo/kodzie: .venv/Scripts/python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+DJANGO_SECRET_KEY=zmien-na-losowy-klucz
+
 # Bazy danych – dla lokalnego uruchomienia (manage.py na hoście) ustaw HOST=localhost, PORT=5434
 # Docker override w docker-compose.dev.yml ustawia postgres-ssh-tunnel dla kontenerów
 DEFAULT_DB_HOST=localhost
