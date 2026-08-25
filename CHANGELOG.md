@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.32.4](https://github.com/pawlo884/nc/compare/v1.32.3...v1.32.4) (2026-08-25)
+
+### Bug Fixes
+
+* **matterhorn1:** zachowaj updated_at przy bulk_update stanow i produktow ([0dbfb21](https://github.com/pawlo884/nc/commit/0dbfb2129761b811e4b3d40312fbe6a71bda4277))
+
 ## [1.32.3](https://github.com/pawlo884/nc/compare/v1.32.2...v1.32.3) (2026-08-20)
 
 ### Bug Fixes
