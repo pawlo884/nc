@@ -728,7 +728,7 @@ def _bulk_import_products(items):
                     products_to_update,
                     ['active', 'name', 'description', 'creation_date', 'color', 'url',
                      'new_collection', 'brand', 'category', 'prices', 'products_in_set',
-                     'other_colors', 'last_api_sync'],
+                     'other_colors', 'last_api_sync', 'updated_at'],
                     batch_size=100
                 )
                 logger.info(
@@ -758,6 +758,7 @@ def _create_related_objects_for_products(products):
         logger.info(
             f"🚀 ROZPOCZYNAM _create_related_objects_for_products dla {len(products)} produktów")
         from matterhorn1.models import ProductVariant, ProductImage, ProductDetails
+        from django.utils import timezone
 
         variants_to_create = []
         variants_to_update = []
@@ -785,6 +786,7 @@ def _create_related_objects_for_products(products):
                             'max_processing_time', existing_variant.max_processing_time)
                         existing_variant.ean = variant_data.get(
                             'ean', existing_variant.ean)
+                        existing_variant.updated_at = timezone.now()
                         variants_to_update.append(existing_variant)
                     except ProductVariant.DoesNotExist:
                         # Utwórz nowy
@@ -823,6 +825,7 @@ def _create_related_objects_for_products(products):
                         'size_table_txt', existing_details.size_table_txt)
                     existing_details.size_table_html = details_data.get(
                         'size_table_html', existing_details.size_table_html)
+                    existing_details.updated_at = timezone.now()
                     details_to_update.append(existing_details)
                 except ProductDetails.DoesNotExist:
                     # Utwórz nowe
@@ -846,7 +849,7 @@ def _create_related_objects_for_products(products):
         if variants_to_update:
             ProductVariant.objects.using('matterhorn1').bulk_update(
                 variants_to_update,
-                ['name', 'stock', 'max_processing_time', 'ean'],
+                ['name', 'stock', 'max_processing_time', 'ean', 'updated_at'],
                 batch_size=100
             )
             logger.info(
@@ -885,7 +888,8 @@ def _create_related_objects_for_products(products):
         if details_to_update:
             ProductDetails.objects.using('matterhorn1').bulk_update(
                 details_to_update,
-                ['weight', 'size_table', 'size_table_txt', 'size_table_html'],
+                ['weight', 'size_table', 'size_table_txt',
+                    'size_table_html', 'updated_at'],
                 batch_size=100
             )
             logger.info(
@@ -1039,6 +1043,9 @@ def _prepare_product_update(product, item):
         'products_in_set') or product.products_in_set
     product.other_colors = item.get('other_colors') or product.other_colors
     product.last_api_sync = timezone.now()
+    # bulk_update() nie wywołuje save(), więc auto_now na updated_at się nie
+    # odpali samo - ustawiamy ręcznie, żeby downstream (bridge do MPD) widział zmianę.
+    product.updated_at = timezone.now()
 
     # Dodaj warianty jeśli są dostępne
     if item.get('variants'):
@@ -1186,6 +1193,7 @@ def _bulk_update_inventory(inventory_data):
     try:
         from matterhorn1.models import Product, ProductVariant
         from django.db import transaction
+        from django.utils import timezone
 
         # Sprawdź czy dane są dostępne
         if not inventory_data:
@@ -1253,6 +1261,11 @@ def _bulk_update_inventory(inventory_data):
                             )
 
                             variant.stock = new_stock
+                            # bulk_update() nie wywołuje save(), więc auto_now na
+                            # updated_at się nie odpali - trzeba ustawić ręcznie,
+                            # bo bridge MPD.tasks.update_stock_from_matterhorn1
+                            # filtruje warianty właśnie po updated_at.
+                            variant.updated_at = timezone.now()
                             variants_to_update.append(variant)
 
                     except ProductVariant.DoesNotExist:
@@ -1268,7 +1281,7 @@ def _bulk_update_inventory(inventory_data):
             with transaction.atomic(using='matterhorn1'):
                 ProductVariant.objects.using('matterhorn1').bulk_update(
                     variants_to_update,
-                    ['stock'],
+                    ['stock', 'updated_at'],
                     batch_size=100
                 )
                 updated_count = len(variants_to_update)
