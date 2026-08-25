@@ -45,3 +45,24 @@ def sync_mada_partial(self):
         raise self.retry(exc=exc)
     finally:
         cache.delete(lock_key)
+
+
+@shared_task(bind=True, name='mada.tasks.cleanup_empty_products', max_retries=2, default_retry_delay=600)
+def cleanup_empty_products(self):
+    """
+    Usuwa puste produkty Mada (bez NAME w feedzie, nigdy nie zmapowane do MPD).
+    Wywoływany raz dziennie, po pełnym imporcie.
+    """
+    lock_key = 'mada:lock:cleanup_empty_products'
+    if not cache.add(lock_key, self.request.id, timeout=_LOCK_TTL_SECONDS):
+        logger.warning('Pomijam cleanup_empty_products: poprzedni task nadal trwa (lock aktywny).')
+        return {'status': 'skipped', 'reason': 'already_running'}
+
+    try:
+        call_command('cleanup_empty_mada_products')
+        return {'status': 'ok'}
+    except Exception as exc:
+        logger.exception('Błąd czyszczenia pustych produktów Mada: %s', exc)
+        raise self.retry(exc=exc)
+    finally:
+        cache.delete(lock_key)
