@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.33.0](https://github.com/pawlo884/nc/compare/v1.32.4...v1.33.0) (2026-08-26)
+
+### Features
+
+* **mada:** dodaj codzienne czyszczenie pustych produktow ([fd99251](https://github.com/pawlo884/nc/commit/fd99251797e21dde6b1dbbc965938199d6e2b90c))
+
 ## [1.32.4](https://github.com/pawlo884/nc/compare/v1.32.3...v1.32.4) (2026-08-25)
 
 ### Bug Fixes
