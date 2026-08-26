@@ -15,14 +15,14 @@ const BulkMapping = ({ mappings, onComplete }) => {
   const handleSuggestionClick = (productId, mpdId) => {
     setSelectedMappings(prev => ({
       ...prev,
-      [productId]: mpdId
+      [productId]: mpdId,
     }));
   };
 
   const submitMappings = async () => {
     const mappingsData = Object.entries(selectedMappings).map(([productId, mpdId]) => ({
       product_id: parseInt(productId),
-      mpd_product_id: parseInt(mpdId)
+      mpd_product_id: parseInt(mpdId),
     }));
 
     if (mappingsData.length === 0) {
@@ -36,13 +36,13 @@ const BulkMapping = ({ mappings, onComplete }) => {
         method: 'POST',
         headers: {
           'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ mappings: mappingsData })
+        body: JSON.stringify({ mappings: mappingsData }),
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         showMessage(data.message, 'success');
         setTimeout(() => {
@@ -64,22 +64,25 @@ const BulkMapping = ({ mappings, onComplete }) => {
     <div style={{ maxWidth: '1200px', margin: '20px auto', padding: '20px' }}>
       <h1>Mapowanie produktów do MPD</h1>
       <p>Wybierz mapowania dla wybranych produktów:</p>
-      
+
       {message && (
-        <div className={`status-message ${messageType}`} style={{
-          margin: '20px 0',
-          padding: '15px',
-          borderRadius: '4px',
-          backgroundColor: messageType === 'success' ? '#d4edda' : '#f8d7da',
-          color: messageType === 'success' ? '#155724' : '#721c24',
-          border: `1px solid ${messageType === 'success' ? '#c3e6cb' : '#f5c6cb'}`
-        }}>
+        <div
+          className={`status-message ${messageType}`}
+          style={{
+            margin: '20px 0',
+            padding: '15px',
+            borderRadius: '4px',
+            backgroundColor: messageType === 'success' ? '#d4edda' : '#f8d7da',
+            color: messageType === 'success' ? '#155724' : '#721c24',
+            border: `1px solid ${messageType === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
+          }}
+        >
           {message}
         </div>
       )}
 
       <div>
-        {mappings.map((mapping) => (
+        {mappings.map(mapping => (
           <div
             key={mapping.product.id}
             style={{
@@ -87,39 +90,44 @@ const BulkMapping = ({ mappings, onComplete }) => {
               borderRadius: '8px',
               marginBottom: '20px',
               padding: '20px',
-              backgroundColor: '#f9f9f9'
+              backgroundColor: '#f9f9f9',
             }}
           >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '15px'
-            }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '15px',
+              }}
+            >
               <div style={{ flex: 1 }}>
-                <div style={{
-                  fontWeight: 'bold',
-                  fontSize: '1.1em',
-                  color: '#333'
-                }}>
+                <div
+                  style={{
+                    fontWeight: 'bold',
+                    fontSize: '1.1em',
+                    color: '#333',
+                  }}
+                >
                   {mapping.product.name}
                 </div>
-                <div style={{
-                  color: '#666',
-                  fontSize: '0.9em',
-                  marginTop: '5px'
-                }}>
-                  ID: {mapping.product.product_uid} | 
-                  Marka: {mapping.product.brand?.name || 'Brak'} | 
-                  Kategoria: {mapping.product.category?.name || 'Brak'}
+                <div
+                  style={{
+                    color: '#666',
+                    fontSize: '0.9em',
+                    marginTop: '5px',
+                  }}
+                >
+                  ID: {mapping.product.product_uid} | Marka: {mapping.product.brand?.name || 'Brak'}{' '}
+                  | Kategoria: {mapping.product.category?.name || 'Brak'}
                 </div>
               </div>
             </div>
-            
+
             <div style={{ marginTop: '15px' }}>
               <h4>Sugerowane mapowania:</h4>
               {mapping.suggestions && mapping.suggestions.length > 0 ? (
-                mapping.suggestions.map((suggestion) => (
+                mapping.suggestions.map(suggestion => (
                   <div
                     key={suggestion.id}
                     onClick={() => handleSuggestionClick(mapping.product.id, suggestion.id)}
@@ -128,42 +136,44 @@ const BulkMapping = ({ mappings, onComplete }) => {
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       padding: '10px',
-                      border: selectedMappings[mapping.product.id] === suggestion.id 
-                        ? '2px solid #28a745' 
-                        : '1px solid #e0e0e0',
+                      border:
+                        selectedMappings[mapping.product.id] === suggestion.id
+                          ? '2px solid #28a745'
+                          : '1px solid #e0e0e0',
                       borderRadius: '4px',
                       marginBottom: '8px',
-                      backgroundColor: selectedMappings[mapping.product.id] === suggestion.id 
-                        ? '#f8fff9' 
-                        : 'white',
+                      backgroundColor:
+                        selectedMappings[mapping.product.id] === suggestion.id
+                          ? '#f8fff9'
+                          : 'white',
                       cursor: 'pointer',
-                      transition: 'all 0.3s'
+                      transition: 'all 0.3s',
                     }}
                   >
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 500, color: '#333' }}>
-                        {suggestion.name}
-                      </div>
-                      <div style={{ color: '#666', fontSize: '0.9em' }}>
-                        {suggestion.brand}
-                      </div>
+                      <div style={{ fontWeight: 500, color: '#333' }}>{suggestion.name}</div>
+                      <div style={{ color: '#666', fontSize: '0.9em' }}>{suggestion.brand}</div>
                     </div>
-                    <div style={{
-                      color: '#28a745',
-                      fontWeight: 'bold',
-                      marginLeft: '10px'
-                    }}>
+                    <div
+                      style={{
+                        color: '#28a745',
+                        fontWeight: 'bold',
+                        marginLeft: '10px',
+                      }}
+                    >
                       {suggestion.similarity}%
                     </div>
                   </div>
                 ))
               ) : (
-                <div style={{
-                  color: '#666',
-                  fontStyle: 'italic',
-                  textAlign: 'center',
-                  padding: '20px'
-                }}>
+                <div
+                  style={{
+                    color: '#666',
+                    fontStyle: 'italic',
+                    textAlign: 'center',
+                    padding: '20px',
+                  }}
+                >
                   Brak sugerowanych mapowań
                 </div>
               )}
@@ -171,13 +181,15 @@ const BulkMapping = ({ mappings, onComplete }) => {
           </div>
         ))}
       </div>
-      
-      <div style={{
-        marginTop: '30px',
-        textAlign: 'center',
-        padding: '20px',
-        borderTop: '1px solid #ddd'
-      }}>
+
+      <div
+        style={{
+          marginTop: '30px',
+          textAlign: 'center',
+          padding: '20px',
+          borderTop: '1px solid #ddd',
+        }}
+      >
         <button
           onClick={submitMappings}
           disabled={isLoading}
@@ -190,12 +202,12 @@ const BulkMapping = ({ mappings, onComplete }) => {
             margin: '0 10px',
             backgroundColor: '#417690',
             color: 'white',
-            opacity: isLoading ? 0.6 : 1
+            opacity: isLoading ? 0.6 : 1,
           }}
         >
           {isLoading ? 'Zapisywanie...' : 'Zapisz mapowania'}
         </button>
-        
+
         <button
           onClick={() => window.history.back()}
           disabled={isLoading}
@@ -207,7 +219,7 @@ const BulkMapping = ({ mappings, onComplete }) => {
             fontSize: '14px',
             margin: '0 10px',
             backgroundColor: '#6c757d',
-            color: 'white'
+            color: 'white',
           }}
         >
           Anuluj

@@ -5,7 +5,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'bundle.js',
-    publicPath: '/static/matterhorn1/js/dist/'
+    publicPath: '/static/matterhorn1/js/dist/',
   },
   module: {
     rules: [
@@ -15,18 +15,18 @@ module.exports = {
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-env', '@babel/preset-react']
-          }
-        }
+            presets: ['@babel/preset-env', '@babel/preset-react'],
+          },
+        },
       },
       {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader']
-      }
-    ]
+        use: ['style-loader', 'css-loader'],
+      },
+    ],
   },
   resolve: {
-    extensions: ['.js', '.jsx']
+    extensions: ['.js', '.jsx'],
   },
   devServer: {
     static: {
@@ -34,6 +34,6 @@ module.exports = {
     },
     compress: true,
     port: 3000,
-    hot: true
-  }
+    hot: true,
+  },
 };
