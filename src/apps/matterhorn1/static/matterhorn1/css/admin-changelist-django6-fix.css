@@ -1,55 +1,41 @@
 /**
- * Django 6 + django-admin-interface: naprawa layoutu changelist.
+ * django-admin-interface: sticky filter panel na changelist.
  *
- * admin_interface (list-filter-sticky) ustawia na #changelist-filter
- * float:right i height:100%. W Django 6 filtr jest wewnątrz
- * .changelist-form-container (flex) — float wypycha tabelę pod filtr
- * i zostawia dużą pustą przestrzeń.
+ * UWAGA - historia tego pliku (Django 5.2.4, DOM sprawdzony na zywo):
+ * Django juz samo ustawia poprawny layout w core admin/css/changelists.css:
+ *   #changelist { display: flex; ... }
+ *   #changelist .changelist-form-container { flex: 1 1 auto; min-width: 0; }
+ *   #changelist-filter { flex: 0 0 240px; order: 1; ... }
+ * .changelist-form-container i #changelist-filter sa BEZPOSREDNIMI
+ * rodzenstwem #changelist (flex-item obok flex-item) - #changelist-filter
+ * nie jest zagniezdzone w .changelist-form-container.
+ *
+ * Poprzednia wersja tego pliku zakladala inny (blednie odgadniety pod
+ * kątem Django 6) uklad DOM i psula layout na dwa sposoby:
+ *   1. `.changelist-form-container { display: flex !important }` +
+ *      `#changelist { display: block }` na koncu pliku - nadpisywalo
+ *      poprawny flex z Django, filtr spadal w block-flow POD cala
+ *      tabele (setki wierszy w dol).
+ *   2. `.changelist-form-container > div { flex: 1 1 auto; min-width: 0 }`
+ *      lapalo #toolbar (div - pasek wyszukiwania) jako flex-item obok
+ *      form#changelist-form (NIE div, wiec regula go omijala) - #toolbar
+ *      zapadal sie do ~0px szerokosci, bo form z cala tabela mial
+ *      znacznie wiekszy flex-basis i wygrywal przy shrinkowaniu.
+ *
+ * Zostawiamy tu tylko dodatek UX (sticky panel filtrow przy scrollu),
+ * ktory nie zmienia display/flex-basis samego .changelist-form-container
+ * ani #toolbar, wiec nie koliduje z natywnym layoutem Django.
  */
 @media (min-width: 768px) {
-    .admin-interface #changelist .changelist-form-container {
-        display: flex !important;
-        align-items: flex-start !important;
-        flex-wrap: nowrap !important;
-        width: 100%;
-    }
-
-    .admin-interface #changelist .changelist-form-container > div {
-        flex: 1 1 auto;
-        min-width: 0;
-    }
-
-    .admin-interface #changelist .changelist-form-container:has(#changelist-filter) > div {
-        max-width: calc(100% - 270px);
-    }
-
-    .admin-interface.list-filter-sticky .module.filtered #changelist-filter,
-    .admin-interface .module.filtered #changelist-filter {
-        float: none !important;
+    .admin-interface.list-filter-sticky .module.filtered #changelist-filter {
         position: sticky;
         top: 30px;
         z-index: 30;
-        flex: 0 0 240px !important;
-        order: 1;
-        align-self: flex-start;
-        height: auto !important;
         max-height: calc(100vh - 60px);
         overflow-y: auto;
-        margin: 0 0 0 30px;
     }
 
     .admin-interface.list-filter-sticky.sticky-pagination .module.filtered #changelist-filter {
         max-height: calc(100vh - 125px);
     }
-
-    /* Stary selektor admin_interface nie pasuje do DOM Django 6 */
-    .admin-interface.list-filter-sticky .module.filtered #toolbar + #changelist-filter {
-        position: sticky !important;
-        top: 30px;
-    }
-}
-
-/* Unikaj podwójnego flexa gdy serwowany jest jeszcze CSS z Django 5.x */
-.admin-interface.change-list #changelist {
-    display: block;
 }
