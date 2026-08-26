@@ -832,6 +832,9 @@ class ManageProductPathsViewTest(TestCase):
 
     def setUp(self):
         self.client = Client()
+        admin_user = User.objects.create_user(
+            username='admin', password='adminpass123', is_staff=True)
+        self.client.force_login(admin_user)
         brand = Brands.objects.using('MPD').create(name='B')
         self.product = Products.objects.using('MPD').create(name='Produkt', brand=brand)
         self.path = Paths.objects.using('MPD').create(name='Kat', path='kat')
@@ -961,6 +964,9 @@ class ManageProductFabricViewTest(TestCase):
 
     def setUp(self):
         self.client = Client()
+        admin_user = User.objects.create_user(
+            username='admin', password='adminpass123', is_staff=True)
+        self.client.force_login(admin_user)
         brand = Brands.objects.using('MPD').create(name='B')
         self.product = Products.objects.using('MPD').create(name='Produkt', brand=brand)
         self.component = FabricComponent.objects.using('MPD').create(name='Bawełna')
@@ -1090,6 +1096,9 @@ class ManageProductAttributesViewTest(TestCase):
 
     def setUp(self):
         self.client = Client()
+        admin_user = User.objects.create_user(
+            username='admin', password='adminpass123', is_staff=True)
+        self.client.force_login(admin_user)
         brand = Brands.objects.using('MPD').create(name='B')
         self.product = Products.objects.using('MPD').create(name='Produkt', brand=brand)
         self.attr = Attributes.objects.using('MPD').create(name='Kolor')
@@ -1231,6 +1240,9 @@ class CreateProductViewTest(TestCase):
 
     def setUp(self):
         self.client = Client()
+        admin_user = User.objects.create_user(
+            username='admin', password='adminpass123', is_staff=True)
+        self.client.force_login(admin_user)
         self.brand = Brands.objects.using('MPD').create(name='Brand Testowy')
 
     def _post(self, data):
