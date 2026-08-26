@@ -18,11 +18,16 @@ PRETTIER_FILES="$(git diff --cached --name-only --diff-filter=ACMR -- '*.js' '*.
 if [ -n "$JS_TS_FILES" ]; then
   echo "husky: eslint (staged js/ts)"
   # Nie blokuj commita - tylko informacyjnie.
-  npx --no eslint --max-warnings=0 --ext .js,.jsx,.ts,.tsx $JS_TS_FILES || true
+  # UWAGA: bez "--no" - ta flaga nie jest rozpoznawana przez obecny npx/npm
+  # (npm >=10) i powoduje, ze npm "polyka" wywolanie zamiast przekazac je do
+  # eslinta (npm --version/EUNKNOWNCONFIG zamiast realnego checka). Lokalna
+  # devDependency (node_modules/.bin) jest wystarczajaca - npx i tak jej uzyje
+  # bez pytania o instalacje.
+  npx eslint --max-warnings=0 --ext .js,.jsx,.ts,.tsx $JS_TS_FILES || true
 fi
 
 if [ -n "$PRETTIER_FILES" ]; then
   echo "husky: prettier --check (staged)"
   # Nie blokuj commita - tylko informacyjnie.
-  npx --no prettier --check $PRETTIER_FILES || true
+  npx prettier --check $PRETTIER_FILES || true
 fi
