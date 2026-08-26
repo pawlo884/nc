@@ -2,76 +2,81 @@
 
 /* Header */
 #header {
-    background: #417690 !important;
+  background: #417690 !important;
 }
 
 /* Sidebar */
 #nav-sidebar {
-    background: #f8f8f8 !important;
+  background: #f8f8f8 !important;
 }
 
 /* Content area */
 #content {
-    background: #ffffff !important;
+  background: #ffffff !important;
 }
 
 /* Links */
-a:link, a:visited {
-    color: #417690 !important;
+a:link,
+a:visited {
+  color: #417690 !important;
 }
 
 /* Hover effects */
 a:hover {
-    color: #205067 !important;
+  color: #205067 !important;
 }
 
 /* Filter sidebar */
 #changelist-filter {
-    background: #f8f8f8 !important;
+  background: #f8f8f8 !important;
 }
 
 /* Filter links */
 #changelist-filter a {
-    color: #417690 !important;
+  color: #417690 !important;
 }
 
 #changelist-filter a:hover {
-    color: #205067 !important;
+  color: #205067 !important;
 }
 
 /* Buttons */
-.default, input[type=submit].default, .submit-row input.default {
-    background: #417690 !important;
-    color: white !important;
+.default,
+input[type='submit'].default,
+.submit-row input.default {
+  background: #417690 !important;
+  color: white !important;
 }
 
-.default:hover, input[type=submit].default:hover, .submit-row input.default:hover {
-    background: #205067 !important;
+.default:hover,
+input[type='submit'].default:hover,
+.submit-row input.default:hover {
+  background: #205067 !important;
 }
 
 /* Table headers */
 #result_list thead th {
-    background: #f8f8f8 !important;
-    color: #333 !important;
+  background: #f8f8f8 !important;
+  color: #333 !important;
 }
 
 /* Selected rows */
 .selected {
-    background: #e8f4fd !important;
+  background: #e8f4fd !important;
 }
 
 /* Messages */
 .messagelist .success {
-    background: #dff0d8 !important;
-    color: #3c763d !important;
+  background: #dff0d8 !important;
+  color: #3c763d !important;
 }
 
 .messagelist .warning {
-    background: #fcf8e3 !important;
-    color: #8a6d3b !important;
+  background: #fcf8e3 !important;
+  color: #8a6d3b !important;
 }
 
 .messagelist .error {
-    background: #f2dede !important;
-    color: #a94442 !important;
+  background: #f2dede !important;
+  color: #a94442 !important;
 }
