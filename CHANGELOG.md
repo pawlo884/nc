@@ -1,5 +1,12 @@
 # Zmiany
 
+## [1.33.1](https://github.com/pawlo884/nc/compare/v1.33.0...v1.33.1) (2026-08-26)
+
+### Bug Fixes
+
+* **husky:** usun bledna flage --no z npx w pre-commit ([bd1445b](https://github.com/pawlo884/nc/commit/bd1445b13107c3650b973ef8b83bdcc905a0d8e7))
+* **matterhorn1:** napraw layout changelist admina (filtr + wyszukiwarka) ([510a131](https://github.com/pawlo884/nc/commit/510a131d9f66225d27d390de93e662183dc365d6)), closes [#changelist-filter](https://github.com/pawlo884/nc/issues/changelist-filter) [#changelist](https://github.com/pawlo884/nc/issues/changelist) [#changelist](https://github.com/pawlo884/nc/issues/changelist) [#toolbar](https://github.com/pawlo884/nc/issues/toolbar) [form#changelist-form](https://github.com/pawlo884/form/issues/changelist-form) [#toolbar](https://github.com/pawlo884/nc/issues/toolbar) [#toolbar](https://github.com/pawlo884/nc/issues/toolbar)
+
 ## [1.33.0](https://github.com/pawlo884/nc/compare/v1.32.4...v1.33.0) (2026-08-26)
 
 ### Features
