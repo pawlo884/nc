@@ -49,7 +49,11 @@ if [[ "$RUN_MIGRATE" == true && "$SKIP_MIGRATE" != true ]]; then
     kubectl logs job/nc-migrate -n nc-prod --tail=40 || true
     exit 1
   fi
-  kubectl logs job/nc-migrate -n nc-prod --tail=20
+  # Job juz potwierdzony przez `kubectl wait` powyzej — logi sa tylko
+  # informacyjne. Nie przerywaj deployu, gdy proxy do kubeleta nie odpowiada
+  # (np. 502 z API servera przy pobieraniu logow).
+  kubectl logs job/nc-migrate -n nc-prod --tail=20 || \
+    echo "UWAGA: nie udalo sie pobrac logow migracji (job i tak zakonczony sukcesem)"
 fi
 
 echo "=== Apply manifestow nc-web (k3s tylko web) ==="
