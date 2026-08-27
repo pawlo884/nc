@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.33.3](https://github.com/pawlo884/nc/compare/v1.33.2...v1.33.3) (2026-08-27)
+
+### Bug Fixes
+
+* **k8s-prod:** nie przerywaj deployu gdy nie da sie pobrac logow migracji ([78ce0a5](https://github.com/pawlo884/nc/commit/78ce0a5e6e51d1f91b90225e65987590e668beec))
+
 ## [1.33.2](https://github.com/pawlo884/nc/compare/v1.33.1...v1.33.2) (2026-08-27)
 
 ### Bug Fixes
