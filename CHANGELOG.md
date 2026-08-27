@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.33.2](https://github.com/pawlo884/nc/compare/v1.33.1...v1.33.2) (2026-08-27)
+
+### Bug Fixes
+
+* **docker:** podaj placeholder DJANGO_SECRET_KEY dla collectstatic w buildzie ([d83f302](https://github.com/pawlo884/nc/commit/d83f3029bb9a69681fc9e0c71a578c07ea42a157))
+
 ## [1.33.1](https://github.com/pawlo884/nc/compare/v1.33.0...v1.33.1) (2026-08-26)
 
 ### Bug Fixes
