@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.33.4](https://github.com/pawlo884/nc/compare/v1.33.3...v1.33.4) (2026-08-27)
+
+### Bug Fixes
+
+* **tabu:** napraw migracje 0013 tworzaca PeriodicTask watchdoga (cross-db) ([feb84d5](https://github.com/pawlo884/nc/commit/feb84d5054a11e42ef14f10ad02f31830a085144))
+
 ## [1.33.3](https://github.com/pawlo884/nc/compare/v1.33.2...v1.33.3) (2026-08-27)
 
 ### Bug Fixes
