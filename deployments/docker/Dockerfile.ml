@@ -63,7 +63,11 @@ RUN chown -R celery:celery /app /var/lib/celery /var/lib/flower && \
 ENV DJANGO_SETTINGS_MODULE=core.settings.prod
 
 # Zbierz pliki statyczne
-RUN python manage.py collectstatic --noinput --clear
+# collectstatic nie potrzebuje prawdziwego SECRET_KEY, ale prod.py przerywa
+# import przy pustej wartosci. Podajemy atrape TYLKO na czas tego RUN (nie jako
+# ENV), zeby dzialajacy kontener nadal wymuszal prawdziwy klucz z Secret nc-env.
+RUN DJANGO_SECRET_KEY="build-time-placeholder-not-used-at-runtime" \
+    python manage.py collectstatic --noinput --clear
 
 # Zmień właściciela plików statycznych
 RUN chown -R celery:celery /app/staticfiles
