@@ -39,13 +39,13 @@ alwaysApply: true
 - **Error handling** z proper exceptions
 - **Task state** tracking
 
-## Konfiguracja Redis
-- **CELERY_BROKER_URL** dla broker
-- **CELERY_RESULT_BACKEND** dla results
-- **CELERY_CACHE_BACKEND** dla cache
-- **Redis password** w URL
-- **Database number** dla separation
-- **Connection pooling** dla performance
+## Konfiguracja Redis / PostgreSQL
+- **Redis = TYLKO broker** (`CELERY_BROKER_URL=redis://...`), `maxmemory-policy noeviction`
+- **CELERY_RESULT_BACKEND='django-db'** (PostgreSQL przez django-celery-results) — na stałe w core/settings, w env zostaw puste
+- **Cache Django** = `DatabaseCache` (tabela `nc_cache_table`, baza `default`) — NIE Redis
+- **Blokady tasków** = PostgreSQL advisory locks: `from core.pg_locks import advisory_lock`
+  (matterhorn1_full_import_lock zostaje na `cache.add` — DatabaseCache)
+- **Redis password** w URL brokera
 
 ## Task patterns
 - **Chain** dla sequential tasks
@@ -74,9 +74,10 @@ alwaysApply: true
 ## Development
 - **CELERY_TASK_ALWAYS_EAGER=True** dla testing
 - **CELERY_TASK_EAGER_PROPAGATES=True** dla debugging
-- **Local development** z Redis
+- **Local development** z Redis (broker) + PostgreSQL (results/cache)
 - **Docker** dla production-like environment
 - **Environment variables** dla configuration
+- Po sklonowaniu / świeżej bazie: `manage.py createcachetable` (tabela cache)
 
 ## Production
 - **Multiple workers** dla scalability

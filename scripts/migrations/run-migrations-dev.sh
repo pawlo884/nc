@@ -59,6 +59,10 @@ python manage.py migrate django_celery_beat --database=zzz_default --settings=co
 log_warning "📦 Migracje dla django_celery_results..."
 python manage.py migrate django_celery_results --database=zzz_default --settings=core.settings.dev
 
+# Tabela cache (DatabaseCache) - zastępuje cache na Redisie
+log_warning "📦 Tabela cache (createcachetable)..."
+python manage.py createcachetable --database=zzz_default --settings=core.settings.dev
+
 log_success "✅ Wszystkie migracje zakończone pomyślnie!"
 echo ""
 log_info "Możesz teraz uruchomić testy:"

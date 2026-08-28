@@ -404,8 +404,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # Celery Configuration
+# Broker: Redis (jedyne zastosowanie Redis w projekcie).
+# Result backend: PostgreSQL przez django-celery-results (tabele w bazie 'default').
 CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
-CELERY_RESULT_BACKEND = 'redis://:dev_password@redis:6379/0'
+CELERY_RESULT_BACKEND = 'django-db'
+# Zapisuj nazwę taska/argumenty w wynikach (czytelny admin django-celery-results,
+# częściowa rekompensata za słabszy historyczny widok Flowera przy backendzie DB).
+CELERY_RESULT_EXTENDED = True
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -431,22 +436,15 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     'health_check_interval': 25,
 }
 
-# Result backend transport options - takie same jak broker
-CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
-    'socket_keepalive': True,
-    'socket_timeout': 120,
-    'socket_connect_timeout': 30,
-    'retry_on_timeout': True,
-    'health_check_interval': 25,
-}
-
-# Cache Configuration - Redis dla blokad między workerami
-_CACHE_REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
+# Cache Configuration - PostgreSQL (DatabaseCache)
+# Używane przez: throttling DRF, wartości porównawcze watchdoga importu matterhorn1
+# oraz blokadę matterhorn1_full_import_lock. Krótkie blokady tasków (tabu/mada)
+# używają natomiast PostgreSQL advisory locks - patrz core.pg_locks.
+# Tabelę tworzy `manage.py createcachetable` (odpalane w krokach migracji deployu).
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        # Używamy bazy 1 dla cache; hasło musi być ustawione w REDIS_PASSWORD w .env
-        'LOCATION': f'redis://:{_CACHE_REDIS_PASSWORD}@redis:6379/1',
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'nc_cache_table',
     }
 }
 CELERY_TASK_TRACK_STARTED = True

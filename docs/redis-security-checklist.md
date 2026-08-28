@@ -1,5 +1,11 @@
 # Redis Security Checklist
 
+> **Zakres Redisa:** od brancha `feat/redis-to-postgres` Redis pełni **wyłącznie**
+> rolę brokera Celery. Cache Django, blokady tasków i result backend Celery są na
+> PostgreSQL (zob. `docs/REDIS_TO_POSTGRES.md`). Mniejsza powierzchnia ataku:
+> w Redisie nie ma już danych aplikacyjnych ani wyników zadań, tylko kolejka komunikatów.
+> `maxmemory-policy` = `noeviction` (broker nie może gubić zadań).
+
 ## ✅ Zaimplementowane zabezpieczenia
 
 ### 1. Konfiguracja Redis (redis.conf)

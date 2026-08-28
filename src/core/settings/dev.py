@@ -176,8 +176,9 @@ if cors_origins_env:
                                 for origin in cors_origins_env.split(',')])
 
 # Celery Configuration for development
+# Broker: Redis; result backend: PostgreSQL (django-celery-results).
 CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
-CELERY_RESULT_BACKEND = 'redis://:dev_password@redis:6379/0'
+CELERY_RESULT_BACKEND = 'django-db'
 
 # Celery Redis connection settings - fix dla connection timeouts
 CELERY_BROKER_CONNECTION_RETRY = True
@@ -195,15 +196,6 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     'socket_connect_timeout': 30,  # Connection timeout (30 sekund)
     'retry_on_timeout': True,
     # Health check co 25 sekund
-    'health_check_interval': 25,
-}
-
-# Result backend transport options - takie same jak broker
-CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
-    'socket_keepalive': True,
-    'socket_timeout': 120,
-    'socket_connect_timeout': 30,
-    'retry_on_timeout': True,
     'health_check_interval': 25,
 }
 
@@ -259,7 +251,7 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 if 'test' in sys.argv:
     DATABASE_ROUTERS = []  # Wyłącz routing podczas testów - wszystkie modele idą do default
 
-    # Wyłącz cache/throttling dla testów - użyj dummy cache zamiast Redis
+    # Wyłącz cache/throttling dla testów - użyj dummy cache zamiast DatabaseCache
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.dummy.DummyCache',

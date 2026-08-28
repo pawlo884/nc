@@ -25,7 +25,7 @@ services:
       [
         '/bin/bash',
         '-c',
-        'python manage.py makemigrations && python manage.py migrate --database=zzz_default && gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --reload',
+        'python manage.py makemigrations && python manage.py migrate --database=zzz_default && python manage.py createcachetable --database=zzz_default && gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 300 --keep-alive 5 --reload',
       ]
     ports:
       - '8000:8000'  # Dostępny w LAN (landing healthcheck nc-dev)
@@ -107,7 +107,7 @@ services:
       # Nie uruchamiamy jako root - kontener już działa jako użytkownik 999:999
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
@@ -162,7 +162,7 @@ services:
       # Nie uruchamiamy jako root - kontener już działa jako użytkownik 999:999
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
@@ -209,7 +209,7 @@ services:
       - TZ=Europe/Warsaw
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=
       - DEFAULT_DB_HOST=postgres-ssh-tunnel
       - MPD_DB_HOST=postgres-ssh-tunnel
       - MATTERHORN1_DB_HOST=postgres-ssh-tunnel
@@ -262,7 +262,7 @@ services:
       # Nie uruchamiamy jako root - kontener już działa jako użytkownik 999:999
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
@@ -302,7 +302,8 @@ services:
     restart: always
     networks:
       - app_network
-    command: redis-server /usr/local/etc/redis/redis.conf --requirepass dev_password --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # Redis = tylko broker Celery. noeviction, żeby nie gubić zadań przy braku pamięci.
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass dev_password --maxmemory 128mb --maxmemory-policy noeviction
     healthcheck:
       test: ['CMD', 'redis-cli', '-a', 'dev_password', 'ping']
       interval: 5s

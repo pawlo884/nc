@@ -2,7 +2,10 @@
 
 ################################################################################
 # Skrypt do ręcznego wykonywania migracji na produkcji
-# 
+#
+# ⚠️ DEPRECATED: blue-green nie jest już używany - aktualny deploy to k3s/k8s
+#    (deployments/k8s/nc-prod/migrate-job.yaml). Skrypt zostawiony pomocniczo.
+#
 # ⚠️ WAŻNE: Migracje powinny być wykonywane PRZED deploymentem
 # Użyj tego skryptu gdy masz nowe migracje do zastosowania
 ################################################################################
@@ -57,6 +60,7 @@ docker exec nc-web-${ACTIVE} python manage.py migrate --database=default --noinp
 docker exec nc-web-${ACTIVE} python manage.py migrate admin_interface --database=default --noinput
 docker exec nc-web-${ACTIVE} python manage.py migrate matterhorn1 --database=matterhorn1 --noinput
 docker exec nc-web-${ACTIVE} python manage.py migrate MPD --database=MPD --noinput
+docker exec nc-web-${ACTIVE} python manage.py createcachetable --database=default
 
 log_success "✅ Migracje zakończone pomyślnie!"
 

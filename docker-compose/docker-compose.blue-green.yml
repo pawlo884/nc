@@ -246,7 +246,7 @@ services:
       - CELERY_STATE_DB=/var/lib/celery/worker_state_default
       - TZ=Europe/Warsaw
       - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
+      - CELERY_RESULT_BACKEND=
       - TABU_DB_HOST=${TABU_DB_HOST:-postgres}
       - TABU_DB_PORT=${TABU_DB_PORT:-5432}
       - TABU_DB_NAME=${TABU_DB_NAME:-tabu}
@@ -282,7 +282,7 @@ services:
       - CELERY_STATE_DB=/var/lib/celery/worker_state_import
       - TZ=Europe/Warsaw
       - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
+      - CELERY_RESULT_BACKEND=
     depends_on:
       - redis
     restart: always
@@ -309,7 +309,7 @@ services:
       - DJANGO_SETTINGS_MODULE=core.settings.prod
       - TZ=Europe/Warsaw
       - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
+      - CELERY_RESULT_BACKEND=
     depends_on:
       - redis
     restart: always
@@ -343,7 +343,7 @@ services:
       - DJANGO_SETTINGS_MODULE=core.settings.prod
       - TZ=Europe/Warsaw
       - CELERY_BROKER_URL=redis://:Relisys17!!@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:Relisys17!!@redis:6379/0
+      - CELERY_RESULT_BACKEND=
     depends_on:
       - redis
       - celery-default
