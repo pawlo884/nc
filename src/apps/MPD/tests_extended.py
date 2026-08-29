@@ -650,6 +650,20 @@ class PathsModelTest(TestCase):
         )
         self.assertEqual(child.parent_id, parent.id)
 
+    def test_path_name_can_repeat(self):
+        Paths.objects.create(
+            name='Biustonosze | Topy',
+            path='Moda damska\\Bielizna\\Biustonosze | Topy',
+        )
+        duplicate = Paths.objects.create(
+            name='Biustonosze | Topy',
+            path='Moda damska\\Bielizna\\Stroje kąpielowe\\Biustonosze | Topy',
+        )
+        self.assertIsNotNone(duplicate.pk)
+        self.assertEqual(
+            Paths.objects.filter(name='Biustonosze | Topy').count(), 2
+        )
+
     def test_path_nullable_fields(self):
         path = Paths.objects.create()
         self.assertIsNone(path.name)

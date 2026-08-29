@@ -211,7 +211,7 @@ class GatewayXMLExporterTest(TestCase):
         # GatewayXMLExporter.__init__ czyta Sources bez .using('MPD') (alias 'default':
         # w testach to osobna transakcja niż 'MPD', mimo że mirroruje tę samą fizyczną bazę),
         # więc tworzymy rekord przez ten sam alias, żeby był widoczny przy odczycie.
-        Sources.objects.create(id=2, name='Matterhorn')
+        Sources.objects.create(id=2, name='Matterhorn', type='api')
 
         root = ET.fromstring(GatewayXMLExporter().generate_xml())
 
@@ -228,7 +228,7 @@ class GatewayXMLExporterTest(TestCase):
         storage (np. DigitalOcean Spaces -> MinIO) stare rekordy nadal mają stary,
         martwy URL - gateway.xml nie powinien go reklamować w <changes>.
         """
-        Sources.objects.create(id=2, name='Matterhorn')
+        Sources.objects.create(id=2, name='Matterhorn', type='api')
         FullChangeFile.objects.using('MPD').create(
             filename='full_change2026-01-01T00-00-00.xml',
             timestamp='2026-01-01T00-00-00',

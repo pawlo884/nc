@@ -284,7 +284,7 @@ class SourcesModelTest(TestCase):
         self.source = Sources.objects.create(
             name='Test Source',
             location='Warsaw',
-            type='Supplier',
+            type='api',
             long_name='Test Source Long Name',
             short_name='TS',
             showcase_image='https://example.com/image.jpg',
@@ -303,10 +303,27 @@ class SourcesModelTest(TestCase):
         """Test tworzenia źródła"""
         self.assertEqual(self.source.name, 'Test Source')
         self.assertEqual(self.source.location, 'Warsaw')
-        self.assertEqual(self.source.type, 'Supplier')
+        self.assertEqual(self.source.type, 'api')
         self.assertEqual(self.source.email, 'test@example.com')
         self.assertEqual(self.source.city, 'Warsaw')
         self.assertEqual(self.source.country, 'Poland')
+
+    def test_type_required_in_form(self):
+        """Puste type ma być odrzucone przez formularz, nie przez IntegrityError."""
+        from django.forms.models import modelform_factory
+        SourceForm = modelform_factory(Sources, fields=['name', 'type'])
+        form = SourceForm(data={'name': 'MADA', 'type': ''})
+        self.assertFalse(form.is_valid())
+        self.assertIn('type', form.errors)
+
+    def test_type_choices_in_form(self):
+        from django.forms.models import modelform_factory
+        SourceForm = modelform_factory(Sources, fields=['name', 'type'])
+        form = SourceForm(data={'name': 'MADA', 'type': Sources.Type.MAGAZYN_OBCY})
+        self.assertTrue(form.is_valid(), form.errors)
+        form_invalid = SourceForm(data={'name': 'MADA', 'type': 'nieznany'})
+        self.assertFalse(form_invalid.is_valid())
+        self.assertIn('type', form_invalid.errors)
 
 
 # ==================== API TESTS ====================
