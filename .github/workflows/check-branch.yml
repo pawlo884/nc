@@ -98,13 +98,69 @@ jobs:
             exit 1
           fi
 
-  # Testy/migracje są wyłączone — bez Postgres/Redis i bez pełnego pip.
-  # Gdy włączysz prawdziwe testy, przywróć services + pip + manage.py test.
   check-django:
-    name: Sprawdź Django (składnia Python)
+    name: Sprawdź Django (składnia + migracje + testy)
     needs: changes
     if: needs.changes.outputs.django == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      # Wszystkie aliasy baz → jeden Postgres. W testach dev.py zeruje routery
+      # i mirroruje wszystko do 'default', więc powstaje jedna testowa baza.
+      DEFAULT_DB_NAME: test_db
+      DEFAULT_DB_USER: postgres
+      DEFAULT_DB_PASSWORD: postgres
+      DEFAULT_DB_HOST: localhost
+      DEFAULT_DB_PORT: '5432'
+      MPD_DB_NAME: test_db
+      MPD_DB_USER: postgres
+      MPD_DB_PASSWORD: postgres
+      MPD_DB_HOST: localhost
+      MPD_DB_PORT: '5432'
+      MATTERHORN1_DB_NAME: test_db
+      MATTERHORN1_DB_USER: postgres
+      MATTERHORN1_DB_PASSWORD: postgres
+      MATTERHORN1_DB_HOST: localhost
+      MATTERHORN1_DB_PORT: '5432'
+      WEB_AGENT_DB_NAME: test_db
+      WEB_AGENT_DB_USER: postgres
+      WEB_AGENT_DB_PASSWORD: postgres
+      WEB_AGENT_DB_HOST: localhost
+      WEB_AGENT_DB_PORT: '5432'
+      TABU_DB_NAME: test_db
+      TABU_DB_USER: postgres
+      TABU_DB_PASSWORD: postgres
+      TABU_DB_HOST: localhost
+      TABU_DB_PORT: '5432'
+      MADA_DB_NAME: test_db
+      MADA_DB_USER: postgres
+      MADA_DB_PASSWORD: postgres
+      MADA_DB_HOST: localhost
+      MADA_DB_PORT: '5432'
+      DJANGO_SECRET_KEY: test-secret-key-for-ci
+      DJANGO_SETTINGS_MODULE: core.settings.dev
+      # Dummy klucz — web_agent AIProcessor wymaga go w __init__, ale klient OpenAI
+      # nie robi żadnego I/O przy konstrukcji; testy helperów nie wołają API.
+      OPENAI_API_KEY: test-dummy-key-ci
+      # MinIO ENDPOINT/KEY nieustawione → defs_db w trybie no-storage (upload/DELETE
+      # pomijane, DEFAULT_FILE_STORAGE lokalny). Sam PUBLIC_URL wystarcza do
+      # generowania linków — potrzebny w testach eksportu XML.
+      MINIO_PUBLIC_URL: https://ci-bucket.example.invalid
 
     steps:
       - name: Checkout kod
@@ -114,22 +170,37 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
+          cache: pip
+          cache-dependency-path: src/requirements.ci.txt
 
       - name: compileall (szybka weryfikacja składni)
         run: |
-          echo "🐍 Sprawdzam składnię Python (compileall) — pełne testy Django są wyłączone w CI."
           python -m compileall -q src
           echo "✅ Składnia OK"
 
-      # --- Pełne testy (wyłączone) — odkomentuj services powyżej + te kroki ---
-      # - name: Install dependencies
-      #   run: |
-      #     python -m pip install --upgrade pip
-      #     pip install -r src/requirements.ci.txt
-      # - name: Sprawdź migracje Django
-      #   if: false
-      # - name: Uruchom testy Django
-      #   if: false
+      - name: Instalacja zależności
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r src/requirements.ci.txt
+
+      - name: Migracje bez luk (makemigrations --check)
+        working-directory: src
+        run: |
+          python manage.py makemigrations --check --dry-run || {
+            echo "❌ Modele rozjeżdżają się z migracjami — uruchom: python manage.py makemigrations"
+            exit 1
+          }
+          echo "✅ Migracje spójne z modelami"
+
+      - name: Testy Django
+        working-directory: src
+        # Jawna lista aplikacji — dyskryminacja z korzenia myli tożsamość modeli
+        # (web_agent vs apps.web_agent). pattern tests*.py pomija komendy
+        # management test_*_connection.py.
+        run: >-
+          python manage.py test
+          MPD matterhorn1 web_agent tabu mada
+          --noinput --pattern "tests*.py"
 
   check-code-quality:
     name: Sprawdź jakość kodu (linting i formatowanie)

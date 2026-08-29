@@ -63,7 +63,9 @@ if not all([S3_BUCKET, S3_ACCESS_KEY, S3_SECRET]):
     S3_ENDPOINT = S3_ENDPOINT if 'S3_ENDPOINT' in globals() else None
     S3_ACCESS_KEY = S3_ACCESS_KEY or None
     S3_SECRET = S3_SECRET or None
-    PUBLIC_BASE_URL = None
+    # Tryb no-storage nie robi uploadów, ale publiczny URL (do generowania linków
+    # do już wgranych plików) można znać nawet bez kluczy — przydatne w CI/testach.
+    PUBLIC_BASE_URL = MINIO_PUBLIC_URL.rstrip('/') if MINIO_PUBLIC_URL else None
 
 BUCKET_PUBLIC_BASE_URL = PUBLIC_BASE_URL
 
