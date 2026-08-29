@@ -157,7 +157,10 @@ jobs:
       # Dummy klucz — web_agent AIProcessor wymaga go w __init__, ale klient OpenAI
       # nie robi żadnego I/O przy konstrukcji; testy helperów nie wołają API.
       OPENAI_API_KEY: test-dummy-key-ci
-      # MinIO/S3 nieustawione → defs_db przechodzi w tryb no-storage (upload/DELETE pomijane).
+      # MinIO ENDPOINT/KEY nieustawione → defs_db w trybie no-storage (upload/DELETE
+      # pomijane, DEFAULT_FILE_STORAGE lokalny). Sam PUBLIC_URL wystarcza do
+      # generowania linków — potrzebny w testach eksportu XML.
+      MINIO_PUBLIC_URL: https://ci-bucket.example.invalid
 
     steps:
       - name: Checkout kod
