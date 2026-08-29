@@ -113,6 +113,36 @@ class TabuAdapter(SourceAdapter):
             ))
         return result
 
+    def get_gallery_images_for_mpd_product(self, mpd_product_id: int) -> List[dict]:
+        """Zdjęcia (główne + gallery) produktów Tabu zmapowanych do tego MPD."""
+        from tabu.models import TabuProduct, TabuProductImage
+
+        product_ids = list(
+            TabuProduct.objects.using(_get_tabu_db())
+            .filter(mapped_product_uid=mpd_product_id)
+            .values_list('id', flat=True)
+        )
+        if not product_ids:
+            return []
+
+        images: List[dict] = []
+        seen = set()
+        for p in TabuProduct.objects.using(_get_tabu_db()).filter(id__in=product_ids):
+            if p.image_url and p.image_url not in seen:
+                seen.add(p.image_url)
+                images.append({'url': p.image_url, 'is_main': True, 'order': 0})
+        for gi in TabuProductImage.objects.using(_get_tabu_db()).filter(
+            product_id__in=product_ids
+        ).order_by('order', 'api_image_id'):
+            if gi.image_url and gi.image_url not in seen:
+                seen.add(gi.image_url)
+                images.append({
+                    'url': gi.image_url,
+                    'is_main': bool(gi.is_main),
+                    'order': gi.order or 0,
+                })
+        return images
+
     def update_source_product_mapped(
         self,
         source_product_id: int,

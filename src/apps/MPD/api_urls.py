@@ -27,6 +27,16 @@ urlpatterns = [
         name="products-orphan-variants",
     ),
     path(
+        "products/<int:product_id>/images/import-from-sources/",
+        api_views.MPDProductImagesImportAPI.as_view(),
+        name="products-images-import",
+    ),
+    path(
+        "products/<int:product_id>/images/<int:image_id>/",
+        api_views.MPDProductImageDetailAPI.as_view(),
+        name="products-image-detail",
+    ),
+    path(
         "products/bulk-create/",
         api_views.MPDBulkCreateProductsAPI.as_view(),
         name="products-bulk-create",

@@ -682,6 +682,148 @@ class MPDProductOrphanVariantsAPI(APIView):
         })
 
 
+class MPDProductImagesImportAPI(APIView):
+    """
+    API: import zdjęć z galerii pozostałych hurtowni do „tacki" produktu MPD.
+
+    POST – dla każdego źródła z adapterem: bierze produkty źródłowe zmapowane do tego
+    produktu MPD, pobiera ich galerię (`SourceAdapter.get_gallery_images_for_mpd_product`),
+    re-uploaduje do bucketa i zapisuje w `product_images` z `producer_color=NULL`
+    (kolor przypisuje się ręcznie – drag&drop). Dedup po `origin_url`.
+    """
+
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, product_id, *args, **kwargs):  # pylint: disable=unused-argument
+        from matterhorn1.defs_db import upload_image_to_bucket_and_get_url
+        from .source_adapters.registry import get_all_adapters, register_default_adapters
+        from .models import ProductImage, Sources
+
+        try:
+            Products.objects.using(_mpd_db()).get(pk=product_id)
+        except Products.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Produkt nie istnieje.'}, status=404)
+
+        register_default_adapters()
+        source_names = {s.id: s.name for s in Sources.objects.using(_mpd_db()).all()}
+        existing_origins = set(
+            ProductImage.objects.using(_mpd_db())
+            .filter(product_id=product_id)
+            .exclude(origin_url__isnull=True)
+            .exclude(origin_url='')
+            .values_list('origin_url', flat=True)
+        )
+
+        imported, skipped, errors = 0, 0, []
+        for source_id, adapter in get_all_adapters():
+            try:
+                gallery = adapter.get_gallery_images_for_mpd_product(product_id)
+            except Exception:  # pylint: disable=broad-except
+                logger.exception('Błąd galerii source=%s product=%s', source_id, product_id)
+                continue
+            for idx, img in enumerate(gallery, start=1):
+                url = (img or {}).get('url')
+                if not url:
+                    continue
+                if url in existing_origins:
+                    skipped += 1
+                    continue
+                try:
+                    key = upload_image_to_bucket_and_get_url(
+                        image_path=url,
+                        product_id=product_id,
+                        producer_color_name=f'src{source_id}',
+                        image_number=idx,
+                    )
+                except Exception as exc:  # pylint: disable=broad-except
+                    logger.exception('Upload zdjęcia %s nieudany', url)
+                    errors.append(str(exc))
+                    continue
+                if not key:
+                    errors.append(f'upload nieudany: {url}')
+                    continue
+                ProductImage.objects.using(_mpd_db()).create(
+                    product_id=product_id,
+                    file_path=key,
+                    producer_color=None,
+                    source_id=source_id,
+                    origin_url=url,
+                )
+                existing_origins.add(url)
+                imported += 1
+
+        return Response({
+            'status': 'success',
+            'imported': imported,
+            'skipped': skipped,
+            'errors': errors,
+            'message': f'Zaimportowano {imported}, pominięto {skipped}.',
+        })
+
+
+class MPDProductImageDetailAPI(APIView):
+    """
+    API: pojedyncze zdjęcie produktu MPD.
+
+    PATCH  – przypisanie/zdjęcie koloru (`producer_color_id`; null = z powrotem do tacki).
+    DELETE – trwałe usunięcie zdjęcia (wiersz + obiekt w buckecie).
+    """
+
+    permission_classes = [IsAdminUser]
+
+    def _get_image(self, product_id, image_id):
+        from .models import ProductImage
+        return ProductImage.objects.using(_mpd_db()).filter(
+            pk=image_id, product_id=product_id,
+        ).first()
+
+    def patch(self, request, product_id, image_id, *args, **kwargs):  # pylint: disable=unused-argument
+        from .models import Colors
+
+        image = self._get_image(product_id, image_id)
+        if image is None:
+            return Response({'status': 'error', 'message': 'Zdjęcie nie istnieje.'}, status=404)
+
+        data = request.data if isinstance(request.data, dict) else {}
+        if 'producer_color_id' not in data:
+            return Response(
+                {'status': 'error', 'message': 'Wymagane pole producer_color_id (może być null).'},
+                status=400,
+            )
+        pcid = data.get('producer_color_id')
+        if pcid in (None, '', 'null'):
+            image.producer_color = None
+        else:
+            try:
+                image.producer_color = Colors.objects.using(_mpd_db()).get(pk=int(pcid))
+            except (TypeError, ValueError, Colors.DoesNotExist):
+                return Response(
+                    {'status': 'error', 'message': 'Nieprawidłowy producer_color_id.'},
+                    status=400,
+                )
+        image.save(using=_mpd_db(), update_fields=['producer_color'])
+        return Response({
+            'status': 'success',
+            'message': 'Zaktualizowano.',
+            'image_id': image.id,
+            'producer_color_id': image.producer_color_id,
+        })
+
+    def delete(self, request, product_id, image_id, *args, **kwargs):  # pylint: disable=unused-argument
+        from matterhorn1.defs_db import delete_object_from_bucket
+
+        image = self._get_image(product_id, image_id)
+        if image is None:
+            return Response({'status': 'error', 'message': 'Zdjęcie nie istnieje.'}, status=404)
+        file_path = image.file_path
+        image.delete(using=_mpd_db())
+        try:
+            delete_object_from_bucket(file_path)
+        except Exception:  # pylint: disable=broad-except
+            logger.exception('Nie udało się usunąć obiektu %s z bucketa', file_path)
+        return Response({'status': 'success', 'message': 'Zdjęcie usunięte.', 'image_id': image_id})
+
+
 class MPDUpdateProducerCodeAPI(APIView):
     """
     API: aktualizacja kodu producenta wariantu.

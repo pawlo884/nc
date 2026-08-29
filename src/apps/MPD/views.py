@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from .models import Products, ProductSet, ProductSetItem, ProductPaths, ProductAttribute
 from .models import Brands, Colors, Sizes, ProductVariants, ProductVariantsRetailPrice, ProductvariantsSources
-from .models import FabricComponent, ProductFabric, Attributes, ProductImage, StockAndPrices, Paths, Vat
+from .models import FabricComponent, ProductFabric, Attributes, ProductImage, StockAndPrices, Paths, Vat, Sources
 from django.http import JsonResponse
 from django.db import connections, transaction
 from django.utils import timezone
@@ -1267,11 +1267,17 @@ def get_product(request, product_id):
                 .values('id', 'name')[:50]
             )
 
+        image_source_names = {
+            s.id: s.name for s in Sources.objects.using('MPD').all()
+        }
         images = [
             {
                 'id': img.id,
                 'image_url': img.get_image_url(),
                 'file_path': img.file_path,
+                'producer_color_id': img.producer_color_id,
+                'source_id': img.source_id,
+                'source_name': image_source_names.get(img.source_id),
             }
             for img in ProductImage.objects.using('MPD').filter(
                 product_id=product_id,

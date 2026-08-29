@@ -254,6 +254,35 @@ def delete_product_folder_from_bucket(product_id):
             f"Błąd podczas usuwania folderu {prefix} z bucketa: {str(e)}")
 
 
+def delete_object_from_bucket(file_key):
+    """
+    Usuń pojedynczy obiekt z bucketa po kluczu (file_path zapisany w product_images).
+
+    Args:
+        file_key (str): klucz obiektu w buckecie (np. 'MPD_test/123/123_1_Black.jpg')
+
+    Returns:
+        bool: True gdy usunięto lub brak storage; False przy błędzie połączenia.
+    """
+    if not file_key:
+        return True
+    try:
+        if not s3_client:
+            logger.warning("Tryb no-storage: pomijam usuwanie obiektu z bucketa")
+            return True
+        key = normalize_storage_key(file_key)
+        s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+        logger.info(f"Usunięto obiekt {key} z bucketa.")
+        return True
+    except (EndpointConnectionError, ClientError, NoCredentialsError) as e:
+        logger.warning(
+            f"Nie można usunąć obiektu {file_key} z bucketa: {str(e)}")
+        return False
+    except Exception as e:  # pragma: no cover
+        logger.error(f"Błąd usuwania obiektu {file_key} z bucketa: {str(e)}")
+        return False
+
+
 def upload_product_images_to_bucket(product_id, images_data):
     """
     Upload wszystkich obrazów produktu do bucketa

@@ -6,6 +6,7 @@ import type {
   MpdAttachOrphanPayload,
   MpdAttachOrphanResponse,
   MpdFabricItem,
+  MpdImportImagesResponse,
   MpdNamedRef,
   MpdOrphanVariantsResponse,
   MpdPathRef,
@@ -154,6 +155,36 @@ export async function attachOrphanVariant(
   const { data } = await apiClient.post<MpdAttachOrphanResponse>(
     `/api/mpd/products/${productId}/orphan-variants/`,
     payload
+  );
+  return data;
+}
+
+export async function importImagesFromSources(productId: number): Promise<MpdImportImagesResponse> {
+  const { data } = await apiClient.post<MpdImportImagesResponse>(
+    `/api/mpd/products/${productId}/images/import-from-sources/`,
+    {}
+  );
+  return data;
+}
+
+export async function assignImageColor(
+  productId: number,
+  imageId: number,
+  producerColorId: number | null
+): Promise<ManageActionResponse> {
+  const { data } = await apiClient.patch<ManageActionResponse>(
+    `/api/mpd/products/${productId}/images/${imageId}/`,
+    { producer_color_id: producerColorId }
+  );
+  return data;
+}
+
+export async function deleteProductImage(
+  productId: number,
+  imageId: number
+): Promise<ManageActionResponse> {
+  const { data } = await apiClient.delete<ManageActionResponse>(
+    `/api/mpd/products/${productId}/images/${imageId}/`
   );
   return data;
 }

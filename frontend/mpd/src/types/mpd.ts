@@ -64,6 +64,9 @@ export interface MpdProductImage {
   id: number;
   image_url: string | null;
   file_path: string;
+  producer_color_id: number | null;
+  source_id: number | null;
+  source_name: string | null;
 }
 
 export interface MpdNamedRef {
@@ -200,6 +203,14 @@ export interface MpdAttachOrphanResponse {
   status: 'success' | 'error';
   message?: string;
   variant_id?: number;
+}
+
+export interface MpdImportImagesResponse {
+  status: 'success' | 'error';
+  message?: string;
+  imported?: number;
+  skipped?: number;
+  errors?: string[];
 }
 
 export interface ManageActionResponse {

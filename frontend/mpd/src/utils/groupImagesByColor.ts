@@ -1,10 +1,24 @@
 import type { MpdProductImage, MpdProductVariant } from '../types/mpd';
 
-export type ImageColorGroup = {
-  key: string;
+export type ImageColorSlot = {
+  /** producer_color_id / color_id — cel drag&drop */
+  colorId: number;
   label: string;
-  kind: 'producer' | 'color' | 'other';
+  kind: 'producer' | 'color';
+};
+
+export type ImageColorGroup = ImageColorSlot & {
+  key: string;
   images: MpdProductImage[];
+};
+
+export type GroupedImages = {
+  /** grupy z co najmniej jednym zdjęciem */
+  groups: ImageColorGroup[];
+  /** wszystkie kolory produktu (także puste) — strefy upuszczania */
+  slots: ImageColorSlot[];
+  /** zdjęcia bez przypisanego koloru — „tacka" */
+  tray: MpdProductImage[];
 };
 
 function normalizeColorKey(name: string): string {
@@ -17,100 +31,85 @@ function basenameLower(filePath: string): string {
 }
 
 /**
- * Grupuje zdjęcia jak Django MPD admin: match nazwy koloru w basename file_path
- * (najpierw kolor producenta, potem zwykły kolor; dłuższe nazwy pierwsze).
+ * Grupuje zdjęcia po kolorze:
+ * 1. jeśli zdjęcie ma producer_color_id → do tego koloru,
+ * 2. inaczej heurystyka po nazwie pliku (jak Django MPD admin — kolor producenta,
+ *    potem zwykły kolor, dłuższe nazwy pierwsze),
+ * 3. inaczej → tacka (do ręcznego przypisania drag&drop).
  */
 export function groupImagesByColor(
   images: MpdProductImage[],
   variants: MpdProductVariant[]
-): ImageColorGroup[] {
-  const producerMap = new Map<string, string>();
-  const colorMap = new Map<string, string>();
+): GroupedImages {
+  const producerMap = new Map<number, string>();
+  const colorMap = new Map<number, string>();
 
   for (const v of variants) {
     if (v.producer_color_id != null && v.producer_color_name) {
-      producerMap.set(String(v.producer_color_id), v.producer_color_name);
+      producerMap.set(v.producer_color_id, v.producer_color_name);
     }
     if (v.color_id != null && v.color_name) {
-      colorMap.set(String(v.color_id), v.color_name);
+      colorMap.set(v.color_id, v.color_name);
+    }
+  }
+
+  // Sloty: najpierw kolory producenta, potem zwykłe (bez duplikatów id).
+  const slots: ImageColorSlot[] = [];
+  const slotIds = new Set<number>();
+  for (const [id, label] of producerMap) {
+    slots.push({ colorId: id, label, kind: 'producer' });
+    slotIds.add(id);
+  }
+  for (const [id, label] of colorMap) {
+    if (!slotIds.has(id)) {
+      slots.push({ colorId: id, label, kind: 'color' });
+      slotIds.add(id);
     }
   }
 
   const producerKeys = [...producerMap.entries()]
-    .map(([id, name]) => ({ id, name, key: normalizeColorKey(name) }))
+    .map(([id, name]) => ({ id, key: normalizeColorKey(name) }))
     .sort((a, b) => b.key.length - a.key.length);
-
   const colorKeys = [...colorMap.entries()]
-    .map(([id, name]) => ({ id, name, key: normalizeColorKey(name) }))
+    .map(([id, name]) => ({ id, key: normalizeColorKey(name) }))
     .sort((a, b) => b.key.length - a.key.length);
 
-  const byProducer = new Map<string, MpdProductImage[]>(
-    [...producerMap.keys()].map(id => [id, []])
-  );
-  const byColor = new Map<string, MpdProductImage[]>([...colorMap.keys()].map(id => [id, []]));
-  const other: MpdProductImage[] = [];
+  const bySlot = new Map<number, MpdProductImage[]>(slots.map(s => [s.colorId, []]));
+  const tray: MpdProductImage[] = [];
 
   for (const img of images) {
-    const fileName = basenameLower(img.file_path);
-    let matched = false;
+    let slotId: number | null = null;
 
-    for (const { id, key } of producerKeys) {
-      if (key && fileName.includes(key)) {
-        byProducer.get(id)?.push(img);
-        matched = true;
-        break;
-      }
-    }
-
-    if (!matched) {
-      for (const { id, key } of colorKeys) {
+    if (img.producer_color_id != null && bySlot.has(img.producer_color_id)) {
+      slotId = img.producer_color_id;
+    } else if (img.producer_color_id == null) {
+      const fileName = basenameLower(img.file_path);
+      for (const { id, key } of producerKeys) {
         if (key && fileName.includes(key)) {
-          byColor.get(id)?.push(img);
-          matched = true;
+          slotId = id;
           break;
+        }
+      }
+      if (slotId == null) {
+        for (const { id, key } of colorKeys) {
+          if (key && fileName.includes(key)) {
+            slotId = id;
+            break;
+          }
         }
       }
     }
 
-    if (!matched) {
-      other.push(img);
+    if (slotId != null) {
+      bySlot.get(slotId)!.push(img);
+    } else {
+      tray.push(img);
     }
   }
 
-  const groups: ImageColorGroup[] = [];
+  const groups: ImageColorGroup[] = slots
+    .map(s => ({ ...s, key: `color-${s.colorId}`, images: bySlot.get(s.colorId) ?? [] }))
+    .filter(g => g.images.length > 0);
 
-  for (const [id, name] of producerMap) {
-    const imgs = byProducer.get(id) ?? [];
-    if (imgs.length > 0) {
-      groups.push({
-        key: `producer-${id}`,
-        label: name,
-        kind: 'producer',
-        images: imgs,
-      });
-    }
-  }
-
-  for (const [id, name] of colorMap) {
-    const imgs = byColor.get(id) ?? [];
-    if (imgs.length > 0) {
-      groups.push({
-        key: `color-${id}`,
-        label: name,
-        kind: 'color',
-        images: imgs,
-      });
-    }
-  }
-
-  if (other.length > 0) {
-    groups.push({
-      key: 'other',
-      label: 'Inne zdjęcia',
-      kind: 'other',
-      images: other,
-    });
-  }
-
-  return groups;
+  return { groups, slots, tray };
 }
