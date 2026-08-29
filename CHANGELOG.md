@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.36.0](https://github.com/pawlo884/nc/compare/v1.35.0...v1.36.0) (2026-08-29)
+
+### Features
+
+* **MPD:** tacka zdjęć z hurtowni + drag&drop przypisania koloru ([12a0c03](https://github.com/pawlo884/nc/commit/12a0c031e0826eba5a1a98efc77f1491a45bd348))
+
 ## [1.35.0](https://github.com/pawlo884/nc/compare/v1.34.0...v1.35.0) (2026-08-29)
 
 ### Features
