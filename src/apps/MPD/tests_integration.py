@@ -216,11 +216,12 @@ class MPDSavePropagatesLinkTest(TestCase):
             "Powinien powstać wiersz ProductvariantsSources dla wariantu MPD ze źródłem Tabu",
         )
 
-    def test_link_creates_new_mpd_variant_for_extra_size_from_other_source(self):
+    def test_link_does_not_create_mpd_variant_for_unmatched_ean(self):
         """
-        Rozmiar 'M' istnieje tylko w Tabu (inny EAN, nieznany jeszcze w MPD) — linking
-        powinien dla niego utworzyć NOWY wariant w MPD (backfill "pozostałych" wariantów),
-        a nie tylko dopiąć się do istniejącego wariantu 'S'.
+        Rozmiar 'M' istnieje tylko w Tabu (inny EAN, nieznany w MPD). Linking dopina
+        WYŁĄCZNIE po EAN — nie tworzy nowych wariantów MPD dla nietrafionych EAN-ów
+        (hurtownia potrafi trzymać kilka kolorów pod jednym produktem, a nazwy kolorów
+        bywają rozjechane). Takie warianty trafiają do panelu „nieprzypisane".
         """
         from MPD.source_adapters.linking import link_variants_from_other_sources
         from MPD.models import ProductvariantsSources
@@ -237,18 +238,60 @@ class MPDSavePropagatesLinkTest(TestCase):
             current_source_id=self.mh_source.id,
         )
 
-        variants_after = list(
+        variants_after = set(
             ProductVariants.objects.using(mpd_db)
             .filter(product=self.mpd_product)
             .values_list('variant_id', flat=True)
         )
-        new_variant_ids = set(variants_after) - variants_before
         self.assertEqual(
-            len(new_variant_ids), 1,
-            "Powinien powstać dokładnie jeden nowy wariant MPD dla rozmiaru 'M' z Tabu",
+            variants_after, variants_before,
+            "Linking nie powinien tworzyć nowych wariantów MPD dla nietrafionych EAN-ów",
         )
-        new_variant_id = new_variant_ids.pop()
-        pvs = ProductvariantsSources.objects.using(mpd_db).get(
-            variant_id=new_variant_id, source=self.tabu_source,
+        # Rozmiar 'S' (ten sam EAN) nadal dopięty do istniejącego wariantu
+        self.assertTrue(
+            ProductvariantsSources.objects.using(mpd_db).filter(
+                variant=self.mpd_variant, source=self.tabu_source,
+            ).exists()
         )
-        self.assertEqual(pvs.ean, self.tabu_variant_extra.ean)
+        # Rozmiar 'M' (inny EAN) NIE został nigdzie dopięty
+        self.assertFalse(
+            ProductvariantsSources.objects.using(mpd_db).filter(
+                source=self.tabu_source, ean=self.tabu_variant_extra.ean,
+            ).exists()
+        )
+
+    def test_get_unmapped_variants_returns_orphaned_tabu_variant(self):
+        """
+        Po zlinkowaniu po EAN wariant 'M' z Tabu (nietrafiony EAN, ten sam produkt
+        źródłowy zmapowany po 'S') jest zwracany jako „nieprzypisany" (orphaned).
+        """
+        from MPD.source_adapters.linking import link_variants_from_other_sources
+        from MPD.source_adapters.registry import get_adapter_for_source
+
+        link_variants_from_other_sources(
+            mpd_product_id=self.mpd_product.id,
+            current_source_id=self.mh_source.id,
+        )
+
+        adapter = get_adapter_for_source(self.tabu_source.id)
+        orphans = adapter.get_unmapped_variants_for_mpd_product(self.mpd_product.id)
+        orphan_eans = {o.ean for o in orphans}
+        self.assertIn(self.tabu_variant_extra.ean, orphan_eans)
+        self.assertNotIn(self.ean, orphan_eans)
+
+
+class VariantUidIntTest(TestCase):
+    """`_variant_uid_int` chroni kolumnę PG integer (32-bit) przed przepełnieniem —
+    identyfikatory hurtowni oparte na EAN (np. Mada variant_key = 13 cyfr) → null."""
+
+    def test_clamps_values_outside_pg_integer_range(self):
+        from MPD.source_adapters.linking import _variant_uid_int
+
+        class M:
+            def __init__(self, uid):
+                self.variant_uid = uid
+
+        self.assertEqual(_variant_uid_int(M('19410')), 19410)
+        self.assertIsNone(_variant_uid_int(M('5902771173479')))  # 13-cyfrowy EAN
+        self.assertIsNone(_variant_uid_int(M('GOS-BIU-105B')))
+        self.assertIsNone(_variant_uid_int(M(None)))

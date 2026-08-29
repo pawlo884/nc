@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { deleteProduct, fetchProduct, updateProduct } from '../api/mpd';
+import { OrphanVariantsPanel } from '../components/OrphanVariantsPanel';
 import { ProductExtrasPanels } from '../components/ProductExtrasPanels';
 import { useActionMessages } from '../hooks/useActionMessages';
 import type { MpdProductDetail, MpdProductUpdatePayload } from '../types/mpd';
@@ -505,6 +506,8 @@ export function ProductDetailPage() {
           </div>
         )}
       </div>
+
+      <OrphanVariantsPanel productId={productId} product={product} />
     </div>
   );
 }

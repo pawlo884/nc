@@ -65,8 +65,18 @@ Adapter dziedziczy po `SourceAdapter` (z `base.py`) i musi zaimplementować:
 
 ### 4.2. Opcjonalne (ale zalecane)
 
+- **`get_unmapped_variants_for_mpd_product(mpd_product_id)`**  
+  Warianty z produktów tej hurtowni zmapowanych do danego produktu MPD
+  (`product.mapped_product_uid == mpd_product_id`), które nie mają jeszcze
+  `mapped_variant_uid`. Zasilają panel „Warianty nieprzypisane (orphaned)" na karcie
+  produktu MPD (`GET /api/mpd/products/<id>/orphan-variants/`).
+
 - **`get_all_variants_for_product(source_product_id)`**  
-  Wszystkie warianty produktu w hurtowni – do dopinania „pozostałych” rozmiarów przy linkowaniu (te same pola co wyżej, w tym `variant_uid` jako string).
+  Wszystkie warianty produktu w hurtowni (te same pola co wyżej, w tym `variant_uid` jako string).  
+  ⚠️ Linkowanie **nie** tworzy już automatycznie wariantów MPD dla nietrafionych EAN-ów
+  (hurtownia potrafi trzymać kilka kolorów pod jednym produktem, a nazwy kolorów bywają
+  rozjechane między hurtowniami). Takie warianty pokazują się jako „orphaned" i dopina się
+  je ręcznie albo automatycznie po EAN, gdy powstanie właściwy produkt MPD.
 
 - **`update_source_product_mapped(source_product_id, mpd_product_id)`**  
   Ustaw w hurtowni na **produkcie**: `mapped_product_uid = mpd_product_id` (oraz ewentualnie `is_mapped=True` jeśli jest).
@@ -95,6 +105,11 @@ Linkowanie wywołuje adaptery z tego rejestru.
    - Wywołanie **`adapter.update_source_variant_mapped(source_product_id, variant_uid, mpd_variant_id)`** – dla każdego wariantu (ustawia `mapped_variant_uid` / `is_mapped` w hurtowni).
 
 Dzięki temu po stronie hurtowni masz uzupełnione `mapped_product_uid` na produkcie i `mapped_variant_uid` (oraz opcjonalnie `is_mapped`) na wariantach – spójnie z Matterhorn i Tabu.
+
+3. Warianty z produktu źródłowego, których EAN nie trafił w żaden wariant MPD, **nie są
+   dopinane** – zostają jako „orphaned" (widoczne na karcie produktu MPD). Dopięcie:
+   - automatyczne – gdy powstanie produkt MPD z tym EAN (kolejne uruchomienie linkowania),
+   - ręczne – z panelu „Warianty nieprzypisane" (`POST /api/mpd/products/<id>/orphan-variants/`).
 
 ---
 
