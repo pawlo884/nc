@@ -1,5 +1,12 @@
 # Zmiany
 
+## [1.37.0](https://github.com/pawlo884/nc/compare/v1.36.0...v1.37.0) (2026-08-29)
+
+### Features
+
+* **MPD:** dopuść powtarzalne nazwy w paths i categories ([a5d8636](https://github.com/pawlo884/nc/commit/a5d863608b19652f36ca6da1bd2379f7cb2bf5e6))
+* **MPD:** typ magazynu IAI na Sources — choices + wymagane pole ([4087303](https://github.com/pawlo884/nc/commit/408730318924f502027d6a79407425a9c102094c))
+
 ## [1.36.0](https://github.com/pawlo884/nc/compare/v1.35.0...v1.36.0) (2026-08-29)
 
 ### Features
