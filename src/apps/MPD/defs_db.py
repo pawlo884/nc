@@ -64,7 +64,7 @@ def create_tables_if_not_exist(conn):
     create_categories_table_queries = """
         CREATE TABLE IF NOT EXISTS categories (
             id BIGSERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL UNIQUE,
+            name VARCHAR(255) NOT NULL,
             path TEXT,
             parent_id BIGINT,
             FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
