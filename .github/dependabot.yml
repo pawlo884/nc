@@ -66,12 +66,20 @@ updates:
     labels:
       - dependencies
       - python
+    ignore:
+      # Django minor/major to świadoma decyzja — django-celery-beat itp. muszą nadążyć
+      # (PR #139 podbił Django 6.0→6.1 i rozwalił rozwiązywanie zależności).
+      - dependency-name: "Django"
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
     groups:
-      python-minor-patch:
+      # Tylko patch grupowo — minory potrafią rozjechać sprzężone pakiety
+      # (pydantic/pydantic-core, openai/openai-agents) przy zbiorczym bumpie.
+      python-patch:
         patterns:
           - "*"
         update-types:
-          - minor
           - patch
 
   # --- GitHub Actions ---
