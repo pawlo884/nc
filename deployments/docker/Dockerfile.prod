@@ -11,7 +11,7 @@ COPY frontend/mpd/ ./
 RUN npm run build
 
 # --- Django ---
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 # Argument dla daty budowania (wymusza rebuild)
 ARG BUILD_DATE

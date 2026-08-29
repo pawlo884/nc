@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY frontend/mpd/ ./
 RUN npm run build
 
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 # Zainstaluj pakiety systemowe z cache'owaniem apt
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \

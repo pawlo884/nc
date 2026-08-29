@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # Dockerfile dla ML Container (PyTorch, Sentence Transformers)
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 # Argument dla daty budowania (wymusza rebuild)
 ARG BUILD_DATE
