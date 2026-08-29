@@ -398,3 +398,140 @@ class MPDProductImagesImportTest(TestCase):
         self.assertFalse(
             ProductImage.objects.using(_mpd_db()).filter(pk=img.id).exists()
         )
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+class MPDAttachOrphanVariantTest(TestCase):
+    """
+    POST /api/mpd/products/<id>/orphan-variants/ — przypięcie „orphaned" wariantu
+    do produktu, który JUŻ jest zmapowany (Tabu.mapped_product_uid ustawione,
+    jeden wariant już zlinkowany).
+    """
+
+    databases = '__all__'
+
+    def setUp(self):
+        from datetime import datetime as _dt
+        mpd_db = _mpd_db()
+        tabu_db = _tabu_db()
+
+        self.tabu_source = Sources.objects.using(mpd_db).create(name='Tabu API', type='api')
+        brand = Brands.objects.using(mpd_db).create(name='B')
+        self.color = Colors.objects.using(mpd_db).create(name='Czarny')
+        size_s = Sizes.objects.using(mpd_db).create(name='S', category='default')
+        self.mpd_product = Products.objects.using(mpd_db).create(name='Anya K422', brand=brand)
+        self.mpd_variant = ProductVariants.objects.using(mpd_db).create(
+            product=self.mpd_product, color=self.color, size=size_s,
+        )
+        ProductvariantsSources.objects.using(mpd_db).create(
+            variant=self.mpd_variant, source=self.tabu_source,
+            ean='5900000000001', variant_uid=5001,
+        )
+
+        # Tabu: produkt zmapowany, wariant 'S' zlinkowany, wariant 'M' orphaned
+        self.tabu_product = TabuProduct.objects.using(tabu_db).create(
+            api_id=9001, symbol='K422', name='Biustonosz K422',
+            last_update=_dt(2026, 1, 1),
+            mapped_product_uid=self.mpd_product.id,
+        )
+        TabuProductVariant.objects.using(tabu_db).create(
+            api_id=5001, product=self.tabu_product, symbol='K422-S',
+            ean='5900000000001', size='S', store=2,
+            mapped_variant_uid=self.mpd_variant.variant_id, is_mapped=True,
+        )
+        self.tabu_orphan = TabuProductVariant.objects.using(tabu_db).create(
+            api_id=5002, product=self.tabu_product, symbol='K422-M',
+            ean='5900000000002', size='M', store=3,
+        )
+
+    def _post(self, payload):
+        from MPD.api_views import MPDProductOrphanVariantsAPI
+        req = type('R', (), {'data': payload})()
+        return MPDProductOrphanVariantsAPI().post(req, product_id=self.mpd_product.id)
+
+    def test_attach_orphan_as_new_variant(self):
+        from MPD.models import ProductVariants as PV, ProductvariantsSources as PVS
+
+        resp = self._post({
+            'source_id': self.tabu_source.id,
+            'source_variant_uid': '5002',
+            'source_product_id': self.tabu_product.id,
+            'ean': '5900000000002',
+            'stock': 3,
+            'price': 61.63,
+            'mode': 'new',
+            'color_id': self.color.id,
+            'size_name': 'M',
+        })
+        self.assertEqual(resp.data['status'], 'success', resp.data)
+
+        new_v = PV.objects.using(_mpd_db()).get(pk=resp.data['variant_id'])
+        self.assertEqual(new_v.product_id, self.mpd_product.id)
+        self.assertTrue(PVS.objects.using(_mpd_db()).filter(
+            variant_id=new_v.variant_id, source=self.tabu_source,
+        ).exists())
+
+        self.tabu_orphan.refresh_from_db(using=_tabu_db())
+        self.assertEqual(self.tabu_orphan.mapped_variant_uid, new_v.variant_id)
+
+    def test_get_orphans_on_mapped_product(self):
+        from MPD.api_views import MPDProductOrphanVariantsAPI
+        req = type('R', (), {'query_params': {}})()
+        resp = MPDProductOrphanVariantsAPI().get(req, product_id=self.mpd_product.id)
+        self.assertEqual(resp.data['status'], 'success', resp.data)
+        eans = {r['ean'] for r in resp.data['results']}
+        self.assertIn('5900000000002', eans)      # orphaned 'M'
+        self.assertNotIn('5900000000001', eans)   # 'S' już zlinkowany
+
+    def test_reattach_orphan_to_already_linked_variant(self):
+        # mpd_variant już MA źródło Tabu (variant_uid=5001). Przypinamy do niego
+        # orphaned wariant 5002 — nie może wybuchnąć na unique (variant, source).
+        resp = self._post({
+            'source_id': self.tabu_source.id,
+            'source_variant_uid': '5002',
+            'source_product_id': self.tabu_product.id,
+            'ean': '5900000000002',
+            'stock': 3, 'price': 61.63,
+            'mode': 'existing',
+            'target_variant_id': self.mpd_variant.variant_id,
+        })
+        self.assertEqual(resp.data['status'], 'success', resp.data)
+
+    def test_attach_new_with_second_tabu_source_present(self):
+        # Druga „Tabu"-owa Sources (duplikat nazwy) — get_all_adapters / matching
+        # nie może wysypać endpointu.
+        Sources.objects.using(_mpd_db()).create(name='Tabu', type='api')
+        resp = self._post({
+            'source_id': self.tabu_source.id,
+            'source_variant_uid': '5002',
+            'source_product_id': self.tabu_product.id,
+            'ean': '5900000000002',
+            'stock': 3, 'price': 61.63,
+            'mode': 'new', 'color_id': self.color.id, 'size_name': 'M',
+        })
+        self.assertEqual(resp.data['status'], 'success', resp.data)
+
+    def test_attach_orphan_to_existing_variant(self):
+        from MPD.models import ProductvariantsSources as PVS
+
+        # nowy wariant MPD 'M' bez źródła — cel przypięcia
+        size_m = Sizes.objects.using(_mpd_db()).create(name='M', category='default')
+        target = ProductVariants.objects.using(_mpd_db()).create(
+            product=self.mpd_product, color=self.color, size=size_m,
+        )
+        resp = self._post({
+            'source_id': self.tabu_source.id,
+            'source_variant_uid': '5002',
+            'source_product_id': self.tabu_product.id,
+            'ean': '5900000000002',
+            'stock': 3,
+            'price': 61.63,
+            'mode': 'existing',
+            'target_variant_id': target.variant_id,
+        })
+        self.assertEqual(resp.data['status'], 'success', resp.data)
+        self.assertTrue(PVS.objects.using(_mpd_db()).filter(
+            variant_id=target.variant_id, source=self.tabu_source,
+        ).exists())
+        self.tabu_orphan.refresh_from_db(using=_tabu_db())
+        self.assertEqual(self.tabu_orphan.mapped_variant_uid, target.variant_id)

@@ -173,6 +173,38 @@ class CreateMpdVariantsTest(TestCase):
         self.assertTrue(self.mh_var1.is_mapped)
         self.assertTrue(self.mh_var2.is_mapped)
 
+    def test_create_mpd_variants_reuses_existing_producer_color_with_other_parent(self):
+        """
+        Regresja: kolor producenta o danej nazwie już istnieje w MPD, ale z INNYM
+        parentem (colors.name jest UNIQUE). Lookup po (name, parent_id) wywalał
+        `duplicate key value violates unique constraint "colors_name_key"`
+        przy przypinaniu kolejnego koloru do już zmapowanego produktu.
+        """
+        mpd_db = _mpd_db()
+        parent_a = Colors.objects.using(mpd_db).create(name='Beżowy główny A')
+        parent_b = Colors.objects.using(mpd_db).create(name='Beżowy główny B')
+        Colors.objects.using(mpd_db).create(name='Beige K422', parent_id=parent_a.id)
+
+        result = create_mpd_variants(
+            mpd_product_id=self.mpd_product.id,
+            matterhorn_product_id=self.mh_product.id,
+            size_category='test_category',
+            producer_code='PROD',
+            main_color_id=parent_b.id,
+            producer_color_name='Beige K422',
+        )
+        self.assertEqual(result['created_variants'], 2)
+
+        beige = Colors.objects.using(mpd_db).get(name='Beige K422')
+        # Istniejący kolor został użyty (nie próbowaliśmy tworzyć duplikatu)
+        self.assertEqual(
+            Colors.objects.using(mpd_db).filter(name='Beige K422').count(), 1
+        )
+        pv = ProductVariants.objects.using(mpd_db).filter(
+            product_id=self.mpd_product.id
+        ).first()
+        self.assertEqual(pv.producer_color_id, beige.id)
+
     def test_create_mpd_variants_empty_variants_returns_zero(self):
         """Gdy produkt nie ma wariantów, zwraca created_variants=0"""
         mh_db, mpd_db = _mh_db(), _mpd_db()

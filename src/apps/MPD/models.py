@@ -74,7 +74,9 @@ class Collection(models.Model):
 
 class Colors(models.Model):
     id = models.BigAutoField(primary_key=True)
-    name = models.CharField(max_length=50, blank=True, null=True)
+    # colors_name_key (UNIQUE) + colors_name_not_null istnieją w bazie od dawna —
+    # model to teraz odzwierciedla (patrz Sources.type / paths.name).
+    name = models.CharField(max_length=50, unique=True)
     hex_code = models.CharField(max_length=7, blank=True, null=True)
     parent = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, db_column='parent_id')
