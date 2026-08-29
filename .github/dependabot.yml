@@ -1,0 +1,100 @@
+version: 2
+
+updates:
+  # --- npm: narzędzia repo (husky, prettier, eslint, semantic-release) ---
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+    groups:
+      npm-tooling:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # --- npm: frontend MPD (React / Vite) ---
+  - package-ecosystem: npm
+    directory: "/frontend/mpd"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - frontend
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-router"
+      build-tooling:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "typescript"
+          - "oxlint"
+      minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # --- pip: backend Django ---
+  - package-ecosystem: pip
+    directory: "/src"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - python
+    groups:
+      python-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # --- GitHub Actions ---
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Warsaw
+    labels:
+      - dependencies
+      - ci
+
+  # --- Docker (obrazy bazowe) ---
+  - package-ecosystem: docker
+    directories:
+      - "/deployments/docker"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Warsaw
+    labels:
+      - dependencies
+      - docker

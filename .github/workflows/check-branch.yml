@@ -144,7 +144,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install dependencies
@@ -152,6 +152,14 @@ jobs:
           if [ -f package.json ]; then
             # Bez husky w CI (prepare → husky)
             HUSKY=0 npm ci
+          fi
+
+      - name: Audyt zależności (informacyjnie)
+        continue-on-error: true
+        run: |
+          if [ -f package.json ]; then
+            npm audit --audit-level=high || true
+            npm outdated || true
           fi
 
       - name: Sprawdź formatowanie Prettier (tylko kod JS/TS/CSS, bez JSON i markdown)
@@ -220,12 +228,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version-file: frontend/mpd/.nvmrc
           cache: 'npm'
           cache-dependency-path: frontend/mpd/package-lock.json
 
       - name: Install dependencies
         run: HUSKY=0 npm ci
+
+      - name: Audyt zależności (informacyjnie)
+        continue-on-error: true
+        run: |
+          npm audit --audit-level=high || true
+          npm outdated || true
 
       - name: Build (tsc -b && vite build)
         run: npm run build

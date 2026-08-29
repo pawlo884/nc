@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26",
+    "npm": ">=11"
+  },
   "scripts": {
     "dev": "vite --host",
     "dev:open": "vite --host --open /mpd-app/",
