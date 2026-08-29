@@ -34,7 +34,7 @@ jobs:
         
     # Build obrazu produkcyjnego z cache (Dockerfile.prod)
     - name: Build and push main app
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: ./deployments/docker/Dockerfile.prod  # ← PRODUCTION Dockerfile
@@ -59,7 +59,7 @@ jobs:
     # Build obrazu ML z cache (Dockerfile.ml) - tylko gdy ML pliki się zmieniły
     - name: Build and push ML app
       if: steps.ml_changed.outputs.ml_changed == 'true'
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: ./deployments/docker/Dockerfile.ml  # ← ML Dockerfile z PyTorch
