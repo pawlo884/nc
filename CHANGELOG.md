@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.34.0](https://github.com/pawlo884/nc/compare/v1.33.4...v1.34.0) (2026-08-29)
+
+### Features
+
+* **infra:** ogranicz Redis do roli brokera Celery (cache/locki/wyniki na PostgreSQL) ([5aa3685](https://github.com/pawlo884/nc/commit/5aa368534b01422b79c9e6c56bbc9d12125ccf5c))
+
 ## [1.33.4](https://github.com/pawlo884/nc/compare/v1.33.3...v1.33.4) (2026-08-27)
 
 ### Bug Fixes
