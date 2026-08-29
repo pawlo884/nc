@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.35.0](https://github.com/pawlo884/nc/compare/v1.34.0...v1.35.0) (2026-08-29)
+
+### Features
+
+* **MPD:** linkowanie po EAN tylko po EAN + panel wariantów orphaned ([d0ad85d](https://github.com/pawlo884/nc/commit/d0ad85d44cb86e8137c9db5f4d0e18e6393d92f8))
+
 ## [1.34.0](https://github.com/pawlo884/nc/compare/v1.33.4...v1.34.0) (2026-08-29)
 
 ### Features
