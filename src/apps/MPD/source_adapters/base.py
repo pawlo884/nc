@@ -82,6 +82,20 @@ class SourceAdapter(ABC):
         """
         return []
 
+    def get_gallery_images_for_mpd_product(
+        self,
+        mpd_product_id: int,
+    ) -> List[dict]:
+        """
+        Zwraca zdjęcia z galerii produktów tej hurtowni zmapowanych do danego produktu MPD.
+        Format: [{'url': str, 'is_main': bool, 'order': int}]. Galeria w hurtowniach jest
+        zwykle wspólna dla wszystkich kolorów – kolor przypisuje się później ręcznie
+        (drag&drop w tacce na karcie produktu MPD).
+
+        Domyślnie brak zdjęć.
+        """
+        return []
+
     def update_source_product_mapped(
         self,
         source_product_id: int,

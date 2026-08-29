@@ -4,9 +4,9 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { deleteProduct, fetchProduct, updateProduct } from '../api/mpd';
 import { OrphanVariantsPanel } from '../components/OrphanVariantsPanel';
 import { ProductExtrasPanels } from '../components/ProductExtrasPanels';
+import { ProductImagesPanel } from '../components/ProductImagesPanel';
 import { useActionMessages } from '../hooks/useActionMessages';
 import type { MpdProductDetail, MpdProductUpdatePayload } from '../types/mpd';
-import { groupImagesByColor } from '../utils/groupImagesByColor';
 import { groupVariantsForDisplay } from '../utils/groupVariantsForDisplay';
 import '../components/Layout.css';
 import './ProductDetailPage.css';
@@ -104,14 +104,6 @@ export function ProductDetailPage() {
     },
     onError: err => reportSaveError(err, 'Nie udało się usunąć produktu.'),
   });
-
-  const imageGroups = useMemo(() => {
-    const product = data?.product;
-    if (!product?.images?.length) {
-      return [];
-    }
-    return groupImagesByColor(product.images, product.variants ?? []);
-  }, [data?.product]);
 
   const variantRows = useMemo(() => {
     const product = data?.product;
@@ -349,54 +341,7 @@ export function ProductDetailPage() {
       </div>
 
       <div className="product-detail__grid">
-        {product.images.length > 0 && (
-          <div className="page-card product-detail__images">
-            <h3 className="section-title">Zdjęcia</h3>
-            <div className="image-groups">
-              {imageGroups.map(group => (
-                <div key={group.key} className="image-group">
-                  <h4 className="image-group__title">
-                    {group.label}
-                    {group.kind === 'producer' && (
-                      <span className="image-group__badge">kolor producenta</span>
-                    )}
-                    <span className="section-count">{group.images.length}</span>
-                  </h4>
-                  <div className="image-gallery">
-                    {group.images.map(img => (
-                      <a
-                        key={img.id}
-                        href={img.image_url || undefined}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="image-gallery__item"
-                      >
-                        {img.image_url ? (
-                          <img
-                            src={img.image_url}
-                            alt={`${group.label} — produkt ${product.id}`}
-                            loading="lazy"
-                            decoding="async"
-                            width={120}
-                            height={120}
-                            onError={e => {
-                              const el = e.currentTarget;
-                              el.onerror = null;
-                              el.src =
-                                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5icmFrIHpkajwvdGV4dD48L3N2Zz4=';
-                            }}
-                          />
-                        ) : (
-                          <span className="image-gallery__fallback">Brak URL</span>
-                        )}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <ProductImagesPanel productId={productId} product={product} />
 
         <div className="page-card product-detail__description">
           <h3 className="section-title">Opis</h3>

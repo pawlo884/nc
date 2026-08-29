@@ -303,6 +303,18 @@ class ProductImage(models.Model):
     product = models.ForeignKey(
         Products, on_delete=models.CASCADE, db_column='product_id', related_name='images')
     file_path = models.CharField(max_length=500)
+    # Kolor przypisany do zdjęcia. NULL = zdjęcie „w tacce", nieprzypisane do koloru
+    # (np. świeżo zaimportowane z hurtowni, gdzie galeria jest wspólna dla kolorów).
+    producer_color = models.ForeignKey(
+        Colors, on_delete=models.SET_NULL, db_column='producer_color_id',
+        null=True, blank=True, related_name='product_images')
+    # Źródło zdjęcia (hurtownia). NULL = Matterhorn/origin/ręczne.
+    source = models.ForeignKey(
+        Sources, on_delete=models.SET_NULL, db_column='source_id',
+        null=True, blank=True, related_name='product_images')
+    # Oryginalny URL w hurtowni – do dedupu przy ponownym imporcie
+    # (re-upload do bucketa generuje nowe klucze, więc file_path nie wystarcza).
+    origin_url = models.CharField(max_length=1000, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     objects = models.Manager()
 

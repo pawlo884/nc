@@ -295,3 +295,106 @@ class VariantUidIntTest(TestCase):
         self.assertIsNone(_variant_uid_int(M('5902771173479')))  # 13-cyfrowy EAN
         self.assertIsNone(_variant_uid_int(M('GOS-BIU-105B')))
         self.assertIsNone(_variant_uid_int(M(None)))
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+class MPDProductImagesImportTest(TestCase):
+    """Import galerii z hurtowni do „tacki" produktu MPD + dedup po origin_url."""
+
+    databases = '__all__'
+
+    def setUp(self):
+        from datetime import datetime as _dt
+        mpd_db = _mpd_db()
+        tabu_db = _tabu_db()
+
+        self.tabu_source = Sources.objects.using(mpd_db).create(name='Tabu API', type='api')
+        brand = Brands.objects.using(mpd_db).create(name='B')
+        self.mpd_product = Products.objects.using(mpd_db).create(name='Img Test', brand=brand)
+
+        self.tabu_product = TabuProduct.objects.using(tabu_db).create(
+            api_id=88001,
+            symbol='IMG-001',
+            name='Tabu z galerią',
+            last_update=_dt(2026, 1, 1),
+            image_url='https://tabu.example/main.jpg',
+            mapped_product_uid=self.mpd_product.id,
+        )
+        TabuProductVariant.objects.using(tabu_db).create(
+            api_id=88001, product=self.tabu_product, symbol='IMG-001-S',
+            ean='5901111111111', size='S', store=1,
+        )
+        from tabu.models import TabuProductImage
+        TabuProductImage.objects.using(tabu_db).create(
+            product=self.tabu_product, api_image_id=1,
+            image_url='https://tabu.example/g1.jpg', is_main=False, order=1,
+        )
+
+    def _call_import(self):
+        from MPD.source_adapters.registry import register_default_adapters
+        from MPD.api_views import MPDProductImagesImportAPI
+        register_default_adapters()
+        from unittest.mock import patch
+        with patch(
+            'matterhorn1.defs_db.upload_image_to_bucket_and_get_url',
+            side_effect=lambda image_path, product_id, producer_color_name, image_number:
+                f'MPD_test/{product_id}/{producer_color_name}-{image_number}.jpg',
+        ):
+            factory_request = type('R', (), {'data': {}})()
+            return MPDProductImagesImportAPI().post(factory_request, product_id=self.mpd_product.id)
+
+    def test_import_pulls_gallery_into_tray_and_dedupes(self):
+        from MPD.models import ProductImage
+
+        resp1 = self._call_import()
+        self.assertEqual(resp1.data['status'], 'success', resp1.data)
+        self.assertEqual(resp1.data['imported'], 2, resp1.data)  # main + 1 gallery
+
+        imgs = list(ProductImage.objects.using(_mpd_db()).filter(product_id=self.mpd_product.id))
+        self.assertEqual(len(imgs), 2)
+        self.assertTrue(all(i.producer_color_id is None for i in imgs))  # tacka
+        self.assertTrue(all(i.source_id == self.tabu_source.id for i in imgs))
+        self.assertEqual(
+            {i.origin_url for i in imgs},
+            {'https://tabu.example/main.jpg', 'https://tabu.example/g1.jpg'},
+        )
+
+        resp2 = self._call_import()
+        self.assertEqual(resp2.data['imported'], 0)
+        self.assertEqual(resp2.data['skipped'], 2)
+        self.assertEqual(
+            ProductImage.objects.using(_mpd_db()).filter(product_id=self.mpd_product.id).count(),
+            2,
+        )
+
+    def test_assign_color_and_delete_image(self):
+        from unittest.mock import patch
+        from MPD.api_views import MPDProductImageDetailAPI
+        from MPD.models import Colors, ProductImage
+
+        color = Colors.objects.using(_mpd_db()).create(name='Czarny')
+        img = ProductImage.objects.using(_mpd_db()).create(
+            product_id=self.mpd_product.id, file_path='MPD_test/x/1.jpg',
+            source_id=self.tabu_source.id, origin_url='https://tabu.example/x.jpg',
+        )
+        view = MPDProductImageDetailAPI()
+
+        req = type('R', (), {'data': {'producer_color_id': color.id}})()
+        resp = view.patch(req, product_id=self.mpd_product.id, image_id=img.id)
+        self.assertEqual(resp.data['status'], 'success', resp.data)
+        img.refresh_from_db(using=_mpd_db())
+        self.assertEqual(img.producer_color_id, color.id)
+
+        req_null = type('R', (), {'data': {'producer_color_id': None}})()
+        view.patch(req_null, product_id=self.mpd_product.id, image_id=img.id)
+        img.refresh_from_db(using=_mpd_db())
+        self.assertIsNone(img.producer_color_id)
+
+        with patch('matterhorn1.defs_db.delete_object_from_bucket', return_value=True) as mock_del:
+            resp_d = view.delete(type('R', (), {'data': {}})(),
+                                 product_id=self.mpd_product.id, image_id=img.id)
+        self.assertEqual(resp_d.data['status'], 'success')
+        mock_del.assert_called_once_with('MPD_test/x/1.jpg')
+        self.assertFalse(
+            ProductImage.objects.using(_mpd_db()).filter(pk=img.id).exists()
+        )

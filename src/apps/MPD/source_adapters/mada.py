@@ -109,6 +109,32 @@ class MadaAdapter(SourceAdapter):
             ))
         return result
 
+    def get_gallery_images_for_mpd_product(self, mpd_product_id: int) -> List[dict]:
+        """Zdjęcia produktów Mada zmapowanych do tego MPD."""
+        from mada.models import MadaProduct, MadaProductImage
+
+        product_ids = list(
+            MadaProduct.objects.using(_get_mada_db())
+            .filter(mapped_product_uid=mpd_product_id)
+            .values_list('id', flat=True)
+        )
+        if not product_ids:
+            return []
+
+        images: List[dict] = []
+        seen = set()
+        for mi in MadaProductImage.objects.using(_get_mada_db()).filter(
+            product_id__in=product_ids
+        ).order_by('order', 'api_image_id'):
+            if mi.image_url and mi.image_url not in seen:
+                seen.add(mi.image_url)
+                images.append({
+                    'url': mi.image_url,
+                    'is_main': mi.order == 0,
+                    'order': mi.order or 0,
+                })
+        return images
+
     def update_source_product_mapped(
         self,
         source_product_id: int,
