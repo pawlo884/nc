@@ -978,7 +978,7 @@ class ProductsAdmin(admin.ModelAdmin):
             html += '</div>'
         if not html:
             return "Brak zdjęć produktu"
-        return format_html(html)
+        return mark_safe(html)
 
     @admin.display(description="Powiązane produkty")
     def show_related_products(self, obj):
@@ -1127,11 +1127,35 @@ class SizesAdmin(admin.ModelAdmin):
 
 @admin.register(Sources)
 class SourceAdmin(admin.ModelAdmin):
-    fields = ['name', 'location', 'type', 'long_name', 'short_name', 'showcase_image',
+    fields = ['name', 'type', 'location', 'long_name', 'short_name', 'showcase_image',
               'email', 'tel', 'fax', 'www', 'street', 'zipcode', 'city', 'country', 'province']
     list_display = ['id', 'name', 'location', 'type']
     search_fields = ['name']
     actions = ['link_products_from_source']
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        initial.setdefault('type', Sources.Type.MAGAZYN_OBCY)
+        return initial
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        field = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name != 'type' or field is None:
+            return field
+        object_id = (request.resolver_match.kwargs or {}).get('object_id')
+        if not object_id:
+            return field
+        current = (
+            self.model.objects.using('MPD')
+            .filter(pk=object_id)
+            .values_list('type', flat=True)
+            .first()
+        )
+        if current:
+            existing = {choice[0] for choice in field.choices}
+            if current not in existing:
+                field.choices = list(field.choices) + [(current, current)]
+        return field
 
     def get_queryset(self, request):
         return super().get_queryset(request).using('MPD')
@@ -1368,7 +1392,7 @@ class ProductImageAdmin(admin.ModelAdmin):
                     '</a>',
                     url, url
                 )
-        return format_html('<span style="color:#999;">Brak obrazu</span>')
+        return mark_safe('<span style="color:#999;">Brak obrazu</span>')
 
     def save_model(self, request, obj, form, change):
         # Upewnij się, że product_id jest liczbą, nie ścieżką

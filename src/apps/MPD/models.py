@@ -184,10 +184,20 @@ class Sizes(models.Model):
 
 
 class Sources(models.Model):
+    class Type(models.TextChoices):
+        MAGAZYN_GLOWNY = 'Magazyn główny', 'Magazyn główny'
+        MAGAZYN_OBCY = 'Magazyn obcy', 'Magazyn obcy'
+        MAGAZYN_WYMIANY = 'Magazyn wymiany', 'Magazyn wymiany'
+        MAGAZYN_POMOCNICZY = 'Magazyn pomocniczy', 'Magazyn pomocniczy'
+
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255, blank=True, null=True)
     location = models.CharField(max_length=255, blank=True, null=True)
-    type = models.CharField(max_length=255, blank=True, null=True)
+    type = models.CharField(
+        max_length=255,
+        choices=Type.choices,
+        help_text='Typ magazynu IAI.',
+    )
     long_name = models.CharField(max_length=255, blank=True, null=True)
     short_name = models.CharField(max_length=100, blank=True, null=True)
     showcase_image = models.URLField(max_length=500, blank=True, null=True)
