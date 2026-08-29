@@ -40,6 +40,13 @@ except ImportError:  # pragma: no cover - środowisko bez drf_spectacular
 logger = logging.getLogger(__name__)
 
 
+def _mpd_db():
+    """Alias bazy MPD – 'zzz_MPD' w dev/testach, 'MPD' na produkcji (spójnie z
+    MPD.source_adapters/linking i registry, które też przez to przechodzą)."""
+    from .source_adapters.registry import _get_mpd_db
+    return _get_mpd_db()
+
+
 class MPDProductCreateAPI(APIView):
     """
     API: tworzenie produktu MPD.
@@ -495,6 +502,184 @@ class MPDGetMatterhorn1ProductsAPI(APIView):
     )
     def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
         return mpd_views.get_matterhorn1_products(request._request)
+
+
+class MPDProductOrphanVariantsAPI(APIView):
+    """
+    API: warianty z hurtowni „nieprzypisane" (orphaned) do wariantów produktu MPD.
+
+    GET  – lista wariantów źródłowych z produktów zmapowanych do tego produktu MPD,
+           które nie mają jeszcze `mapped_variant_uid` (patrz
+           `SourceAdapter.get_unmapped_variants_for_mpd_product`).
+    POST – ręczne przypięcie takiego wariantu: do istniejącego wariantu MPD
+           (`mode=existing`, `target_variant_id`) albo jako nowy wariant MPD
+           (`mode=new`, `color_id`, opcjonalnie `producer_color_id` / `size_id` / `size_name`).
+    """
+
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, product_id, *args, **kwargs):  # pylint: disable=unused-argument
+        from .source_adapters.registry import get_all_adapters, register_default_adapters
+        from .models import Sources
+
+        try:
+            Products.objects.using(_mpd_db()).get(pk=product_id)
+        except Products.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Produkt nie istnieje.'}, status=404)
+
+        register_default_adapters()
+        source_names = {
+            s.id: s.name for s in Sources.objects.using(_mpd_db()).all()
+        }
+        results = []
+        for source_id, adapter in get_all_adapters():
+            try:
+                matches = adapter.get_unmapped_variants_for_mpd_product(product_id)
+            except Exception:  # pylint: disable=broad-except
+                logger.exception(
+                    'Błąd get_unmapped_variants_for_mpd_product source=%s product=%s',
+                    source_id, product_id,
+                )
+                continue
+            for m in matches:
+                results.append({
+                    'source_id': source_id,
+                    'source_name': source_names.get(source_id),
+                    'ean': m.ean or '',
+                    'variant_uid': str(m.variant_uid) if m.variant_uid is not None else '',
+                    'source_product_id': m.source_product_id,
+                    'size': m.size or '',
+                    'color': m.color or '',
+                    'stock': m.stock,
+                    'price': float(m.price) if m.price is not None else None,
+                    'currency': m.currency or 'PLN',
+                    'producer_code': m.producer_code or '',
+                })
+        results.sort(key=lambda r: (r['source_name'] or '', r['color'], r['size']))
+        return Response({'status': 'success', 'results': results})
+
+    def post(self, request, product_id, *args, **kwargs):  # pylint: disable=unused-argument
+        from django.utils import timezone
+        from .source_adapters.registry import get_adapter_for_source, register_default_adapters
+        from .models import (
+            ProductVariants,
+            ProductvariantsSources,
+            Sizes,
+            Sources,
+            StockAndPrices,
+        )
+
+        data = request.data if isinstance(request.data, dict) else {}
+        try:
+            source_id = int(data['source_id'])
+        except (KeyError, TypeError, ValueError):
+            return Response({'status': 'error', 'message': 'Wymagane pole source_id.'}, status=400)
+
+        source_variant_uid = str(data.get('source_variant_uid') or '').strip()
+        source_product_id = data.get('source_product_id')
+        ean = (data.get('ean') or '').strip()
+        producer_code = (data.get('producer_code') or '').strip()[:255] or None
+        mode = (data.get('mode') or 'existing').strip()
+
+        try:
+            product = Products.objects.using(_mpd_db()).get(pk=product_id)
+        except Products.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Produkt nie istnieje.'}, status=404)
+
+        try:
+            source = Sources.objects.using(_mpd_db()).get(pk=source_id)
+        except Sources.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Źródło nie istnieje.'}, status=404)
+
+        register_default_adapters()
+        adapter = get_adapter_for_source(source_id)
+        if adapter is None:
+            return Response(
+                {'status': 'error', 'message': f'Brak adaptera dla źródła {source.name}.'},
+                status=400,
+            )
+
+        if mode == 'new':
+            color_id = data.get('color_id')
+            if not color_id:
+                return Response(
+                    {'status': 'error', 'message': 'Tryb „new" wymaga color_id.'},
+                    status=400,
+                )
+            producer_color_id = data.get('producer_color_id') or None
+            size_id = data.get('size_id') or None
+            if not size_id and (data.get('size_name') or '').strip():
+                size_name = data['size_name'].strip()[:255]
+                size_obj = (
+                    Sizes.objects.using(_mpd_db()).filter(name__iexact=size_name).first()
+                    or Sizes.objects.using(_mpd_db()).create(
+                        name=size_name,
+                        name_lower=size_name.lower(),
+                    )
+                )
+                size_id = size_obj.id
+            variant = ProductVariants.objects.using(_mpd_db()).create(
+                product=product,
+                color_id=color_id,
+                producer_color_id=producer_color_id,
+                size_id=size_id,
+            )
+        else:
+            try:
+                variant = ProductVariants.objects.using(_mpd_db()).get(
+                    variant_id=data['target_variant_id'], product_id=product_id,
+                )
+            except (KeyError, TypeError, ValueError, ProductVariants.DoesNotExist):
+                return Response(
+                    {'status': 'error', 'message': 'Nieprawidłowy target_variant_id.'},
+                    status=400,
+                )
+
+        # PG integer (32-bit); identyfikatory oparte na EAN przekraczają zakres → null
+        variant_uid_int = (
+            int(source_variant_uid)
+            if source_variant_uid.isdigit() and int(source_variant_uid) <= 2_147_483_647
+            else None
+        )
+        pvs, _created = ProductvariantsSources.objects.using(_mpd_db()).get_or_create(
+            variant_id=variant.variant_id,
+            source=source,
+            defaults={
+                'ean': ean[:50],
+                'variant_uid': variant_uid_int,
+                'producer_code': producer_code,
+            },
+        )
+        stock_val = data.get('stock')
+        price_val = data.get('price')
+        StockAndPrices.objects.using(_mpd_db()).get_or_create(
+            variant_id=variant.variant_id,
+            source=source,
+            defaults={
+                'stock': stock_val if stock_val is not None else 0,
+                'price': price_val if price_val is not None else 0,
+                'currency': (data.get('currency') or 'PLN'),
+                'last_updated': timezone.now(),
+            },
+        )
+
+        if source_product_id:
+            try:
+                adapter.update_source_variant_mapped(
+                    int(source_product_id), source_variant_uid or None, variant.variant_id,
+                )
+                adapter.update_source_product_mapped(int(source_product_id), product_id)
+            except Exception:  # pylint: disable=broad-except
+                logger.exception(
+                    'Błąd ustawiania mapped_* w źródle %s dla wariantu %s',
+                    source_id, source_variant_uid,
+                )
+
+        return Response({
+            'status': 'success',
+            'message': 'Wariant przypięty.',
+            'variant_id': variant.variant_id,
+        })
 
 
 class MPDUpdateProducerCodeAPI(APIView):

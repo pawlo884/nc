@@ -247,6 +247,18 @@
   overflow-x: auto;
 }
 
+.orphan-attach {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 200px;
+}
+
+.orphan-attach__actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
 .section-title {
   margin: 0 0 1rem;
   font-size: 1.1rem;

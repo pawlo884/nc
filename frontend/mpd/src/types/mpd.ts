@@ -159,6 +159,49 @@ export interface CatalogResponse<T> {
   results: T[];
 }
 
+export interface MpdOrphanVariant {
+  source_id: number;
+  source_name: string | null;
+  ean: string;
+  variant_uid: string;
+  source_product_id: number | null;
+  size: string;
+  color: string;
+  stock: number | null;
+  price: number | null;
+  currency: string;
+  producer_code: string;
+}
+
+export interface MpdOrphanVariantsResponse {
+  status: 'success' | 'error';
+  message?: string;
+  results: MpdOrphanVariant[];
+}
+
+export interface MpdAttachOrphanPayload {
+  source_id: number;
+  source_variant_uid: string;
+  source_product_id: number | null;
+  ean: string;
+  producer_code?: string;
+  stock?: number | null;
+  price?: number | null;
+  currency?: string;
+  mode: 'existing' | 'new';
+  target_variant_id?: number;
+  color_id?: number | null;
+  producer_color_id?: number | null;
+  size_id?: number | null;
+  size_name?: string;
+}
+
+export interface MpdAttachOrphanResponse {
+  status: 'success' | 'error';
+  message?: string;
+  variant_id?: number;
+}
+
 export interface ManageActionResponse {
   status: 'success' | 'error';
   message?: string;

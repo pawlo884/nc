@@ -95,6 +95,38 @@ class MatterhornAdapter(SourceAdapter):
             ))
         return result
 
+    def get_unmapped_variants_for_mpd_product(
+        self,
+        mpd_product_id: int,
+    ) -> List[VariantMatch]:
+        """Warianty Matterhorn z produktów zmapowanych do tego MPD, bez przypisania do wariantu MPD."""
+        from matterhorn1.models import ProductVariant
+
+        qs = ProductVariant.objects.using(_get_matterhorn1_db()).filter(
+            product__mapped_product_uid=mpd_product_id,
+            mapped_variant_uid__isnull=True,
+        ).select_related('product')
+        result = []
+        for v in qs:
+            price = Decimal('0')
+            if v.product and v.product.prices:
+                prices = v.product.prices
+                if isinstance(prices, str):
+                    prices = json.loads(prices) if prices else {}
+                price = Decimal(str(prices.get('PLN', 0) or 0))
+            result.append(VariantMatch(
+                ean=normalize_ean(v.ean) if v.ean else '',
+                variant_uid=v.variant_uid,
+                stock=v.stock or 0,
+                price=price,
+                currency='PLN',
+                size=v.name or '',
+                color=v.product.color if v.product else '',
+                source_product_id=v.product_id if v.product_id else None,
+                producer_code=getattr(v, 'producer_code', None) and (v.producer_code or '').strip() or None,
+            ))
+        return result
+
     def update_source_product_mapped(
         self,
         source_product_id: int,

@@ -68,6 +68,20 @@ class SourceAdapter(ABC):
         """
         return []
 
+    def get_unmapped_variants_for_mpd_product(
+        self,
+        mpd_product_id: int,
+    ) -> List[VariantMatch]:
+        """
+        Zwraca warianty z produktów tej hurtowni zmapowanych do danego produktu MPD
+        (`mapped_product_uid == mpd_product_id`), które nie mają jeszcze przypisania do
+        wariantu MPD (`mapped_variant_uid IS NULL`). Do panelu „nieprzypisane" (orphaned)
+        na karcie produktu MPD.
+
+        Domyślnie brak akcji (dla hurtowni bez pól mapped_*).
+        """
+        return []
+
     def update_source_product_mapped(
         self,
         source_product_id: int,

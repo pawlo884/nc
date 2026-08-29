@@ -3,8 +3,11 @@ import type {
   AuthResponse,
   CatalogResponse,
   ManageActionResponse,
+  MpdAttachOrphanPayload,
+  MpdAttachOrphanResponse,
   MpdFabricItem,
   MpdNamedRef,
+  MpdOrphanVariantsResponse,
   MpdPathRef,
   MpdProduct,
   MpdProductDetailResponse,
@@ -133,6 +136,26 @@ export async function updateRetailPrices(
   const { data } = await apiClient.post<ManageActionResponse>(
     `/api/mpd/products/${productId}/retail-prices/`,
     { prices }
+  );
+  return data;
+}
+
+export async function fetchOrphanVariants(
+  productId: number
+): Promise<MpdOrphanVariantsResponse> {
+  const { data } = await apiClient.get<MpdOrphanVariantsResponse>(
+    `/api/mpd/products/${productId}/orphan-variants/`
+  );
+  return data;
+}
+
+export async function attachOrphanVariant(
+  productId: number,
+  payload: MpdAttachOrphanPayload
+): Promise<MpdAttachOrphanResponse> {
+  const { data } = await apiClient.post<MpdAttachOrphanResponse>(
+    `/api/mpd/products/${productId}/orphan-variants/`,
+    payload
   );
   return data;
 }

@@ -2,7 +2,6 @@
 Logika dopinania wariantów z innych hurtowni po EAN.
 """
 import logging
-from decimal import Decimal
 from typing import Dict, Optional, Set
 
 from django.utils import timezone
@@ -10,7 +9,6 @@ from django.utils import timezone
 from MPD.models import (
     ProductVariants,
     ProductvariantsSources,
-    Sizes,
     Sources,
     StockAndPrices,
 )
@@ -26,13 +24,22 @@ def _get_mpd_db() -> str:
     return 'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD'
 
 
+# ProductvariantsSources.variant_uid to PG integer (32-bit). Identyfikatory hurtowni
+# oparte na EAN (np. Mada variant_key = 13 cyfr) przekraczają zakres — wtedy null,
+# tożsamość i tak niesie ean/producer_code.
+_PG_INT_MAX = 2_147_483_647
+
+
 def _variant_uid_int(m) -> Optional[int]:
     """Konwersja variant_uid z matcha na int do kolumny ProductvariantsSources.variant_uid."""
     uid = getattr(m, 'variant_uid', None)
     if uid is None:
         return None
     s = str(uid).strip()
-    return int(s) if s.isdigit() else None
+    if not s.isdigit():
+        return None
+    value = int(s)
+    return value if 0 <= value <= _PG_INT_MAX else None
 
 
 def link_variants_from_other_sources(
@@ -181,95 +188,14 @@ def link_variants_from_other_sources(
                                 m.source_product_id, upd_err
                             )
 
-                # Pozostałe warianty z tego samego produktu w źródle (wszystkie hurtownie)
-                # first_mpd: pierwszy wariant MPD (color_id, producer_color_id) – z variant_ids, nie „variants”
-                if not variant_ids:
-                    stats['sources_processed'] += 1
-                    continue
-                first_mpd = (
-                    ProductVariants.objects.using(db)
-                    .filter(variant_id=variant_ids[0])
-                    .only('variant_id', 'color_id', 'producer_color_id')
-                    .first()
-                )
-                if not first_mpd:
-                    stats['sources_processed'] += 1
-                    continue
-                ean_linked: Set[str] = set(variant_by_ean.keys())
-                for source_product_id in updated_source_products:
-                    try:
-                        all_in_source = adapter.get_all_variants_for_product(source_product_id)
-                        for m in all_in_source:
-                            ean_norm = normalize_ean(m.ean) if m.ean else ''
-                            if ean_norm and ean_norm in ean_linked:
-                                continue
-                            # Nowy wariant MPD dla „pozostałego” rozmiaru z hurtowni
-                            size_name = (m.size or '').strip()[:255] if m.size else ''
-                            size_obj = None
-                            if size_name:
-                                size_obj = (
-                                    Sizes.objects.using(db).filter(name__iexact=size_name).first()
-                                    or Sizes.objects.using(db).filter(name=size_name).first()
-                                )
-                                if not size_obj:
-                                    size_obj = Sizes.objects.using(db).create(
-                                        name=size_name,
-                                        category=None,
-                                        unit=None,
-                                        name_lower=size_name.lower() if size_name else '',
-                                    )
-                            # producer_code tylko gdy jasno podany z hurtowni, inaczej null
-                            pc = (getattr(m, 'producer_code', None) or '').strip()[:255] or None
-                            new_pv = ProductVariants.objects.using(db).create(
-                                product_id=mpd_product_id,
-                                color_id=first_mpd.color_id,
-                                producer_color_id=first_mpd.producer_color_id,
-                                size=size_obj,
-                            )
-                            variant_uid_int = _variant_uid_int(m)
-                            ProductvariantsSources.objects.using(db).create(
-                                variant_id=new_pv.variant_id,
-                                source=source,
-                                ean=(m.ean or '')[:50] if m.ean else '',
-                                variant_uid=variant_uid_int,
-                                producer_code=pc,
-                            )
-                            StockAndPrices.objects.using(db).create(
-                                variant_id=new_pv.variant_id,
-                                source=source,
-                                stock=m.stock or 0,
-                                price=m.price or Decimal('0'),
-                                currency=m.currency or 'PLN',
-                                last_updated=timezone.now(),
-                            )
-                            if ean_norm:
-                                variant_by_ean[ean_norm] = new_pv.variant_id
-                                ean_linked.add(ean_norm)
-                            stats['linked_count'] += 1
-                            logger.info(
-                                "Dodano pozostały wariant z produktu %s: size=%s ean=%s variant_id=%s",
-                                source_product_id, size_name, m.ean, new_pv.variant_id
-                            )
-                            # Ustaw mapped_variant_uid w hurtowni źródłowej (np. Matterhorn productvariant)
-                            if m.source_product_id:
-                                try:
-                                    adapter.update_source_variant_mapped(
-                                        m.source_product_id,
-                                        getattr(m, 'variant_uid', None),
-                                        new_pv.variant_id,
-                                    )
-                                except Exception as var_err:
-                                    logger.warning(
-                                        "Błąd ustawiania mapped_variant_uid (pozostały wariant): %s",
-                                        var_err
-                                    )
-                    except Exception as rem_err:
-                        logger.exception(
-                            "Błąd dopinania pozostałych wariantów dla produktu %s: %s",
-                            source_product_id, rem_err
-                        )
-                        stats['errors'].append(str(rem_err))
-
+                # UWAGA: świadomie NIE dopinamy „pozostałych” rozmiarów z produktu
+                # źródłowego, których EAN nie występuje w MPD. Hurtownia potrafi trzymać
+                # kilka kolorów pod jednym produktem (np. Tabu: czarny + beżowy razem),
+                # a nazwy kolorów bywają rozjechane między hurtowniami ("czarny" vs
+                # "black"), więc automatyczne tworzenie wariantów prowadziło do wciągania
+                # obcego koloru pod zły produkt. Takie warianty pokazujemy jako
+                # „nieprzypisane” (orphaned) na karcie produktu MPD i dopina się je
+                # ręcznie albo automatycznie po EAN, gdy powstanie właściwy produkt.
                 stats['sources_processed'] += 1
             except Exception as e:
                 logger.exception("Błąd linkowania ze źródła %s: %s", source_id, e)

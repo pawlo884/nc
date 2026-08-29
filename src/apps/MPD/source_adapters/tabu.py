@@ -87,6 +87,32 @@ class TabuAdapter(SourceAdapter):
             ))
         return result
 
+    def get_unmapped_variants_for_mpd_product(
+        self,
+        mpd_product_id: int,
+    ) -> List[VariantMatch]:
+        """Warianty Tabu z produktów zmapowanych do tego MPD, bez przypisania do wariantu MPD."""
+        from tabu.models import TabuProductVariant
+
+        qs = TabuProductVariant.objects.using(_get_tabu_db()).filter(
+            product__mapped_product_uid=mpd_product_id,
+            mapped_variant_uid__isnull=True,
+        ).select_related('product')
+        result = []
+        for v in qs:
+            result.append(VariantMatch(
+                ean=normalize_ean(v.ean) if v.ean else '',
+                variant_uid=str(v.api_id),
+                stock=v.store or 0,
+                price=v.price_net or Decimal('0'),
+                currency='PLN',
+                size=v.size or '',
+                color=v.color or '',
+                source_product_id=v.product_id if v.product_id else None,
+                producer_code=(v.symbol or '').strip() or None,
+            ))
+        return result
+
     def update_source_product_mapped(
         self,
         source_product_id: int,

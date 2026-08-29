@@ -22,6 +22,11 @@ urlpatterns = [
         name="products-retail-prices",
     ),
     path(
+        "products/<int:product_id>/orphan-variants/",
+        api_views.MPDProductOrphanVariantsAPI.as_view(),
+        name="products-orphan-variants",
+    ),
+    path(
         "products/bulk-create/",
         api_views.MPDBulkCreateProductsAPI.as_view(),
         name="products-bulk-create",
