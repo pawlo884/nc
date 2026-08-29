@@ -269,6 +269,11 @@ if 'test' in sys.argv:
         'bulk': '1000000/min',
     }
 
+    # Celery: zadania w testach wykonują się synchronicznie (bez brokera Redis),
+    # deterministycznie i bez zależności od infrastruktury (potrzebne w CI).
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+
 # Konfiguracja testów dla baz danych
 # Dla testów wszystkie bazy używają tej samej testowej bazy (MIRROR)
 # To rozwiązuje problemy z tworzeniem wielu testowych baz jednocześnie
