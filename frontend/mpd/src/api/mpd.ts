@@ -140,9 +140,7 @@ export async function updateRetailPrices(
   return data;
 }
 
-export async function fetchOrphanVariants(
-  productId: number
-): Promise<MpdOrphanVariantsResponse> {
+export async function fetchOrphanVariants(productId: number): Promise<MpdOrphanVariantsResponse> {
   const { data } = await apiClient.get<MpdOrphanVariantsResponse>(
     `/api/mpd/products/${productId}/orphan-variants/`
   );

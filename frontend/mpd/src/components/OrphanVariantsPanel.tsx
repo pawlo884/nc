@@ -59,13 +59,10 @@ export function OrphanVariantsPanel({
         price: o.price,
         currency: o.currency,
         mode: draft.mode,
-        target_variant_id:
-          draft.mode === 'existing' ? Number(draft.targetVariantId) : undefined,
+        target_variant_id: draft.mode === 'existing' ? Number(draft.targetVariantId) : undefined,
         color_id: draft.mode === 'new' ? Number(draft.colorId) : undefined,
         producer_color_id:
-          draft.mode === 'new' && draft.producerColorId
-            ? Number(draft.producerColorId)
-            : undefined,
+          draft.mode === 'new' && draft.producerColorId ? Number(draft.producerColorId) : undefined,
         size_name: draft.mode === 'new' ? draft.sizeName || undefined : undefined,
       });
     },
@@ -91,10 +88,9 @@ export function OrphanVariantsPanel({
         <span className="section-count">{rows.length}</span>
       </h3>
       <p className="muted-note">
-        Warianty z hurtowni, których produkt jest zmapowany do tego produktu MPD, ale sam
-        wariant nie został jeszcze dopięty po EAN (np. inny kolor pod jednym produktem
-        hurtowni albo rozjechany EAN). Przypnij je do istniejącego wariantu MPD lub utwórz
-        nowy.
+        Warianty z hurtowni, których produkt jest zmapowany do tego produktu MPD, ale sam wariant
+        nie został jeszcze dopięty po EAN (np. inny kolor pod jednym produktem hurtowni albo
+        rozjechany EAN). Przypnij je do istniejącego wariantu MPD lub utwórz nowy.
       </p>
 
       {isLoading ? (
@@ -130,7 +126,11 @@ export function OrphanVariantsPanel({
                     <td>{o.ean || <span className="muted">—</span>}</td>
                     <td>{o.stock ?? <span className="muted">—</span>}</td>
                     <td>
-                      {o.price != null ? `${o.price} ${o.currency}` : <span className="muted">—</span>}
+                      {o.price != null ? (
+                        `${o.price} ${o.currency}`
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                     <td>
                       {!isOpen ? (
@@ -149,9 +149,7 @@ export function OrphanVariantsPanel({
                           <select
                             className="search-input"
                             value={draft.mode}
-                            onChange={e =>
-                              setDraft({ mode: e.target.value as 'existing' | 'new' })
-                            }
+                            onChange={e => setDraft({ mode: e.target.value as 'existing' | 'new' })}
                           >
                             <option value="existing">Do istniejącego wariantu</option>
                             <option value="new">Utwórz nowy wariant</option>
