@@ -185,10 +185,9 @@ jobs:
 
       - name: Migracje bez luk (makemigrations --check)
         working-directory: src
-        continue-on-error: true # informacyjnie — do zaostrzenia gdy drift zniknie
         run: |
           python manage.py makemigrations --check --dry-run || {
-            echo "⚠️ Modele rozjeżdżają się z migracjami — uruchom: python manage.py makemigrations"
+            echo "❌ Modele rozjeżdżają się z migracjami — uruchom: python manage.py makemigrations"
             exit 1
           }
           echo "✅ Migracje spójne z modelami"
