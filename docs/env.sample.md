@@ -72,12 +72,16 @@ AWS_DEFAULT_ACL=
 AWS_QUERYSTRING_AUTH=false
 
 
-# Redis/Celery Configuration
+# Redis Configuration
+# Redis pełni TYLKO rolę brokera Celery. Cache Django (DatabaseCache) oraz result
+# backend Celery (django-celery-results) korzystają z PostgreSQL - bez dodatkowych zmiennych.
 REDIS_HOST=
 REDIS_PORT=
 REDIS_PASSWORD=
 REDIS_DB=
 
 # Celery Configuration
+# Result backend jest ustawiony na stałe na 'django-db' w core/settings - NIE ustawiaj
+# CELERY_RESULT_BACKEND w env (pusta wartość jest OK).
 CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}
-CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}
+CELERY_RESULT_BACKEND=

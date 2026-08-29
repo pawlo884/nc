@@ -41,13 +41,15 @@ TABU_DB_NAME=test_tabu
 TABU_DB_USER=
 TABU_DB_PASSWORD=
 
-# Redis w klastrze k3s (Service: redis)
+# Redis w klastrze k3s (Service: redis) - TYLKO broker Celery.
+# Cache Django i result backend Celery są na PostgreSQL.
 REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_PASSWORD=zmien-haslo-test
 REDIS_DB=0
 CELERY_BROKER_URL=redis://:zmien-haslo-test@redis:6379/0
-CELERY_RESULT_BACKEND=redis://:zmien-haslo-test@redis:6379/0
+# Result backend jest na stałe 'django-db' w core/settings - zostaw puste.
+CELERY_RESULT_BACKEND=
 
 # MinIO / S3 (opcjonalnie osobny bucket test)
 MINIO_ENDPOINT=

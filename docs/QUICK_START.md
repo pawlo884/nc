@@ -282,15 +282,16 @@ deploy:
       memory: 256M
 ```
 
-### 4. Używaj Redis do cache
+### 4. Cache na PostgreSQL (DatabaseCache)
 ```python
-# settings/dev.py
+# core/settings/base.py — Redis jest już tylko brokerem Celery
 CACHES = {
     'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://:dev_password@redis:6379/1',
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'nc_cache_table',
     }
 }
+# Tabelę tworzy: python manage.py createcachetable --database=<db>
 ```
 
 ---

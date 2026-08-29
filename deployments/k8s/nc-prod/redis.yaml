@@ -26,7 +26,9 @@ spec:
           command:
             - sh
             - -c
-            - redis-server --requirepass "$REDIS_PASSWORD" --maxmemory 512mb --maxmemory-policy allkeys-lru
+            # Redis = tylko broker Celery (cache i result backend na PostgreSQL).
+            # noeviction: nie eksmituj zakolejkowanych zadań przy braku pamięci.
+            - redis-server --requirepass "$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy noeviction
           env:
             - name: REDIS_PASSWORD
               valueFrom:

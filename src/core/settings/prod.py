@@ -1,4 +1,6 @@
 import os
+from importlib.util import find_spec
+
 from django.core.exceptions import ImproperlyConfigured
 from .base import *
 from .base import _strip_env_value
@@ -227,21 +229,18 @@ if cors_origins_env:
     CORS_ALLOWED_ORIGINS.extend([origin.strip()
                                 for origin in cors_origins_env.split(',') if origin.strip()])
 
-# Redis Configuration - wspólne dla Celery i Cache
-# W Dockerze nazwa serwisu Redis to 'redis' (w trybie blue-green: docker-compose.blue-green.yml)
-# Użyj zmiennych środowiskowych CELERY_BROKER_URL jeśli są ustawione (z docker-compose)
-# W przeciwnym razie użyj REDIS_HOST i REDIS_PASSWORD
+# Redis Configuration - Redis jest już TYLKO brokerem Celery.
+# Cache Django i result backend Celery używają PostgreSQL (patrz niżej).
+# W Dockerze nazwa serwisu Redis to 'redis' (w trybie blue-green: docker-compose.blue-green.yml).
+# Użyj zmiennej CELERY_BROKER_URL jeśli ustawiona (z docker-compose), inaczej złóż z REDIS_HOST/REDIS_PASSWORD.
 if os.getenv('CELERY_BROKER_URL'):
     # Workerzy mają ustawione CELERY_BROKER_URL w docker-compose
     CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')
-    CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', os.getenv('CELERY_BROKER_URL'))
-    # Wyciągnij REDIS_HOST i REDIS_PASSWORD z URL dla cache
-    # Użyj prostego parsowania stringa zamiast regex
+    # Wyłuskaj REDIS_HOST/REDIS_PASSWORD z URL (przydają się np. do healthchecków/monitoringu)
     try:
         # Format: redis://:password@host:port/db
         broker_url = CELERY_BROKER_URL
         if '://:' in broker_url:
-            # Ma hasło
             parts = broker_url.replace('redis://:', '').split('@', 1)
             if len(parts) == 2:
                 REDIS_PASSWORD = parts[0]
@@ -251,25 +250,26 @@ if os.getenv('CELERY_BROKER_URL'):
                 REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
                 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
         else:
-            # Bez hasła
             REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
             REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
     except Exception:
-        # Fallback jeśli parsowanie się nie powiedzie
         REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
         REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
 else:
-    # Aplikacja web używa REDIS_HOST i REDIS_PASSWORD
+    # Aplikacja web składa URL brokera z REDIS_HOST i REDIS_PASSWORD
     REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
     REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'CHANGE_ME_IN_ENV')
     CELERY_BROKER_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0'
-    CELERY_RESULT_BACKEND = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0'
+
+# Result backend: PostgreSQL przez django-celery-results (tabele w bazie 'default').
+# Nadpisujemy ewentualną wartość z env (docker-compose/k8s ustawiają pusty string).
+CELERY_RESULT_BACKEND = 'django-db'
 
 # Debug: sprawdź czy zmienne są załadowane (tylko jeśli DEBUG=True)
 if DEBUG:
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"Celery Configuration: BROKER_URL={CELERY_BROKER_URL[:30]}..., RESULT_BACKEND={CELERY_RESULT_BACKEND[:30]}...")
+    logger.info(f"Celery Configuration: BROKER_URL={CELERY_BROKER_URL[:30]}..., RESULT_BACKEND={CELERY_RESULT_BACKEND}")
     logger.info(f"Redis Configuration: HOST={REDIS_HOST}, PASSWORD={'***' if REDIS_PASSWORD else 'NOT SET'}")
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
@@ -297,15 +297,6 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     'health_check_interval': 25,
 }
 
-# Result backend transport options - takie same jak broker
-CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
-    'socket_keepalive': True,
-    'socket_timeout': 120,
-    'socket_connect_timeout': 30,
-    'retry_on_timeout': True,
-    'health_check_interval': 25,
-}
-
 # Celery Beat Configuration
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
@@ -319,36 +310,16 @@ CELERY_TASK_ROUTES = {
     'tabu.tasks.*': {'queue': 'default'},
 }
 
-# Cache Configuration - Redis dla blokad między workerami
-# Użyj django-redis z obsługą błędów, ale sprawdź dostępność pakietu
-from importlib.util import find_spec
-
-if find_spec('django_redis') is not None:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django_redis.cache.RedisCache',
-            # Używamy bazy 1 dla cache
-            'LOCATION': f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/1',
-            'OPTIONS': {
-                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-                'SOCKET_CONNECT_TIMEOUT': 5,
-                'SOCKET_TIMEOUT': 5,
-                'CONNECTION_POOL_KWARGS': {
-                    'retry_on_timeout': True,
-                    'socket_connect_timeout': 5,
-                },
-                # Ignoruj błędy połączenia - aplikacja będzie działać bez cache
-                'IGNORE_EXCEPTIONS': True,
-            }
-        }
+# Cache Configuration - PostgreSQL (DatabaseCache), tabela w bazie 'default'.
+# Używane przez throttling DRF, watchdog importu matterhorn1 oraz blokadę
+# matterhorn1_full_import_lock. Tabelę tworzy `manage.py createcachetable`
+# (krok w migracji deployu). Krótkie blokady tasków tabu/mada -> core.pg_locks.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'nc_cache_table',
     }
-else:
-    # Fallback do dummy cache jeśli django-redis nie jest dostępne
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
-        }
-    }
+}
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {

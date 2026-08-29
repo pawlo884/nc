@@ -19,7 +19,7 @@ services:
       - TZ=Europe/Warsaw
       - REDIS_PASSWORD=dev_password
       - CELERY_BROKER_URL=redis://:dev_password@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:dev_password@redis:6379/0
+      - CELERY_RESULT_BACKEND=
       - CELERY_WORKER_ENABLE_REMOTE_CONTROL=true
       - CELERY_WORKER_SEND_TASK_EVENTS=true
       - CELERY_TASK_SEND_SENT_EVENT=true
