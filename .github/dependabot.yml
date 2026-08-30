@@ -74,8 +74,26 @@ updates:
           - version-update:semver-major
           - version-update:semver-minor
     groups:
-      # Tylko patch grupowo — minory potrafią rozjechać sprzężone pakiety
-      # (pydantic/pydantic-core, openai/openai-agents) przy zbiorczym bumpie.
+      # Rodziny sprzężone: pinujemy tranzytywy (pydantic-core, pydantic-settings),
+      # więc muszą się ruszać razem z rodzicem — inaczej pip nie rozwiąże
+      # (pydantic 2.13.4 wymaga dokładnie pydantic-core 2.46.4).
+      pydantic:
+        patterns:
+          - "pydantic"
+          - "pydantic-core"
+          - "pydantic_core"
+          - "pydantic-settings"
+        update-types:
+          - minor
+          - patch
+      openai-stack:
+        patterns:
+          - "openai"
+          - "openai-agents"
+        update-types:
+          - minor
+          - patch
+      # Reszta: tylko patch grupowo (minory pojedynczo, przez bramkę testową).
       python-patch:
         patterns:
           - "*"
