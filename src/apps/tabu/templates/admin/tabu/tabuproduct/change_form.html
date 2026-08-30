@@ -63,6 +63,7 @@
               <th style="text-align: left; border: 1px solid #ddd; padding: 6px; width: 100px;">Główny kolor</th>
               <th style="text-align: left; border: 1px solid #ddd; padding: 6px; width: 100px;">Kolor prod.</th>
               <th style="text-align: left; border: 1px solid #ddd; padding: 6px; width: 80px;">Kod prod.</th>
+              <th style="text-align: left; border: 1px solid #ddd; padding: 6px; width: 90px;">Kolor hurt.</th>
               <th style="text-align: center; border: 1px solid #ddd; padding: 6px; width: 90px;">Akcja</th>
             </tr>
           </thead>
@@ -91,6 +92,16 @@
               </td>
               <td style="border: 1px solid #ddd; padding: 4px;">
                 <input type="text" class="tabu-producer-code-input" placeholder="Kod" style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;" />
+              </td>
+              <td style="border: 1px solid #ddd; padding: 4px;">
+                {% if source_colors %}
+                <select class="tabu-source-color-select" style="width:100%; font-size:11px; padding:2px; border:1px solid #ccc; border-radius:3px;">
+                  <option value="">-- wszystkie --</option>
+                  {% for c in source_colors %}
+                  <option value="{{ c }}">{{ c }}</option>
+                  {% endfor %}
+                </select>
+                {% else %}<span style="color:#bbb">—</span>{% endif %}
               </td>
               <td style="border: 1px solid #ddd; padding: 4px; text-align: center;">
                 <button type="button" class="tabu-assign-mpd-btn" data-mpd-id="{{ p.id }}" style="background: #007cba; color: white; border: none; padding: 4px 10px; border-radius: 3px; font-size: 11px; cursor: pointer; margin-right: 6px;">Przypisz</button>
@@ -152,6 +163,19 @@
             </select>
           </div>
         </div>
+
+        {% if source_colors %}
+        <div class="form-row">
+          <label for="source_color">Kolor hurtowni (Tabu) do zmapowania:</label>
+          <select id="source_color" name="source_color">
+            <option value="">-- wszystkie warianty --</option>
+            {% for c in source_colors %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+          <small style="color:#777">Produkt Tabu ma kilka kolorów — wybierz jeden; reszta = osobne mapowanie.</small>
+        </div>
+        {% endif %}
 
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px">
           <div class="form-row">
@@ -271,6 +295,8 @@ document.addEventListener('DOMContentLoaded', function() {
       formData.append('main_color_id', document.getElementById('main_color_id').value);
       formData.append('producer_color_name', document.getElementById('producer_color_name').value);
       formData.append('producer_code', document.getElementById('producer_code').value);
+      var srcColorEl = document.getElementById('source_color');
+      formData.append('source_color', srcColorEl ? srcColorEl.value : '');
       formData.append('series_name', document.getElementById('series_name').value);
       formData.append('unit_id', document.getElementById('unit_id').value);
       Array.from(document.getElementById('mpd_paths').selectedOptions).forEach(function(o) { formData.append('mpd_paths', o.value); });
@@ -320,6 +346,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var mainColorId = row ? (row.querySelector('.tabu-main-color-select') && row.querySelector('.tabu-main-color-select').value) || '' : '';
     var producerColorName = row ? (row.querySelector('.tabu-producer-color-input') && row.querySelector('.tabu-producer-color-input').value) || '' : '';
     var producerCode = row ? (row.querySelector('.tabu-producer-code-input') && row.querySelector('.tabu-producer-code-input').value) || '' : '';
+    var sourceColor = row ? (row.querySelector('.tabu-source-color-select') && row.querySelector('.tabu-source-color-select').value) || '' : '';
     var statusEl = document.getElementById('tabu-mpd-status');
     if (statusEl) {
       statusEl.style.display = 'block';
@@ -328,7 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     var csrf = getTabuCsrfToken();
     var assignUrl = '/admin/tabu/tabuproduct/assign-mapping/{{ original.id }}/' + mpdId + '/';
-    var body = 'csrfmiddlewaretoken=' + encodeURIComponent(csrf) + '&main_color_id=' + encodeURIComponent(mainColorId) + '&producer_color_name=' + encodeURIComponent(producerColorName) + '&producer_code=' + encodeURIComponent(producerCode);
+    var body = 'csrfmiddlewaretoken=' + encodeURIComponent(csrf) + '&main_color_id=' + encodeURIComponent(mainColorId) + '&producer_color_name=' + encodeURIComponent(producerColorName) + '&producer_code=' + encodeURIComponent(producerCode) + '&source_color=' + encodeURIComponent(sourceColor);
     fetch(assignUrl, {
       method: 'POST',
       headers: {

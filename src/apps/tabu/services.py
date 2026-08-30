@@ -157,7 +157,16 @@ def _saga_create_mpd_tabu(
             defaults={'type': 'api', 'location': 'https://b2b.tabu.com.pl'},
         )
 
+        # Produkt Tabu potrafi trzymać kilka kolorów pod jednym api_id — gdy formularz
+        # wskazał konkretny kolor hurtowni, mapujemy tylko warianty tego koloru
+        # (reszta kolorów = osobne mapowanie do osobnego produktu MPD).
+        source_color = _post('source_color').strip()
         variants = list(tabu_product.api_variants.all())
+        if source_color:
+            variants = [
+                v for v in variants
+                if (v.color or '').strip().casefold() == source_color.casefold()
+            ]
         for v in variants:
             color_obj = main_color if main_color else None
             if not color_obj and v.color:
@@ -403,6 +412,7 @@ def create_mpd_variants_from_tabu(
     producer_code: Optional[str] = None,
     main_color_id: Optional[int] = None,
     producer_color_name: Optional[str] = None,
+    source_color: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Tworzy/dopina warianty w MPD z wariantów Tabu (wzór: matterhorn1/saga_variants.create_mpd_variants).
@@ -430,8 +440,11 @@ def create_mpd_variants_from_tabu(
     tabu_variants = list(
         TabuProductVariant.objects.using(tabu_db).filter(product_id=tabu_product_id)
     )
+    if source_color and (source_color or '').strip():
+        wanted = source_color.strip().casefold()
+        tabu_variants = [v for v in tabu_variants if (v.color or '').strip().casefold() == wanted]
     if not tabu_variants:
-        logger.warning("Brak wariantów Tabu dla produktu %s", tabu_product_id)
+        logger.warning("Brak wariantów Tabu dla produktu %s (source_color=%r)", tabu_product_id, source_color)
         return {"created_variants": 0, "variant_ids": []}
 
     # Główny kolor: z formularza (main_color_id) albo z produktu MPD / Tabu

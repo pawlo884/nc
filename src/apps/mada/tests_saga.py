@@ -80,6 +80,40 @@ class MadaSagaTest(TestCase):
         self.assertEqual([s.step_name for s in steps], ['create_mpd', 'update_mada_mapping'])
         self.assertTrue(all(s.status == 'completed' for s in steps))
 
+    def test_saga_maps_only_selected_source_color(self):
+        """Gdy form_data ma source_color, saga mapuje tylko warianty tego koloru Mada."""
+        mada_db = _mada_db()
+        mpd_db = _mpd_db()
+        from MPD.models import ProductVariants
+
+        # drugi kolor pod tym samym produktem Mada
+        MadaProductVariant.objects.using(mada_db).create(
+            product=self.mada_product,
+            variant_key='5901234567891',
+            size='M',
+            color='beżowy',
+            ean='5901234567891',
+            stock=3,
+        )
+
+        result = create_mpd_product_from_mada(
+            self.mada_product.pk, form_data={'source_color': 'Czerwony'},
+        )
+        self.assertTrue(result['success'], result.get('error_message'))
+
+        mpd_variants = list(
+            ProductVariants.objects.using(mpd_db)
+            .filter(product_id=result['mpd_product_id'])
+            .select_related('color')
+        )
+        # tylko wariant 'Czerwony', bez 'beżowy'
+        self.assertEqual(len(mpd_variants), 1)
+
+        self.mada_variant.refresh_from_db(using=mada_db)
+        self.assertIsNotNone(self.mada_variant.mapped_variant_uid)
+        bezowy = MadaProductVariant.objects.using(mada_db).get(variant_key='5901234567891')
+        self.assertIsNone(bezowy.mapped_variant_uid)
+
     def test_saga_compensation_when_step2_fails(self):
         mada_db = _mada_db()
         mpd_db = _mpd_db()
