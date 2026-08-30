@@ -20,6 +20,7 @@ from MPD.models import (
     Sources,
 )
 from matterhorn1.models import Product as MhProduct
+from mada.models import Brand as MadaBrand, MadaProduct, MadaProductVariant
 from tabu.models import TabuProduct, TabuProductVariant, Brand as TabuBrand
 
 
@@ -35,6 +36,10 @@ def _tabu_db():
     return 'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu'
 
 
+def _mada_db():
+    return 'zzz_mada' if 'zzz_mada' in settings.DATABASES else 'mada'
+
+
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class MPDDeletePropagatesToHurtownieTest(TestCase):
     """
@@ -47,12 +52,16 @@ class MPDDeletePropagatesToHurtownieTest(TestCase):
         mpd_db = _mpd_db()
         mh_db = _mh_db()
         tabu_db = _tabu_db()
+        mada_db = _mada_db()
 
-        # Produkt MPD
+        # Produkt MPD + wariant (do sprawdzenia czyszczenia mapped_variant_uid)
         brand = Brands.objects.using(mpd_db).create(name='Test Brand')
         self.mpd_product = Products.objects.using(mpd_db).create(
             name='Produkt do usunięcia',
             brand=brand,
+        )
+        self.mpd_variant = ProductVariants.objects.using(mpd_db).create(
+            product=self.mpd_product,
         )
 
         # Produkt Matterhorn z mapowaniem
@@ -82,6 +91,24 @@ class MPDDeletePropagatesToHurtownieTest(TestCase):
             mapped_product_uid=self.mpd_product.id,
         )
 
+        # Produkt Mada z mapowaniem (produkt + wariant)
+        MadaBrand.objects.using(mada_db).create(
+            producer_id='MADA_INT_BR',
+            name='Mada Brand',
+        )
+        self.mada_product = MadaProduct.objects.using(mada_db).create(
+            api_id=70001,
+            name='Mada Product',
+            mapped_product_uid=self.mpd_product.id,
+        )
+        self.mada_variant = MadaProductVariant.objects.using(mada_db).create(
+            product=self.mada_product,
+            variant_key='5900000000001',
+            ean='5900000000001',
+            mapped_variant_uid=self.mpd_variant.variant_id,
+            is_mapped=True,
+        )
+
     def test_delete_mpd_product_clears_matterhorn_mapping(self):
         """Usunięcie produktu MPD czyści mapped_product_uid w Matterhorn"""
         mpd_db = _mpd_db()
@@ -102,6 +129,19 @@ class MPDDeletePropagatesToHurtownieTest(TestCase):
 
         self.tabu_product.refresh_from_db(using=tabu_db)
         self.assertIsNone(self.tabu_product.mapped_product_uid)
+
+    def test_delete_mpd_product_clears_mada_mapping(self):
+        """Usunięcie produktu MPD czyści mapped_product_uid/mapped_variant_uid w Mada"""
+        mpd_db = _mpd_db()
+        mada_db = _mada_db()
+
+        self.mpd_product.delete(using=mpd_db)
+
+        self.mada_product.refresh_from_db(using=mada_db)
+        self.assertIsNone(self.mada_product.mapped_product_uid)
+        self.mada_variant.refresh_from_db(using=mada_db)
+        self.assertIsNone(self.mada_variant.mapped_variant_uid)
+        self.assertFalse(self.mada_variant.is_mapped)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
