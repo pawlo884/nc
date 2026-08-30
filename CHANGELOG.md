@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.39.0](https://github.com/pawlo884/nc/compare/v1.38.1...v1.39.0) (2026-08-30)
+
+### Features
+
+* **mada:** ścieżka mapowania produktu Mada → MPD (analogicznie do Tabu) ([03c7fd3](https://github.com/pawlo884/nc/commit/03c7fd3b464cc98bb864e75fb9f67cba044ebd03))
+
 ## [1.38.1](https://github.com/pawlo884/nc/compare/v1.38.0...v1.38.1) (2026-08-30)
 
 ### Bug Fixes
