@@ -70,9 +70,9 @@ prompt_toolkit==3.0.53
 psutil==7.0.0
 psycopg2-binary==2.9.12
 pycparser==3.0
-pydantic==2.11.7
-pydantic-settings==2.10.1
-pydantic_core==2.33.2
+pydantic==2.13.4
+pydantic-settings==2.15.0
+pydantic_core==2.48.0
 Pygments==2.20.0
 PySocks==1.7.1
 python-crontab==3.2.0
