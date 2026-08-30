@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.40.2](https://github.com/pawlo884/nc/compare/v1.40.1...v1.40.2) (2026-08-30)
+
+### Bug Fixes
+
+* **mada:** czyść mapped_product_uid/mapped_variant_uid w Mada przy usunięciu produktu MPD ([b2d1454](https://github.com/pawlo884/nc/commit/b2d1454bcdcdfa71c6d303d069621d78bad0fef4))
+
 ## [1.40.1](https://github.com/pawlo884/nc/compare/v1.40.0...v1.40.1) (2026-08-30)
 
 ### Bug Fixes
