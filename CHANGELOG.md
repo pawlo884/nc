@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.40.1](https://github.com/pawlo884/nc/compare/v1.40.0...v1.40.1) (2026-08-30)
+
+### Bug Fixes
+
+* **deps:** cofnij redis 8.1.0 -> 5.2.1 (brak wsparcia w celery/kombu) ([8463a54](https://github.com/pawlo884/nc/commit/8463a548a243ed2e58d9e45e9566a778117ea360)), references [#141](https://github.com/pawlo884/nc/issues/141)
+
 ## [1.40.0](https://github.com/pawlo884/nc/compare/v1.39.0...v1.40.0) (2026-08-30)
 
 ### Features
