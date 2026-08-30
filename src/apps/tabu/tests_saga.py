@@ -161,3 +161,60 @@ class TabuSagaAdminTest(TestCase):
     def test_sagastep_changelist_reachable(self):
         response = self.client.get(reverse('admin:tabu_sagastep_changelist'))
         self.assertEqual(response.status_code, 200)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+class TabuImageUploadProducerColorTest(TestCase):
+    """upload_tabu_images_to_mpd ustawia producer_color_id na product_images
+    (jawne grupowanie po kolorze zamiast heurystyki po nazwie pliku)."""
+
+    databases = '__all__'
+
+    def setUp(self):
+        from MPD.models import Brands, Colors, Products
+        mpd_db = _mpd_db()
+        tabu_db = _tabu_db()
+
+        Colors.objects.using(mpd_db).create(name='Czarny główny')
+        self.pc = Colors.objects.using(mpd_db).create(name='Grafit K999')
+        brand = Brands.objects.using(mpd_db).create(name='B')
+        self.mpd_product = Products.objects.using(mpd_db).create(name='Img PC Test', brand=brand)
+
+        self.tabu_product = TabuProduct.objects.using(tabu_db).create(
+            api_id=930001, symbol='IMG-PC', name='Tabu img pc',
+            last_update=timezone.now(),
+            image_url='https://tabu.example/main.jpg',
+        )
+
+    def test_producer_color_set_from_name(self):
+        from unittest.mock import patch
+        from tabu.services import upload_tabu_images_to_mpd
+        from MPD.models import ProductImage
+
+        with patch(
+            'matterhorn1.defs_db.upload_image_to_bucket_and_get_url',
+            return_value='MPD_test/x/x_1_Grafit.jpg',
+        ):
+            res = upload_tabu_images_to_mpd(
+                self.mpd_product.id, self.tabu_product.id,
+                producer_color_name='Grafit K999',
+            )
+        self.assertEqual(res['uploaded_images'], 1)
+        img = ProductImage.objects.using(_mpd_db()).get(product_id=self.mpd_product.id)
+        self.assertEqual(img.producer_color_id, self.pc.id)
+
+    def test_producer_color_null_when_name_unknown(self):
+        from unittest.mock import patch
+        from tabu.services import upload_tabu_images_to_mpd
+        from MPD.models import ProductImage
+
+        with patch(
+            'matterhorn1.defs_db.upload_image_to_bucket_and_get_url',
+            return_value='MPD_test/x/x_1.jpg',
+        ):
+            upload_tabu_images_to_mpd(
+                self.mpd_product.id, self.tabu_product.id,
+                producer_color_name='NieMaTakiego',
+            )
+        img = ProductImage.objects.using(_mpd_db()).get(product_id=self.mpd_product.id)
+        self.assertIsNone(img.producer_color_id)

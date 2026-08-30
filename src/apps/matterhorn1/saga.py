@@ -647,6 +647,16 @@ class SagaService:
                 logger.info("ℹ️ Brak zdjęć do uploadu")
                 return {"uploaded_images": 0}
 
+            # Jawne przypisanie do koloru — grupowanie po producer_color_id zamiast
+            # heurystyki po nazwie pliku. colors.name jest UNIQUE, więc lookup deterministyczny.
+            producer_color_id = None
+            _pc = (producer_color_name or '').strip()
+            if _pc:
+                with connections['MPD'].cursor() as _c:
+                    _c.execute("SELECT id FROM colors WHERE name = %s", [_pc])
+                    _row = _c.fetchone()
+                    producer_color_id = _row[0] if _row else None
+
             uploaded_count = 0
             uploaded_images = []
 
@@ -665,10 +675,10 @@ class SagaService:
                             bucket_url = resolve_image_url(bucket_key)
                             # Zapisz do MPD
                             mpd_cursor.execute("""
-                                INSERT INTO product_images (product_id, file_path)
-                                VALUES (%s, %s)
+                                INSERT INTO product_images (product_id, file_path, producer_color_id)
+                                VALUES (%s, %s, %s)
                                 ON CONFLICT (product_id, file_path) DO NOTHING
-                            """, [mpd_product_id, bucket_key])
+                            """, [mpd_product_id, bucket_key, producer_color_id])
 
                             uploaded_count += 1
                             uploaded_images.append({

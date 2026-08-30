@@ -244,7 +244,7 @@ def _saga_create_mpd_tabu(
                         ProductImage.objects.using(mpd_db).get_or_create(
                             product=mpd_product,
                             file_path=bucket_key,
-                            defaults={'product': mpd_product, 'file_path': bucket_key},
+                            defaults={'producer_color': producer_color},
                         )
             except Exception as img_err:
                 logger.warning("Błąd uploadu zdjęć Tabu→MPD: %s", img_err)
@@ -598,7 +598,7 @@ def upload_tabu_images_to_mpd(
     """
     try:
         from tabu.models import TabuProduct
-        from MPD.models import Products, ProductImage
+        from MPD.models import Colors, Products, ProductImage
         from core.db_routers import _get_mpd_db, _get_tabu_db
         from matterhorn1.defs_db import upload_image_to_bucket_and_get_url
 
@@ -620,6 +620,12 @@ def upload_tabu_images_to_mpd(
 
         mpd_product = Products.objects.using(mpd_db).get(pk=mpd_product_id)
         producer_color = (producer_color_name or "").strip()
+        # Jawne przypisanie do koloru (grupowanie po producer_color_id, nie heurystyka
+        # po nazwie pliku). colors.name UNIQUE → lookup deterministyczny.
+        producer_color_obj = (
+            Colors.objects.using(mpd_db).filter(name=producer_color).first()
+            if producer_color else None
+        )
         uploaded_count = 0
         uploaded_images = []
         for idx, (img_url, order_num) in enumerate(images_to_upload, 1):
@@ -633,7 +639,7 @@ def upload_tabu_images_to_mpd(
                 ProductImage.objects.using(mpd_db).get_or_create(
                     product=mpd_product,
                     file_path=bucket_key,
-                    defaults={"product": mpd_product, "file_path": bucket_key},
+                    defaults={"producer_color": producer_color_obj},
                 )
                 uploaded_count += 1
                 uploaded_images.append({"original_url": img_url, "storage_key": bucket_key, "order": order_num})
