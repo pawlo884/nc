@@ -1,13 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { attachOrphanVariant, fetchOrphanVariants } from '../api/mpd';
 import { useActionMessages } from '../hooks/useActionMessages';
-import type { MpdOrphanVariant, MpdProductDetail } from '../types/mpd';
+import type { MpdOrphanVariant, MpdProductDetail, MpdProductVariant } from '../types/mpd';
 
 type RowKey = string;
+type ColorOption = { id: number; name: string };
 
 function rowKey(o: MpdOrphanVariant): RowKey {
   return `${o.source_id}:${o.variant_uid}:${o.ean}`;
+}
+
+/** Unikalne kolory / kolory producenta z wariantów tego produktu. */
+function colorOptionsFromVariants(
+  variants: MpdProductVariant[],
+  which: 'color' | 'producer'
+): ColorOption[] {
+  const map = new Map<number, string>();
+  for (const v of variants) {
+    const id = which === 'color' ? v.color_id : v.producer_color_id;
+    const name = which === 'color' ? v.color_name : v.producer_color_name;
+    if (id != null && !map.has(id)) map.set(id, name || `#${id}`);
+  }
+  return [...map.entries()].map(([id, name]) => ({ id, name }));
 }
 
 interface DraftState {
@@ -18,12 +33,25 @@ interface DraftState {
   sizeName: string;
 }
 
-function emptyDraft(o: MpdOrphanVariant): DraftState {
+function emptyDraft(
+  o: MpdOrphanVariant,
+  colors: ColorOption[],
+  variants: MpdProductVariant[]
+): DraftState {
+  // dopasuj kolor hurtowni (o.color) do koloru produktu po nazwie, inaczej pierwszy
+  const wanted = (o.color || '').trim().toLowerCase();
+  const matched =
+    colors.find(c => c.name.toLowerCase() === wanted) ??
+    (colors.length === 1 ? colors[0] : undefined);
+  // kolor producenta: taki jak w innych wariantach tego koloru
+  const sibling = matched
+    ? variants.find(v => v.color_id === matched.id && v.producer_color_id != null)
+    : undefined;
   return {
     mode: 'existing',
     targetVariantId: '',
-    colorId: '',
-    producerColorId: '',
+    colorId: matched ? String(matched.id) : '',
+    producerColorId: sibling?.producer_color_id != null ? String(sibling.producer_color_id) : '',
     sizeName: o.size || '',
   };
 }
@@ -39,6 +67,15 @@ export function OrphanVariantsPanel({
   const { setError, setSuccess, reportError } = useActionMessages();
   const [openRow, setOpenRow] = useState<RowKey | null>(null);
   const [drafts, setDrafts] = useState<Record<RowKey, DraftState>>({});
+
+  const colorOptions = useMemo(
+    () => colorOptionsFromVariants(product.variants, 'color'),
+    [product.variants]
+  );
+  const producerColorOptions = useMemo(
+    () => colorOptionsFromVariants(product.variants, 'producer'),
+    [product.variants]
+  );
 
   const { data, isLoading } = useQuery({
     queryKey: ['mpd-orphan-variants', productId],
@@ -114,7 +151,7 @@ export function OrphanVariantsPanel({
             <tbody>
               {rows.map(o => {
                 const key = rowKey(o);
-                const draft = drafts[key] || emptyDraft(o);
+                const draft = drafts[key] || emptyDraft(o, colorOptions, product.variants);
                 const isOpen = openRow === key;
                 const setDraft = (patch: Partial<DraftState>) =>
                   setDrafts(prev => ({ ...prev, [key]: { ...draft, ...patch } }));
@@ -138,7 +175,10 @@ export function OrphanVariantsPanel({
                           type="button"
                           className="btn btn-muted"
                           onClick={() => {
-                            setDrafts(prev => ({ ...prev, [key]: emptyDraft(o) }));
+                            setDrafts(prev => ({
+                              ...prev,
+                              [key]: emptyDraft(o, colorOptions, product.variants),
+                            }));
                             setOpenRow(key);
                           }}
                         >
@@ -171,20 +211,30 @@ export function OrphanVariantsPanel({
                             </select>
                           ) : (
                             <>
-                              <input
+                              <select
                                 className="search-input"
-                                inputMode="numeric"
-                                placeholder="color_id"
                                 value={draft.colorId}
                                 onChange={e => setDraft({ colorId: e.target.value })}
-                              />
-                              <input
+                              >
+                                <option value="">Kolor…</option>
+                                {colorOptions.map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
                                 className="search-input"
-                                inputMode="numeric"
-                                placeholder="producer_color_id (opc.)"
                                 value={draft.producerColorId}
                                 onChange={e => setDraft({ producerColorId: e.target.value })}
-                              />
+                              >
+                                <option value="">Kolor producenta (opc.)…</option>
+                                {producerColorOptions.map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
                               <input
                                 className="search-input"
                                 placeholder="rozmiar"
