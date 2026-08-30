@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.38.1](https://github.com/pawlo884/nc/compare/v1.38.0...v1.38.1) (2026-08-30)
+
+### Bug Fixes
+
+* **tabu:** ustaw parent_id na kolorze producenta w sadze MPD ([ef0b9ad](https://github.com/pawlo884/nc/commit/ef0b9adb6a728890947597f35ef62f010bc79419))
+
 ## [1.38.0](https://github.com/pawlo884/nc/compare/v1.37.1...v1.38.0) (2026-08-30)
 
 ### Features
