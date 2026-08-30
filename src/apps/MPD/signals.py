@@ -16,6 +16,7 @@ def _get_connections_db():
         'zzz_MPD' if 'zzz_MPD' in settings.DATABASES else 'MPD',
         'zzz_matterhorn1' if 'zzz_matterhorn1' in settings.DATABASES else 'matterhorn1',
         'zzz_tabu' if 'zzz_tabu' in settings.DATABASES else 'tabu',
+        'zzz_mada' if 'zzz_mada' in settings.DATABASES else 'mada',
     )
 
 
@@ -87,7 +88,7 @@ def capture_variant_ids(sender, instance, using=None, **kwargs):
 def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
     # Sprawdź czy to produkt z bazy MPD - sprawdź using lub _state.db
     db = using or getattr(instance, '_state', {}).db or 'default'
-    mpd_db, mh_db, tabu_db = _get_connections_db()
+    mpd_db, mh_db, tabu_db, mada_db = _get_connections_db()
     if db != mpd_db and 'MPD' not in str(db):
         # Sprawdź czy instancja pochodzi z bazy MPD
         try:
@@ -184,6 +185,42 @@ def remove_mapping_in_matterhorn(sender, instance, using=None, **kwargs):
                                 f"Zaktualizowano {tabu_variants_updated} rekordów w tabu_product_variant (mapped_variant_uid)")
             except Exception as e:
                 logger.warning(f"Nie udało się zaktualizować Tabu dla produktu MPD {instance.id}: {e}")
+
+        # Usunięcie mapped_product_uid i mapped_variant_uid w Mada
+        if mada_db in settings.DATABASES:
+            try:
+                with connections[mada_db].cursor() as cursor:
+                    cursor.execute(
+                        """
+                        UPDATE mada_product
+                        SET mapped_product_uid = NULL,
+                            updated_at = NOW()
+                        WHERE mapped_product_uid = %s
+                        """, [instance.id]
+                    )
+                    mada_updated = cursor.rowcount
+                    if mada_updated:
+                        logger.info(
+                            f"Zaktualizowano {mada_updated} rekordów w mada_product (mapped_product_uid = {instance.id})")
+                    # Usunięcie mapped_variant_uid z wariantów Mada (mada_product_variant)
+                    if variant_ids:
+                        placeholders = ', '.join(['%s'] * len(variant_ids))
+                        cursor.execute(
+                            f"""
+                            UPDATE mada_product_variant
+                            SET mapped_variant_uid = NULL,
+                                is_mapped = FALSE,
+                                updated_at = NOW()
+                            WHERE mapped_variant_uid IN ({placeholders})
+                            """,
+                            variant_ids,
+                        )
+                        mada_variants_updated = cursor.rowcount
+                        if mada_variants_updated:
+                            logger.info(
+                                f"Zaktualizowano {mada_variants_updated} rekordów w mada_product_variant (mapped_variant_uid)")
+            except Exception as e:
+                logger.warning(f"Nie udało się zaktualizować Mada dla produktu MPD {instance.id}: {e}")
 
         logger.info(
             f"Zakończono usuwanie mapowań dla produktu MPD ID: {instance.id}")
