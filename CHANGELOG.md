@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.37.1](https://github.com/pawlo884/nc/compare/v1.37.0...v1.37.1) (2026-08-30)
+
+### Bug Fixes
+
+* **mapping:** duplicate key colors_name_key przy przypinaniu kolejnego koloru ([8d3c7f4](https://github.com/pawlo884/nc/commit/8d3c7f406bb7a1caa092dc454607033add357db9))
+
 ## [1.37.0](https://github.com/pawlo884/nc/compare/v1.36.0...v1.37.0) (2026-08-29)
 
 ### Features
