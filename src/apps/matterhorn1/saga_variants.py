@@ -74,13 +74,15 @@ def create_mpd_variants(
             raise ValueError("Color %s not found in MPD" % product_color)
         color_id = color.id
 
-        # Producer color
+        # Producer color. UWAGA: colors.name jest UNIQUE — szukamy po samej nazwie,
+        # parent_id trafia tylko do defaults. Lookup po (name, parent_id) wywalał się
+        # na colors_name_key, gdy kolor o tej nazwie już istniał z innym parentem
+        # (np. „Beige" przypięty do innego koloru głównego).
         producer_color_id = None
         if producer_color_name and main_color_id:
             producer_color, created = Colors.objects.using(mpd_db).get_or_create(
                 name=producer_color_name,
-                parent_id=main_color_id,
-                defaults={'hex_code': ''},
+                defaults={'hex_code': '', 'parent_id': main_color_id},
             )
             producer_color_id = producer_color.id
             if created:
