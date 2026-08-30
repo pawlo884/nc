@@ -517,6 +517,7 @@ class MPDProductOrphanVariantsAPI(APIView):
     """
 
     permission_classes = [IsAdminUser]
+    authentication_classes = [TokenAuthentication]
 
     def get(self, request, product_id, *args, **kwargs):  # pylint: disable=unused-argument
         from .source_adapters.registry import get_all_adapters, register_default_adapters
@@ -693,6 +694,7 @@ class MPDProductImagesImportAPI(APIView):
     """
 
     permission_classes = [IsAdminUser]
+    authentication_classes = [TokenAuthentication]
 
     def post(self, request, product_id, *args, **kwargs):  # pylint: disable=unused-argument
         from matterhorn1.defs_db import upload_image_to_bucket_and_get_url
@@ -770,6 +772,7 @@ class MPDProductImageDetailAPI(APIView):
     """
 
     permission_classes = [IsAdminUser]
+    authentication_classes = [TokenAuthentication]
 
     def _get_image(self, product_id, image_id):
         from .models import ProductImage
