@@ -144,9 +144,12 @@ def _saga_create_mpd_tabu(
 
         producer_color = None
         if producer_color_name:
+            # Lookup po samej nazwie (colors.name jest UNIQUE) – parent_id tylko w
+            # defaults, analogicznie do Matterhorn, żeby nie wywalić się na
+            # colors_name_key gdy kolor już istnieje z innym parentem.
             producer_color, _ = Colors.objects.using(mpd_db).get_or_create(
                 name=producer_color_name[:50],
-                defaults={'name': producer_color_name[:50]},
+                defaults={'parent_id': main_color.id if main_color else None},
             )
 
         tabu_source, _ = Sources.objects.using(mpd_db).get_or_create(
