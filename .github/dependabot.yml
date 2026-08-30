@@ -73,6 +73,13 @@ updates:
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
+      # redis-py: kombu (nawet 5.6.2) trzyma redis<6.5. redis 8.x nie ma wsparcia
+      # w żadnej wersji celery/kombu (PR #141 podbił do 8.1.0 — broker by się wywalił).
+      # Bump dopiero gdy celery/kombu dogonią.
+      - dependency-name: "redis"
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
     groups:
       # Rodziny sprzężone: pinujemy tranzytywy (pydantic-core, pydantic-settings),
       # więc muszą się ruszać razem z rodzicem — inaczej pip nie rozwiąże
