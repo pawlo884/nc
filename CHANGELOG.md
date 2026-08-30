@@ -1,5 +1,15 @@
 # Zmiany
 
+## [1.38.0](https://github.com/pawlo884/nc/compare/v1.37.1...v1.38.0) (2026-08-30)
+
+### Features
+
+* **mpd:** ustaw producer_color_id przy uploadzie zdjęć z hurtowni ([ca4d0d7](https://github.com/pawlo884/nc/commit/ca4d0d7ec9f9177303f4a848ff42889a9916452e)), references [#145](https://github.com/pawlo884/nc/issues/145)
+
+### Bug Fixes
+
+* **release:** wymuś conventional-changelog-writer@9 dla semantic-release ([8e966de](https://github.com/pawlo884/nc/commit/8e966de6a712037518080719055f5c71128fe1d9))
+
 ## [1.37.1](https://github.com/pawlo884/nc/compare/v1.37.0...v1.37.1) (2026-08-30)
 
 ### Bug Fixes
