@@ -1,5 +1,15 @@
 # Zmiany
 
+## [1.40.0](https://github.com/pawlo884/nc/compare/v1.39.0...v1.40.0) (2026-08-30)
+
+### Features
+
+* **mpd:** dropdowny kolorów w panelu orphaned zamiast surowych id ([d2a2812](https://github.com/pawlo884/nc/commit/d2a2812e4851ce58000850efc962259484b1f0bc))
+
+### Bug Fixes
+
+* **mpd-api:** jawne TokenAuthentication na endpointach orphaned/images ([b61abb3](https://github.com/pawlo884/nc/commit/b61abb3219e919b22b198e4b5b13717fa6079d45))
+
 ## [1.39.0](https://github.com/pawlo884/nc/compare/v1.38.1...v1.39.0) (2026-08-30)
 
 ### Features
