@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.42.0](https://github.com/pawlo884/nc/compare/v1.41.2...v1.42.0) (2026-08-31)
+
+### Features
+
+* **prestashop:** eksport MPD do PrestaShop WebAPI (Faza 1) ([9e802a7](https://github.com/pawlo884/nc/commit/9e802a72bf400f2d9776cc905cbe98c9c6b914dc))
+
 ## [1.41.2](https://github.com/pawlo884/nc/compare/v1.41.1...v1.41.2) (2026-08-31)
 
 ### Bug Fixes
