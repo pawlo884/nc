@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.41.2](https://github.com/pawlo884/nc/compare/v1.41.1...v1.41.2) (2026-08-31)
+
+### Bug Fixes
+
+* **mpd:** nie dopinaj wariantów hurtowni podwójnie przez zdublowane źródło ([9559622](https://github.com/pawlo884/nc/commit/95596226e15e5474c52ac68d30732dbcd25d229d))
+
 ## [1.41.1](https://github.com/pawlo884/nc/compare/v1.41.0...v1.41.1) (2026-08-31)
 
 ### Performance Improvements
