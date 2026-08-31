@@ -9,6 +9,16 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# Część hostów hurtowni (np. www.mada.pl) odrzuca żądania bez nagłówka
+# User-Agent zwracając HTTP 403 — przy pobieraniu zdjęć udajemy przeglądarkę.
+_IMAGE_DOWNLOAD_HEADERS = {
+    'User-Agent': (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+        '(KHTML, like Gecko) Chrome/124.0 Safari/537.36'
+    ),
+    'Accept': 'image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8',
+}
+
 # Załaduj zmienne środowiskowe
 load_dotenv('.env.dev')
 
@@ -164,7 +174,10 @@ def upload_image_to_bucket_and_get_url(image_path, product_id, producer_color_na
         if image_path.startswith(('http://', 'https://')):
             logger.info(f"Pobieranie pliku z URL: {image_path}")
             try:
-                response = requests.get(image_path, stream=True, timeout=30)
+                response = requests.get(
+                    image_path, stream=True, timeout=30,
+                    headers=_IMAGE_DOWNLOAD_HEADERS,
+                )
                 if response.status_code != 200:
                     logger.error(
                         f"Nie można pobrać pliku z URL: {image_path}. Status code: {response.status_code}")

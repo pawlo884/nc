@@ -113,6 +113,11 @@ class MadaProductAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
                 product.name, product.brand.name if product.brand else None,
                 mpd_db_alias=_get_mpd_db(),
             )
+            mpd_context['source_colors'] = sorted({
+                (c or '').strip()
+                for c in product.variants.values_list('color', flat=True)
+                if c and c.strip()
+            })
             extra_context.update(mpd_context)
         except MadaProduct.DoesNotExist:
             extra_context['is_mapped'] = False
@@ -138,6 +143,7 @@ class MadaProductAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
             'main_color_id': request.POST.get('main_color_id'),
             'producer_color_name': request.POST.get('producer_color_name'),
             'producer_code': request.POST.get('producer_code'),
+            'source_color': request.POST.get('source_color'),
             'mpd_paths': request.POST.getlist('mpd_paths'),
             'mpd_attributes': request.POST.getlist('mpd_attributes'),
             'fabric_component': request.POST.getlist('fabric_component[]'),
@@ -196,6 +202,7 @@ class MadaProductAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
                     size_category = row[0]
 
             producer_color_name = (request.POST.get('producer_color_name') or '').strip() or None
+            source_color = (request.POST.get('source_color') or '').strip() or None
             mapping_info = {}
             if size_category:
                 producer_code = request.POST.get('producer_code', '').strip() or None
@@ -209,6 +216,7 @@ class MadaProductAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
                         producer_code=producer_code,
                         main_color_id=main_color_id,
                         producer_color_name=producer_color_name,
+                        source_color=source_color,
                     )
                     logger.info("Wynik dodawania wariantów Mada→MPD: %s", mapping_info)
                 except Exception as e:

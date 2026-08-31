@@ -169,7 +169,16 @@ def _saga_create_mpd_mada(
         )
 
         product_price = mada_product.price or Decimal('0')
+        # Produkt Mada trzyma kilka kolorów pod jednym api_id (np. czarny + beżowy) —
+        # gdy formularz wskazał kolor hurtowni, mapujemy tylko warianty tego koloru
+        # (reszta kolorów = osobne mapowanie do osobnego produktu MPD).
+        source_color = _post('source_color').strip()
         variants = list(mada_product.variants.all())
+        if source_color:
+            variants = [
+                v for v in variants
+                if (v.color or '').strip().casefold() == source_color.casefold()
+            ]
         for v in variants:
             color_obj = main_color if main_color else None
             if not color_obj and v.color:
@@ -399,6 +408,7 @@ def create_mpd_variants_from_mada(
     producer_code: Optional[str] = None,
     main_color_id: Optional[int] = None,
     producer_color_name: Optional[str] = None,
+    source_color: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Tworzy/dopina warianty w MPD z wariantów Mada (wzór: create_mpd_variants_from_tabu).
@@ -426,8 +436,11 @@ def create_mpd_variants_from_mada(
     mada_variants = list(
         MadaProductVariant.objects.using(mada_db).filter(product_id=mada_product_id)
     )
+    if source_color and (source_color or '').strip():
+        wanted = source_color.strip().casefold()
+        mada_variants = [v for v in mada_variants if (v.color or '').strip().casefold() == wanted]
     if not mada_variants:
-        logger.warning("Brak wariantów Mada dla produktu %s", mada_product_id)
+        logger.warning("Brak wariantów Mada dla produktu %s (source_color=%r)", mada_product_id, source_color)
         return {"created_variants": 0, "variant_ids": []}
 
     color_id = None
