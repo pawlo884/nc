@@ -29,6 +29,8 @@ class Brands(models.Model):
     opis = models.TextField(blank=True, null=True)
     url = models.URLField(max_length=255, blank=True, null=True)
     iai_brand_id = models.IntegerField(blank=True, null=True)
+    presta_manufacturer_id = models.IntegerField(
+        blank=True, null=True, verbose_name='ID producenta w PrestaShop')
     objects = models.Manager()
 
     class Meta:
@@ -81,6 +83,9 @@ class Colors(models.Model):
     parent = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, db_column='parent_id')
     iai_colors_id = models.IntegerField(blank=True, null=True)
+    presta_option_value_id = models.IntegerField(
+        blank=True, null=True,
+        verbose_name='ID product_option_value w PrestaShop (grupa "Kolor")')
     objects = models.Manager()
 
     class Meta:
@@ -132,6 +137,8 @@ class Products(models.Model):
         related_name='products', verbose_name='Sezon')
     visibility = models.BooleanField(
         default=True, verbose_name='Widoczność w sklepie')
+    presta_product_id = models.IntegerField(
+        blank=True, null=True, verbose_name='ID produktu w PrestaShop')
     objects = models.Manager()
 
     class Meta:
@@ -172,6 +179,9 @@ class Sizes(models.Model):
     unit = models.CharField(max_length=255, blank=True, null=True)
     name_lower = models.CharField(max_length=255, blank=True, null=True)
     iai_size_id = models.CharField(max_length=255, blank=True, null=True)
+    presta_option_value_id = models.IntegerField(
+        blank=True, null=True,
+        verbose_name='ID product_option_value w PrestaShop (grupa "Rozmiar")')
     objects = models.Manager()
 
     class Meta:
@@ -237,6 +247,8 @@ class ProductVariants(models.Model):
         Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
     exported_to_iai = models.BooleanField(
         default=False, verbose_name='Wyeksportowany do IAI')
+    presta_combination_id = models.IntegerField(
+        blank=True, null=True, verbose_name='ID combination w PrestaShop')
     updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     objects = models.Manager()
 
@@ -524,6 +536,8 @@ class Paths(models.Model):
     iai_category_id = models.IntegerField(blank=True, null=True)
     iai_menu_id = models.IntegerField(blank=True, null=True)
     iai_menu_parent_id = models.IntegerField(blank=True, null=True)
+    presta_category_id = models.IntegerField(
+        blank=True, null=True, verbose_name='ID kategorii w PrestaShop')
     objects = models.Manager()
 
     class Meta:

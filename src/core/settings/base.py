@@ -74,6 +74,12 @@ MADA_API_BASE_URL = (
 MADA_API_LOGIN = _strip_env_value(os.getenv('MADA_API_LOGIN', ''))
 MADA_API_PASSWORD = _strip_env_value(os.getenv('MADA_API_PASSWORD', ''))
 
+# PrestaShop WebAPI configuration (kanal sprzedazowy - push produktow/stanow/cen,
+# nie zrodlo importu). Auth: HTTP Basic, klucz webservice jako login, puste haslo.
+# Adres bazowy sklepu, np. https://sklep.example.com/api - BEZ koncowego /.
+PRESTASHOP_API_URL = _strip_env_value(os.getenv('PRESTASHOP_API_URL', '')).rstrip('/')
+PRESTASHOP_API_KEY = _strip_env_value(os.getenv('PRESTASHOP_API_KEY', ''))
+
 # React SPA MPD — ta sama ścieżka w dev (Vite) i prod (Django): /mpd-app
 MPD_REACT_FRONTEND_URL = (
     _strip_env_value(os.getenv('MPD_REACT_FRONTEND_URL'))
@@ -143,6 +149,7 @@ INSTALLED_APPS = [
     'web_agent',
     'tabu',
     'mada',
+    'prestashop',
 ]
 
 # Dodaj drf_spectacular tylko jeśli jest dostępny
