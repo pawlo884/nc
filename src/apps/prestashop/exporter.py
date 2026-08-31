@@ -105,6 +105,12 @@ def build_product_xml(
     return f'''<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
   <product>
     {id_tag}
+    <!-- state=1 (Product::STATE_SAVED) - bez tego webservice zostawia
+         state=0 (STATE_TEMP), ktore panel admina domyslnie filtruje z listy
+         Catalog > Products. Produkt istnieje i jest zwracany przez API, ale
+         wyglada jakby "nic sie nie dodalo". Potwierdzone zrodlem PrestaShop
+         (classes/Product.php) i oficjalnym tutorialem webservice. -->
+    <state><![CDATA[1]]></state>
     <id_category_default><![CDATA[{id_category_default_display}]]></id_category_default>
     <active><![CDATA[{active}]]></active>
     <price><![CDATA[{price or '0'}]]></price>
