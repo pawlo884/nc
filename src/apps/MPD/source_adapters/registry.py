@@ -40,9 +40,13 @@ def get_adapter_for_source(source_id: int) -> Optional[object]:
 
     try:
         source = Sources.objects.using(_get_mpd_db()).get(id=source_id)
-        name = (source.name or '').strip()
+        name = (source.name or '').strip().lower()
+        # Nazwa źródła MUSI zawierać zarejestrowaną nazwę adaptera (np. "Mada API",
+        # "Mada API PL"). Dawniej dopuszczano też odwrotność (name ⊂ reg_name), przez
+        # co stary, pusty rekord Sources "MADA" łapał adapter "Mada API" i linkowanie
+        # dopinało warianty Mady podwójnie (raz pod "MADA", raz pod "Mada API").
         for reg_name, adapter_class in _ADAPTER_REGISTRY.items():
-            if reg_name.lower() in name.lower() or name.lower() in reg_name.lower():
+            if reg_name.lower() in name:
                 adapter = adapter_class(source_id=source_id)
                 _ADAPTER_CACHE[source_id] = adapter
                 return adapter

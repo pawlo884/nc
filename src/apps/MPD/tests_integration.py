@@ -337,6 +337,39 @@ class VariantUidIntTest(TestCase):
         self.assertIsNone(_variant_uid_int(M(None)))
 
 
+class SourceAdapterRegistryMatchTest(TestCase):
+    """Nazwa źródła musi ZAWIERAĆ zarejestrowaną nazwę adaptera. Stary, pusty
+    rekord Sources 'MADA' nie może łapać adaptera 'Mada API' (to powodowało
+    podwójne dopinanie wariantów Mady)."""
+
+    databases = '__all__'
+
+    def setUp(self):
+        from MPD.source_adapters.registry import _ADAPTER_CACHE, register_default_adapters
+        register_default_adapters()
+        _ADAPTER_CACHE.clear()
+        self.addCleanup(_ADAPTER_CACHE.clear)
+
+    def test_short_stale_name_does_not_match_longer_adapter_name(self):
+        from MPD.source_adapters.registry import get_adapter_for_source
+        from MPD.source_adapters.mada import MadaAdapter
+
+        mpd_db = _mpd_db()
+        stale = Sources.objects.using(mpd_db).create(name='MADA', type='api')
+        proper = Sources.objects.using(mpd_db).create(name='Mada API', type='api')
+
+        self.assertIsNone(get_adapter_for_source(stale.id))
+        self.assertIsInstance(get_adapter_for_source(proper.id), MadaAdapter)
+
+    def test_suffixed_source_name_still_matches(self):
+        from MPD.source_adapters.registry import get_adapter_for_source
+        from MPD.source_adapters.mada import MadaAdapter
+
+        mpd_db = _mpd_db()
+        src = Sources.objects.using(mpd_db).create(name='Mada API PL', type='api')
+        self.assertIsInstance(get_adapter_for_source(src.id), MadaAdapter)
+
+
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class MPDProductImagesImportTest(TestCase):
     """Import galerii z hurtowni do „tacki" produktu MPD + dedup po origin_url."""
