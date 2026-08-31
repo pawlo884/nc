@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.41.0](https://github.com/pawlo884/nc/compare/v1.40.2...v1.41.0) (2026-08-31)
+
+### Features
+
+* **tabu,mada:** mapowanie do MPD tylko dla wybranego koloru hurtowni ([fba92a8](https://github.com/pawlo884/nc/commit/fba92a85317af9bf25c77d4eb1db8f4a9dfe27b9))
+
 ## [1.40.2](https://github.com/pawlo884/nc/compare/v1.40.1...v1.40.2) (2026-08-30)
 
 ### Bug Fixes
