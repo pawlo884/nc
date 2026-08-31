@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.41.1](https://github.com/pawlo884/nc/compare/v1.41.0...v1.41.1) (2026-08-31)
+
+### Performance Improvements
+
+* **mada:** usuń N+1 na liście produktów w adminie ([1db4567](https://github.com/pawlo884/nc/commit/1db456741d8303c357922f3533d560097340c864))
+
 ## [1.41.0](https://github.com/pawlo884/nc/compare/v1.40.2...v1.41.0) (2026-08-31)
 
 ### Features
