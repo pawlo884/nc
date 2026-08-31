@@ -28,6 +28,16 @@ from .mapping import ensure_category, ensure_color_value, ensure_size_value
 
 logger = logging.getLogger(__name__)
 
+# id_shop tego sklepu (shop.sowa.ch) - potwierdzone na zywo, ten sam co
+# SHOP_ROOT_CATEGORY_ID w mapping.py. WebAPI automatycznie tworzy
+# stock_available przy tworzeniu combination, ale zostawia id_shop=0 (zamiast
+# 1) - PrestaShop admin (Symfony) laczy stock_available do combinations przez
+# LEFT JOIN + WHERE sa.id_shop=:id_shop, co przy id_shop=0 po prostu odrzuca
+# caly wiersz z wyniku (LEFT JOIN + WHERE na dolaczonej tabeli = INNER JOIN).
+# Bez tej poprawki combination istnieje i jest zwracany przez WebAPI, ale
+# jest niewidoczny w zakladce Combinations panelu admina.
+SHOP_ID = 1
+
 
 def _variant_reference(variant: ProductVariants) -> str:
     """Kod producenta/EAN wariantu - fallback ean->gtin14->gtin13->producer_code->other,
@@ -266,6 +276,7 @@ def push_stock(variant: ProductVariants, presta_product_id: int,
     <id><![CDATA[{stock_available_id}]]></id>
     <id_product><![CDATA[{presta_product_id}]]></id_product>
     <id_product_attribute><![CDATA[{presta_combination_id}]]></id_product_attribute>
+    <id_shop><![CDATA[{SHOP_ID}]]></id_shop>
     <quantity><![CDATA[{quantity}]]></quantity>
     <depends_on_stock><![CDATA[0]]></depends_on_stock>
     <out_of_stock><![CDATA[2]]></out_of_stock>
