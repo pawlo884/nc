@@ -2,6 +2,7 @@ import logging
 
 from django.contrib import admin
 from django.db import connections
+from django.db.models import OuterRef, Subquery
 from django.http import JsonResponse
 from django.urls import path
 from django.utils.decorators import method_decorator
@@ -83,10 +84,23 @@ class MadaProductAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
     ordering = ['-api_id']
     change_form_template = 'admin/mada/madaproduct/change_form.html'
 
+    def get_queryset(self, request):
+        first_image_subquery = (
+            MadaProductImage.objects.filter(product_id=OuterRef('pk'))
+            .order_by('order', 'api_image_id')
+            .values('image_url')[:1]
+        )
+        return (
+            super()
+            .get_queryset(request)
+            .select_related('brand', 'category')
+            .annotate(first_image_url=Subquery(first_image_subquery))
+        )
+
     def thumbnail(self, obj):
-        first_image = obj.images.order_by('order').first()
-        if first_image:
-            return render_product_thumbnail(first_image.image_url, fallback_host='mada.pl')
+        url = getattr(obj, 'first_image_url', None)
+        if url:
+            return render_product_thumbnail(url, fallback_host='mada.pl')
         return '-'
     thumbnail.short_description = 'Zdjęcie'
 
