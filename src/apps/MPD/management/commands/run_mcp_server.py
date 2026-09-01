@@ -4,15 +4,20 @@ MCP server (stdio) udostepniajacy katalog MPD DO ODCZYTU dla klientow MCP
 pliku - to jedyna warstwa ochrony przed przypadkowa modyfikacja danych przez
 narzedzie AI, wiec pilnowac tego przy kazdej zmianie.
 
-Funkcje tools sa zwyklymi funkcjami modulu (nieowiniete w @mcp.tool()) i
-rejestrowane recznie w handle() przez mcp.add_tool(fn) - dzieki temu da sie
-je testowac bezposrednio (tests_mcp_server.py) bez uruchamiania serwera MCP.
+Funkcje tools sa zwyklymi, SYNCHRONICZNYMI funkcjami modulu (nieowiniete w
+@mcp.tool()) - dzieki temu da sie je testowac bezposrednio
+(tests_mcp_server.py) bez uruchamiania serwera MCP. Do serwera trafiaja przez
+_add_sync_tool(), ktore owija je w async + sync_to_async (FastMCP wola sync
+tools wprost w petli asyncio, a Django ORM tego zabrania).
 
 Uzycie (lokalnie, bez Dockera - patrz docs/MCP_SERVER.md):
   .venv/Scripts/python.exe src/manage.py run_mcp_server --settings=core.settings.dev
 """
+import functools
+import inspect
 from decimal import Decimal
 
+from asgiref.sync import sync_to_async
 from django.core.management.base import BaseCommand
 
 from MPD.models import (
@@ -134,6 +139,20 @@ def list_categories() -> list[dict]:
     ]
 
 
+def _add_sync_tool(mcp, fn):
+    """FastMCP wola synchroniczne funkcje-narzedzia wprost w petli asyncio,
+    a Django ORM tego zabrania (SynchronousOnlyOperation). Owijamy wiec kazde
+    narzedzie w async + sync_to_async, zachowujac sygnature i docstring, zeby
+    FastMCP zbudowal poprawny schemat wejscia. Oryginalne funkcje zostaja
+    synchroniczne - tak sa testowane w tests_mcp_server.py."""
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        return await sync_to_async(fn, thread_sensitive=True)(*args, **kwargs)
+
+    wrapper.__signature__ = inspect.signature(fn)
+    mcp.add_tool(wrapper)
+
+
 class Command(BaseCommand):
     help = 'Uruchamia MCP server (stdio, read-only) udostepniajacy katalog MPD.'
     requires_system_checks = []
@@ -151,9 +170,7 @@ class Command(BaseCommand):
                 'list_categories do zobaczenia drzewa kategorii.'
             ),
         )
-        mcp.add_tool(search_products)
-        mcp.add_tool(get_product)
-        mcp.add_tool(get_stock_by_ean)
-        mcp.add_tool(list_categories)
+        for tool in (search_products, get_product, get_stock_by_ean, list_categories):
+            _add_sync_tool(mcp, tool)
 
         mcp.run(transport='stdio')
