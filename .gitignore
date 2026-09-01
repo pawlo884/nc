@@ -19,6 +19,9 @@ __pycache__/
 .env
 .env.dev
 .env.prod
+# Config MCP Claude Code - lokalne, absolutne sciezki per-maszyna (np.
+# C:\Users\...\.venv\Scripts\python.exe), nie do wspoldzielenia w repo.
+.mcp.json
 .vscode/
 *.code-workspace
 .shotgun/

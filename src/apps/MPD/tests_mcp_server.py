@@ -7,6 +7,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from .management.commands.run_mcp_server import (
+    _add_sync_tool,
     get_product,
     get_stock_by_ean,
     list_categories,
@@ -137,3 +138,37 @@ class ListCategoriesTest(TestCase):
         names = {c['name']: c for c in categories}
         self.assertIsNone(names['Bielizna']['parent_id'])
         self.assertEqual(names['Biustonosze']['parent_id'], parent.id)
+
+
+class AddSyncToolTest(TestCase):
+    """FastMCP wola narzedzia wprost w petli asyncio - synchroniczne funkcje
+    uzywajace Django ORM (jak search_products/get_product) rzucaja tam
+    SynchronousOnlyOperation, jesli nie sa owiniete w sync_to_async.
+    _add_sync_tool to naprawia; te testy pilnuja zeby nie zniknelo przy
+    kolejnej zmianie."""
+    databases = {'default', 'MPD'}
+
+    def setUp(self):
+        Products.objects.using('MPD').create(name='Testowy Produkt MCP')
+
+    async def test_wrapped_tool_is_awaitable_and_returns_same_result(self):
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP('test-server')
+        _add_sync_tool(mcp, search_products)
+
+        tool = mcp._tool_manager.get_tool('search_products')
+        result = await tool.fn('Testowy')
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['name'], 'Testowy Produkt MCP')
+
+    def test_wrapper_preserves_name_and_signature(self):
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP('test-server')
+        _add_sync_tool(mcp, get_stock_by_ean)
+
+        tool = mcp._tool_manager._tools['get_stock_by_ean']
+        self.assertEqual(tool.name, 'get_stock_by_ean')
+        self.assertIn('ean', tool.parameters['properties'])
