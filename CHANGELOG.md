@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.43.0](https://github.com/pawlo884/nc/compare/v1.42.1...v1.43.0) (2026-09-01)
+
+### Features
+
+* **MPD:** dodaj lokalny MCP server (stdio, read-only) dla katalogu MPD ([30fa202](https://github.com/pawlo884/nc/commit/30fa2026675c7772446e874028f3d3143e0bb2ae))
+
 ## [1.42.1](https://github.com/pawlo884/nc/compare/v1.42.0...v1.42.1) (2026-09-01)
 
 ### Bug Fixes
