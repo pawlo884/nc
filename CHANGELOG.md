@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.43.2](https://github.com/pawlo884/nc/compare/v1.43.1...v1.43.2) (2026-09-01)
+
+### Bug Fixes
+
+* **MPD:** owin narzedzia MCP w sync_to_async (SynchronousOnlyOperation) ([c416e92](https://github.com/pawlo884/nc/commit/c416e922e91f030b88fd098a20452558d36a93c5))
+
 ## [1.43.1](https://github.com/pawlo884/nc/compare/v1.43.0...v1.43.1) (2026-09-01)
 
 ### Bug Fixes
