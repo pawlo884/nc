@@ -65,7 +65,7 @@ packaging==24.2
 parso==0.8.7
 pillow==12.3.0
 platformdirs==4.3.8
-prometheus_client==0.21.1
+prometheus_client==0.26.0
 prompt_toolkit==3.0.53
 psutil==7.0.0
 psycopg2-binary==2.9.12
