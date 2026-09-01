@@ -47,18 +47,19 @@ sprawdź czy `postgres-ssh-tunnel` działa.
 
 ## Dostępne narzędzia (tools)
 
-| Tool | Opis |
-|---|---|
-| `search_products(query, limit=20)` | Szukaj produktów po nazwie (częściowe dopasowanie) |
-| `get_product(product_id)` | Pełny szczegół: warianty, kolory, rozmiary, ceny, stany, kategorie |
-| `get_stock_by_ean(ean)` | Szybki lookup stanu/ceny po kodzie kreskowym |
-| `list_categories()` | Płaska lista kategorii (`id`/`name`/`parent_id`) do zbudowania drzewa |
+| Tool                               | Opis                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| `search_products(query, limit=20)` | Szukaj produktów po nazwie (częściowe dopasowanie)                    |
+| `get_product(product_id)`          | Pełny szczegół: warianty, kolory, rozmiary, ceny, stany, kategorie    |
+| `get_stock_by_ean(ean)`            | Szybki lookup stanu/ceny po kodzie kreskowym                          |
+| `list_categories()`                | Płaska lista kategorii (`id`/`name`/`parent_id`) do zbudowania drzewa |
 
 ## Rozszerzanie
 
-Nowe narzędzie = nowa funkcja w `run_mcp_server.py` (moduł, nie metoda klasy)
-+ `mcp.add_tool(nowa_funkcja)` w `Command.handle()`. Trzymaj się **tylko
-odczytu** (`.filter()`/`.get()`/`.first()`) — to jedyna warstwa ochrony przed
-przypadkową modyfikacją danych przez narzędzie AI. Jeśli kiedyś potrzebne będą
-akcje zapisujące (np. push do PrestaShop przez MCP), rozważ osobny,
-jawnie nazwany serwer z dodatkową autoryzacją, nie dopisywanie do tego.
+Nowe narzędzie to nowa funkcja w `run_mcp_server.py` (moduł, nie metoda
+klasy) zarejestrowana przez `mcp.add_tool(nowa_funkcja)` w `Command.handle()`.
+Trzymaj się **tylko odczytu** (`.filter()`/`.get()`/`.first()`) — to jedyna
+warstwa ochrony przed przypadkową modyfikacją danych przez narzędzie AI.
+Jeśli kiedyś potrzebne będą akcje zapisujące (np. push do PrestaShop przez
+MCP), rozważ osobny, jawnie nazwany serwer z dodatkową autoryzacją, nie
+dopisywanie do tego.
