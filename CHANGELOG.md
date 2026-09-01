@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.43.1](https://github.com/pawlo884/nc/compare/v1.43.0...v1.43.1) (2026-09-01)
+
+### Bug Fixes
+
+* **deps:** bump pydantic 2.11.7->2.13.4, odepnij tranzytywy ([dbc398e](https://github.com/pawlo884/nc/commit/dbc398efd655ce1465e48c9f9980b7d191f9566e))
+
 ## [1.43.0](https://github.com/pawlo884/nc/compare/v1.42.1...v1.43.0) (2026-09-01)
 
 ### Features
