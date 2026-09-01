@@ -1,5 +1,12 @@
 # Zmiany
 
+## [1.42.1](https://github.com/pawlo884/nc/compare/v1.42.0...v1.42.1) (2026-09-01)
+
+### Bug Fixes
+
+* **prestashop:** ustaw id_shop na stock_available dla combinations ([799daa0](https://github.com/pawlo884/nc/commit/799daa00cb8c85d90f995a6dd3718a3a1ef9ee90))
+* **prestashop:** ustaw state=1 (Product::STATE_SAVED) na produkcie ([b1ddc1f](https://github.com/pawlo884/nc/commit/b1ddc1fa677b27a97c45647120e5c33784456895))
+
 ## [1.42.0](https://github.com/pawlo884/nc/compare/v1.41.2...v1.42.0) (2026-08-31)
 
 ### Features
