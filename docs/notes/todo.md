@@ -1,4 +1,10 @@
-# TODO: Zgodność modeli Django z IOF 3.0 (XSD)
+# Zgodność modeli Django z IOF 3.0 (XSD)
+
+> **Zadania przeniesione do GitHub Issues** — tracking: [#183](https://github.com/pawlo884/nc/issues/183)
+> ([#177](https://github.com/pawlo884/nc/issues/177), [#178](https://github.com/pawlo884/nc/issues/178),
+> [#179](https://github.com/pawlo884/nc/issues/179), [#180](https://github.com/pawlo884/nc/issues/180),
+> [#181](https://github.com/pawlo884/nc/issues/181)). Wspólne produkty po EAN: [#182](https://github.com/pawlo884/nc/issues/182).
+> Poniżej zostaje sama analiza jako materiał referencyjny.
 
 ## Analiza zgodności modeli z plikami XSD
 
@@ -61,21 +67,21 @@
 
 ---
 
-## Najważniejsze TODO do zgodności z IOF 3.0 (XSD)
+## Najważniejsze do zgodności z IOF 3.0 (XSD)
 
-- [ ] Dodać modele: `Units`, `Parameters`, `ParameterValues`, `Sections`, `Warranties`.
-- [ ] Ustawić wymagane pola (`blank=False, null=False`) tam, gdzie XSD wymaga.
-- [ ] Dodać relacje ForeignKey zamiast samych ID tam, gdzie to logiczne (np. kategorie, jednostki).
-- [ ] Rozważyć typy pól `id` (jeśli eksportujesz do XML, zadbać o konwersję liczba <-> string).
-- [ ] Uzupełnić powiązania produktów z kategorią, jednostką, gwarancją, parametrami.
-- [ ] Poprawić modele tak, by były zgodne z wymaganiami XSD IOF 3.0.
+Przeniesione do Issues — patrz nagłówek pliku:
 
----
-
-## TODO: Wspólne produkty w Mada/Matterhorn/Tabu
-
-- [ ] Produkty wspólne po EAN we wszystkich trzech hurtowniach (Mada, Matterhorn, Tabu) — patrz `common_products_ean.csv` w root repo, 5453 dopasowań.
+| Issue                                             | Zakres                                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------------------- |
+| [#177](https://github.com/pawlo884/nc/issues/177) | Modele: `Units`, `Parameters`, `ParameterValues`, `Sections`, `Warranties` |
+| [#178](https://github.com/pawlo884/nc/issues/178) | Wymagane pola (`blank=False, null=False`) tam, gdzie XSD wymaga            |
+| [#179](https://github.com/pawlo884/nc/issues/179) | FK zamiast samych `*_id` (kategorie, jednostki)                            |
+| [#180](https://github.com/pawlo884/nc/issues/180) | Konwersja typów `id` liczba ↔ string przy eksporcie do XML                 |
+| [#181](https://github.com/pawlo884/nc/issues/181) | Powiązania produktów z kategorią, jednostką, gwarancją, parametrami        |
 
 ---
 
-Jeśli chcesz, mogę przygotować szkice brakujących modeli lub poprawki do istniejących – daj znać, które elementy chcesz uzupełnić w pierwszej kolejności!
+## Wspólne produkty w Mada/Matterhorn/Tabu
+
+[#182](https://github.com/pawlo884/nc/issues/182) — produkty wspólne po EAN we wszystkich trzech hurtowniach
+(Mada, Matterhorn, Tabu), `common_products_ean.csv` w root repo, 5453 dopasowań.
