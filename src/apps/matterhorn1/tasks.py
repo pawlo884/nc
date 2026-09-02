@@ -1,5 +1,6 @@
 import time
 from celery import shared_task
+from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.cache import cache
@@ -70,6 +71,7 @@ def full_import_and_update(self, start_id=None, max_products=200000,
         }
 
     task_completed_successfully = False
+    soft_timeout_hit = False
     total_imported = 0
     total_updated = 0
     iteration = 0
@@ -197,6 +199,24 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             'task_id': task_id_value
         }
 
+    except SoftTimeLimitExceeded:
+        # Limit czasu tasku. NIE retry'ujemy i nie traktujemy jako twardego błędu:
+        # numer bieżącej strony (current_page) jest zapisywany w ApiSyncLog po
+        # każdej stronie, a dane z już przetworzonych stron są zacommitowane
+        # (każda strona to osobna transaction.atomic). Blok `finally` niżej oznaczy
+        # rekord jako 'error' zachowując current_page, a kolejny tick Celery Beat
+        # wznowi import od tej strony (patrz _get_last_items_page).
+        soft_timeout_hit = True
+        logger.warning(
+            "⏱️ Soft time limit importu ITEMS — przerywam czysto, wznowienie od "
+            "ostatniej strony przy kolejnym uruchomieniu (bez retry).")
+        return {
+            'status': 'interrupted',
+            'reason': 'soft_time_limit',
+            'total_imported': total_imported,
+            'task_id': task_id_value,
+        }
+
     except Exception as e:
         logger.error(f"❌ Błąd pełnego importu: {e}")
         # 5 minut przerwy, max 2 retry
@@ -213,7 +233,9 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             cache.delete(lock_id)
             logger.info(f"🔓 Blokada zwolniona dla {task_id_value}")
 
-        # Aktualizuj status na podstawie tego czy task się zakończył sukcesem
+        # Aktualizuj status na podstawie tego czy task się zakończył sukcesem.
+        # Przy soft-timeout zostawiamy status 'error' z zachowanym current_page —
+        # _get_last_items_page wznowi od tej strony.
         try:
             if task_completed_successfully:
                 _update_items_import_status(
@@ -222,7 +244,10 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             else:
                 _update_items_import_status(
                     'error', total_imported, updated_count=total_updated, processed_count=total_imported + total_updated)
-                logger.info("❌ Task zakończony jako 'error'")
+                if soft_timeout_hit:
+                    logger.info("⏱️ Task przerwany soft-timeoutem — status 'error', current_page zachowany do wznowienia")
+                else:
+                    logger.info("❌ Task zakończony jako 'error'")
         except Exception as e:
             logger.error(f"❌ Błąd podczas aktualizacji statusu na końcu: {e}")
 
@@ -355,6 +380,8 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                                     'running', imported_count, page, updated_count=bulk_result.get('updated_count', 0), processed_count=imported_count)
                             break  # Sukces - wyjdź z retry loop
 
+                        except SoftTimeLimitExceeded:
+                            raise
                         except Exception as e:
                             logger.error(f"❌ Błąd parsowania JSON: {e}")
                             if attempt < max_attempts:
@@ -384,6 +411,8 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                                 "❌ Osiągnięto maksymalną liczbę prób API")
                             break
 
+                except SoftTimeLimitExceeded:
+                    raise
                 except Exception as e:
                     logger.error(
                         f"❌ Błąd podczas pobierania strony {page}: {e}")
@@ -418,6 +447,10 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
             'imported_count': imported_count
         }
 
+    except SoftTimeLimitExceeded:
+        # Propaguj do full_import_and_update — tam checkpoint (current_page już
+        # zapisany per-strona) i czyste wyjście bez retry.
+        raise
     except Exception as e:
         logger.error(f"❌ Błąd importu ITEMS: {e}")
         # Zaktualizuj status na 'error' jeśli nie dry_run
@@ -516,10 +549,34 @@ def _get_last_items_update_time():
 
 
 def _get_last_items_page():
-    """Zawsze zaczyna od strony 1 - każdy task zaczyna od początku z last_update"""
+    """Wznawianie: jeśli poprzedni import ITEMS został przerwany (error / running /
+    interrupted) na stronie > 1 i jest świeży (< 24 h), zacznij od tej strony.
+    Wszystkie przerwane runy używają tego samego `last_update` (znacznik przeskakuje
+    tylko po statusie 'completed'), więc numer strony jest spójny.
+    W przeciwnym razie strona 1.
+    """
     try:
-        logger.info(
-            "📄 Zaczynam od strony 1 - każdy task zaczyna od początku z last_update")
+        from matterhorn1.models import ApiSyncLog
+        from django.utils import timezone
+        from datetime import timedelta
+
+        last = ApiSyncLog.objects.using('matterhorn1').filter(
+            sync_type__in=['items_import', 'items_sync']
+        ).order_by('-started_at').first()
+
+        if (
+            last
+            and last.status in ('error', 'running', 'interrupted')
+            and (last.current_page or 0) > 1
+            and last.started_at
+            and last.started_at > timezone.now() - timedelta(hours=24)
+        ):
+            logger.info(
+                f"🔄 Wznawiam import od strony {last.current_page} "
+                f"(poprzedni run #{last.id} status={last.status})")
+            return last.current_page
+
+        logger.info("📄 Zaczynam od strony 1")
         return 1
     except Exception as e:
         logger.error(f"Błąd podczas pobierania ostatniej strony: {e}")
@@ -742,6 +799,10 @@ def _bulk_import_products(items):
             'imported_count': imported_count
         }
 
+    except SoftTimeLimitExceeded:
+        # Limit czasu tasku — nie połykać, nie retry'ować per-strona; propaguj wyżej,
+        # żeby full_import_and_update zrobił checkpoint i czysto wyszedł.
+        raise
     except Exception as e:
         logger.error(f"❌ Błąd bulk import: {e}")
         # Nie ma fallback - tylko bulk operations
