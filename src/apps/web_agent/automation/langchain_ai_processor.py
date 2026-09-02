@@ -7,18 +7,26 @@ run_automation.py) bez zadnych zmian tam. Ustaw USE_LANGCHAIN_AI=1
 (get_ai_processor w ai_processor.py), zeby z niego korzystac.
 
 Routing = miedzy modelami (niezawodnosc), nie miedzy promptami - oba modele
-ida przez ten sam prompt/schemat. Fallback jest jawny po stronie LangChain
-(.with_fallbacks()), nie ukryty w OpenRouter-owym multi-model routingu -
-dzieki temu kazda proba (primary i fallback) jest osobnym spanem w
-LangSmith, widac osobno co i dlaczego padlo.
+ida przez ten sam prompt/schemat. Fallback to JAWNA petla primary->fallback
+w _invoke() (nie LangChainowe .with_fallbacks()) - kazda proba to osobny
+.invoke(), wiec kazda i tak jest osobnym spanem w LangSmith (dodatkowo
+otagowanym nazwa modelu), ale sukces/blad kazdej proby liczymy z PRAWDZIWEGO
+wyniku TEGO wywolania (try/except), a nie z LLM-owych callbackow. To celowe:
+.with_structured_output() to w rzeczywistosci DWA kroki (LLM, potem parser
+Pydantic) - .with_fallbacks() + callback na poziomie LLM widzi tylko
+pierwszy krok i potrafi zaraportowac model jako "sukces", mimo ze jego JSON
+zostal odrzucony przez walidacje Pydantic (@field_validator w
+ProductNameStructure/ProductDescriptionStructure) i wyrzucony na rzecz
+fallbacku - reczna petla z try/except wokol calego chain.invoke() (LLM +
+parser) tego nie ma, bo widzi realny wynik, nie tylko polowe.
 
 Kontrola = dwa niezalezne mechanizmy, nie jeden zamiast drugiego:
 1. LangSmith (ambient) - samo LANGSMITH_TRACING=true + LANGSMITH_API_KEY w
    .env.dev instrumentuje KAZDE wywolanie ChatOpenAI.invoke() bez zmian w
    kodzie. Tu tylko doklejamy tags/metadata (config= w .invoke()), zeby
    trace'y byly opisane, nie golym UUID.
-2. _CallLogCallback (ponizej) - lokalny, programistyczny zapis per-attempt
-   (ktory model probowal, sukces/blad, czas) NIEZALEZNY od LangSmith - zeby
+2. Lokalny, programistyczny zapis per-attempt w _invoke() (ktory model
+   probowal, sukces/blad, czas) NIEZALEZNY od LangSmith - zeby
    processing_data w Django admin (ProductProcessingLog) mial te informacje
    nawet bez otwierania LangSmith UI. pop_call_log() to eksponuje.
 """
@@ -27,7 +35,6 @@ import os
 import time
 from typing import Dict, List, Optional
 
-from langchain_core.callbacks import BaseCallbackHandler
 from pydantic import BaseModel, Field
 
 from .ai_processor import (
@@ -70,36 +77,10 @@ def _get_prompt(name: str, **kwargs) -> Optional[str]:
         return None
 
 
-class _CallLogCallback(BaseCallbackHandler):
-    """Lekki LangChain callback - zbiera per-attempt info (który model
-    faktycznie odpowiedział primary/fallback, sukces/błąd, bez polegania na
-    tym że .with_fallbacks() to gdziekolwiek wystawia w zwracanym wyniku)."""
-
-    def __init__(self):
-        super().__init__()
-        self.attempts: List[Dict] = []
-
-    def on_chat_model_start(self, serialized, messages, **kwargs):
-        params = kwargs.get("invocation_params") or {}
-        self.attempts.append({
-            "model": params.get("model", "unknown"),
-            "success": None,
-        })
-
-    def on_llm_end(self, response, **kwargs):
-        if self.attempts:
-            self.attempts[-1]["success"] = True
-
-    def on_llm_error(self, error, **kwargs):
-        if self.attempts:
-            self.attempts[-1]["success"] = False
-            self.attempts[-1]["error"] = str(error)
-
-
 class LangChainAIProcessor:
     """Procesor AI: OpenRouter, dwa modele (moonshotai/kimi-k2-thinking ->
-    openai/gpt-4o-mini) spięte przez LangChain .with_fallbacks(), tracing
-    przez LangSmith."""
+    openai/gpt-4o-mini), reczny fallback (petla try/except w _invoke() -
+    patrz docstring modulu), tracing przez LangSmith."""
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
@@ -111,7 +92,7 @@ class LangChainAIProcessor:
             "OPENAI_MODEL_PRODUCT_ENRICHMENT", DEFAULT_PRIMARY_MODEL)
         self.fallback_model = os.getenv(
             "LANGCHAIN_FALLBACK_MODEL", DEFAULT_FALLBACK_MODEL)
-        self._chains: Dict[str, object] = {}
+        self._chains: Dict[tuple, object] = {}
         self._call_log: List[Dict] = []
         logger.info(
             "LangChainAIProcessor zainicjalizowany (OpenRouter, primary=%s, fallback=%s)",
@@ -146,50 +127,56 @@ class LangChainAIProcessor:
             extra_body={"reasoning": {"effort": "low"}},
         )
 
-    def _get_chain(self, cache_key: str, pydantic_class=None):
-        """Chain primary->fallback (opcjonalnie ze strukturyzowanym wyjściem),
-        cache'owany per (schemat), żeby nie tworzyć nowego klienta HTTP przy
-        każdym wywołaniu."""
-        if cache_key not in self._chains:
-            primary = self._get_llm(self.primary_model)
-            fallback = self._get_llm(self.fallback_model)
+    def _get_model_chain(self, model: str, cache_key: str, pydantic_class=None):
+        """Chain dla POJEDYNCZEGO modelu (opcjonalnie ze strukturyzowanym
+        wyjściem), cache'owany per (model, operacja), żeby nie tworzyć
+        nowego klienta HTTP przy każdym wywołaniu. Fallback między modelami
+        to pętla w _invoke() (nie .with_fallbacks()) - patrz docstring
+        modułu, dlaczego."""
+        key = (model, cache_key)
+        if key not in self._chains:
+            llm = self._get_llm(model)
             if pydantic_class is not None:
-                primary = primary.with_structured_output(pydantic_class)
-                fallback = fallback.with_structured_output(pydantic_class)
-            self._chains[cache_key] = primary.with_fallbacks([fallback])
-        return self._chains[cache_key]
+                llm = llm.with_structured_output(pydantic_class)
+            self._chains[key] = llm
+        return self._chains[key]
 
     def _invoke(self, cache_key: str, system: str, user: str, *, tags: List[str],
                 pydantic_class=None):
-        """Woła chain (primary+fallback) z tagami dla LangSmith i własnym
-        callbackiem dla pop_call_log(). Zwraca wynik albo None przy błędzie
-        na obu modelach (zalogowane w _call_log jako success=False)."""
+        """Próbuje primary, potem fallback - osobny chain.invoke() na próbę
+        (osobny span w LangSmith, otagowany nazwą modelu), sukces/błąd
+        każdej próby liczony z jej PRAWDZIWEGO wyniku (try/except wokół
+        całego invoke - LLM + parser Pydantic), nie z LLM-owych callbacków
+        (patrz docstring modułu). Zwraca wynik pierwszej udanej próby albo
+        None gdy obie zawiodły (obie zalogowane w _call_log)."""
         from langchain_core.messages import HumanMessage, SystemMessage
 
-        chain = self._get_chain(cache_key, pydantic_class)
-        call_log = _CallLogCallback()
-        started = time.monotonic()
-        try:
-            result = chain.invoke(
-                [SystemMessage(content=system), HumanMessage(content=user)],
-                config={
-                    "tags": ["web_agent", "product-enrichment", *tags],
-                    "callbacks": [call_log],
-                },
-            )
-            return result
-        except Exception as e:
-            logger.error("LangChain invoke (%s) nieudane na obu modelach: %s", cache_key, e)
-            if not call_log.attempts or call_log.attempts[-1].get("success") is not False:
-                call_log.attempts.append(
-                    {"model": self.fallback_model, "success": False, "error": str(e)})
-            return None
-        finally:
-            duration_ms = round((time.monotonic() - started) * 1000)
-            for attempt in call_log.attempts:
-                attempt["duration_ms"] = duration_ms
-                attempt["operation"] = cache_key
-            self._call_log.extend(call_log.attempts)
+        messages = [SystemMessage(content=system), HumanMessage(content=user)]
+        attempts: List[Dict] = []
+        result = None
+        for model in (self.primary_model, self.fallback_model):
+            started = time.monotonic()
+            try:
+                chain = self._get_model_chain(model, cache_key, pydantic_class)
+                result = chain.invoke(
+                    messages,
+                    config={"tags": ["web_agent", "product-enrichment", *tags, model]},
+                )
+                attempts.append({
+                    "model": model, "success": True,
+                    "duration_ms": round((time.monotonic() - started) * 1000),
+                    "operation": cache_key,
+                })
+                break
+            except Exception as e:
+                logger.error("LangChain invoke (%s) %s nieudane: %s", cache_key, model, e)
+                attempts.append({
+                    "model": model, "success": False, "error": str(e),
+                    "duration_ms": round((time.monotonic() - started) * 1000),
+                    "operation": cache_key,
+                })
+        self._call_log.extend(attempts)
+        return result
 
     def enhance_product_name(
         self,

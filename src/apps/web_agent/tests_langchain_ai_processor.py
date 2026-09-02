@@ -1,11 +1,12 @@
 """
-Testy `LangChainAIProcessor` (OpenRouter + .with_fallbacks() + LangSmith,
-patrz automation/langchain_ai_processor.py). Zero prawdziwych wywolan
-HTTP/LangSmith - `_get_chain()` jest podmieniane na `_FakeChain`, ktora
-odtwarza dokladnie to, co widzialaby `_invoke()` od prawdziwego
-`primary.with_fallbacks([fallback])`: kolejne proby, wywolania callbacku
-(`_CallLogCallback`) per model, i albo wynik pierwszej udanej proby, albo
-ostatni wyjatek gdy wszystkie zawiedly.
+Testy `LangChainAIProcessor` (OpenRouter + reczny fallback primary->fallback
++ LangSmith, patrz automation/langchain_ai_processor.py). Zero prawdziwych
+wywolan HTTP/LangSmith - `_get_model_chain()` jest podmieniane, zeby kazdy
+model (primary/fallback) mial wlasny, niezalezny fake `.invoke()`: albo
+zwraca wynik, albo rzuca wyjatek - dokladnie tak jak _invoke() to konsumuje
+(try/except wokol calego chain.invoke() per model, sukces/blad z
+PRAWDZIWEGO wyniku tej proby, nie z LLM-owych callbackow - patrz docstring
+modulu o tym, dlaczego to wazne dla walidacji Pydantic).
 """
 from unittest.mock import patch
 
@@ -22,32 +23,31 @@ from web_agent.automation.langchain_ai_processor import (
 )
 
 
-class _FakeChain:
-    """Podmienia realny Runnable zwracany przez `_get_chain()`. `attempts`
-    to lista (model_name, wynik_albo_wyjatek) w kolejnosci prob -
-    dokladnie tak zachowuje sie `primary.with_fallbacks([fallback])`:
-    probuje po kolei, zwraca pierwszy sukces, albo rzuca ostatni wyjatek
-    gdy wszystkie zawiodly."""
+class _FakeSingleChain:
+    """Odpowiednik chaina zwracanego przez _get_model_chain() dla JEDNEGO
+    modelu - jeden fake `.invoke()`, albo zwraca `outcome`, albo (gdy
+    `outcome` jest wyjatkiem - w tym pydantic.ValidationError, dokladnie to
+    co realnie rzuca .with_structured_output() gdy LLM zwroci zly JSON) go
+    rzuca."""
 
-    def __init__(self, attempts):
-        self.attempts = attempts
+    def __init__(self, outcome):
+        self.outcome = outcome
 
     def invoke(self, messages, config=None):
-        callbacks = (config or {}).get("callbacks") or []
-        last_exc = None
-        for model_name, outcome in self.attempts:
-            for cb in callbacks:
-                cb.on_chat_model_start(
-                    {}, [messages], invocation_params={"model": model_name})
-            if isinstance(outcome, Exception):
-                last_exc = outcome
-                for cb in callbacks:
-                    cb.on_llm_error(outcome)
-                continue
-            for cb in callbacks:
-                cb.on_llm_end(outcome)
-            return outcome
-        raise last_exc
+        if isinstance(self.outcome, Exception):
+            raise self.outcome
+        return self.outcome
+
+
+def _patch_model_chains(proc, outcomes):
+    """outcomes: dict model_name -> wynik_albo_wyjatek. Model bez wpisu w
+    outcomes, jesli zostanie faktycznie wywolany, rzuci KeyError - to
+    celowe, ujawnia gdyby kod probowal model, ktorego test nie oczekiwal."""
+
+    def fake_get_model_chain(model, cache_key, pydantic_class=None):
+        return _FakeSingleChain(outcomes[model])
+
+    return patch.object(proc, "_get_model_chain", side_effect=fake_get_model_chain)
 
 
 class _FakeMessage:
@@ -68,9 +68,8 @@ class LangChainAIProcessorNameTest(TestCase):
         expected = ProductNameStructure(
             base_type="Kostium kąpielowy", model_name="Ada",
             final_name="Kostium kąpielowy Ada")
-        chain = _FakeChain([(proc.primary_model, expected)])
 
-        with patch.object(proc, "_get_chain", return_value=chain):
+        with _patch_model_chains(proc, {proc.primary_model: expected}):
             result = proc.enhance_product_name("Kostium kąpielowy Model Ada M-803 - Marko")
 
         self.assertEqual(result, "Kostium kąpielowy Ada")
@@ -84,12 +83,12 @@ class LangChainAIProcessorNameTest(TestCase):
         expected = ProductNameStructure(
             base_type="Figi kąpielowe", model_name="Lupo",
             final_name="Figi kąpielowe Lupo")
-        chain = _FakeChain([
-            (proc.primary_model, RuntimeError("primary model niedostępny")),
-            (proc.fallback_model, expected),
-        ])
+        outcomes = {
+            proc.primary_model: RuntimeError("primary model niedostępny"),
+            proc.fallback_model: expected,
+        }
 
-        with patch.object(proc, "_get_chain", return_value=chain):
+        with _patch_model_chains(proc, outcomes):
             result = proc.enhance_product_name("Figi kąpielowe Lupo M-120 - Marko")
 
         self.assertEqual(result, "Figi kąpielowe Lupo")
@@ -102,12 +101,12 @@ class LangChainAIProcessorNameTest(TestCase):
 
     def test_both_models_fail_raises(self):
         proc = _make_processor()
-        chain = _FakeChain([
-            (proc.primary_model, RuntimeError("primary padł")),
-            (proc.fallback_model, RuntimeError("fallback też padł")),
-        ])
+        outcomes = {
+            proc.primary_model: RuntimeError("primary padł"),
+            proc.fallback_model: RuntimeError("fallback też padł"),
+        }
 
-        with patch.object(proc, "_get_chain", return_value=chain):
+        with _patch_model_chains(proc, outcomes):
             with self.assertRaises(RuntimeError):
                 proc.enhance_product_name("Kostium kąpielowy Model Ada M-803 - Marko")
 
@@ -116,11 +115,12 @@ class LangChainAIProcessorNameTest(TestCase):
         self.assertFalse(log[0]["success"])
         self.assertFalse(log[1]["success"])
 
-    def test_malformed_llm_output_rejected_by_pydantic_falls_back(self):
-        """Gdy primary zwraca cos co nie przejdzie walidacji schematu (to co
-        realnie robi .with_structured_output() gdy LLM zwroci zly JSON -
-        rzuca ValidationError), fallback ma szanse przejąć, tak samo jak przy
-        kazdym innym wyjatku primary."""
+    def test_primary_validation_error_falls_back_and_is_logged_as_failure(self):
+        """Kluczowy przypadek: primary "odpowiada" (LLM sie wywoluje), ale
+        JSON nie przechodzi walidacji Pydantic (@field_validator w
+        ProductNameStructure) - .with_structured_output() rzuca
+        ValidationError z kroku parsera. Musi to zostac policzone jako
+        PORAZKA primary (nie sukces), a fallback ma przejac."""
         proc = _make_processor()
         try:
             ProductNameStructure(base_type="", model_name="", final_name="")
@@ -129,17 +129,20 @@ class LangChainAIProcessorNameTest(TestCase):
         expected = ProductNameStructure(
             base_type="Kostium kąpielowy", model_name="Ada",
             final_name="Kostium kąpielowy Ada")
-        chain = _FakeChain([
-            (proc.primary_model, malformed_error),
-            (proc.fallback_model, expected),
-        ])
+        outcomes = {
+            proc.primary_model: malformed_error,
+            proc.fallback_model: expected,
+        }
 
-        with patch.object(proc, "_get_chain", return_value=chain):
+        with _patch_model_chains(proc, outcomes):
             result = proc.enhance_product_name("Kostium kąpielowy Model Ada M-803 - Marko")
 
         self.assertEqual(result, "Kostium kąpielowy Ada")
         log = proc.pop_call_log()
-        self.assertFalse(log[0]["success"])
+        self.assertEqual(len(log), 2)
+        self.assertEqual(log[0]["model"], proc.primary_model)
+        self.assertFalse(log[0]["success"], "primary z odrzuconym przez Pydantic JSON-em NIE jest sukcesem")
+        self.assertEqual(log[1]["model"], proc.fallback_model)
         self.assertTrue(log[1]["success"])
 
     def test_empty_name_raises_before_any_call(self):
@@ -159,9 +162,8 @@ class LangChainAIProcessorDescriptionTest(TestCase):
             packaging="Produkt pakowany w ekologiczną torebkę z logo marki.",
             size_tip="Zalecamy wybór rozmiaru zgodnego z tabelą rozmiarów producenta.",
         )
-        chain = _FakeChain([(proc.primary_model, expected)])
 
-        with patch.object(proc, "_get_chain", return_value=chain):
+        with _patch_model_chains(proc, {proc.primary_model: expected}):
             result = proc.enhance_product_description("Kostium kąpielowy, fiszbiny, regulowane boki")
 
         self.assertIn("Regulowane boki", result)
@@ -169,13 +171,13 @@ class LangChainAIProcessorDescriptionTest(TestCase):
 
     def test_both_models_fail_returns_original_text(self):
         proc = _make_processor()
-        chain = _FakeChain([
-            (proc.primary_model, RuntimeError("primary padł")),
-            (proc.fallback_model, RuntimeError("fallback też padł")),
-        ])
+        outcomes = {
+            proc.primary_model: RuntimeError("primary padł"),
+            proc.fallback_model: RuntimeError("fallback też padł"),
+        }
         original = "Oryginalny, niezmieniony opis produktu."
 
-        with patch.object(proc, "_get_chain", return_value=chain):
+        with _patch_model_chains(proc, outcomes):
             result = proc.enhance_product_description(original)
 
         self.assertEqual(result, original)
@@ -186,7 +188,7 @@ class LangChainAIProcessorDescriptionTest(TestCase):
 
     def test_empty_description_returns_empty_without_calling_model(self):
         proc = _make_processor()
-        with patch.object(proc, "_get_chain") as get_chain:
+        with patch.object(proc, "_get_model_chain") as get_chain:
             result = proc.enhance_product_description("")
         self.assertEqual(result, "")
         get_chain.assert_not_called()
@@ -195,21 +197,18 @@ class LangChainAIProcessorDescriptionTest(TestCase):
 class LangChainAIProcessorShortDescriptionAndAttributesTest(TestCase):
     def test_create_short_description_truncates(self):
         proc = _make_processor()
-        chain = _FakeChain([
-            (proc.primary_model, _FakeMessage("x" * 300)),
-        ])
-        with patch.object(proc, "_get_chain", return_value=chain):
+        with _patch_model_chains(proc, {proc.primary_model: _FakeMessage("x" * 300)}):
             result = proc.create_short_description("opis bazowy", max_length=250)
         self.assertEqual(len(result), 250)
 
     def test_create_short_description_both_fail_truncates_original(self):
         proc = _make_processor()
-        chain = _FakeChain([
-            (proc.primary_model, RuntimeError("padł")),
-            (proc.fallback_model, RuntimeError("padł")),
-        ])
+        outcomes = {
+            proc.primary_model: RuntimeError("padł"),
+            proc.fallback_model: RuntimeError("padł"),
+        }
         original = "y" * 300
-        with patch.object(proc, "_get_chain", return_value=chain):
+        with _patch_model_chains(proc, outcomes):
             result = proc.create_short_description(original, max_length=250)
         self.assertEqual(result, original[:250])
 
@@ -220,21 +219,19 @@ class LangChainAIProcessorShortDescriptionAndAttributesTest(TestCase):
             {"id": 2, "name": "Niski stan"},
             {"id": 3, "name": "Push-up"},
         ]
-        chain = _FakeChain([
-            (proc.primary_model, AttributesOutput(attributes=["Wysoki stan", "Push-Up", "Nieznany"])),
-        ])
-        with patch.object(proc, "_get_chain", return_value=chain):
+        outcome = AttributesOutput(attributes=["Wysoki stan", "Push-Up", "Nieznany"])
+        with _patch_model_chains(proc, {proc.primary_model: outcome}):
             ids = proc.extract_attributes_from_description("opis", available)
         self.assertEqual(ids, [1, 3])
 
     def test_extract_attributes_both_fail_returns_empty_list(self):
         proc = _make_processor()
         available = [{"id": 1, "name": "Wysoki stan"}]
-        chain = _FakeChain([
-            (proc.primary_model, RuntimeError("padł")),
-            (proc.fallback_model, RuntimeError("padł")),
-        ])
-        with patch.object(proc, "_get_chain", return_value=chain):
+        outcomes = {
+            proc.primary_model: RuntimeError("padł"),
+            proc.fallback_model: RuntimeError("padł"),
+        }
+        with _patch_model_chains(proc, outcomes):
             ids = proc.extract_attributes_from_description("opis", available)
         self.assertEqual(ids, [])
 
