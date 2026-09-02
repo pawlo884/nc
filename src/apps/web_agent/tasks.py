@@ -169,18 +169,27 @@ def automate_mpd_form_filling(self, brand_id: int = None, category_id: int = Non
         
         admin_username = os.getenv('DJANGO_ADMIN_USERNAME', 'admin')
         admin_password = os.getenv('DJANGO_ADMIN_PASSWORD', '')
+        # USE_LANGCHAIN_AI=1 -> get_ai_processor() zwraca LangChainAIProcessor
+        # (OpenRouter, ai_processor.py:2533), ktory czyta OPENROUTER_API_KEY,
+        # nie OPENAI_API_KEY - wymagac i przekazac wlasciwy klucz do wlasciwej
+        # sciezki, zeby nie wyciekal klucz OpenAI do klienta OpenRouter.
+        use_langchain_ai = os.getenv('USE_LANGCHAIN_AI', '').lower() in ('1', 'true', 'yes')
         openai_api_key = os.getenv('OPENAI_API_KEY', '')
+        openrouter_api_key = os.getenv('OPENROUTER_API_KEY', '')
         headless = os.getenv('BROWSER_HEADLESS', 'False').lower() == 'true'
-        
+
         if not admin_username:
             raise ValueError("DJANGO_ADMIN_USERNAME nie jest ustawione w zmiennych środowiskowych")
-        
+
         if not admin_password:
             raise ValueError("DJANGO_ADMIN_PASSWORD nie jest ustawione w zmiennych środowiskowych")
-        
-        if not openai_api_key:
+
+        if use_langchain_ai:
+            if not openrouter_api_key:
+                raise ValueError("OPENROUTER_API_KEY nie jest ustawione w zmiennych środowiskowych")
+        elif not openai_api_key:
             raise ValueError("OPENAI_API_KEY nie jest ustawione w zmiennych środowiskowych")
-        
+
         # Inicjalizuj komponenty
         browser_automation = BrowserAutomation(
             base_url=base_url,
@@ -189,7 +198,9 @@ def automate_mpd_form_filling(self, brand_id: int = None, category_id: int = Non
             headless=headless
         )
         
-        ai_processor = get_ai_processor(api_key=openai_api_key)
+        ai_processor = get_ai_processor(
+            api_key=openrouter_api_key if use_langchain_ai else openai_api_key
+        )
         
         product_processor = ProductProcessor(
             browser_automation=browser_automation,
@@ -253,6 +264,11 @@ def automate_mpd_form_filling(self, brand_id: int = None, category_id: int = Non
                         product_log.error_message = result.get('error_message', 'Unknown error')
                         automation_run.products_failed += 1
                     
+                    # Podsumowanie wywolan AI (ktory model odpowiedzial - primary/
+                    # fallback, sukces/blad, czas) - patrz pop_call_log() w
+                    # LangChainAIProcessor. getattr z domyslnym no-op, zeby dzialalo
+                    # tez z legacy AIProcessor (bez tej metody).
+                    result['_ai_pipeline'] = getattr(ai_processor, 'pop_call_log', lambda: [])()
                     product_log.processing_data = result
                     product_log.save()
                     

@@ -59,3 +59,14 @@ MINIO_SECRET_KEY=
 
 FLOWER_USER=admin
 FLOWER_PASSWORD=
+
+# AI (web_agent) - patrz env.sample.md dla opisu. Testy web_agent mockuja
+# wywolania LLM (tests_langchain_ai_processor.py) - te zmienne nie sa
+# wymagane, zeby testy przeszly, tylko dla realnego uruchomienia automatyzacji.
+USE_LANGCHAIN_AI=
+OPENROUTER_API_KEY=
+OPENAI_API_KEY=
+HF_TOKEN=
+LANGSMITH_TRACING=
+LANGSMITH_API_KEY=
+LANGSMITH_PROJECT=nc
