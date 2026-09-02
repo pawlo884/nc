@@ -85,3 +85,22 @@ REDIS_DB=
 # CELERY_RESULT_BACKEND w env (pusta wartość jest OK).
 CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}
 CELERY_RESULT_BACKEND=
+
+# AI (web_agent - wzbogacanie nazwy/opisu produktu przy automatyzacji)
+# USE_LANGCHAIN_AI=1 przelacza get_ai_processor() (ai_processor.py) na
+# LangChainAIProcessor: OpenRouter, primary moonshotai/kimi-k2-thinking ->
+# fallback openai/gpt-4o-mini przez LangChain .with_fallbacks(). Wymaga
+# OPENROUTER_API_KEY (NIE OPENAI_API_KEY - inny klucz, inny provider).
+# Bez USE_LANGCHAIN_AI=1 uzywany jest legacy AIProcessor (OPENAI_API_KEY
+# albo HF_TOKEN - patrz ai_processor.py).
+USE_LANGCHAIN_AI=
+OPENROUTER_API_KEY=
+OPENAI_API_KEY=
+HF_TOKEN=
+
+# LangSmith - tracing LangChain (ambient, samo ustawienie tych zmiennych
+# instrumentuje kazde ChatOpenAI.invoke() bez zmian w kodzie). Klucz z
+# smith.langchain.com. Dziala tylko razem z USE_LANGCHAIN_AI=1.
+LANGSMITH_TRACING=
+LANGSMITH_API_KEY=
+LANGSMITH_PROJECT=nc
