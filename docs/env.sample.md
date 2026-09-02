@@ -88,15 +88,32 @@ CELERY_RESULT_BACKEND=
 
 # AI (web_agent - wzbogacanie nazwy/opisu produktu przy automatyzacji)
 # USE_LANGCHAIN_AI=1 przelacza get_ai_processor() (ai_processor.py) na
-# LangChainAIProcessor: OpenRouter, primary moonshotai/kimi-k2-thinking ->
-# fallback openai/gpt-4o-mini przez LangChain .with_fallbacks(). Wymaga
-# OPENROUTER_API_KEY (NIE OPENAI_API_KEY - inny klucz, inny provider).
-# Bez USE_LANGCHAIN_AI=1 uzywany jest legacy AIProcessor (OPENAI_API_KEY
-# albo HF_TOKEN - patrz ai_processor.py).
+# LangChainAIProcessor: OpenRouter, model routowany PER OPERACJA (name/
+# description/attributes/short_description dostaja osobna pare primary/
+# fallback - patrz DEFAULT_MODEL_ROUTING w langchain_ai_processor.py),
+# reczny fallback primary->fallback per operacja. Wymaga OPENROUTER_API_KEY
+# (NIE OPENAI_API_KEY - inny klucz, inny provider). Bez USE_LANGCHAIN_AI=1
+# uzywany jest legacy AIProcessor (OPENAI_API_KEY albo HF_TOKEN - patrz
+# ai_processor.py).
 USE_LANGCHAIN_AI=
 OPENROUTER_API_KEY=
 OPENAI_API_KEY=
 HF_TOKEN=
+
+# Nadpisanie modelu dla KONKRETNEJ operacji (opcjonalne - bez tego uzywane
+# sa domyslne z DEFAULT_MODEL_ROUTING). OPERACJA = NAME / DESCRIPTION /
+# ATTRIBUTES / SHORT_DESCRIPTION, np. AI_MODEL_DESCRIPTION_PRIMARY=... .
+# OPENAI_MODEL_PRODUCT_ENRICHMENT/LANGCHAIN_FALLBACK_MODEL to starsze,
+# nadal dzialajace nazwy - ale tylko dla DESCRIPTION (wstecznie kompatybilne
+# sprzed routingu per operacja).
+AI_MODEL_NAME_PRIMARY=
+AI_MODEL_NAME_FALLBACK=
+OPENAI_MODEL_PRODUCT_ENRICHMENT=
+LANGCHAIN_FALLBACK_MODEL=
+AI_MODEL_ATTRIBUTES_PRIMARY=
+AI_MODEL_ATTRIBUTES_FALLBACK=
+AI_MODEL_SHORT_DESCRIPTION_PRIMARY=
+AI_MODEL_SHORT_DESCRIPTION_FALLBACK=
 
 # LangSmith - tracing LangChain (ambient, samo ustawienie tych zmiennych
 # instrumentuje kazde ChatOpenAI.invoke() bez zmian w kodzie). Klucz z
