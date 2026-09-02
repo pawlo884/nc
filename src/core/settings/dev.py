@@ -189,7 +189,10 @@ CELERY_REDIS_MAX_CONNECTIONS = 50
 
 # Celery Redis transport options - uproszczona konfiguracja keepalive
 CELERY_BROKER_TRANSPORT_OPTIONS = {
-    'visibility_timeout': 3600,
+    # Musi być >= najdłuższego task time limit (patrz CELERY_TASK_TIME_LIMIT
+    # niżej), inaczej przy acks_late broker uzna wiadomość za zgubioną w trakcie
+    # importu i drugi worker odpali go równolegle.
+    'visibility_timeout': 14400,
     'max_connections': 50,
     'socket_keepalive': True,
     'socket_timeout': 120,  # Socket timeout (2 minuty)
@@ -207,9 +210,13 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = False  # Zmieniony na False dla development
 CELERY_WORKER_DISABLE_RATE_LIMITS = True  # Wyłącz limity dla development
-# Zwiększone limity dla długotrwałych tasków importu (3600s = 1 godzina)
-CELERY_TASK_TIME_LIMIT = 3600  # 1 godzina hard limit dla tasków
-CELERY_TASK_SOFT_TIME_LIMIT = 3300  # 55 minut soft limit
+# Limity dla długotrwałych tasków importu Matterhorn. Import inkrementalny po
+# dużym backlogu (znacznik last_update potrafi cofnąć się o dobę+) paginuje
+# kilkadziesiąt stron × ~1000 pozycji, a baza dev jest za tunelem SSH — 1h nie
+# wystarczało i task ginął z TimeLimitExceeded, przez co znacznik nigdy nie
+# przeskakiwał (spirala). 4h daje zapas na jednorazowe nadgonienie.
+CELERY_TASK_TIME_LIMIT = 14400  # 4 godziny hard limit
+CELERY_TASK_SOFT_TIME_LIMIT = 13800  # 3h50 soft limit
 
 # Static files configuration for development with Nginx
 # Nginx obsługuje pliki statyczne, nie WhiteNoise

@@ -40,15 +40,17 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             'task_id': getattr(getattr(self, 'request', None), 'id', 'direct_call')
         }
 
-    # BLOKADA - zapobiega równoległemu wykonaniu (działa dla Celery i bezpośrednich wywołań)
+    # BLOKADA - zapobiega równoległemu wykonaniu (działa dla Celery i bezpośrednich wywołań).
+    # Musi pokrywać maksymalny czas trwania importu (patrz CELERY_TASK_TIME_LIMIT),
+    # inaczej blokada wygasa w trakcie i kolejny tick beat odpala drugi import równolegle.
     lock_id = 'matterhorn1_full_import_lock'
-    lock_timeout = 3600  # 1 godzina
+    lock_timeout = 14400  # 4 godziny (>= CELERY_TASK_TIME_LIMIT)
 
     # Użyj task_id jeśli dostępny (Celery), w przeciwnym razie 'direct_call'
     task_identifier = getattr(self, 'request', None)
     task_id_value = task_identifier.id if task_identifier else 'direct_call'
 
-    # CZYŚĆ STARE RUNNING REKORDY (starsze niż 2 godziny)
+    # CZYŚĆ STARE RUNNING REKORDY (starsze niż 5 godzin - backstop)
     _cleanup_old_running_imports()
 
     # CZYŚĆ WSZYSTKIE RUNNING REKORDY (rozwiązuje problem z ręcznym przerywaniem)
@@ -1360,8 +1362,11 @@ def test_periodic_task():
 
 def _cleanup_old_running_imports():
     """
-    Czyści stare rekordy 'running' starsze niż 2 godziny.
-    To zapobiega kumulowaniu się zawieszonych importów.
+    Czyści rekordy 'running' starsze niż 5 godzin (backstop dla importów, które
+    zawisły bez sprzątnięcia). Próg musi być > CELERY_TASK_TIME_LIMIT (4h),
+    inaczej ubija normalnie pracujący import po dużym backlogu. Świeższe zombie
+    łapie progressowy watchdog (brak zmiany current_page) i _cleanup_all_running_imports
+    (running w DB bez blokady Redis).
     Z retry logic dla połączenia z bazą danych.
     """
     max_retries = 5
@@ -1373,8 +1378,8 @@ def _cleanup_old_running_imports():
             from django.utils import timezone
             from datetime import timedelta
 
-            # Znajdź stare running rekordy (starsze niż 2 godziny)
-            cutoff_time = timezone.now() - timedelta(hours=2)
+            # Znajdź stare running rekordy (starsze niż 5 godzin, > task time limit)
+            cutoff_time = timezone.now() - timedelta(hours=5)
             old_running = ApiSyncLog.objects.using('matterhorn1').filter(
                 sync_type='items_import',
                 status='running',
@@ -1390,7 +1395,7 @@ def _cleanup_old_running_imports():
                 old_running.update(
                     status='error',
                     completed_at=timezone.now(),
-                    error_details='Zawieszone - automatycznie oznaczone jako błąd po 2 godzinach'
+                    error_details='Zawieszone - automatycznie oznaczone jako błąd po 5 godzinach'
                 )
                 logger.info(
                     f"✅ Oznaczono {count} starych rekordów jako 'error'")
