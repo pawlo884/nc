@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.0](https://github.com/pawlo884/nc/compare/v1.43.2...v1.44.0) (2026-09-02)
+
+### Features
+
+* **web_agent:** ai pipeline przez openrouter + langchain fallback + langsmith ([463f453](https://github.com/pawlo884/nc/commit/463f45336c527ad671c638f633edb97e6dde4cf7)), references [#195](https://github.com/pawlo884/nc/issues/195)
+
 ## [1.43.2](https://github.com/pawlo884/nc/compare/v1.43.1...v1.43.2) (2026-09-01)
 
 ### Bug Fixes
