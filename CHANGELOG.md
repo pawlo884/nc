@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.2](https://github.com/pawlo884/nc/compare/v1.44.1...v1.44.2) (2026-09-02)
+
+### Bug Fixes
+
+* **matterhorn:** wznawiaj import ITEMS od przerwanej strony zamiast od 1 ([8e7f6b1](https://github.com/pawlo884/nc/commit/8e7f6b1e1336c7dfa0671da2bf77ed17b6373d47))
+
 ## [1.44.1](https://github.com/pawlo884/nc/compare/v1.44.0...v1.44.1) (2026-09-02)
 
 ### Bug Fixes
