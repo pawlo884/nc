@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.1](https://github.com/pawlo884/nc/compare/v1.44.0...v1.44.1) (2026-09-02)
+
+### Bug Fixes
+
+* **web_agent:** popraw liczenie sukcesu/porazki fallbacku AI po niezaleznym review ([1d38ba0](https://github.com/pawlo884/nc/commit/1d38ba04d3cf82ee8e82ba8ee149e94ec424443f)), references [#197](https://github.com/pawlo884/nc/issues/197)
+
 ## [1.44.0](https://github.com/pawlo884/nc/compare/v1.43.2...v1.44.0) (2026-09-02)
 
 ### Features
