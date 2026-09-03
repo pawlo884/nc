@@ -3,6 +3,11 @@ import sys
 from .base import *
 from core.middleware import get_debug
 
+# True gdy trwają testy — `manage.py test` (stare) ORAZ pytest-django (nowe).
+# pytest nie wkłada 'test' do sys.argv, ale importuje moduł `pytest` zanim
+# Django wczyta settings, więc `'pytest' in sys.modules` łapie ten przypadek.
+RUNNING_TESTS = 'test' in sys.argv or 'pytest' in sys.modules
+
 # Development rozszerza DATABASES z base.py o wersje z zzz_
 # Dodajemy bazy z przedrostkiem zzz_ (routery wybiorą je automatycznie)
 DATABASES['zzz_default'] = DATABASES['default'].copy()
@@ -134,7 +139,7 @@ INTERNAL_IPS = ['127.0.0.1', 'localhost', '192.168.50.63'] + \
 def show_debug_toolbar(request):
     """Callback dla debug toolbar - pokazuje się tylko dla localhost (nie w testach)."""
     # django-debug-toolbar 7.x psuje reverse('djdt') w APIClient jeśli toolbar jest aktywny w testach
-    if 'test' in sys.argv:
+    if RUNNING_TESTS:
         return False
     return get_debug() and request.META.get('REMOTE_ADDR') in INTERNAL_IPS
 
@@ -248,7 +253,7 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
 # Wyłącz database routers podczas testów - używamy tylko bazy default
 # To rozwiązuje problemy z tworzeniem wielu testowych baz jednocześnie
-if 'test' in sys.argv:
+if RUNNING_TESTS:
     DATABASE_ROUTERS = []  # Wyłącz routing podczas testów - wszystkie modele idą do default
 
     # Wyłącz cache/throttling dla testów - użyj dummy cache zamiast DatabaseCache
