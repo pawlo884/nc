@@ -192,15 +192,13 @@ jobs:
           }
           echo "✅ Migracje spójne z modelami"
 
-      - name: Testy Django
-        working-directory: src
-        # Jawna lista aplikacji — dyskryminacja z korzenia myli tożsamość modeli
-        # (web_agent vs apps.web_agent). pattern tests*.py pomija komendy
-        # management test_*_connection.py.
+      - name: Testy (pytest)
+        # Konfiguracja w pyproject.toml [tool.pytest.ini_options]:
+        # DJANGO_SETTINGS_MODULE, pythonpath, python_files=tests*.py
+        # (pomija management/commands/test_*_connection.py), testpaths=src/apps.
         run: >-
-          python manage.py test
-          MPD matterhorn1 web_agent tabu mada
-          --noinput --pattern "tests*.py"
+          pytest
+          --cov=src/apps --cov-report=term-missing:skip-covered
 
   check-code-quality:
     name: Sprawdź jakość kodu (linting i formatowanie)
