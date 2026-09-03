@@ -34,13 +34,18 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Dodaj src/ do PYTHONPATH, żeby Python mógł znaleźć aplikacje
 ENV PYTHONPATH=/app:/app/apps
 
-# Skopiuj tylko potrzebne pliki
+# Skopiuj tylko potrzebne pliki.
+# UWAGA: każda nowa aplikacja Django z INSTALLED_APPS (core/settings/base.py)
+# musi mieć tu swój COPY — inaczej django.setup() w buildzie wywala
+# ModuleNotFoundError.
 COPY src/manage.py .
 COPY src/core/ ./core/
 COPY src/apps/matterhorn1/ ./matterhorn1/
 COPY src/apps/MPD/ ./MPD/
 COPY src/apps/web_agent/ ./web_agent/
 COPY src/apps/tabu/ ./tabu/
+COPY src/apps/mada/ ./mada/
+COPY src/apps/prestashop/ ./prestashop/
 COPY deployments/nginx/nginx.conf ./nginx.conf
 COPY deployments/redis.conf ./redis.conf
 COPY package.json .
