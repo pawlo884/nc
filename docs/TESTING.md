@@ -120,8 +120,8 @@ kolejne szybko). `--create-db` wymusza odtworzenie po zmianie migracji.
 | **0** | Infra pytest-django (wyżej)                                                                                                                                                                                    | ✅   |
 | **1** | Pakiet `matterhorn1/tests/`: `factories.py` (buildery ładunków API), `mock_matterhorn.py` (`responses` helpery ITEMS/INVENTORY), `conftest.py` (fixture'y), pierwszy e2e importu + unit `_parse_creation_date` | ✅   |
 | **2** | Unit: `_prepare_product_create/update`, `stock_tracker`, `transaction_logger` (`database_utils` = martwy kod, pominięty)                                                                                       | ✅   |
-| **3** | Integration: `saga.py` (happy + kompensacja), admin `mpd_create`/`assign_mapping`, `_bulk_*`, watchdog                                                                                                         | ⬜   |
-| **4** | E2E: import→`mpd_create`→link po EAN, scenariusze błędów (500 na str. 2, blokada równoległa)                                                                                                                   | ⬜   |
+| **3** | Integration: silnik sagi (kompensacja / propagacja / logi), `_bulk_import_products` + `_bulk_update_inventory`, watchdog                                                                                       | ✅   |
+| **4** | E2E: import→`mpd_create`→link po EAN, scenariusze błędów (500 na str. 2, blokada równoległa), admin `mpd_create`/`assign_mapping`                                                                              | ⬜   |
 | **5** | Próg pokrycia w CI (`--cov-fail-under`), raport, białe plamy                                                                                                                                                   | ⬜   |
 
 Cel pokrycia matterhorn1: **linie ≥ 80%**, `tasks.py` i `saga.py` ≥ 75%.
