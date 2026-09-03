@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.3](https://github.com/pawlo884/nc/compare/v1.44.2...v1.44.3) (2026-09-03)
+
+### Bug Fixes
+
+* **docker:** kopiuj aplikację prestashop do obrazów prod i ml ([0e55e62](https://github.com/pawlo884/nc/commit/0e55e6236230e52b8f69bb31add67e579ff06ad6))
+
 ## [1.44.2](https://github.com/pawlo884/nc/compare/v1.44.1...v1.44.2) (2026-09-02)
 
 ### Bug Fixes
