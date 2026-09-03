@@ -115,16 +115,37 @@ kolejne szybko). `--create-db` wymusza odtworzenie po zmianie migracji.
 
 ## Fazy realizacji
 
-| Faza  | Zakres                                                                                                                     | PR          |
-| ----- | -------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| **0** | Infra pytest-django (wyżej)                                                                                                | 1           |
-| **1** | Fixtures + `responses` helpers dla API Matterhorn (`tests/fixtures/matterhorn/*.json`), reorganizacja plików w `tests/unit | integration | e2e` | 1   |
-| **2** | Unit: `tasks.py` helpery, `stock_tracker`, `transaction_logger`, `database_utils`, braki w serializerach                   | 1–2         |
-| **3** | Integration: `saga.py` (happy + kompensacja), admin `mpd_create`/`assign_mapping`, `_bulk_*`, watchdog                     | 2–3         |
-| **4** | E2E: `full_import_and_update` z `responses`, import→map→link, scenariusze błędów                                           | 2           |
-| **5** | Próg pokrycia w CI (`--cov-fail-under`), raport, uzupełnienie białych plam                                                 | 1           |
+| Faza  | Zakres                                                                                                                                                                                                         | Stan |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| **0** | Infra pytest-django (wyżej)                                                                                                                                                                                    | ✅   |
+| **1** | Pakiet `matterhorn1/tests/`: `factories.py` (buildery ładunków API), `mock_matterhorn.py` (`responses` helpery ITEMS/INVENTORY), `conftest.py` (fixture'y), pierwszy e2e importu + unit `_parse_creation_date` | ✅   |
+| **2** | Unit: `_prepare_product_create/update`, `stock_tracker`, `transaction_logger`, `database_utils`, braki w serializerach                                                                                         | ⬜   |
+| **3** | Integration: `saga.py` (happy + kompensacja), admin `mpd_create`/`assign_mapping`, `_bulk_*`, watchdog                                                                                                         | ⬜   |
+| **4** | E2E: import→`mpd_create`→link po EAN, scenariusze błędów (500 na str. 2, blokada równoległa)                                                                                                                   | ⬜   |
+| **5** | Próg pokrycia w CI (`--cov-fail-under`), raport, białe plamy                                                                                                                                                   | ⬜   |
 
 Cel pokrycia matterhorn1: **linie ≥ 80%**, `tasks.py` i `saga.py` ≥ 75%.
+
+### Struktura `matterhorn1/tests/`
+
+```
+matterhorn1/
+  tests_api.py            # legacy (był tests.py) — testy DRF ViewSetów
+  tests_models.py         # legacy
+  tests_serializers.py    # legacy
+  tests_saga*.py          # legacy
+  tests_import_resume.py  # legacy
+  tests_admin_linking.py  # legacy
+  tests/
+    factories.py          # api_item(), api_variant(), inventory_record()
+    mock_matterhorn.py    # mock_items(rsps, pages), mock_inventory(...), mock_items_error(...)
+    conftest.py           # no_sleep (autouse), matterhorn_api, mocked_responses, prior_items_sync
+    tests_unit_*.py       # @pytest.mark.unit
+    tests_integration_*.py # @pytest.mark.integration
+    tests_e2e_*.py         # @pytest.mark.e2e
+```
+
+Legacy `tests_*.py` zostają w korzeniu apki (przenoszenie zepsułoby `from .models`).
 
 ---
 
@@ -132,7 +153,7 @@ Cel pokrycia matterhorn1: **linie ≥ 80%**, `tasks.py` i `saga.py` ≥ 75%.
 
 - nowe testy: plik `tests_<obszar>.py` (collector zbiera `tests*.py`, **nie** `test_*.py` — to koliduje z komendami `test_*_connection.py`), styl pytest (funkcje + fixture, `@pytest.mark.django_db`)
 - markery: `@pytest.mark.unit` / `integration` / `e2e`; `pytest -m "not e2e"` do szybkiego cyklu
-- HTTP: **zawsze** `@responses.activate` — żaden test nie dzwoni po sieci
+- HTTP: **zawsze** przez fixture `mocked_responses` (`responses.RequestsMock`) + helpery z `mock_matterhorn.py` — żaden test nie dzwoni po sieci
 - Celery: `CELERY_TASK_ALWAYS_EAGER` (już włączone w trybie testów) — taski wołane synchronicznie
-- fixtures API w `src/apps/matterhorn1/tests/fixtures/` (prawdziwe kształty odpowiedzi, zanonimizowane)
+- ładunki API budowane funkcjami z `matterhorn1/tests/factories.py`, nie surowym JSON-em (łatwiej parametryzować)
 - jeden `assert` logiczny na test gdy się da; nazwy `test_<co>_<warunek>_<oczekiwanie>`
