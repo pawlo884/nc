@@ -1,7 +1,9 @@
 # nc_project — przegląd projektu
 
 Dokument wysokopoziomowy: co to jest, z czego się składa, jak dane płyną i
-jaki jest stan techniczny. Szczegóły przepływu danych: [ARCHITECTURE.md](ARCHITECTURE.md).
+jaki jest stan techniczny. Diagram: [ARCHITECTURE.md](ARCHITECTURE.md).
+Szczegółowy opis przepływów krok po kroku + status funkcji:
+[HOW_IT_WORKS.md](HOW_IT_WORKS.md).
 
 ## 1. Po co to jest
 
