@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.5](https://github.com/pawlo884/nc/compare/v1.44.4...v1.44.5) (2026-09-04)
+
+### Bug Fixes
+
+* **matterhorn:** views.py szukal produktu po nieistniejacym polu product_id ([c278391](https://github.com/pawlo884/nc/commit/c2783911a8940151c9f7312aa8390b103f0ba313)), references [#110](https://github.com/pawlo884/nc/issues/110)
+
 ## [1.44.4](https://github.com/pawlo884/nc/compare/v1.44.3...v1.44.4) (2026-09-04)
 
 ### Bug Fixes
