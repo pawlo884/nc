@@ -283,7 +283,7 @@ class ProductBulkUpdateView(ProductBulkView):
 
                     try:
                         # Znajdź istniejący produkt
-                        product = Product.objects.get(product_id=product_id)
+                        product = Product.objects.get(product_uid=product_id)
                         serializer = ProductSerializer(
                             product, data=product_data, partial=True)
 
@@ -407,7 +407,7 @@ class VariantBulkCreateView(AdminRequiredMixin, View):
                         continue
 
                     try:
-                        product = Product.objects.get(product_id=product_id)
+                        product = Product.objects.get(product_uid=product_id)
                         variant_data['product'] = product.id
                         serializer = ProductVariantSerializer(
                             data=variant_data)
@@ -826,7 +826,7 @@ class ImageBulkCreateView(AdminRequiredMixin, View):
                         continue
 
                     try:
-                        product = Product.objects.get(product_id=product_id)
+                        product = Product.objects.get(product_uid=product_id)
                         image_data['product'] = product.id
                         serializer = ProductImageSerializer(data=image_data)
 
@@ -971,7 +971,7 @@ def get_product_details(request, product_id):
     """
     try:
         product = Product.objects.select_related(
-            'brand', 'category').get(product_id=product_id)
+            'brand', 'category').get(product_uid=product_id)
 
         # Pobierz warianty
         variants = []
