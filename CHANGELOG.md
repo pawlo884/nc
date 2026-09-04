@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.4](https://github.com/pawlo884/nc/compare/v1.44.3...v1.44.4) (2026-09-04)
+
+### Bug Fixes
+
+* **matterhorn:** przerwij import ITEMS zamiast pętlić na trwałym 5xx ([a0d8a3a](https://github.com/pawlo884/nc/commit/a0d8a3a5720839370cd0786d0758d52b1379f20e))
+
 ## [1.44.3](https://github.com/pawlo884/nc/compare/v1.44.2...v1.44.3) (2026-09-03)
 
 ### Bug Fixes
