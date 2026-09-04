@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.7](https://github.com/pawlo884/nc/compare/v1.44.6...v1.44.7) (2026-09-04)
+
+### Performance Improvements
+
+* **matterhorn:** batchuj zapytania w _bulk_update_inventory (N+1) ([97f8b21](https://github.com/pawlo884/nc/commit/97f8b2100f5ab22abe78f04c6da6d9d0f05790c0)), references [#223](https://github.com/pawlo884/nc/issues/223)
+
 ## [1.44.6](https://github.com/pawlo884/nc/compare/v1.44.5...v1.44.6) (2026-09-04)
 
 ### Performance Improvements
