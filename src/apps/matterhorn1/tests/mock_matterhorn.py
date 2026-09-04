@@ -30,24 +30,32 @@ def _base_url() -> str:
     return getattr(settings, "MATTERHORN_API_URL", "https://matterhorn.pl").rstrip("/")
 
 
-def _paginated_callback(pages: list[list[dict]]):
+def _paginated_callback(pages: list[list[dict]], transient_errors: dict[int, list[int]] | None = None):
+    """`transient_errors` = {numer_strony: [status, status, ...]} — kolejne
+    trafienia w tę stronę zwracają te statusy (po wyczerpaniu: normalna treść).
+    Do symulacji chwilowego błędu API, po którym import się dogania."""
+    errors = {p: list(codes) for p, codes in (transient_errors or {}).items()}
+
     def _cb(request):
         try:
             page = int(request.params.get("page", "1"))
         except (TypeError, ValueError):
             page = 1
+        if errors.get(page):
+            return (errors[page].pop(0), {}, "")
         idx = page - 1  # API 1-indeksowane
         body = pages[idx] if 0 <= idx < len(pages) else []
         return (200, {"Content-Type": "application/json"}, json.dumps(body))
     return _cb
 
 
-def mock_items(rsps, pages: list[list[dict]]) -> None:
-    """`pages` = lista stron, każda to lista elementów ITEMS."""
+def mock_items(rsps, pages: list[list[dict]], transient_errors: dict[int, list[int]] | None = None) -> None:
+    """`pages` = lista stron, każda to lista elementów ITEMS.
+    `transient_errors` — patrz `_paginated_callback`."""
     rsps.add_callback(
         responses.GET,
         f"{_base_url()}{ITEMS_PATH}",
-        callback=_paginated_callback(pages),
+        callback=_paginated_callback(pages, transient_errors),
         content_type="application/json",
     )
 
