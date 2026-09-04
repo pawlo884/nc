@@ -75,6 +75,7 @@ def full_import_and_update(self, start_id=None, max_products=200000,
     total_imported = 0
     total_updated = 0
     iteration = 0
+    items_error = None  # ustawiane gdy _import_products_from_items zwróci błąd
 
     try:
         logger.info(
@@ -137,6 +138,7 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             elif items_result['status'] != 'success':
                 logger.error(
                     f"❌ Błąd importu ITEMS w iteracji {iteration}: {items_result.get('error')}")
+                items_error = items_result.get('error') or 'items import failed'
                 break
 
             logger.info(
@@ -188,6 +190,19 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                         total_imported)
             logger.info(
                 "📊 Łącznie zaktualizowano: %s produktów w INVENTORY", total_updated)
+
+        if items_error:
+            # import ITEMS padł na którejś stronie (5xx/sieć po wyczerpaniu prób).
+            # NIE oznaczamy jako 'completed' — current_page zostaje, kolejny tick
+            # Celery Beat wznowi od tej strony (patrz _get_last_items_page).
+            return {
+                'status': 'error',
+                'error': items_error,
+                'total_imported': total_imported,
+                'total_updated': total_updated,
+                'iterations': iteration,
+                'task_id': task_id_value,
+            }
 
         task_completed_successfully = True
 
@@ -289,6 +304,11 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         while imported_count < max_products:
             max_attempts = 10
             attempt = 1
+            # Czy tę stronę udało się pobrać+zapisać. Bez tego przy trwałym 5xx
+            # (page rośnie tylko po sukcesie) outer while pętli w nieskończoność
+            # na martwej stronie aż do soft-timeoutu Celery.
+            page_succeeded = False
+            end_of_data = False
 
             while attempt <= max_attempts:
                 try:
@@ -374,6 +394,7 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                                         imported_count += 1
 
                             page += 1
+                            page_succeeded = True
                             # Aktualizuj current_page w bazie danych
                             if not dry_run:
                                 _update_items_import_status(
@@ -397,6 +418,7 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
 
                     elif response.status_code == 404:
                         logger.info("📊 Strona nie istnieje - koniec danych")
+                        end_of_data = True
                         break
                     else:
                         logger.warning(f"⚠️ Błąd API {response.status_code}")
@@ -430,9 +452,26 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                             "❌ Osiągnięto maksymalną liczbę prób połączenia")
                         break
 
-            # Jeśli osiągnięto maksymalną liczbę prób, przerwij główną pętlę
-            if attempt > max_attempts:
-                break
+            # Po pętli retry: strona albo się udała (page += 1, lecimy dalej),
+            # albo API zwróciło 404 = koniec danych, albo wyczerpaliśmy próby na
+            # błędzie sieci/5xx/JSON. `page` rośnie TYLKO po sukcesie, więc bez
+            # tego rozgałęzienia outer while pętliłby w kółko na tej samej stronie.
+            if page_succeeded:
+                continue  # następna strona
+            if end_of_data:
+                return {
+                    'status': 'completed',
+                    'imported_count': imported_count,
+                    'reason': 'page_404',
+                }
+            logger.error(
+                f"❌ Strona {page} nieosiągalna po {max_attempts} próbach - przerywam import "
+                f"(current_page={page} zachowany do wznowienia)")
+            return {
+                'status': 'error',
+                'imported_count': imported_count,
+                'error': f'Strona {page} nieosiągalna po {max_attempts} próbach (błąd API/sieci)',
+            }
 
         # Zaktualizuj status importu na 'success' po zakończeniu
         if not dry_run:
