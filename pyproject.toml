@@ -16,3 +16,25 @@ markers = [
   "integration: test z DB lub wieloma komponentami",
   "e2e: pełny przepływ (np. pipeline importu z zamockowanym HTTP)",
 ]
+
+[tool.coverage.run]
+branch = false
+omit = [
+  "*/tests/*",
+  "*/tests.py",
+  "*/tests_*.py",
+  "*/migrations/*",
+  "*/management/commands/*",
+  "*_example.py",
+  "*_examples.py",
+  "*/database_utils.py",           # martwy kod (zero zewnętrznych importów)
+  "*/saga_example.py",
+]
+
+[tool.coverage.report]
+exclude_also = [
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+]
+
