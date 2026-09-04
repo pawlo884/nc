@@ -1,10 +1,9 @@
-# DEPRECATED: produkcja działa teraz na k3s (deployments/k8s/nc-prod), nie na
-# blue-green przez docker-compose. Plik zostawiony do wglądu/awaryjnego
-# rollbacku, ale nie jest już częścią aktywnego procesu wdrożenia.
+# Nakladka na docker-compose.services.yml (dawniej docker-compose.blue-green.yml)
+# dodajaca ML workera do wspoldzielonych uslug Dockera. Nieuzywana jeszcze na
+# produkcji (celery-ml nie jest odpalony) — patrz docs/ML_CONTAINER_TODO.md.
 #
-# docker-compose.blue-green.ml.yml - ML worker dla BLUE-GREEN (PROD)
 # Uruchamianie:
-#   docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml up -d celery-ml
+#   docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml up -d celery-ml
 services:
   celery-ml:
     image: ${DOCKERHUB_USERNAME:-pawlo884}/django-app-ml:latest

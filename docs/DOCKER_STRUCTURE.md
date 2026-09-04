@@ -1,6 +1,6 @@
 # 🐳 Struktura plików Docker
 
-> ⚠️ **DEPRECATED (część blue-green)**: opisy plików `docker-compose.blue-green*.yml` dotyczą nieaktywnego mechanizmu produkcyjnego — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`).
+> ⚠️ **DEPRECATED (część blue-green)**: opisy plików `docker-compose.services*.yml` dotyczą nieaktywnego mechanizmu produkcyjnego — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`).
 
 ## 📁 Uporządkowana struktura
 
@@ -11,7 +11,7 @@ nc_project/
 ├── Dockerfile.dev              # Development - Python 3.12 + Django
 ├── Dockerfile.prod             # Production - zoptymalizowany dla CI/CD
 ├── docker-compose.dev.yml      # Local development (localhost)
-├── docker-compose.blue-green.yml  # Production (blue-green)
+├── docker-compose.services.yml  # Production (blue-green)
 └── requirements.txt            # Wspólne dependencje (bez PyTorch)
 ```
 
@@ -67,7 +67,7 @@ DJANGO_SETTINGS_MODULE=nc.settings.dev
   - BuildKit cache (szybki rebuild w CI/CD)
   - Collectstatic w czasie buildu
 
-- **docker-compose.blue-green.yml** - orkiestracja prod (blue-green)
+- **docker-compose.services.yml** - orkiestracja prod (blue-green)
   - Bazy danych bez prefiksu `zzz_`
   - Redis z hasłem `prod_password`
   - Flower z basic auth
@@ -111,7 +111,7 @@ jobs:
           
       # 2. Deploy (blue-green)
       - name: Deploy
-        run: ./scripts/deploy/deploy-blue-green.sh deploy  # ← Używa docker-compose.blue-green.yml
+        run: ./scripts/deploy/deploy-blue-green.sh deploy  # ← Używa docker-compose.services.yml
 ```
 
 ### Czasy buildów:
@@ -128,7 +128,7 @@ jobs:
 | Aspekt | Development | Production |
 |--------|-------------|------------|
 | **Dockerfile** | `Dockerfile.dev` | `Dockerfile.prod` |
-| **Compose** | `docker-compose.dev.yml` | `docker-compose.blue-green.yml` |
+| **Compose** | `docker-compose.dev.yml` | `docker-compose.services.yml` |
 | **Build** | Lokalnie | GitHub Actions |
 | **Image source** | Build local | Build na serwerze (blue-green) |
 | **Bazy danych** | Prefiks `zzz_*` | Bez prefiksu |
@@ -177,7 +177,7 @@ grep "dockerfile:" docker-compose.dev.yml
 # Powinno: dockerfile: Dockerfile.dev
 
 # Prod
-grep "image:" docker-compose.blue-green.yml
+grep "image:" docker-compose.services.yml
 # Powinno: image: nc-django-app:latest (build na serwerze)
 ```
 
@@ -235,9 +235,9 @@ Jeśli migrujesz ze starej struktury:
 
 - [x] ~~Dockerfile~~ → **Dockerfile.dev** + **Dockerfile.prod**
 - [x] ~~Dockerfile.simple~~ → Usunięty
-- [x] ~~docker-compose.yml~~ → **docker-compose.dev.yml** + **docker-compose.blue-green.yml**
+- [x] ~~docker-compose.yml~~ → **docker-compose.dev.yml** + **docker-compose.services.yml**
 - [x] GitHub Actions używa **Dockerfile.prod**
-- [x] Deploy używa **docker-compose.blue-green.yml**
+- [x] Deploy używa **docker-compose.services.yml**
 - [x] Dokumentacja zaktualizowana
 
 ---

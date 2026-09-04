@@ -54,7 +54,7 @@ W każdym momencie **tylko jedno** środowisko obsługuje ruch produkcyjny.
 - `celery-*` - workery (jedna instancja)
 - `flower` - monitoring
 
-**Wszystko w jednym stacku oprócz postgresów:** Redis, web-blue, web-green, nginx-router, celery, flower są w jednym stacku (ten plik). **Postgres** jest w osobnym stacku – w compose ma `profiles: ["shared"]`, więc przy zwykłym `up` nie jest uruchamiany. Skrypt deploy wymaga, żeby `nc-postgres-1` (i `nc-redis-1`) już działały; redis można uruchomić z tego pliku (`up -d redis`). Postgres tylko z profile: `docker-compose -f docker-compose.blue-green.yml --profile shared up -d postgres`.
+**Wszystko w jednym stacku oprócz postgresów:** Redis, web-blue, web-green, nginx-router, celery, flower są w jednym stacku (ten plik). **Postgres** jest w osobnym stacku – w compose ma `profiles: ["shared"]`, więc przy zwykłym `up` nie jest uruchamiany. Skrypt deploy wymaga, żeby `nc-postgres-1` (i `nc-redis-1`) już działały; redis można uruchomić z tego pliku (`up -d redis`). Postgres tylko z profile: `docker-compose -f docker-compose.services.yml --profile shared up -d postgres`.
 
 **Jeśli Redis był w stacku „nc”:** zatrzymaj redis w stacku nc (np. wyłącz tylko redis w tym stacku), potem uruchom główny stack – redis wystartuje w tym samym stacku co web/celery/nginx. Dane Redis (volume) pozostają; kontener `nc-redis-1` będzie w głównym stacku.
 
@@ -66,7 +66,7 @@ W każdym momencie **tylko jedno** środowisko obsługuje ruch produkcyjny.
 ### 1. Skopiuj pliki
 
 Masz już:
-- ✅ `docker-compose.blue-green.yml` - konfiguracja Docker
+- ✅ `docker-compose.services.yml` - konfiguracja Docker
 - ✅ `nginx-blue-green.conf` - konfiguracja NGINX
 - ✅ `scripts/deploy/deploy-blue-green.sh` - skrypt deployment
 
@@ -80,7 +80,7 @@ mkdir -p /mnt/data2tb/docker/volumes/nc_nginx_state
 
 ```bash
 # Uruchom oba środowiska pierwszy raz
-docker-compose -f docker-compose.blue-green.yml up -d
+docker-compose -f docker-compose.services.yml up -d
 
 # Sprawdź status
 ./scripts/deploy/deploy-blue-green.sh status
@@ -290,12 +290,12 @@ Rollback z green na blue...
 1. **Po deploy zatrzymaj stary** (domyślne):
    ```bash
    # W scripts/deploy/deploy-blue-green.sh już jest:
-   docker-compose -f docker-compose.blue-green.yml stop web-${ACTIVE}
+   docker-compose -f docker-compose.services.yml stop web-${ACTIVE}
    ```
 
 2. **Zmniejsz resources dla standby**:
    ```yaml
-   # W docker-compose.blue-green.yml
+   # W docker-compose.services.yml
    web-green:
      deploy:
        resources:
@@ -389,7 +389,7 @@ docker exec nc-nginx-router nginx -s reload
 
 ```bash
 # Uruchom oba
-docker-compose -f docker-compose.blue-green.yml up -d web-blue web-green
+docker-compose -f docker-compose.services.yml up -d web-blue web-green
 
 # Sprawdź który działa
 ./scripts/deploy/deploy-blue-green.sh status
@@ -411,7 +411,7 @@ docker exec nc-postgres-1 pg_dumpall -U postgres > backup_before_bluegreen.sql
 # (w repo usunęliśmy docker-compose.prod.yml, bo prod działa tylko blue-green)
 
 # Uruchom blue-green
-docker-compose -f docker-compose.blue-green.yml up -d
+docker-compose -f docker-compose.services.yml up -d
 
 # Sprawdź status
 ./scripts/deploy/deploy-blue-green.sh status
@@ -434,7 +434,7 @@ curl http://VPS_IP:5555/
 
 ```yaml
 # W .github/workflows/deploy-vps.yml
-# Używaj docker-compose.blue-green.yml (prod działa tylko blue-green)
+# Używaj docker-compose.services.yml (prod działa tylko blue-green)
 # Zmień komendy deploy na ./scripts/deploy/deploy-blue-green.sh deploy
 ```
 

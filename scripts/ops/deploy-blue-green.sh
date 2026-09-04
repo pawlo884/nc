@@ -8,7 +8,7 @@
 set -e
 
 APP_DIR="/home/pawel/apps/nc"
-COMPOSE_FILE="$APP_DIR/docker-compose/docker-compose.blue-green.yml"
+COMPOSE_FILE="$APP_DIR/docker-compose/docker-compose.services.yml"
 SWITCH_SCRIPT="$APP_DIR/switch-blue-green.sh"
 
 # Określ aktualnie aktywny kolor

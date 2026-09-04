@@ -25,8 +25,8 @@ echo "=========================================="
 echo ""
 
 # Sprawdź czy plik istnieje
-if [ ! -f "docker-compose/docker-compose.blue-green.yml" ]; then
-    log_error "Nie znaleziono docker-compose/docker-compose.blue-green.yml"
+if [ ! -f "docker-compose/docker-compose.services.yml" ]; then
+    log_error "Nie znaleziono docker-compose/docker-compose.services.yml"
     exit 1
 fi
 
@@ -43,7 +43,7 @@ WEB_GREEN_EXISTS=$(docker ps -a --format '{{.Names}}' | grep -c "nc-web-green\|w
 
 if [ "$WEB_BLUE_EXISTS" -eq "0" ] || [ "$WEB_GREEN_EXISTS" -eq "0" ]; then
     log_info "Uruchamianie kontenerów web-blue i web-green..."
-    docker-compose -f docker-compose/docker-compose.blue-green.yml up -d web-blue web-green
+    docker-compose -f docker-compose/docker-compose.services.yml up -d web-blue web-green
     
     log_info "Czekam 15 sekund na start kontenerów..."
     sleep 15
@@ -53,7 +53,7 @@ if [ "$WEB_BLUE_EXISTS" -eq "0" ] || [ "$WEB_GREEN_EXISTS" -eq "0" ]; then
         log_success "web-blue uruchomiony"
     else
         log_error "web-blue nie uruchomił się!"
-        docker-compose -f docker-compose/docker-compose.blue-green.yml logs web-blue --tail 50
+        docker-compose -f docker-compose/docker-compose.services.yml logs web-blue --tail 50
         exit 1
     fi
     
@@ -61,7 +61,7 @@ if [ "$WEB_BLUE_EXISTS" -eq "0" ] || [ "$WEB_GREEN_EXISTS" -eq "0" ]; then
         log_success "web-green uruchomiony"
     else
         log_error "web-green nie uruchomił się!"
-        docker-compose -f docker-compose/docker-compose.blue-green.yml logs web-green --tail 50
+        docker-compose -f docker-compose/docker-compose.services.yml logs web-green --tail 50
         exit 1
     fi
 else
@@ -70,12 +70,12 @@ else
     # Sprawdź czy działają
     if ! docker ps --format '{{.Names}}' | grep -q "nc-web-blue\|web-blue"; then
         log_info "Restartowanie web-blue..."
-        docker-compose -f docker-compose/docker-compose.blue-green.yml restart web-blue
+        docker-compose -f docker-compose/docker-compose.services.yml restart web-blue
     fi
     
     if ! docker ps --format '{{.Names}}' | grep -q "nc-web-green\|web-green"; then
         log_info "Restartowanie web-green..."
-        docker-compose -f docker-compose/docker-compose.blue-green.yml restart web-green
+        docker-compose -f docker-compose/docker-compose.services.yml restart web-green
     fi
 fi
 
@@ -87,10 +87,10 @@ log_info "Sprawdzanie nginx-router..."
 if docker ps --format '{{.Names}}' | grep -q "nc-nginx-router\|nginx-router"; then
     log_success "nginx-router już działa"
     log_info "Restartowanie nginx-router z nową konfiguracją..."
-    docker-compose -f docker-compose/docker-compose.blue-green.yml restart nginx-router
+    docker-compose -f docker-compose/docker-compose.services.yml restart nginx-router
 else
     log_info "Uruchamiam nginx-router..."
-    docker-compose -f docker-compose/docker-compose.blue-green.yml up -d nginx-router
+    docker-compose -f docker-compose/docker-compose.services.yml up -d nginx-router
 fi
 
 echo ""
@@ -121,7 +121,7 @@ if docker ps --format '{{.Names}}' | grep -q "nc-nginx-router\|nginx-router"; th
     fi
 else
     log_error "nginx-router nie uruchomił się!"
-    docker-compose -f docker-compose/docker-compose.blue-green.yml logs nginx-router --tail 50
+    docker-compose -f docker-compose/docker-compose.services.yml logs nginx-router --tail 50
     exit 1
 fi
 
@@ -131,7 +131,7 @@ echo "✅ Wdrożenie zakończone"
 echo "=========================================="
 echo ""
 log_info "Status kontenerów:"
-docker-compose -f docker-compose/docker-compose.blue-green.yml ps
+docker-compose -f docker-compose/docker-compose.services.yml ps
 echo ""
 log_info "Testy:"
 echo "  - Health check: curl http://localhost:8001/nginx-health"

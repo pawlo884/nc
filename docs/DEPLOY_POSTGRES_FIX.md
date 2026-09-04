@@ -6,8 +6,8 @@
 
 ```bash
 # STARE (NIEBEZPIECZNE):
-docker-compose -f docker-compose.blue-green.yml build --no-cache
-docker-compose -f docker-compose.blue-green.yml up -d --force-recreate  # ❌ ODTWARZA WSZYSTKO!
+docker-compose -f docker-compose.services.yml build --no-cache
+docker-compose -f docker-compose.services.yml up -d --force-recreate  # ❌ ODTWARZA WSZYSTKO!
 ```
 
 **`--force-recreate`** odtwarzał **WSZYSTKIE** kontenery, włączając:
@@ -22,13 +22,13 @@ docker-compose -f docker-compose.blue-green.yml up -d --force-recreate  # ❌ OD
 # NOWE (BEZPIECZNE):
 
 # 1. Zatrzymaj tylko kontenery aplikacji
-docker-compose -f docker-compose.blue-green.yml stop web-blue web-green celery-default celery-import celery-beat flower nginx-router
+docker-compose -f docker-compose.services.yml stop web-blue web-green celery-default celery-import celery-beat flower nginx-router
 
 # 2. Rebuild tylko aplikacji
-docker-compose -f docker-compose.blue-green.yml build --no-cache web-blue web-green celery-default celery-import celery-beat flower
+docker-compose -f docker-compose.services.yml build --no-cache web-blue web-green celery-default celery-import celery-beat flower
 
 # 3. Uruchom wszystko (postgres i redis pozostają NIETKNIĘTE)
-docker-compose -f docker-compose.blue-green.yml up -d
+docker-compose -f docker-compose.services.yml up -d
 ```
 
 ## Co się zmienia podczas deploy
@@ -155,7 +155,7 @@ Starting nc-web-1 ... done
 
 ### 1. Exclude postgres i redis z rebuild
 
-W `docker-compose.blue-green.yml` kontenery chronione mają label `nc.protected=true` (PostgreSQL/Redis).
+W `docker-compose.services.yml` kontenery chronione mają label `nc.protected=true` (PostgreSQL/Redis).
 
 ```yaml
 postgres:

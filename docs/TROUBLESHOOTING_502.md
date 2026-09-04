@@ -59,7 +59,7 @@ Jeśli nadal 502, spróbuj:
 
 Jeśli rozwiązywanie nazwy `nc-nginx-router` z kontenera NPM nie działa, możesz kierować ruch na port wystawiony na hoście.
 
-W `docker-compose.blue-green.yml` dla serwisu `nginx-router` dodaj (albo odkomentuj):
+W `docker-compose.services.yml` dla serwisu `nginx-router` dodaj (albo odkomentuj):
 
 ```yaml
 ports:
@@ -69,7 +69,7 @@ ports:
 Potem:
 
 ```bash
-docker-compose -f docker-compose/docker-compose.blue-green.yml up -d nginx-router
+docker-compose -f docker-compose/docker-compose.services.yml up -d nginx-router
 ```
 
 W NPM ustaw:

@@ -1,6 +1,6 @@
 # Produkcja na k3s (zamiast blue-green)
 
-Migracja z `docker-compose.blue-green.yml` + `nginx-router` na **k3s + Traefik + 3 repliki + RollingUpdate**.
+Migracja z `docker-compose.services.yml` + `nginx-router` na **k3s + Traefik + 3 repliki + RollingUpdate**.
 
 ## Co sie zmienia
 

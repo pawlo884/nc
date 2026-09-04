@@ -197,7 +197,7 @@ switch_nginx() {
     # 7. Restart NGINX (nie reload, bo reload może używać starego DNS cache)
     # Plik jest mountowany jako volume, więc zmiany są automatycznie widoczne
     log_info "🔄 Restartowanie nginx-router aby załadować nową konfigurację..."
-    docker-compose -f docker-compose/docker-compose.blue-green.yml restart nginx-router
+    docker-compose -f docker-compose/docker-compose.services.yml restart nginx-router
     
     # Poczekaj na start nginx
     log_info "⏳ Czekam 5 sekund na start nginx..."
@@ -211,7 +211,7 @@ switch_nginx() {
         # Rollback
         mv deployments/nginx/nginx-blue-green.conf.backup deployments/nginx/nginx-blue-green.conf
         log_error "❌ Przywracanie poprzedniej konfiguracji..."
-        docker-compose -f docker-compose/docker-compose.blue-green.yml restart nginx-router
+        docker-compose -f docker-compose/docker-compose.services.yml restart nginx-router
         sleep 3
         return 1
     fi
@@ -267,18 +267,18 @@ deploy() {
         fi
         if ! docker ps --format '{{.Names}}' | grep -q "^nc-redis-1$"; then
             log_info "Uruchamianie Redis w stacku docker-compose..."
-            docker-compose -f docker-compose/docker-compose.blue-green.yml up -d redis
+            docker-compose -f docker-compose/docker-compose.services.yml up -d redis
             sleep 5
         fi
         
         # 2. web-blue, web-green z --no-deps (nie ciągniemy postgres)
         log_info "Uruchamianie web-blue i web-green (--no-deps)..."
-        if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps web-blue web-green 2>/dev/null; then
+        if ! docker-compose -f docker-compose/docker-compose.services.yml up -d --no-deps web-blue web-green 2>/dev/null; then
             log_warning "⚠️ Nie uruchomiono obu web - próbuję tylko nginx-router..."
         fi
         
         # 3. nginx-router z --no-deps
-        if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps nginx-router; then
+        if ! docker-compose -f docker-compose/docker-compose.services.yml up -d --no-deps nginx-router; then
             log_error "❌ Nie udało się uruchomić NGINX router"
             exit 1
         fi
@@ -317,7 +317,7 @@ deploy() {
     POSTGRES_STARTED_BEFORE=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
     
     # ✅ Bezpieczne - buduje web-${TARGET} i kontenery Celery (używają tego samego obrazu), nie dotyka nietykalnych kontenerów
-    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml build --no-cache web-${TARGET} celery-default celery-import celery-beat flower; then
+    if ! docker-compose -f docker-compose/docker-compose.services.yml build --no-cache web-${TARGET} celery-default celery-import celery-beat flower; then
         log_error "❌ Nie udało się zbudować obrazu"
         exit 1
     fi
@@ -334,7 +334,7 @@ deploy() {
     # 3.5. Restart kontenerów Celery z nowym obrazem
     log_info "🔄 Restartowanie kontenerów Celery z nowym obrazem..."
     # ✅ Bezpieczne - restartuje tylko kontenery Celery, nie dotyka nietykalnych kontenerów
-    docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --force-recreate --no-deps celery-default celery-import celery-beat flower 2>/dev/null || {
+    docker-compose -f docker-compose/docker-compose.services.yml up -d --force-recreate --no-deps celery-default celery-import celery-beat flower 2>/dev/null || {
         log_warning "⚠️ Nie udało się zrestartować kontenerów Celery, kontynuuję..."
     }
     log_success "✅ Kontenery Celery zrestartowane"
@@ -342,7 +342,7 @@ deploy() {
     # 4. Zatrzymaj i usuń stary kontener target (jeśli istnieje)
     log_info "🛑 Zatrzymywanie i usuwanie starego kontenera ${TARGET}..."
     # ✅ Bezpieczne - dotyka tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
-    docker-compose -f docker-compose/docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || true
+    docker-compose -f docker-compose/docker-compose.services.yml stop web-${TARGET} 2>/dev/null || true
     docker rm -f nc-web-${TARGET} 2>/dev/null || true
     
     # 5. Uruchom nowy kontener
@@ -350,7 +350,7 @@ deploy() {
     # ✅ Bezpieczne - uruchamia tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
     # --no-deps: Nie tworzy zależności (postgres, redis) - są nietykalne i już działają
     # --force-recreate: Wymusza odtworzenie kontenera (w razie gdyby poprzedni nie został usunięty)
-    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps --force-recreate web-${TARGET}; then
+    if ! docker-compose -f docker-compose/docker-compose.services.yml up -d --no-deps --force-recreate web-${TARGET}; then
         log_error "❌ Nie udało się uruchomić kontenera ${TARGET}"
         exit 1
     fi
@@ -363,7 +363,7 @@ deploy() {
         log_error "❌ Deployment failed - health check nie przeszedł"
         log_warning "🔙 Rollback: ${TARGET} nie zostanie aktywowany"
         # ✅ Bezpieczne - zatrzymuje tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
-        docker-compose -f docker-compose/docker-compose.blue-green.yml stop web-${TARGET} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${TARGET}"
+        docker-compose -f docker-compose/docker-compose.services.yml stop web-${TARGET} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${TARGET}"
         exit 1
     fi
     
@@ -389,7 +389,7 @@ deploy() {
     
     log_info "🛑 Zatrzymywanie starego środowiska ${ACTIVE}..."
     # ✅ Bezpieczne - zatrzymuje tylko web-${ACTIVE}, nie dotyka nietykalnych kontenerów
-    docker-compose -f docker-compose/docker-compose.blue-green.yml stop web-${ACTIVE} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${ACTIVE}"
+    docker-compose -f docker-compose/docker-compose.services.yml stop web-${ACTIVE} 2>/dev/null || log_warning "⚠️ Nie można zatrzymać kontenera ${ACTIVE}"
     
     # 10. Finalna weryfikacja - sprawdź czy PostgreSQL nie został odtworzony
     POSTGRES_STARTED_AFTER_DEPLOY=$(docker inspect nc-postgres-1 --format='{{.State.StartedAt}}' 2>/dev/null || echo "")
@@ -437,7 +437,7 @@ rollback() {
     # Uruchom stary environment
     # ✅ Bezpieczne - uruchamia tylko web-${TARGET}, nie dotyka nietykalnych kontenerów
     # --no-deps: Nie tworzy zależności (postgres, redis) - są nietykalne i już działają
-    if ! docker-compose -f docker-compose/docker-compose.blue-green.yml up -d --no-deps web-${TARGET}; then
+    if ! docker-compose -f docker-compose/docker-compose.services.yml up -d --no-deps web-${TARGET}; then
         log_error "❌ Nie udało się uruchomić kontenera ${TARGET} podczas rollback"
         exit 1
     fi

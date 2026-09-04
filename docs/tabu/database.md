@@ -41,7 +41,7 @@ W `.env.prod` muszą być ustawione: `TABU_DB_HOST`, `TABU_DB_PORT`, `TABU_DB_NA
 
 **Składnia pliku dla Dockera (`env_file`):** linie muszą mieć postać `NAZWA=wartość` **bez spacji wokół `=`**. Błędna linia (np. `KEY = "x"`) może spowodować **odrzucenie całego pliku** albo brak zmiennych **od tej linii w dół** — wtedy w kontenerze nie ma `TABU_API_KEY`, mimo że „jest w pliku” niżej. To samo dotyczy innych kluczy w tym samym `.env.prod` (np. `MATTERHORN_API_KEY`).
 
-W `docker-compose/docker-compose.blue-green.yml` dla **web-blue**, **web-green** i **celery-default** są domyślne wartości interpolacji (`TABU_DB_HOST` itd.) — po `docker compose ... up -d` kontener dostanie poprawny host TCP nawet gdy wcześniej `HOST` był pusty. **Hasło** nadal musi pochodzić z `env_file` (`.env.prod`).
+W `docker-compose/docker-compose.services.yml` dla **web-blue**, **web-green** i **celery-default** są domyślne wartości interpolacji (`TABU_DB_HOST` itd.) — po `docker compose ... up -d` kontener dostanie poprawny host TCP nawet gdy wcześniej `HOST` był pusty. **Hasło** nadal musi pochodzić z `env_file` (`.env.prod`).
 
 **`TABU_API_KEY`:** ten sam plik `.env.prod` jest montowany do **`/app/.env.prod`** w kontenerach web/celery/flower. Komendy Tabu przy starcie wywołują `load_dotenv` na tym pliku (python-dotenv), żeby wczytać klucz nawet wtedy, gdy Docker `env_file` pominął część zmiennych z powodu wcześniejszej błędnej linii w pliku.
 

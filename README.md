@@ -1,6 +1,6 @@
 # NC (nc_project)
 
-Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa na k3s** (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`). Tryb blue‑green (`docker-compose.blue-green.yml`) jest **DEPRECATED** — zachowany tylko do wglądu/awaryjnego rollbacku.
+Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa na k3s** (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`). Tryb blue‑green (`docker-compose.services.yml`) jest **DEPRECATED** — zachowany tylko do wglądu/awaryjnego rollbacku.
 
 ## Wymagania
 - **Docker + Docker Compose** (w praktyce: Docker Desktop na Windows).
@@ -111,7 +111,7 @@ export ENVIRONMENT=prod
 
 ### ML worker na produkcji (blue/green, DEPRECATED)
 ```bash
-docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml up -d celery-ml
+docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml up -d celery-ml
 ```
 
 ## Dokumentacja

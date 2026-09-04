@@ -1,6 +1,14 @@
-# DEPRECATED: produkcja działa teraz na k3s (deployments/k8s/nc-prod), nie na
-# blue-green przez docker-compose. Plik zostawiony do wglądu/awaryjnego
-# rollbacku, ale nie jest już częścią aktywnego procesu wdrożenia.
+# Byly plik "blue-green" (docker-compose.blue-green.yml) — nazwa myląca,
+# bo web-blue/web-green/nginx-router ponizej NIE dzialaja na produkcji od
+# migracji na k3s (deployments/k8s/nc-prod, patrz docs/K8S_PROD.md) i sluza
+# tylko do wgladu/awaryjnego rollbacku.
+#
+# Realnie AKTYWNA czesc tego pliku to wspoldzielone uslugi tla, ktore NIE
+# zostaly przeniesione na k3s i nadal dzialaja z tego pliku na produkcji:
+# postgres (profil "shared"), redis, celery-default, celery-import,
+# celery-beat, flower. Patrz deployments/k8s/nc-prod/celery.yaml — manifest
+# do docelowej migracji Celery na k3s istnieje, ale nie zostal jeszcze
+# zaaplikowany (wymaga poprawki REDIS_HOST, patrz commit historii).
 version: '3.8'
 
 services:
@@ -303,6 +311,7 @@ services:
       - sleep 20 && celery -A core.celery beat --loglevel=info
     volumes:
       - ../src:/app
+      - ../.env.${ENVIRONMENT:-prod}:/app/.env.prod:ro
     env_file:
       - ../.env.${ENVIRONMENT:-prod}
     environment:

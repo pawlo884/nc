@@ -36,8 +36,8 @@ log_error() {
 }
 
 # Sprawdź czy jesteśmy w odpowiednim katalogu
-if [ ! -f "docker-compose.blue-green.yml" ]; then
-    log_error "❌ Nie znaleziono docker-compose.blue-green.yml"
+if [ ! -f "docker-compose.services.yml" ]; then
+    log_error "❌ Nie znaleziono docker-compose.services.yml"
     log_info "Uruchom skrypt z katalogu głównego projektu"
     exit 1
 fi

@@ -85,7 +85,7 @@ na `:5173`.
 
 - **Prod = k3s na VPS.** `Release` workflow (semantic-release) tworzy tag `v*` → `deploy-vps.yml` → `scripts/k8s-prod/deploy.sh`. `collectstatic --clear` wypalany w `Dockerfile.prod` na etapie build. Manifesty: `web`, `celery`, `flower`, `redis`, `ingress`, `migrate-job`.
 - **Dev:** `docker-compose/docker-compose.dev.yml` — `web`, `nginx` (:8090), `celery-default`, `celery-import`, `celery-beat`, `flower`, `redis`, `postgres-ssh-tunnel` (baza dev zdalna, przez tunel SSH), `static-init`. `src/` bind-mount = hot reload; statyki wypalone przy starcie (nowy plik statyczny wymaga ręcznego `collectstatic`).
-- **blue-green** (`docker-compose.blue-green*.yml`, `scripts/deploy/`) — **DEPRECATED**, tylko awaryjny rollback.
+- **`docker-compose.services.yml`** (dawniej `docker-compose.blue-green.yml`) — `web-blue`/`web-green`/`nginx-router` i skrypty `scripts/deploy/` są **DEPRECATED** (tylko awaryjny rollback, produkcja web działa na k3s). Reszta pliku jest **aktywna**: `postgres` (profil `shared`), `redis`, `celery-default`, `celery-import`, `celery-beat`, `flower` nadal realnie działają z tego pliku na Dockerze — nie zostały jeszcze przeniesione na k3s, mimo że gotowe manifesty (`deployments/k8s/nc-prod/celery.yaml`, `flower.yaml`) już tam leżą.
 
 ## 10. Testy
 

@@ -9,7 +9,7 @@
 docker-compose -f docker-compose.dev.yml [command]
 
 # 🚀 PRODUCTION (blue-green)
-docker-compose -f docker-compose.blue-green.yml [command]
+docker-compose -f docker-compose.services.yml [command]
 ```
 
 ---
@@ -98,17 +98,17 @@ git pull origin main
 ./scripts/deploy/deploy-blue-green.sh deploy
 
 # Sprawdź status
-docker-compose -f docker-compose.blue-green.yml ps
+docker-compose -f docker-compose.services.yml ps
 
 # Logi
-docker-compose -f docker-compose.blue-green.yml logs -f web-blue
-docker-compose -f docker-compose.blue-green.yml logs -f web-green
+docker-compose -f docker-compose.services.yml logs -f web-blue
+docker-compose -f docker-compose.services.yml logs -f web-green
 ```
 
 ### Monitoring produkcji
 ```bash
 # Status wszystkich kontenerów
-docker-compose -f docker-compose.blue-green.yml ps
+docker-compose -f docker-compose.services.yml ps
 
 # Użycie zasobów
 docker stats
@@ -118,7 +118,7 @@ docker logs nc-web-blue --tail 100
 docker logs nc-web-green --tail 100
 
 # Logi na żywo (kilka serwisów)
-docker-compose -f docker-compose.blue-green.yml logs -f celery-import celery-default
+docker-compose -f docker-compose.services.yml logs -f celery-import celery-default
 ```
 
 ### Rollback (awaria)
@@ -137,7 +137,7 @@ docker-compose -f docker-compose.blue-green.yml logs -f celery-import celery-def
 ls -la | grep -E "Dockerfile.dev|docker-compose.dev.yml"
 
 # Prod
-ls -la | grep -E "Dockerfile.prod|docker-compose.blue-green.yml|nginx-blue-green.conf"
+ls -la | grep -E "Dockerfile.prod|docker-compose.services.yml|nginx-blue-green.conf"
 ```
 
 ### Sprawdź settings Django
@@ -187,9 +187,9 @@ docker system prune -a --volumes
 |-------|-------------|------------|
 | **Build** | `docker-compose -f docker-compose.dev.yml build` | GitHub Actions |
 | **Start** | `docker-compose -f docker-compose.dev.yml up -d` | `./scripts/deploy/deploy-blue-green.sh deploy` |
-| **Logs** | `docker-compose -f docker-compose.dev.yml logs -f` | `docker-compose -f docker-compose.blue-green.yml logs -f` |
+| **Logs** | `docker-compose -f docker-compose.dev.yml logs -f` | `docker-compose -f docker-compose.services.yml logs -f` |
 | **Shell** | `docker-compose -f docker-compose.dev.yml exec web bash` | `docker exec -it nc-web-blue bash` |
-| **Stop** | `docker-compose -f docker-compose.dev.yml down` | `docker-compose -f docker-compose.blue-green.yml stop web-blue web-green nginx-router celery-default celery-import celery-beat flower` |
+| **Stop** | `docker-compose -f docker-compose.dev.yml down` | `docker-compose -f docker-compose.services.yml stop web-blue web-green nginx-router celery-default celery-import celery-beat flower` |
 
 ---
 
@@ -204,8 +204,8 @@ alias dc-dev-logs='docker-compose -f docker-compose.dev.yml logs -f'
 alias dc-dev-shell='docker-compose -f docker-compose.dev.yml exec web bash'
 
 # Production
-alias dc-prod='docker-compose -f docker-compose.blue-green.yml'
-alias dc-prod-logs='docker-compose -f docker-compose.blue-green.yml logs -f'
+alias dc-prod='docker-compose -f docker-compose.services.yml'
+alias dc-prod-logs='docker-compose -f docker-compose.services.yml logs -f'
 ```
 
 Użycie:

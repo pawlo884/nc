@@ -1,6 +1,6 @@
 # 🤖 ML Container - Dokumentacja
 
-> ⚠️ **DEPRECATED (część blue-green)**: fragmenty o deployu ML workera przez `docker-compose.blue-green.ml.yml` opisują nieaktywny mechanizm — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`).
+> ⚠️ **DEPRECATED (część blue-green)**: fragmenty o deployu ML workera przez `docker-compose.services.ml.yml` opisują nieaktywny mechanizm — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`).
 
 ## 📋 Cel i uzasadnienie
 
@@ -29,8 +29,8 @@ nc_project/
 ├── requirements.ml.txt         # ML zależności (PyTorch, sentence-transformers)
 ├── docker-compose.dev.yml      # Dev - standardowe serwisy
 ├── docker-compose.dev.ml.yml   # Dev - ML serwis (opcjonalny)
-├── docker-compose.blue-green.yml     # Prod - blue-green
-├── docker-compose.blue-green.ml.yml  # Prod - ML worker (opcjonalny)
+├── docker-compose.services.yml     # Prod - blue-green
+├── docker-compose.services.ml.yml  # Prod - ML worker (opcjonalny)
 └── .github/workflows/deploy.yml # CI/CD z warunkowym buildem ML
 ```
 
@@ -57,7 +57,7 @@ scikit-learn==1.5.2
 numpy==2.2.0
 ```
 
-### 3. `docker-compose.blue-green.ml.yml` i `docker-compose.dev.ml.yml`
+### 3. `docker-compose.services.ml.yml` i `docker-compose.dev.ml.yml`
 - Serwis: `celery-ml`
 - Kolejka: `-Q ml`
 - Pamięć: 2GB limit, 1GB reservation
@@ -137,13 +137,13 @@ docker-compose -f docker-compose.dev.yml -f docker-compose.dev.ml.yml down -v
 #### Deploy Z ML (gdy potrzebny):
 ```bash
 # Uruchom tylko ML worker (nie dotykając postgres/redis)
-docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml up -d celery-ml
+docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml up -d celery-ml
 ```
 **Czas buildu ML**: ~20-25 minut (pierwsza instalacja lub zmiana ML)
 
 #### Zatrzymanie ML workera:
 ```bash
-docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml stop celery-ml
+docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml stop celery-ml
 ```
 
 ---
@@ -232,7 +232,7 @@ embeddings = result.get(timeout=30)
 docker-compose -f docker-compose.dev.ml.yml logs celery-ml
 
 # PROD - Sprawdź logi
-docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml logs celery-ml
+docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml logs celery-ml
 
 # Sprawdź czy obraz istnieje
 docker images | grep django-app-ml
@@ -241,7 +241,7 @@ docker images | grep django-app-ml
 docker-compose -f docker-compose.dev.ml.yml build celery-ml
 
 # PROD - Rebuild ML image
-docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml build celery-ml
+docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml build celery-ml
 ```
 
 ### Problem: Brak miejsca na dysku (ML pobiera 2-3GB)
@@ -279,19 +279,19 @@ docker exec -it <container> python manage.py shell
 docker-compose -f docker-compose.dev.ml.yml ps
 
 # PROD - Lista workerów
-docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml ps
+docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml ps
 
 # DEV - Logi ML workera
 docker-compose -f docker-compose.dev.ml.yml logs -f celery-ml
 
 # PROD - Logi ML workera
-docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml logs -f celery-ml
+docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml logs -f celery-ml
 
 # Statystyki pamięci (DEV)
 docker stats $(docker-compose -f docker-compose.dev.ml.yml ps -q celery-ml)
 
 # Statystyki pamięci (PROD)
-docker stats $(docker-compose -f docker-compose.blue-green.yml -f docker-compose.blue-green.ml.yml ps -q celery-ml)
+docker stats $(docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml ps -q celery-ml)
 ```
 
 ---
