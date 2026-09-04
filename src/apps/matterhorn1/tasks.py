@@ -751,6 +751,59 @@ def _parse_creation_date(date_string):
     return None
 
 
+def _resolve_brands_categories(items):
+    """Batchowy odpowiednik Brand/Category.get_or_create() na całą stronę
+    importu - jedno SELECT (+ ewentualny bulk_create) per model zamiast
+    dwóch get_or_create per produkt (do ~2000 zapytań na stronę 1000
+    pozycji). Semantyka jak get_or_create: pierwsza napotkana nazwa dla
+    danego id wygrywa przy tworzeniu; już istniejące rekordy w bazie NIE są
+    nadpisywane nazwą z eventu. Zwraca (brand_by_id, category_by_id)."""
+    from matterhorn1.models import Brand, Category
+
+    brand_names = {}      # brand_id -> name (pierwsza napotkana)
+    category_data = {}    # category_id -> (name, path)
+
+    for item in items:
+        if item.get("creation_date") is None:
+            continue
+        brand_names.setdefault(
+            item.get('brand_id') or 'unknown', item.get('brand') or 'Unknown')
+        category_data.setdefault(
+            item.get('category_id') or 'unknown',
+            (item.get('category_name') or 'Unknown', item.get('category_path') or ''))
+
+    brand_by_id = {
+        b.brand_id: b for b in
+        Brand.objects.using('matterhorn1').filter(brand_id__in=brand_names.keys())
+    }
+    missing_brand_ids = [bid for bid in brand_names if bid not in brand_by_id]
+    if missing_brand_ids:
+        Brand.objects.using('matterhorn1').bulk_create(
+            [Brand(brand_id=bid, name=brand_names[bid]) for bid in missing_brand_ids],
+            batch_size=100)
+        brand_by_id.update({
+            b.brand_id: b for b in
+            Brand.objects.using('matterhorn1').filter(brand_id__in=missing_brand_ids)
+        })
+
+    category_by_id = {
+        c.category_id: c for c in
+        Category.objects.using('matterhorn1').filter(category_id__in=category_data.keys())
+    }
+    missing_category_ids = [cid for cid in category_data if cid not in category_by_id]
+    if missing_category_ids:
+        Category.objects.using('matterhorn1').bulk_create(
+            [Category(category_id=cid, name=category_data[cid][0], path=category_data[cid][1])
+             for cid in missing_category_ids],
+            batch_size=100)
+        category_by_id.update({
+            c.category_id: c for c in
+            Category.objects.using('matterhorn1').filter(category_id__in=missing_category_ids)
+        })
+
+    return brand_by_id, category_by_id
+
+
 def _bulk_import_products(items):
     """Bulk import/update produktów"""
     try:
@@ -764,6 +817,17 @@ def _bulk_import_products(items):
         products_to_create = []
         products_to_update = []
 
+        # Batch pre-fetch zamiast query per produkt/markę/kategorię (patrz
+        # docs/TESTING.md - N+1 spowalniał import ~500x na dev, gdzie baza
+        # jest za tunelem SSH).
+        valid_uids = [int(item['id']) for item in items
+                      if item.get("creation_date") is not None and item.get('id')]
+        existing_products_by_uid = {
+            p.product_uid: p for p in
+            Product.objects.using('matterhorn1').filter(product_uid__in=valid_uids)
+        } if valid_uids else {}
+        brand_by_id, category_by_id = _resolve_brands_categories(items)
+
         # Najpierw przygotuj wszystkie dane
         for item in items:
             if item.get("creation_date") is None:
@@ -773,16 +837,17 @@ def _bulk_import_products(items):
             if not product_uid:
                 continue
 
-            # Sprawdź czy produkt istnieje - użyj get_or_create dla bezpieczeństwa
-            try:
-                existing_product = Product.objects.using(
-                    'matterhorn1').get(product_uid=int(product_uid))
+            brand = brand_by_id.get(item.get('brand_id') or 'unknown')
+            category = category_by_id.get(item.get('category_id') or 'unknown')
+
+            existing_product = existing_products_by_uid.get(int(product_uid))
+            if existing_product is not None:
                 # Aktualizuj istniejący
-                _prepare_product_update(existing_product, item)
+                _prepare_product_update(existing_product, item, brand=brand, category=category)
                 products_to_update.append(existing_product)
-            except Product.DoesNotExist:
+            else:
                 # Utwórz nowy
-                product_data = _prepare_product_create(item)
+                product_data = _prepare_product_create(item, brand=brand, category=category)
                 products_to_create.append(product_data)
 
             imported_count += 1
@@ -853,18 +918,52 @@ def _bulk_import_products(items):
 
 
 def _create_related_objects_for_products(products):
-    """Utwórz warianty, obrazy i szczegóły dla produktów"""
+    """Utwórz warianty, obrazy i szczegóły dla produktów.
+
+    Trzy sprawdzenia istnienia (wariant po variant_uid / szczegóły po
+    produkcie / duplikat obrazu po product+image_url) są zbatchowane na całą
+    listę produktów - po jednym SELECT zamiast query per wariant/produkt/
+    obraz (do kilku tysięcy zapytań na stronę importu przy starym
+    get()/exists() w pętli)."""
     try:
         logger.info(
             f"🚀 ROZPOCZYNAM _create_related_objects_for_products dla {len(products)} produktów")
         from matterhorn1.models import ProductVariant, ProductImage, ProductDetails
         from django.utils import timezone
 
+        # ProductVariant.variant_uid to CharField - normalizuj do str, inaczej
+        # dict zbudowany z wartości zwróconych przez DB (zawsze str) nie
+        # dopasuje się do surowych wartości z API (bywają int), co wygląda
+        # jak "wariant nie istnieje" i wywala unique constraint na bulk_create.
+        all_variant_uids = [
+            str(vd.get('variant_uid'))
+            for p in products for vd in (getattr(p, '_variants_to_create', None) or [])
+            if vd.get('variant_uid')
+        ]
+        existing_variants_by_uid = {
+            v.variant_uid: v for v in
+            ProductVariant.objects.using('matterhorn1').filter(variant_uid__in=all_variant_uids)
+        } if all_variant_uids else {}
+
+        products_with_details = [p for p in products if getattr(p, '_details_to_create', None)]
+        existing_details_by_product_id = {
+            d.product_id: d for d in
+            ProductDetails.objects.using('matterhorn1').filter(product__in=products_with_details)
+        } if products_with_details else {}
+
+        products_with_images = [p for p in products if getattr(p, '_images_to_create', None)]
+        existing_image_keys = set(
+            ProductImage.objects.using('matterhorn1').filter(
+                product__in=products_with_images
+            ).values_list('product_id', 'image_url')
+        ) if products_with_images else set()
+
         variants_to_create = []
         variants_to_update = []
         images_to_create = []
         details_to_create = []
         details_to_update = []
+        skipped_duplicate_images = 0
 
         for product in products:
             if hasattr(product, '_variants_to_create') and product._variants_to_create:
@@ -873,10 +972,8 @@ def _create_related_objects_for_products(products):
                     if not variant_uid:
                         continue
 
-                    try:
-                        # Sprawdź czy wariant istnieje
-                        existing_variant = ProductVariant.objects.using('matterhorn1').get(
-                            variant_uid=variant_uid)
+                    existing_variant = existing_variants_by_uid.get(str(variant_uid))
+                    if existing_variant is not None:
                         # Aktualizuj istniejący
                         existing_variant.name = variant_data.get(
                             'name', existing_variant.name)
@@ -888,7 +985,7 @@ def _create_related_objects_for_products(products):
                             'ean', existing_variant.ean)
                         existing_variant.updated_at = timezone.now()
                         variants_to_update.append(existing_variant)
-                    except ProductVariant.DoesNotExist:
+                    else:
                         # Utwórz nowy
                         variants_to_create.append(ProductVariant(
                             variant_uid=variant_uid,
@@ -900,22 +997,24 @@ def _create_related_objects_for_products(products):
                             ean=variant_data.get('ean', '')
                         ))
 
-            # Obsługa obrazków
+            # Obsługa obrazków - pomiń duplikat (product + image_url) już w bazie
             if hasattr(product, '_images_to_create') and product._images_to_create:
                 for image_data in product._images_to_create:
+                    image_url = image_data.get('image_url')
+                    if (product.id, image_url) in existing_image_keys:
+                        skipped_duplicate_images += 1
+                        continue
                     images_to_create.append(ProductImage(
                         product=product,
-                        image_url=image_data.get('image_url'),
+                        image_url=image_url,
                         order=image_data.get('order', 0)
                     ))
 
             # Obsługa szczegółów produktu
             if hasattr(product, '_details_to_create') and product._details_to_create:
                 details_data = product._details_to_create
-                try:
-                    # Sprawdź czy szczegóły istnieją
-                    existing_details = ProductDetails.objects.using('matterhorn1').get(
-                        product=product)
+                existing_details = existing_details_by_product_id.get(product.id)
+                if existing_details is not None:
                     # Aktualizuj istniejące
                     existing_details.weight = details_data.get(
                         'weight', existing_details.weight)
@@ -927,7 +1026,7 @@ def _create_related_objects_for_products(products):
                         'size_table_html', existing_details.size_table_html)
                     existing_details.updated_at = timezone.now()
                     details_to_update.append(existing_details)
-                except ProductDetails.DoesNotExist:
+                else:
                     # Utwórz nowe
                     details_to_create.append(ProductDetails(
                         product=product,
@@ -955,28 +1054,15 @@ def _create_related_objects_for_products(products):
             logger.info(
                 f"🔄 Zaktualizowano {len(variants_to_update)} wariantów")
 
-        # Bulk operations dla obrazków - sprawdź duplikaty
+        # Bulk operations dla obrazków (duplikaty już odfiltrowane wyżej)
         if images_to_create:
-            # Filtruj duplikaty - sprawdź które obrazki już istnieją
-            unique_images_to_create = []
-            for image in images_to_create:
-                # Sprawdź czy obrazek już istnieje (product + image_url)
-                image_exists = ProductImage.objects.using('matterhorn1').filter(
-                    product=image.product,
-                    image_url=image.image_url
-                ).exists()
-
-                if not image_exists:
-                    unique_images_to_create.append(image)
-
-            if unique_images_to_create:
-                ProductImage.objects.using('matterhorn1').bulk_create(
-                    unique_images_to_create, batch_size=100)
-                logger.info(
-                    f"✅ Utworzono {len(unique_images_to_create)} nowych obrazków (pominięto {len(images_to_create) - len(unique_images_to_create)} duplikatów)")
-            else:
-                logger.info(
-                    f"ℹ️ Wszystkie {len(images_to_create)} obrazków już istnieją - pominięto")
+            ProductImage.objects.using('matterhorn1').bulk_create(
+                images_to_create, batch_size=100)
+            logger.info(
+                f"✅ Utworzono {len(images_to_create)} nowych obrazków (pominięto {skipped_duplicate_images} duplikatów)")
+        elif skipped_duplicate_images:
+            logger.info(
+                f"ℹ️ Wszystkie {skipped_duplicate_images} obrazków już istnieją - pominięto")
 
         # Bulk operations dla szczegółów
         if details_to_create:
@@ -999,19 +1085,15 @@ def _create_related_objects_for_products(products):
         logger.error(f"❌ Błąd tworzenia powiązanych obiektów: {e}")
 
 
-def _prepare_product_create(item):
-    """Przygotuj dane do utworzenia nowego produktu"""
+def _prepare_product_create(item, brand=None, category=None):
+    """Przygotuj dane do utworzenia nowego produktu.
+
+    `brand`/`category` — przekaż gdy wywołujesz w pętli po wielu itemach
+    (np. z `_bulk_import_products`, przez `_resolve_brands_categories`),
+    żeby uniknąć get_or_create per produkt. Bez nich (domyślnie, np. do
+    pojedynczych wywołań/testów) resolvuje jak wcześniej."""
     from matterhorn1.models import Product
     from django.utils import timezone
-
-    # Marka
-    brand_id = item.get('brand_id') or 'unknown'
-    brand_name = item.get('brand') or 'Unknown'
-
-    # Kategoria
-    category_id = item.get('category_id') or 'unknown'
-    category_name = item.get('category_name') or 'Unknown'
-    category_path = item.get('category_path') or ''
 
     # Konwersje
     active_value = item.get('active', True)
@@ -1022,21 +1104,21 @@ def _prepare_product_create(item):
     if isinstance(new_collection_value, str):
         new_collection_value = new_collection_value.upper() in ('Y', 'YES', 'TRUE', '1')
 
-    # Pobierz lub utwórz markę i kategorię
-    from matterhorn1.models import Brand, Category
-
-    brand, _ = Brand.objects.using('matterhorn1').get_or_create(
-        brand_id=brand_id,
-        defaults={'name': brand_name}
-    )
-
-    category, _ = Category.objects.using('matterhorn1').get_or_create(
-        category_id=category_id,
-        defaults={
-            'name': category_name,
-            'path': category_path
-        }
-    )
+    if brand is None or category is None:
+        from matterhorn1.models import Brand, Category
+        if brand is None:
+            brand, _ = Brand.objects.using('matterhorn1').get_or_create(
+                brand_id=item.get('brand_id') or 'unknown',
+                defaults={'name': item.get('brand') or 'Unknown'}
+            )
+        if category is None:
+            category, _ = Category.objects.using('matterhorn1').get_or_create(
+                category_id=item.get('category_id') or 'unknown',
+                defaults={
+                    'name': item.get('category_name') or 'Unknown',
+                    'path': item.get('category_path') or ''
+                }
+            )
 
     product = Product(
         product_uid=int(item.get('id')),
@@ -1089,18 +1171,12 @@ def _prepare_product_create(item):
     return product
 
 
-def _prepare_product_update(product, item):
-    """Przygotuj dane do aktualizacji istniejącego produktu"""
+def _prepare_product_update(product, item, brand=None, category=None):
+    """Przygotuj dane do aktualizacji istniejącego produktu.
+
+    `brand`/`category` — jak w `_prepare_product_create`: przekaż z pętli
+    batch, żeby uniknąć get_or_create per produkt."""
     from django.utils import timezone
-
-    # Marka
-    brand_id = item.get('brand_id') or 'unknown'
-    brand_name = item.get('brand') or 'Unknown'
-
-    # Kategoria
-    category_id = item.get('category_id') or 'unknown'
-    category_name = item.get('category_name') or 'Unknown'
-    category_path = item.get('category_path') or ''
 
     # Konwersje
     active_value = item.get('active', True)
@@ -1111,21 +1187,21 @@ def _prepare_product_update(product, item):
     if isinstance(new_collection_value, str):
         new_collection_value = new_collection_value.upper() in ('Y', 'YES', 'TRUE', '1')
 
-    # Pobierz lub utwórz markę i kategorię
-    from matterhorn1.models import Brand, Category
-
-    brand, _ = Brand.objects.using('matterhorn1').get_or_create(
-        brand_id=brand_id,
-        defaults={'name': brand_name}
-    )
-
-    category, _ = Category.objects.using('matterhorn1').get_or_create(
-        category_id=category_id,
-        defaults={
-            'name': category_name,
-            'path': category_path
-        }
-    )
+    if brand is None or category is None:
+        from matterhorn1.models import Brand, Category
+        if brand is None:
+            brand, _ = Brand.objects.using('matterhorn1').get_or_create(
+                brand_id=item.get('brand_id') or 'unknown',
+                defaults={'name': item.get('brand') or 'Unknown'}
+            )
+        if category is None:
+            category, _ = Category.objects.using('matterhorn1').get_or_create(
+                category_id=item.get('category_id') or 'unknown',
+                defaults={
+                    'name': item.get('category_name') or 'Unknown',
+                    'path': item.get('category_path') or ''
+                }
+            )
 
     # Aktualizuj pola
     product.active = active_value

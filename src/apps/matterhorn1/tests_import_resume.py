@@ -64,12 +64,17 @@ class BulkImportSoftTimeLimitTest(TestCase):
     def test_soft_time_limit_propagates_not_swallowed(self):
         """_bulk_import_products nie może połknąć SoftTimeLimitExceeded jako
         'status: error' (to uruchamiało 5x retry per-strona i zjadało grace
-        między soft a hard limitem)."""
+        między soft a hard limitem).
+
+        Batch pre-fetch (patrz docs/TESTING.md - N+1 spowalniał import) woła
+        teraz Product.objects.using(...).filter(...) zamiast .get() per
+        pozycja - to pierwszy dostęp do bazy w _bulk_import_products, więc
+        tu podpinamy side_effect."""
         from unittest.mock import MagicMock, patch
 
         mock_product = MagicMock()
         mock_product.DoesNotExist = type('DoesNotExist', (Exception,), {})
-        mock_product.objects.using.return_value.get.side_effect = SoftTimeLimitExceeded()
+        mock_product.objects.using.return_value.filter.side_effect = SoftTimeLimitExceeded()
 
         with patch('matterhorn1.models.Product', mock_product):
             with self.assertRaises(SoftTimeLimitExceeded):
