@@ -129,28 +129,28 @@ kolejne szybko). `--create-db` wymusza odtworzenie po zmianie migracji.
 Metryka liczy tylko kod produkcyjny (`omit` w `pyproject.toml`: testy,
 migracje, `management/commands/*`, `database_utils*`, `*_example.py`).
 
-| Moduł                                | Cov       |                                                                                                |
-| ------------------------------------ | --------- | ---------------------------------------------------------------------------------------------- |
-| `models.py`                          | 93%       | ✅                                                                                             |
-| `transaction_logger.py`              | 84%       | ✅                                                                                             |
-| `saga_variants.py`                   | 83%       | ✅                                                                                             |
-| `serializers.py`                     | 77%       |                                                                                                |
-| `views_secure.py`                    | 70%       |                                                                                                |
-| `stock_tracker.py`                   | 68%       | (był 36%)                                                                                      |
-| `tasks.py`                           | 63%       |                                                                                                |
-| `saga.py`                            | 43%       | (był 18%) — `SagaService` kroki pokryte, cały `create_product_with_mapping` + upload zdjęć nie |
-| `admin.py`                           | 30%       | 903 stmt — osobny epik                                                                         |
-| `views.py`                           | 24%       | 394 stmt — legacy, osobny epik                                                                 |
-| `defs_db.py` / `bestsellers_data.py` | 27% / 14% |                                                                                                |
-| **TOTAL**                            | **51%**   | próg CI: 48% (ratchet, nie cel)                                                                |
+| Moduł                                | Cov       |                                                                                                                                                                                                                                                                                    |
+| ------------------------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `models.py`                          | 93%       | ✅                                                                                                                                                                                                                                                                                 |
+| `transaction_logger.py`              | 84%       | ✅                                                                                                                                                                                                                                                                                 |
+| `saga_variants.py`                   | 83%       | ✅                                                                                                                                                                                                                                                                                 |
+| `serializers.py`                     | 77%       |                                                                                                                                                                                                                                                                                    |
+| `views_secure.py`                    | 70%       |                                                                                                                                                                                                                                                                                    |
+| `stock_tracker.py`                   | 68%       |                                                                                                                                                                                                                                                                                    |
+| `tasks.py`                           | 64%       |                                                                                                                                                                                                                                                                                    |
+| `saga.py`                            | 49%       | `SagaService` kroki + `mpd_create` happy path/kompensacja pokryte (był 18%)                                                                                                                                                                                                        |
+| `admin.py`                           | 40%       | 903 stmt — `mpd_create`, `assign_mapping`, `bulk_map_to_mpd`, `auto_map_variants` pokryte (był 30%); `bulk_create_mpd_action`/`views.py`-owe akcje zostają — #218                                                                                                                  |
+| `views.py`                           | 24%       | 394 stmt — **nie martwy kod**: `views.py` (legacy, mniej zabezpieczone) i `views_secure.py` (hardened) to dwa równoległe, oba routowane w `urls.py` API — do zweryfikowania, czy legacy da się wyłączyć zamiast testować (patrz `fix/lock-legacy-api-endpoints` w historii) — #218 |
+| `defs_db.py` / `bestsellers_data.py` | 27% / 14% |                                                                                                                                                                                                                                                                                    |
+| **TOTAL**                            | **54%**   | próg CI: 51% (ratchet, nie cel)                                                                                                                                                                                                                                                    |
 
-**Cel „linie ≥ 80%" jest poza zakresem tego planu** — wymaga pokrycia
-`admin.py` (2085 LOC akcji admina) i `views.py` (legacy widoki), co jest
-osobnym, dużym zadaniem. Logika krytyczna (import, saga engine, stock
-tracking, serializery, modele) jest w przedziale 63–93%.
+**Cel „linie ≥ 80%" jest poza zakresem tego planu** — wymaga pokrycia reszty
+`admin.py` i decyzji o `views.py` (legacy vs `views_secure.py`) — [#218](https://github.com/pawlo884/nc/issues/218).
+Logika krytyczna (import, saga engine, stock tracking, serializery, modele)
+jest w przedziale 64–93%.
 
 **Podnoszenie progu / dalej:** dopisać ścieżki innych apek do `--cov` w
-`check-branch.yml` gdy dostaną testy; osobny epik na `admin.py` + `views.py`.
+`check-branch.yml` gdy dostaną testy; reszta `admin.py` + decyzja o `views.py` w #218.
 
 ### Struktura `matterhorn1/tests/`
 
