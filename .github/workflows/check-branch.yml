@@ -200,7 +200,7 @@ jobs:
         run: >-
           pytest
           --cov=src/apps/matterhorn1 --cov-report=term-missing:skip-covered
-          --cov-fail-under=48
+          --cov-fail-under=51
 
   check-code-quality:
     name: Sprawdź jakość kodu (linting i formatowanie)
