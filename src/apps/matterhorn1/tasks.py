@@ -1365,9 +1365,16 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
 
 
 def _bulk_update_inventory(inventory_data):
-    """Bulk update stanów magazynowych z INVENTORY API"""
+    """Bulk update stanów magazynowych z INVENTORY API.
+
+    Batch pre-fetch produktów/wariantów + bulk_create dla StockHistory
+    zamiast query per produkt/wariant + create() per zmieniony wariant (ten
+    sam wzorzec N+1 co w _bulk_import_products, patrz #223). Nazwy dla
+    historii mamy zawsze z batcha, więc budujemy wiersze wprost zamiast
+    wołać track_stock_change() (ta ma własny per-wywołanie create() +
+    opcjonalny raw-SQL fallback na nazwy, którego tu nie potrzebujemy)."""
     try:
-        from matterhorn1.models import Product, ProductVariant
+        from matterhorn1.models import Product, ProductVariant, StockHistory
         from django.db import transaction
         from django.utils import timezone
 
@@ -1378,6 +1385,30 @@ def _bulk_update_inventory(inventory_data):
 
         updated_count = 0
         variants_to_update = []
+        history_to_create = []
+
+        # Batch pre-fetch: produkty po product_uid, warianty po variant_uid
+        # (globalnie unikalne - unique=True na modelu).
+        product_uids = [
+            int(item['id']) for item in inventory_data
+            if isinstance(item, dict) and item.get('id')
+        ]
+        products_by_uid = {
+            p.product_uid: p for p in
+            Product.objects.using('matterhorn1').filter(product_uid__in=product_uids)
+        } if product_uids else {}
+
+        all_variant_uids = [
+            str(vd.get('variant_uid'))
+            for item in inventory_data if isinstance(item, dict)
+            for vd in (item.get('inventory') or [])
+            if isinstance(vd, dict) and vd.get('variant_uid')
+        ]
+        variants_by_uid = {
+            v.variant_uid: v for v in
+            ProductVariant.objects.using('matterhorn1').select_related('product').filter(
+                variant_uid__in=all_variant_uids)
+        } if all_variant_uids else {}
 
         # Przygotuj dane do bulk update
         for i, item in enumerate(inventory_data):
@@ -1392,67 +1423,67 @@ def _bulk_update_inventory(inventory_data):
                 continue
 
             # Znajdź produkt
-            try:
-                product = Product.objects.using(
-                    'matterhorn1').get(product_uid=int(product_uid))
-
-                # Aktualizuj warianty (w INVENTORY API dane są w 'inventory')
-                variants_data = item.get('inventory', [])
-
-                if not variants_data:
-                    logger.info(f"Brak wariantów dla produktu {product_uid}")
-                    continue
-
-                for j, variant_data in enumerate(variants_data):
-                    if variant_data is None:
-                        logger.warning(
-                            f"Pominięto None variant {j} dla produktu {product_uid}")
-                        continue
-                    if not isinstance(variant_data, dict):
-                        continue
-
-                    variant_uid = variant_data.get('variant_uid')
-                    if not variant_uid:
-                        continue
-
-                    # Znajdź wariant
-                    try:
-                        variant = ProductVariant.objects.using('matterhorn1').get(
-                            variant_uid=variant_uid,
-                            product=product
-                        )
-
-                        # Aktualizuj stan magazynowy
-                        new_stock = int(variant_data.get('stock', 0)) if variant_data.get(
-                            'stock', '0').isdigit() else 0
-                        if variant.stock != new_stock:
-                            # Śledź zmianę stanu przed aktualizacją
-                            track_stock_change(
-                                variant_uid=variant.variant_uid,
-                                product_uid=variant.product.product_uid,
-                                old_stock=variant.stock,
-                                new_stock=new_stock,
-                                product_name=variant.product.name,
-                                variant_name=variant.name
-                            )
-
-                            variant.stock = new_stock
-                            # bulk_update() nie wywołuje save(), więc auto_now na
-                            # updated_at się nie odpali - trzeba ustawić ręcznie,
-                            # bo bridge MPD.tasks.update_stock_from_matterhorn1
-                            # filtruje warianty właśnie po updated_at.
-                            variant.updated_at = timezone.now()
-                            variants_to_update.append(variant)
-
-                    except ProductVariant.DoesNotExist:
-                        # Wariant nie istnieje - pomiń
-                        continue
-
-            except Product.DoesNotExist:
+            product = products_by_uid.get(int(product_uid))
+            if product is None:
                 # Produkt nie istnieje - pomiń
                 continue
 
-        # Bulk update wariantów
+            # Aktualizuj warianty (w INVENTORY API dane są w 'inventory')
+            variants_data = item.get('inventory', [])
+
+            if not variants_data:
+                logger.info(f"Brak wariantów dla produktu {product_uid}")
+                continue
+
+            for j, variant_data in enumerate(variants_data):
+                if variant_data is None:
+                    logger.warning(
+                        f"Pominięto None variant {j} dla produktu {product_uid}")
+                    continue
+                if not isinstance(variant_data, dict):
+                    continue
+
+                variant_uid = variant_data.get('variant_uid')
+                if not variant_uid:
+                    continue
+
+                # Znajdź wariant - musi należeć do TEGO produktu, jak przy
+                # oryginalnym .get(variant_uid=..., product=product)
+                variant = variants_by_uid.get(str(variant_uid))
+                if variant is None or variant.product_id != product.id:
+                    # Wariant nie istnieje (dla tego produktu) - pomiń
+                    continue
+
+                # Aktualizuj stan magazynowy
+                new_stock = int(variant_data.get('stock', 0)) if variant_data.get(
+                    'stock', '0').isdigit() else 0
+                if variant.stock != new_stock:
+                    # Śledź zmianę stanu przed aktualizacją
+                    stock_change = new_stock - variant.stock
+                    change_type = (
+                        'increase' if stock_change > 0
+                        else 'decrease' if stock_change < 0 else 'no_change'
+                    )
+                    history_to_create.append(StockHistory(
+                        variant_uid=variant.variant_uid,
+                        product_uid=product.product_uid,
+                        product_name=product.name,
+                        variant_name=variant.name,
+                        old_stock=variant.stock,
+                        new_stock=new_stock,
+                        stock_change=stock_change,
+                        change_type=change_type,
+                    ))
+
+                    variant.stock = new_stock
+                    # bulk_update() nie wywołuje save(), więc auto_now na
+                    # updated_at się nie odpali - trzeba ustawić ręcznie,
+                    # bo bridge MPD.tasks.update_stock_from_matterhorn1
+                    # filtruje warianty właśnie po updated_at.
+                    variant.updated_at = timezone.now()
+                    variants_to_update.append(variant)
+
+        # Bulk update wariantów + bulk create historii
         if variants_to_update:
             with transaction.atomic(using='matterhorn1'):
                 ProductVariant.objects.using('matterhorn1').bulk_update(
@@ -1460,6 +1491,9 @@ def _bulk_update_inventory(inventory_data):
                     ['stock', 'updated_at'],
                     batch_size=100
                 )
+                if history_to_create:
+                    StockHistory.objects.using('matterhorn1').bulk_create(
+                        history_to_create, batch_size=100)
                 updated_count = len(variants_to_update)
                 logger.info(
                     f"✅ INVENTORY bulk update: {updated_count} wariantów")

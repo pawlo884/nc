@@ -100,3 +100,18 @@ class TestBulkUpdateInventory:
         _bulk_update_inventory([
             {"id": 12345, "inventory": [{"variant_uid": "1", "stock": "5"}]},
         ])
+
+    def test_wariant_innego_produktu_jest_pomijany(self, variant):
+        # variant_uid "8001" istnieje, ale należy do produktu 500, nie 999 -
+        # to samo zachowanie co oryginalne .get(variant_uid=..., product=product)
+        other_brand = Brand.objects.using(DB).create(brand_id="B2", name="B2")
+        other_cat = Category.objects.using(DB).create(category_id="C2", name="C2")
+        Product.objects.using(DB).create(
+            product_uid=999, name="Inny", brand=other_brand, category=other_cat)
+
+        _bulk_update_inventory([
+            {"id": 999, "inventory": [{"variant_uid": "8001", "stock": "1"}]},
+        ])
+        variant.refresh_from_db()
+        assert variant.stock == 10
+        assert StockHistory.objects.using(DB).count() == 0
