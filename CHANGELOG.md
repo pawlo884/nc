@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.6](https://github.com/pawlo884/nc/compare/v1.44.5...v1.44.6) (2026-09-04)
+
+### Performance Improvements
+
+* **matterhorn:** batchuj zapytania w imporcie ITEMS zamiast N+1 ([1c25c16](https://github.com/pawlo884/nc/commit/1c25c1627ff7959565548c7dc9dde245b4561645))
+
 ## [1.44.5](https://github.com/pawlo884/nc/compare/v1.44.4...v1.44.5) (2026-09-04)
 
 ### Bug Fixes
