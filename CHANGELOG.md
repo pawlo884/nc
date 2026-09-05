@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.11](https://github.com/pawlo884/nc/compare/v1.44.10...v1.44.11) (2026-09-05)
+
+### Performance Improvements
+
+* **matterhorn:** przyspiesz changelist admina StockHistory ([#229](https://github.com/pawlo884/nc/issues/229)) ([26542b5](https://github.com/pawlo884/nc/commit/26542b5331817c9b79101305e7e03c09f0724059))
+
 ## [1.44.10](https://github.com/pawlo884/nc/compare/v1.44.9...v1.44.10) (2026-09-05)
 
 ### Bug Fixes
