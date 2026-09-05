@@ -80,7 +80,10 @@ def test_wznowienie_od_przerwanej_strony(
 
     item_pages = [int(c.request.params["page"]) for c in mocked_responses.calls
                   if "/B2BAPI/ITEMS/?" in c.request.url]
-    assert item_pages[0] == 3  # start od przerwanej strony, nie od 1
+    # Strony 3+ lecą kilka naraz (pipeline, patrz _import_products_from_items),
+    # więc kolejność ODPOWIEDZI HTTP nie jest gwarantowana - liczy się, że
+    # nigdy nie zeszliśmy poniżej checkpointu (start od 3, nie od 1).
+    assert min(item_pages) == 3
     assert Product.objects.using("matterhorn1").filter(product_uid=4001).exists()
 
 
