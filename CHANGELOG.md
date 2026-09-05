@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.12](https://github.com/pawlo884/nc/compare/v1.44.11...v1.44.12) (2026-09-05)
+
+### Bug Fixes
+
+* **matterhorn:** idempotentny _bulk_update_inventory (duplikaty w StockHistory) ([#230](https://github.com/pawlo884/nc/issues/230)) ([6407c8f](https://github.com/pawlo884/nc/commit/6407c8f5918903d5e459a355162118277c5b9029))
+
 ## [1.44.11](https://github.com/pawlo884/nc/compare/v1.44.10...v1.44.11) (2026-09-05)
 
 ### Performance Improvements
