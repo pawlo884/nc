@@ -401,6 +401,12 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         # strona 2 z bufora dopiero gdy strona 1 już zapisana - niezależnie od
         # tego, która odpowiedź HTTP wróci pierwsza. Inaczej wznowienie po
         # awarii mogłoby pominąć stronę, która akurat odpowiedziała później.
+        # Wystrzeliwanie nowych stron kończy się, jak tylko KTÓRAKOLWIEK już
+        # gotowa strona w buforze okaże się końcem danych/błędem - nie trzeba
+        # czekać, aż dojdzie do niej przetwarzanie w kolejności (puste strony
+        # odpowiadają szybko, więc to realnie ogranicza liczbę zbędnych
+        # requestów - patrz test na żywym API: bez tego leciało aż do strony
+        # 70, mimo że koniec danych był na 24-tej).
         PAGE_LAUNCH_INTERVAL = 2.0
         # Górna granica liczby wątków - nie throttling (o tempie decyduje
         # PAGE_LAUNCH_INTERVAL), tylko zabezpieczenie przed nieograniczonym
@@ -419,13 +425,29 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         pending = {}  # page -> Future - bufor odpowiedzi czekających na zapis
         next_to_launch = page
         next_to_process = page
+        stop_launching = False
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_SAFETY_CAP)
         try:
             while True:
-                pending[next_to_launch] = executor.submit(
-                    _fetch_items_page, next_to_launch, api_url, headers, limit, last_update)
-                next_to_launch += 1
+                if not stop_launching:
+                    pending[next_to_launch] = executor.submit(
+                        _fetch_items_page, next_to_launch, api_url, headers, limit, last_update)
+                    next_to_launch += 1
+
+                    # Wczesny stop: puste strony/błędy odpowiadają szybko (nie
+                    # trzeba czekać, aż strony z realnymi danymi z przodu
+                    # kolejki się doczekają) - jak tylko KTÓRAKOLWIEK już
+                    # zakończona strona w buforze okaże się końcem danych albo
+                    # błędem, przestań wystrzeliwać dalsze. Realny import
+                    # (patrz test na żywo): bez tego launcher strzelał aż do
+                    # strony 70, mimo że koniec danych był już na 24-tej -
+                    # 46 zbędnych requestów do zewnętrznego API. Przetwarzanie
+                    # i zapis niżej nadal idą ściśle w kolejności, bez zmian.
+                    for fut in pending.values():
+                        if fut.done() and fut.result()['outcome'] != 'ok':
+                            stop_launching = True
+                            break
 
                 # Przetwórz WSZYSTKO co już gotowe, ściśle w kolejności stron -
                 # mogło odpowiedzieć kilka naraz, podczas gdy czekaliśmy.
@@ -506,7 +528,13 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                 if hit_max_products:
                     break
 
-                time.sleep(PAGE_LAUNCH_INTERVAL)
+                if stop_launching:
+                    # Nic już nie wystrzeliwujemy - tylko czekamy, aż to co w
+                    # locie się skończy (przetworzone wyżej w kolejności), więc
+                    # krótszy odstęp niż tempo launchera.
+                    time.sleep(0.2)
+                else:
+                    time.sleep(PAGE_LAUNCH_INTERVAL)
         finally:
             for f in pending.values():
                 f.cancel()
