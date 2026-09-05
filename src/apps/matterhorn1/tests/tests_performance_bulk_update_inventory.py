@@ -1,13 +1,10 @@
 """
-Regresja wydajności: `_bulk_update_inventory` musi skalować się w stałej
-(małej) liczbie zapytań SQL na stronę, nie liniowo z liczbą produktów/
-wariantów (ten sam N+1 wzorzec co #223, tu w kroku INVENTORY).
-
-Przed fixem: query per produkt (`Product.objects.get`), query per wariant
-(`ProductVariant.objects.get`) i `StockHistory.objects.create()` per zmieniony
-wariant - strona 1000 pozycji = do ~3000 zapytań. Ten test aktualizuje stan
-20 wariantów (z czego połowa faktycznie się zmienia) i pilnuje że liczba
-zapytań zostaje płasko-mała, niezależna od N.
+`_bulk_update_inventory`:
+- pre-fetch produktów/wariantów batchem (nie query per element - wzorzec N+1
+  jak #223), więc liczba SELECT-ów nie rośnie z liczbą wariantów w danych,
+  tylko warunkowy UPDATE per FAKTYCZNIE zmieniony wariant (w praktyce garstka);
+- idempotencja: drugi run z tymi samymi danymi nie powiela wpisów StockHistory
+  (regresja na duplikaty przy nakładających się runach importu).
 """
 from __future__ import annotations
 
@@ -24,10 +21,6 @@ pytestmark = [pytest.mark.integration, pytest.mark.django_db(databases=["default
 DB = "matterhorn1"
 
 N_PRODUCTS = 20
-# Płaski budżet: pre-fetch produktów + wariantów (2 SELECT-y) + bulk_update
-# wariantów + bulk_create historii + BEGIN/COMMIT. Rośnie z liczbą modeli
-# dotkniętych, nie z N.
-MAX_QUERIES = 15
 
 
 @pytest.fixture
@@ -43,40 +36,59 @@ def products_with_variants():
     return variants
 
 
-def _make_inventory(variants):
-    # Co drugi wariant zmienia stan (10 -> 3), reszta bez zmiany (10 -> 10).
+def _inventory(variants, changed_idx):
+    """INVENTORY dla wszystkich wariantów; te z `changed_idx` dostają stock=3,
+    reszta zostaje na 10 (bez zmiany)."""
     return [
         inventory_record(
             item_id=v.product.product_uid,
-            variants=[{"variant_uid": v.variant_uid, "stock": 3 if i % 2 == 0 else 10}],
+            variants=[{"variant_uid": v.variant_uid, "stock": 3 if i in changed_idx else 10}],
         )
         for i, v in enumerate(variants)
     ]
 
 
-def test_zapytania_nie_rosna_liniowo_z_liczba_wariantow(products_with_variants):
-    inventory_data = _make_inventory(products_with_variants)
+def test_liczba_zapytan_skaluje_sie_ze_zmienionymi_nie_z_wszystkimi(products_with_variants):
+    # 20 wariantów w danych, ale tylko 2 faktycznie się zmieniają.
+    data = _inventory(products_with_variants, changed_idx={0, 1})
 
     with CaptureQueriesContext(connections[DB]) as ctx:
-        updated_count = _bulk_update_inventory(inventory_data)
+        updated = _bulk_update_inventory(data)
 
-    assert updated_count == N_PRODUCTS // 2
-    assert len(ctx.captured_queries) < MAX_QUERIES, (
-        f"{len(ctx.captured_queries)} zapytań dla {N_PRODUCTS} wariantów — "
-        f"podejrzenie N+1 (query/create per element zamiast batcha)"
+    assert updated == 2
+    assert StockHistory.objects.using(DB).count() == 2
+    # 2 SELECT-y pre-fetch + 2 warunkowe UPDATE-y + 1 bulk_create.
+    # Kluczowe: NIE ~20 (query per wariant w danych).
+    assert len(ctx.captured_queries) <= 8, (
+        f"{len(ctx.captured_queries)} zapytań dla 20 wariantów w danych (2 zmienione) — "
+        f"podejrzenie query per element"
     )
-    assert StockHistory.objects.using(DB).count() == N_PRODUCTS // 2
 
 
-def test_zapytania_przy_ponownej_aktualizacji_tez_plaskie(products_with_variants):
-    inventory_data = _make_inventory(products_with_variants)
-    _bulk_update_inventory(inventory_data)
+def test_drugi_run_z_tymi_samymi_danymi_nie_powiela_historii(products_with_variants):
+    data = _inventory(products_with_variants, changed_idx={0, 1, 2})
+    assert _bulk_update_inventory(data) == 3
+    assert StockHistory.objects.using(DB).count() == 3
 
     with CaptureQueriesContext(connections[DB]) as ctx:
-        updated_count = _bulk_update_inventory(inventory_data)
+        updated = _bulk_update_inventory(data)
 
-    # Drugi przebieg z tymi samymi danymi: stan już zaktualizowany, więc
-    # nic się nie zmienia, ale pre-fetch nadal leci (2 SELECT-y + brak
-    # bulk_update/bulk_create bo nic do zapisania).
-    assert updated_count == 0
-    assert len(ctx.captured_queries) < MAX_QUERIES
+    # Stany już zaktualizowane -> nic do zrobienia, żadnego nowego wpisu.
+    assert updated == 0
+    assert StockHistory.objects.using(DB).count() == 3
+    # Same pre-fetch SELECT-y, bez UPDATE-ów i bez bulk_create.
+    assert len(ctx.captured_queries) <= 4
+
+
+def test_stan_juz_docelowy_w_dbie_nie_zapisuje_historii(products_with_variants):
+    """Inny run zdążył już zastosować tę zmianę - pre-fetch widzi stan
+    docelowy, więc nic nie robimy i nie ma wpisu (idempotencja)."""
+    variants = products_with_variants
+    data = _inventory(variants, changed_idx={0})
+
+    ProductVariant.objects.using(DB).filter(pk=variants[0].pk).update(stock=3)
+
+    updated = _bulk_update_inventory(data)
+
+    assert updated == 0
+    assert StockHistory.objects.using(DB).count() == 0
