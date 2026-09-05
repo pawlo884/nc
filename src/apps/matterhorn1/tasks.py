@@ -1571,17 +1571,19 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
 
 
 def _bulk_update_inventory(inventory_data):
-    """Bulk update stanów magazynowych z INVENTORY API.
+    """Aktualizacja stanów magazynowych z INVENTORY API.
 
-    Batch pre-fetch produktów/wariantów + bulk_create dla StockHistory
-    zamiast query per produkt/wariant + create() per zmieniony wariant (ten
-    sam wzorzec N+1 co w _bulk_import_products, patrz #223). Nazwy dla
-    historii mamy zawsze z batcha, więc budujemy wiersze wprost zamiast
-    wołać track_stock_change() (ta ma własny per-wywołanie create() +
-    opcjonalny raw-SQL fallback na nazwy, którego tu nie potrzebujemy)."""
+    Batch pre-fetch produktów/wariantów (zamiast query per element, wzorzec
+    N+1 jak w _bulk_import_products, patrz #223). Sam zapis stanu robimy
+    warunkowym UPDATE-em per zmieniony wariant (`filter(pk=..., stock=old)
+    .update(...)`), a wiersz StockHistory zapisujemy TYLKO gdy ten UPDATE
+    faktycznie zmienił rząd - to jednocześnie idempotencja (re-run widzi już
+    nowy stan) i ochrona przed wyścigiem nakładających się runów importu,
+    które inaczej powielały wpisy historii dla tej samej zmiany. Nazwy do
+    historii mamy z batcha, więc budujemy wiersze wprost zamiast wołać
+    track_stock_change()."""
     try:
         from matterhorn1.models import Product, ProductVariant, StockHistory
-        from django.db import transaction
         from django.utils import timezone
 
         # Sprawdź czy dane są dostępne
@@ -1590,7 +1592,6 @@ def _bulk_update_inventory(inventory_data):
             return 0
 
         updated_count = 0
-        variants_to_update = []
         history_to_create = []
 
         # Batch pre-fetch: produkty po product_uid, warianty po variant_uid
@@ -1663,46 +1664,51 @@ def _bulk_update_inventory(inventory_data):
                 # Aktualizuj stan magazynowy
                 new_stock = int(variant_data.get('stock', 0)) if variant_data.get(
                     'stock', '0').isdigit() else 0
-                if variant.stock != new_stock:
-                    # Śledź zmianę stanu przed aktualizacją
-                    stock_change = new_stock - variant.stock
-                    change_type = (
-                        'increase' if stock_change > 0
-                        else 'decrease' if stock_change < 0 else 'no_change'
-                    )
-                    history_to_create.append(StockHistory(
-                        variant_uid=variant.variant_uid,
-                        product_uid=product.product_uid,
-                        product_name=product.name,
-                        variant_name=variant.name,
-                        old_stock=variant.stock,
-                        new_stock=new_stock,
-                        stock_change=stock_change,
-                        change_type=change_type,
-                    ))
+                if variant.stock == new_stock:
+                    continue
 
-                    variant.stock = new_stock
-                    # bulk_update() nie wywołuje save(), więc auto_now na
-                    # updated_at się nie odpali - trzeba ustawić ręcznie,
-                    # bo bridge MPD.tasks.update_stock_from_matterhorn1
-                    # filtruje warianty właśnie po updated_at.
-                    variant.updated_at = timezone.now()
-                    variants_to_update.append(variant)
+                old_stock = variant.stock
+                # Warunkowy UPDATE: zmieni rząd tylko jeśli stan w DB NADAL ==
+                # old_stock. Jeśli inny run (albo redeliver ubitego taska) już
+                # złapał ten sam przeskok, zwróci 0 - wtedy NIE zapisujemy
+                # wiersza historii. Idempotencja + brak wyścigu (to WHERE
+                # stock=old_stock serializuje pisarzy) - patrz duplikaty w
+                # StockHistory przy nakładających się runach importu.
+                # updated_at ustawiane wprost, bo bridge
+                # MPD.tasks.update_stock_from_matterhorn1 filtruje po nim.
+                changed = ProductVariant.objects.using('matterhorn1').filter(
+                    pk=variant.pk, stock=old_stock
+                ).update(stock=new_stock, updated_at=timezone.now())
+                if not changed:
+                    continue
 
-        # Bulk update wariantów + bulk create historii
-        if variants_to_update:
-            with transaction.atomic(using='matterhorn1'):
-                ProductVariant.objects.using('matterhorn1').bulk_update(
-                    variants_to_update,
-                    ['stock', 'updated_at'],
-                    batch_size=100
+                stock_change = new_stock - old_stock
+                change_type = (
+                    'increase' if stock_change > 0
+                    else 'decrease' if stock_change < 0 else 'no_change'
                 )
-                if history_to_create:
-                    StockHistory.objects.using('matterhorn1').bulk_create(
-                        history_to_create, batch_size=100)
-                updated_count = len(variants_to_update)
-                logger.info(
-                    f"✅ INVENTORY bulk update: {updated_count} wariantów")
+                history_to_create.append(StockHistory(
+                    variant_uid=variant.variant_uid,
+                    product_uid=product.product_uid,
+                    product_name=product.name,
+                    variant_name=variant.name,
+                    old_stock=old_stock,
+                    new_stock=new_stock,
+                    stock_change=stock_change,
+                    change_type=change_type,
+                ))
+                updated_count += 1
+
+        # Warianty już zaktualizowane warunkowo wyżej; historia to log - zapis
+        # osobno (bez wspólnej transakcji, żeby ew. błąd bulk_create nie cofał
+        # zaktualizowanych stanów i nie prowadził do ponownego zapisu przy
+        # następnym runie).
+        if history_to_create:
+            StockHistory.objects.using('matterhorn1').bulk_create(
+                history_to_create, batch_size=100)
+            logger.info(
+                f"✅ INVENTORY bulk update: {updated_count} wariantów, "
+                f"{len(history_to_create)} wpisów historii")
 
         return updated_count
 
