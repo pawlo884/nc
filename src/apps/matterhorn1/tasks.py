@@ -11,6 +11,44 @@ from .defs_db import normalize_storage_key
 
 logger = get_task_logger(__name__)
 
+try:
+    from celery._state import get_current_task as _celery_get_current_task, _task_stack as _celery_task_stack
+except Exception:  # pragma: no cover - obrona przed zmianą wewnętrznego API Celery
+    _celery_get_current_task = lambda: None
+    _celery_task_stack = None
+
+
+def _run_with_task_context(task_and_request, fn, *args, **kwargs):
+    """Uruchamia `fn` w bieżącym wątku z kontekstem zadania Celery
+    wepchniętym na stos. Dzięki temu `get_task_logger`/`TaskFormatter` w
+    logach z wątków w tle (launcher pipeline'u, pool pobierający strony)
+    pokazuje nazwę i id zadania zamiast `???[???]` - i zadanie, i jego
+    request są w Celery thread-local, więc wątki poboczne ich nie widzą.
+
+    `task_and_request` = (task, request) złapane w wątku głównym, albo None."""
+    if not task_and_request or _celery_task_stack is None:
+        return fn(*args, **kwargs)
+    task, request = task_and_request
+    _celery_task_stack.push(task)
+    if request is not None:
+        task.request_stack.push(request)
+    try:
+        return fn(*args, **kwargs)
+    finally:
+        if request is not None:
+            task.request_stack.pop()
+        _celery_task_stack.pop()
+
+
+def _capture_task_context():
+    """(task, request) bieżącego zadania Celery - do przekazania wątkom w tle
+    przez _run_with_task_context. None gdy nie w zadaniu (np. w testach)."""
+    task = _celery_get_current_task()
+    if task is None:
+        return None
+    return (task, getattr(task, 'request', None))
+
+
 # Pipeline pobierania stron B2BAPI (ITEMS i ITEMS/INVENTORY): nowa strona co
 # tyle sekund, niezależnie od tego, ile poprzednich jeszcze nie odpowiedziało.
 # Limit API Matterhorn to 2 requesty/sekundę (docs/matterhorn/MATTERHORN1_*.md),
@@ -443,6 +481,7 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         pending_lock = threading.Lock()
         next_to_process = page
         stop_launching = threading.Event()
+        task_ctx = _capture_task_context()  # (task, request) do logów z wątków w tle
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
 
@@ -451,7 +490,8 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
             while not stop_launching.is_set():
                 with pending_lock:
                     pending[p] = executor.submit(
-                        _fetch_items_page, p, api_url, headers, limit, last_update)
+                        _run_with_task_context, task_ctx, _fetch_items_page,
+                        p, api_url, headers, limit, last_update)
                     p += 1
                     # Wczesny stop - patrz komentarz wyżej. Skanujemy pod tym
                     # samym lockiem co wstawianie/zdejmowanie z `pending`.
@@ -463,8 +503,8 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                     time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
 
         launcher_thread = threading.Thread(
-            target=_launcher, args=(page,), daemon=True,
-            name="matterhorn-items-launcher")
+            target=_run_with_task_context, args=(task_ctx, _launcher, page),
+            daemon=True, name="matterhorn-items-launcher")
         launcher_thread.start()
 
         try:
@@ -1454,6 +1494,7 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
         pending_lock = threading.Lock()
         next_to_process = 1
         stop_launching = threading.Event()
+        task_ctx = _capture_task_context()  # (task, request) do logów z wątków w tle
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
 
@@ -1462,7 +1503,8 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
             while not stop_launching.is_set():
                 with pending_lock:
                     pending[p] = executor.submit(
-                        _fetch_inventory_page, p, api_url, headers, limit, last_update)
+                        _run_with_task_context, task_ctx, _fetch_inventory_page,
+                        p, api_url, headers, limit, last_update)
                     p += 1
                     # Wczesny stop - patrz _import_products_from_items.
                     for fut in list(pending.values()):
@@ -1473,8 +1515,8 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
                     time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
 
         launcher_thread = threading.Thread(
-            target=_launcher, args=(1,), daemon=True,
-            name="matterhorn-inventory-launcher")
+            target=_run_with_task_context, args=(task_ctx, _launcher, 1),
+            daemon=True, name="matterhorn-inventory-launcher")
         launcher_thread.start()
 
         try:
