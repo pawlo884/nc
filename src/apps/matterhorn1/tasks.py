@@ -10,6 +10,16 @@ from .defs_db import normalize_storage_key
 
 logger = get_task_logger(__name__)
 
+# Pipeline pobierania stron B2BAPI (ITEMS i ITEMS/INVENTORY): nowa strona co
+# tyle sekund, niezależnie od tego, ile poprzednich jeszcze nie odpowiedziało.
+# Limit API Matterhorn to 2 requesty/sekundę (docs/matterhorn/MATTERHORN1_*.md),
+# więc to spory margines. MAX_PIPELINE_WORKERS to tylko górna granica liczby
+# wątków (nie throttling - o tempie decyduje wyłącznie interval powyżej),
+# zabezpieczenie przed nieograniczonym tworzeniem wątków, gdyby detekcja końca
+# danych z jakiegoś powodu zawiodła.
+MATTERHORN_PAGE_LAUNCH_INTERVAL = 2.0
+MATTERHORN_PIPELINE_MAX_WORKERS = 50
+
 
 @shared_task(bind=True, name='matterhorn1.tasks.full_import_and_update', queue='import')
 def full_import_and_update(self, start_id=None, max_products=200000,
@@ -407,13 +417,6 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         # odpowiadają szybko, więc to realnie ogranicza liczbę zbędnych
         # requestów - patrz test na żywym API: bez tego leciało aż do strony
         # 70, mimo że koniec danych był na 24-tej).
-        PAGE_LAUNCH_INTERVAL = 2.0
-        # Górna granica liczby wątków - nie throttling (o tempie decyduje
-        # PAGE_LAUNCH_INTERVAL), tylko zabezpieczenie przed nieograniczonym
-        # tworzeniem wątków, gdyby detekcja końca danych z jakiegoś powodu
-        # zawiodła.
-        MAX_CONCURRENT_SAFETY_CAP = 50
-
         api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
         if not api_key:
             api_key = f"{username}:{password}"
@@ -427,7 +430,7 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         next_to_process = page
         stop_launching = False
 
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_SAFETY_CAP)
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
         try:
             while True:
                 if not stop_launching:
@@ -534,7 +537,7 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                     # krótszy odstęp niż tempo launchera.
                     time.sleep(0.2)
                 else:
-                    time.sleep(PAGE_LAUNCH_INTERVAL)
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
         finally:
             for f in pending.values():
                 f.cancel()
@@ -1330,8 +1333,69 @@ def _prepare_product_update(product, item, brand=None, category=None):
 # Usunięto funkcje single import - używamy tylko bulk operations
 
 
+def _fetch_inventory_page(page, api_url, headers, limit, last_update):
+    """Pobiera jedną stronę B2BAPI/ITEMS/INVENTORY. Bez retry - tak jak
+    oryginalnie: każdy błąd (JSON/status/sieć) albo koniec danych (pusta
+    strona/404) po prostu kończy pobieranie tej strony jako 'stop' (oryginalny
+    kod na każdym z tych przypadków po prostu przerywał pętlę i zwracał
+    'success' z tym, co już zdążono zaktualizować - to zachowanie zostaje).
+
+    Zwraca:
+      {'outcome': 'ok', 'items': [...]}
+      {'outcome': 'stop'}
+    """
+    try:
+        import requests
+
+        url = f"{api_url}/B2BAPI/ITEMS/INVENTORY/?page={page}&limit={limit}&last_update={last_update}"
+        logger.info(f"🔗 INVENTORY Request URL: {url}")
+        response = requests.get(url, headers=headers, timeout=120)
+
+        logger.info(f"🔍 INVENTORY API Response strona {page}: status={response.status_code}")
+
+        if response.status_code == 200:
+            if not response.text.strip():
+                logger.info(f"📊 INVENTORY (strona {page}) - pusta odpowiedź - koniec danych")
+                return {'outcome': 'stop'}
+
+            try:
+                inventory_data = response.json()
+            except Exception as e:
+                logger.error(f"❌ Błąd parsowania JSON INVENTORY (strona {page}): {e}")
+                return {'outcome': 'stop'}
+
+            if not inventory_data:
+                logger.info(f"📊 INVENTORY (strona {page}) - brak danych na stronie - koniec")
+                return {'outcome': 'stop'}
+
+            logger.info(f"📥 INVENTORY - pobrano {len(inventory_data)} rekordów ze strony {page}")
+            return {'outcome': 'ok', 'items': inventory_data}
+
+        elif response.status_code == 404:
+            logger.info(f"📊 INVENTORY (strona {page}) - strona nie istnieje - koniec danych")
+            return {'outcome': 'stop'}
+        else:
+            logger.warning(f"⚠️ Błąd INVENTORY API {response.status_code} (strona {page})")
+            return {'outcome': 'stop'}
+
+    except Exception as e:
+        logger.error(f"❌ Błąd podczas pobierania INVENTORY strony {page}: {e}")
+        return {'outcome': 'stop'}
+
+
 def _update_inventory_from_api(api_url, username, password, batch_size, dry_run):
-    """Pomocnicza funkcja do aktualizacji INVENTORY z bulk operations i tą samą datą co ITEMS"""
+    """Pomocnicza funkcja do aktualizacji INVENTORY z bulk operations i tą samą datą co ITEMS.
+
+    Ten sam pipeline co w _import_products_from_items: WSZYSTKIE strony lecą
+    w locie naraz, nowa co MATTERHORN_PAGE_LAUNCH_INTERVAL sekund, aż do
+    trafienia na koniec danych/błąd (a wystrzeliwanie kończy się wcześniej,
+    jak tylko którakolwiek już gotowa strona w buforze okaże się takim
+    "stop"). INVENTORY nie ma checkpointu do wznowienia (zawsze zaczyna od
+    strony 1) i _bulk_update_inventory per strona jest niezależny od innych
+    stron, więc bufor porządkujący jest tu tylko dla przewidywalnej
+    kolejności logów/liczenia - nie ma ryzyka pominięcia danych przy
+    wznowieniu jak przy ITEMS.
+    """
     try:
         # Użyj tej samej daty startu co ITEMS z poprawnym formatowaniem
         last_update = _get_last_items_update_time()
@@ -1348,9 +1412,6 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
         logger.info(
             f"📅 INVENTORY używam tej samej daty co ITEMS: {last_update}")
 
-        # Pobierz dane uwierzytelniające
-        from django.conf import settings
-        import requests
         api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
         if not api_key:
             api_key = f"{username}:{password}"
@@ -1361,64 +1422,59 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
         }
 
         updated_count = 0
-        page = 1
         limit = 1000
 
-        while True:
-            try:
-                # Pobierz dane z INVENTORY API z last_update
-                url = f"{api_url}/B2BAPI/ITEMS/INVENTORY/?page={page}&limit={limit}&last_update={last_update}"
-                logger.info(f"🔗 INVENTORY Request URL: {url}")
+        pending = {}  # page -> Future - bufor odpowiedzi czekających na zapis
+        next_to_launch = 1
+        next_to_process = 1
+        stop_launching = False
 
-                response = requests.get(url, headers=headers, timeout=120)
-                time.sleep(0.6)  # Ograniczenie API: max 2 requests/sekundę
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
+        try:
+            while True:
+                if not stop_launching:
+                    pending[next_to_launch] = executor.submit(
+                        _fetch_inventory_page, next_to_launch, api_url, headers, limit, last_update)
+                    next_to_launch += 1
 
-                logger.info(
-                    f"🔍 INVENTORY API Response strona {page}: status={response.status_code}")
-
-                if response.status_code == 200:
-                    if not response.text.strip():
-                        logger.info(
-                            "📊 INVENTORY - pusta odpowiedź - koniec danych")
-                        break
-
-                    try:
-                        inventory_data = response.json()
-                        if not inventory_data:
-                            logger.info(
-                                "📊 INVENTORY - brak danych na stronie - koniec")
+                    # Wczesny stop - patrz _import_products_from_items, ten sam wzorzec.
+                    for fut in pending.values():
+                        if fut.done() and fut.result()['outcome'] != 'ok':
+                            stop_launching = True
                             break
 
-                        logger.info(
-                            f"📥 INVENTORY - pobrano {len(inventory_data)} rekordów ze strony {page}")
+                # Przetwórz WSZYSTKO co już gotowe, ściśle w kolejności stron.
+                reached_stop = False
+                while next_to_process in pending and pending[next_to_process].done():
+                    result = pending.pop(next_to_process).result()
+                    current_page = next_to_process
 
-                        if not dry_run:
-                            # Bulk update stanów magazynowych
-                            page_updated = _bulk_update_inventory(
-                                inventory_data)
-                            updated_count += page_updated
-                            logger.info(
-                                f"✅ INVENTORY - zaktualizowano {page_updated} produktów na stronie {page}")
-
-                        page += 1
-
-                    except Exception as e:
-                        logger.error(f"❌ Błąd parsowania JSON INVENTORY: {e}")
+                    if result['outcome'] != 'ok':
+                        reached_stop = True
                         break
 
-                elif response.status_code == 404:
-                    logger.info(
-                        "📊 INVENTORY - strona nie istnieje - koniec danych")
-                    break
-                else:
-                    logger.warning(
-                        f"⚠️ Błąd INVENTORY API {response.status_code}")
+                    inventory_data = result['items']
+                    if not dry_run:
+                        page_updated = _bulk_update_inventory(inventory_data)
+                        updated_count += page_updated
+                        logger.info(
+                            f"✅ INVENTORY - zaktualizowano {page_updated} produktów na stronie {current_page}")
+
+                    next_to_process += 1
+
+                if reached_stop:
                     break
 
-            except Exception as e:
-                logger.error(
-                    f"❌ Błąd podczas pobierania INVENTORY strony {page}: {e}")
-                break
+                if stop_launching:
+                    # Nic już nie wystrzeliwujemy - tylko czekamy, aż to co w
+                    # locie się skończy, więc krótszy odstęp niż tempo launchera.
+                    time.sleep(0.2)
+                else:
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
+        finally:
+            for f in pending.values():
+                f.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
 
         logger.info(
             f"📊 INVENTORY zakończony: {updated_count} zaktualizowanych produktów")
