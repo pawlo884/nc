@@ -1,4 +1,5 @@
 import time
+import concurrent.futures
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
@@ -8,6 +9,16 @@ from .stock_tracker import track_stock_change, track_bulk_stock_changes, sync_st
 from .defs_db import normalize_storage_key
 
 logger = get_task_logger(__name__)
+
+# Pipeline pobierania stron B2BAPI (ITEMS i ITEMS/INVENTORY): nowa strona co
+# tyle sekund, niezależnie od tego, ile poprzednich jeszcze nie odpowiedziało.
+# Limit API Matterhorn to 2 requesty/sekundę (docs/matterhorn/MATTERHORN1_*.md),
+# więc to spory margines. MAX_PIPELINE_WORKERS to tylko górna granica liczby
+# wątków (nie throttling - o tempie decyduje wyłącznie interval powyżej),
+# zabezpieczenie przed nieograniczonym tworzeniem wątków, gdyby detekcja końca
+# danych z jakiegoś powodu zawiodła.
+MATTERHORN_PAGE_LAUNCH_INTERVAL = 2.0
+MATTERHORN_PIPELINE_MAX_WORKERS = 50
 
 
 @shared_task(bind=True, name='matterhorn1.tasks.full_import_and_update', queue='import')
@@ -267,6 +278,94 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             logger.error(f"❌ Błąd podczas aktualizacji statusu na końcu: {e}")
 
 
+def _fetch_items_page(page, api_url, headers, limit, last_update):
+    """Pobiera jedną stronę B2BAPI/ITEMS z retry/backoff (do 10 prób, 20s
+    między próbami). Wydzielone z `_import_products_from_items`, żeby dało
+    się to wołać równolegle z executora w pipeline pobierania (patrz niżej) -
+    wolne API (30-60s/strona) sekwencyjnie zjadało większość czasu importu.
+
+    Zwraca:
+      {'outcome': 'ok', 'items': [...]}
+      {'outcome': 'end_of_data', 'reason': 'empty_response'|'no_more_products'|'page_404'}
+      {'outcome': 'error', 'error': str}
+    """
+    max_attempts = 10
+    attempt = 1
+
+    while attempt <= max_attempts:
+        try:
+            import requests
+
+            url = f"{api_url}/B2BAPI/ITEMS/?page={page}&limit={limit}&last_update={last_update}"
+            logger.info(f"🔗 Request URL: {url}")
+            response = requests.get(url, headers=headers, timeout=120)
+
+            logger.info(
+                f"🔍 Bulk API Response strona {page}: status={response.status_code}, content_length={len(response.text)}")
+
+            if response.status_code == 200:
+                if not response.text.strip():
+                    logger.info(f"📊 Pusta odpowiedź (strona {page}) - koniec danych")
+                    return {'outcome': 'end_of_data', 'reason': 'empty_response'}
+
+                try:
+                    items = response.json()
+                except SoftTimeLimitExceeded:
+                    raise
+                except Exception as e:
+                    logger.error(f"❌ Błąd parsowania JSON (strona {page}): {e}")
+                    if attempt < max_attempts:
+                        logger.warning(
+                            f"⚠️ Próba {attempt}/{max_attempts} (strona {page}) - ponawiam za 20 sekund...")
+                        time.sleep(20)
+                        attempt += 1
+                        continue
+                    logger.error(f"❌ Osiągnięto maksymalną liczbę prób parsowania JSON (strona {page})")
+                    break
+
+                if not items:
+                    logger.info(f"📊 Brak produktów na stronie {page} - koniec danych")
+                    return {'outcome': 'end_of_data', 'reason': 'no_more_products'}
+
+                logger.info(f"📥 Pobrano {len(items)} produktów ze strony {page}")
+                return {'outcome': 'ok', 'items': items}
+
+            elif response.status_code == 404:
+                logger.info(f"📊 Strona {page} nie istnieje - koniec danych")
+                return {'outcome': 'end_of_data', 'reason': 'page_404'}
+            else:
+                logger.warning(f"⚠️ Błąd API {response.status_code} (strona {page})")
+                if attempt < max_attempts:
+                    logger.warning(
+                        f"⚠️ Próba {attempt}/{max_attempts} (strona {page}) - ponawiam za 20 sekund...")
+                    time.sleep(20)
+                    attempt += 1
+                    continue
+                logger.error(f"❌ Osiągnięto maksymalną liczbę prób API (strona {page})")
+                break
+
+        except SoftTimeLimitExceeded:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Błąd podczas pobierania strony {page}: {e}")
+            logger.error(f"❌ Typ błędu: {type(e).__name__}")
+            if "timeout" in str(e).lower():
+                logger.warning("⚠️ Timeout - API może być wolne, zwiększam timeout")
+            if attempt < max_attempts:
+                logger.warning(
+                    f"⚠️ Próba {attempt}/{max_attempts} (strona {page}) - ponawiam za 20 sekund...")
+                time.sleep(20)
+                attempt += 1
+                continue
+            logger.error(f"❌ Osiągnięto maksymalną liczbę prób połączenia (strona {page})")
+            break
+
+    return {
+        'outcome': 'error',
+        'error': f'Strona {page} nieosiągalna po {max_attempts} próbach (błąd API/sieci)',
+    }
+
+
 def _import_products_from_items(start_id, max_products, api_url, username, password, batch_size, dry_run):
     """Pomocnicza funkcja do importu produktów z ITEMS używając last_update"""
     try:
@@ -301,177 +400,153 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
 
         logger.info(f"🔍 Używam bulk API ITEMS z last_update i limit={limit}")
 
-        while imported_count < max_products:
-            max_attempts = 10
-            attempt = 1
-            # Czy tę stronę udało się pobrać+zapisać. Bez tego przy trwałym 5xx
-            # (page rośnie tylko po sukcesie) outer while pętli w nieskończoność
-            # na martwej stronie aż do soft-timeoutu Celery.
-            page_succeeded = False
-            end_of_data = False
+        # Pipeline: WSZYSTKIE strony lecą w locie naraz (bez sztucznego okna),
+        # nowa co PAGE_LAUNCH_INTERVAL sekund - aż do trafienia na koniec danych
+        # (pusta strona/404) albo błąd. Limit API Matterhorn to 2 requesty/
+        # sekundę (docs/matterhorn/MATTERHORN1_*.md), więc to spory margines.
+        # Sens: pojedyncza strona odpowiada 30-60s (wolne API), więc wiele w
+        # locie realnie skraca czas importu. Odpowiedzi trafiają do `pending`
+        # (odpowiednik "JSONa" z buforem) w miarę jak są gotowe; zapis do bazy
+        # i checkpoint (current_page) idą jednak ŚCIŚLE w kolejności stron -
+        # strona 2 z bufora dopiero gdy strona 1 już zapisana - niezależnie od
+        # tego, która odpowiedź HTTP wróci pierwsza. Inaczej wznowienie po
+        # awarii mogłoby pominąć stronę, która akurat odpowiedziała później.
+        # Wystrzeliwanie nowych stron kończy się, jak tylko KTÓRAKOLWIEK już
+        # gotowa strona w buforze okaże się końcem danych/błędem - nie trzeba
+        # czekać, aż dojdzie do niej przetwarzanie w kolejności (puste strony
+        # odpowiadają szybko, więc to realnie ogranicza liczbę zbędnych
+        # requestów - patrz test na żywym API: bez tego leciało aż do strony
+        # 70, mimo że koniec danych był na 24-tej).
+        api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
+        if not api_key:
+            api_key = f"{username}:{password}"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": api_key,
+        }
 
-            while attempt <= max_attempts:
-                try:
-                    # Pobierz dane uwierzytelniające
-                    from django.conf import settings
-                    import requests
-                    api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
-                    if not api_key:
-                        api_key = f"{username}:{password}"
+        pending = {}  # page -> Future - bufor odpowiedzi czekających na zapis
+        next_to_launch = page
+        next_to_process = page
+        stop_launching = False
 
-                    headers = {
-                        "Content-Type": "application/json",
-                        "Authorization": api_key
-                    }
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
+        try:
+            while True:
+                if not stop_launching:
+                    pending[next_to_launch] = executor.submit(
+                        _fetch_items_page, next_to_launch, api_url, headers, limit, last_update)
+                    next_to_launch += 1
 
-                    # Użyj bulk API z last_update
-                    url = f"{api_url}/B2BAPI/ITEMS/?page={page}&limit={limit}&last_update={last_update}"
-                    logger.info(f"🔗 Request URL: {url}")
-                    response = requests.get(url, headers=headers, timeout=120)
-                    time.sleep(1.0)  # Ograniczenie API: 1 request/sekundę
-
-                    logger.info(
-                        f"🔍 Bulk API Response strona {page}: status={response.status_code}, content_length={len(response.text)}")
-
-                    if response.status_code == 200:
-                        if not response.text.strip():
-                            logger.info("📊 Pusta odpowiedź - koniec danych")
-                            return {
-                                'status': 'completed',
-                                'imported_count': imported_count,
-                                'reason': 'empty_response'
-                            }
-
-                        try:
-                            items = response.json()
-                            if not items:
-                                logger.info(
-                                    "📊 Brak produktów na stronie - koniec danych")
-                                return {
-                                    'status': 'completed',
-                                    'imported_count': imported_count,
-                                    'reason': 'no_more_products'
-                                }
-
-                            logger.info(
-                                f"📥 Pobrano {len(items)} produktów ze strony {page}")
-
-                            # Bulk import/update
-                            if not dry_run:
-                                bulk_result = None
-                                for db_attempt in range(1, max_page_db_retries + 1):
-                                    bulk_result = _bulk_import_products(items)
-                                    if bulk_result.get('status') != 'error':
-                                        break
-
-                                    if db_attempt < max_page_db_retries:
-                                        delay = min(page_db_retry_delay * (2 ** (db_attempt - 1)), 30)
-                                        logger.warning(
-                                            f"⏳ Błąd zapisu DB dla strony {page} "
-                                            f"(próba {db_attempt}/{max_page_db_retries}): "
-                                            f"{bulk_result.get('error', 'unknown_error')}. "
-                                            f"Ponowienie tej samej strony za {delay}s..."
-                                        )
-                                        time.sleep(delay)
-                                    else:
-                                        logger.error(
-                                            f"❌ Wyczerpano retry zapisu DB dla strony {page} "
-                                            f"({max_page_db_retries} prób)"
-                                        )
-
-                                if bulk_result is None or bulk_result.get('status') == 'error':
-                                    return {
-                                        'status': 'error',
-                                        'error': bulk_result.get('error', f'Bulk import failed for page {page}') if bulk_result else f'Bulk import failed for page {page}'
-                                    }
-                                imported_count += bulk_result['imported_count']
-                            else:
-                                # Dry run - tylko zlicz
-                                for item in items:
-                                    if imported_count >= max_products:
-                                        break
-                                    if item.get("creation_date") is not None:
-                                        imported_count += 1
-
-                            page += 1
-                            page_succeeded = True
-                            # Aktualizuj current_page w bazie danych
-                            if not dry_run:
-                                _update_items_import_status(
-                                    'running', imported_count, page, updated_count=bulk_result.get('updated_count', 0), processed_count=imported_count)
-                            break  # Sukces - wyjdź z retry loop
-
-                        except SoftTimeLimitExceeded:
-                            raise
-                        except Exception as e:
-                            logger.error(f"❌ Błąd parsowania JSON: {e}")
-                            if attempt < max_attempts:
-                                logger.warning(
-                                    f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
-                                time.sleep(20)
-                                attempt += 1
-                                continue
-                            else:
-                                logger.error(
-                                    "❌ Osiągnięto maksymalną liczbę prób parsowania JSON")
-                                break
-
-                    elif response.status_code == 404:
-                        logger.info("📊 Strona nie istnieje - koniec danych")
-                        end_of_data = True
-                        break
-                    else:
-                        logger.warning(f"⚠️ Błąd API {response.status_code}")
-                        if attempt < max_attempts:
-                            logger.warning(
-                                f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
-                            time.sleep(20)
-                            attempt += 1
-                            continue
-                        else:
-                            logger.error(
-                                "❌ Osiągnięto maksymalną liczbę prób API")
+                    # Wczesny stop: puste strony/błędy odpowiadają szybko (nie
+                    # trzeba czekać, aż strony z realnymi danymi z przodu
+                    # kolejki się doczekają) - jak tylko KTÓRAKOLWIEK już
+                    # zakończona strona w buforze okaże się końcem danych albo
+                    # błędem, przestań wystrzeliwać dalsze. Realny import
+                    # (patrz test na żywo): bez tego launcher strzelał aż do
+                    # strony 70, mimo że koniec danych był już na 24-tej -
+                    # 46 zbędnych requestów do zewnętrznego API. Przetwarzanie
+                    # i zapis niżej nadal idą ściśle w kolejności, bez zmian.
+                    for fut in pending.values():
+                        if fut.done() and fut.result()['outcome'] != 'ok':
+                            stop_launching = True
                             break
 
-                except SoftTimeLimitExceeded:
-                    raise
-                except Exception as e:
-                    logger.error(
-                        f"❌ Błąd podczas pobierania strony {page}: {e}")
-                    logger.error(f"❌ Typ błędu: {type(e).__name__}")
-                    if "timeout" in str(e).lower():
-                        logger.warning("⚠️ Timeout - API może być wolne, zwiększam timeout")
-                    if attempt < max_attempts:
-                        logger.warning(
-                            f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
-                        time.sleep(20)
-                        attempt += 1
-                        continue
-                    else:
+                # Przetwórz WSZYSTKO co już gotowe, ściśle w kolejności stron -
+                # mogło odpowiedzieć kilka naraz, podczas gdy czekaliśmy.
+                hit_max_products = False
+                while next_to_process in pending and pending[next_to_process].done():
+                    result = pending.pop(next_to_process).result()  # propaguje wyjątki (np. SoftTimeLimitExceeded)
+                    current_page = next_to_process
+
+                    if result['outcome'] == 'error':
                         logger.error(
-                            "❌ Osiągnięto maksymalną liczbę prób połączenia")
+                            f"❌ Import przerwany błędem (current_page={next_to_process} zachowany do wznowienia): "
+                            f"{result['error']}")
+                        return {
+                            'status': 'error',
+                            'imported_count': imported_count,
+                            'error': result['error'],
+                        }
+
+                    if result['outcome'] == 'end_of_data':
+                        return {
+                            'status': 'completed',
+                            'imported_count': imported_count,
+                            'reason': result['reason'],
+                        }
+
+                    items = result['items']
+                    logger.info(f"📥 Przetwarzam stronę {current_page} ({len(items)} produktów)")
+
+                    # Bulk import/update
+                    if not dry_run:
+                        bulk_result = None
+                        for db_attempt in range(1, max_page_db_retries + 1):
+                            bulk_result = _bulk_import_products(items)
+                            if bulk_result.get('status') != 'error':
+                                break
+
+                            if db_attempt < max_page_db_retries:
+                                delay = min(page_db_retry_delay * (2 ** (db_attempt - 1)), 30)
+                                logger.warning(
+                                    f"⏳ Błąd zapisu DB dla strony {current_page} "
+                                    f"(próba {db_attempt}/{max_page_db_retries}): "
+                                    f"{bulk_result.get('error', 'unknown_error')}. "
+                                    f"Ponowienie tej samej strony za {delay}s..."
+                                )
+                                time.sleep(delay)
+                            else:
+                                logger.error(
+                                    f"❌ Wyczerpano retry zapisu DB dla strony {current_page} "
+                                    f"({max_page_db_retries} prób)"
+                                )
+
+                        if bulk_result is None or bulk_result.get('status') == 'error':
+                            return {
+                                'status': 'error',
+                                'error': bulk_result.get('error', f'Bulk import failed for page {current_page}') if bulk_result else f'Bulk import failed for page {current_page}',
+                            }
+                        imported_count += bulk_result['imported_count']
+                    else:
+                        # Dry run - tylko zlicz
+                        for item in items:
+                            if imported_count >= max_products:
+                                break
+                            if item.get("creation_date") is not None:
+                                imported_count += 1
+
+                    next_to_process += 1
+                    # Aktualizuj current_page w bazie danych
+                    if not dry_run:
+                        _update_items_import_status(
+                            'running', imported_count, next_to_process,
+                            updated_count=bulk_result.get('updated_count', 0),
+                            processed_count=imported_count)
+
+                    if imported_count >= max_products:
+                        hit_max_products = True
                         break
 
-            # Po pętli retry: strona albo się udała (page += 1, lecimy dalej),
-            # albo API zwróciło 404 = koniec danych, albo wyczerpaliśmy próby na
-            # błędzie sieci/5xx/JSON. `page` rośnie TYLKO po sukcesie, więc bez
-            # tego rozgałęzienia outer while pętliłby w kółko na tej samej stronie.
-            if page_succeeded:
-                continue  # następna strona
-            if end_of_data:
-                return {
-                    'status': 'completed',
-                    'imported_count': imported_count,
-                    'reason': 'page_404',
-                }
-            logger.error(
-                f"❌ Strona {page} nieosiągalna po {max_attempts} próbach - przerywam import "
-                f"(current_page={page} zachowany do wznowienia)")
-            return {
-                'status': 'error',
-                'imported_count': imported_count,
-                'error': f'Strona {page} nieosiągalna po {max_attempts} próbach (błąd API/sieci)',
-            }
+                if hit_max_products:
+                    break
+
+                if stop_launching:
+                    # Nic już nie wystrzeliwujemy - tylko czekamy, aż to co w
+                    # locie się skończy (przetworzone wyżej w kolejności), więc
+                    # krótszy odstęp niż tempo launchera.
+                    time.sleep(0.2)
+                else:
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
+        finally:
+            for f in pending.values():
+                f.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
+
+        # imported_count >= max_products osiągnięte w trakcie pipeline'u -
+        # spadamy do bloku "sukces" niżej (dokładnie jak wcześniej, gdy outer
+        # while kończył się naturalnie po przekroczeniu max_products). Ścieżki
+        # 'error'/'completed' (koniec danych) zwracają wyżej, wprost z pętli.
 
         # Zaktualizuj status importu na 'success' po zakończeniu
         if not dry_run:
@@ -1258,8 +1333,69 @@ def _prepare_product_update(product, item, brand=None, category=None):
 # Usunięto funkcje single import - używamy tylko bulk operations
 
 
+def _fetch_inventory_page(page, api_url, headers, limit, last_update):
+    """Pobiera jedną stronę B2BAPI/ITEMS/INVENTORY. Bez retry - tak jak
+    oryginalnie: każdy błąd (JSON/status/sieć) albo koniec danych (pusta
+    strona/404) po prostu kończy pobieranie tej strony jako 'stop' (oryginalny
+    kod na każdym z tych przypadków po prostu przerywał pętlę i zwracał
+    'success' z tym, co już zdążono zaktualizować - to zachowanie zostaje).
+
+    Zwraca:
+      {'outcome': 'ok', 'items': [...]}
+      {'outcome': 'stop'}
+    """
+    try:
+        import requests
+
+        url = f"{api_url}/B2BAPI/ITEMS/INVENTORY/?page={page}&limit={limit}&last_update={last_update}"
+        logger.info(f"🔗 INVENTORY Request URL: {url}")
+        response = requests.get(url, headers=headers, timeout=120)
+
+        logger.info(f"🔍 INVENTORY API Response strona {page}: status={response.status_code}")
+
+        if response.status_code == 200:
+            if not response.text.strip():
+                logger.info(f"📊 INVENTORY (strona {page}) - pusta odpowiedź - koniec danych")
+                return {'outcome': 'stop'}
+
+            try:
+                inventory_data = response.json()
+            except Exception as e:
+                logger.error(f"❌ Błąd parsowania JSON INVENTORY (strona {page}): {e}")
+                return {'outcome': 'stop'}
+
+            if not inventory_data:
+                logger.info(f"📊 INVENTORY (strona {page}) - brak danych na stronie - koniec")
+                return {'outcome': 'stop'}
+
+            logger.info(f"📥 INVENTORY - pobrano {len(inventory_data)} rekordów ze strony {page}")
+            return {'outcome': 'ok', 'items': inventory_data}
+
+        elif response.status_code == 404:
+            logger.info(f"📊 INVENTORY (strona {page}) - strona nie istnieje - koniec danych")
+            return {'outcome': 'stop'}
+        else:
+            logger.warning(f"⚠️ Błąd INVENTORY API {response.status_code} (strona {page})")
+            return {'outcome': 'stop'}
+
+    except Exception as e:
+        logger.error(f"❌ Błąd podczas pobierania INVENTORY strony {page}: {e}")
+        return {'outcome': 'stop'}
+
+
 def _update_inventory_from_api(api_url, username, password, batch_size, dry_run):
-    """Pomocnicza funkcja do aktualizacji INVENTORY z bulk operations i tą samą datą co ITEMS"""
+    """Pomocnicza funkcja do aktualizacji INVENTORY z bulk operations i tą samą datą co ITEMS.
+
+    Ten sam pipeline co w _import_products_from_items: WSZYSTKIE strony lecą
+    w locie naraz, nowa co MATTERHORN_PAGE_LAUNCH_INTERVAL sekund, aż do
+    trafienia na koniec danych/błąd (a wystrzeliwanie kończy się wcześniej,
+    jak tylko którakolwiek już gotowa strona w buforze okaże się takim
+    "stop"). INVENTORY nie ma checkpointu do wznowienia (zawsze zaczyna od
+    strony 1) i _bulk_update_inventory per strona jest niezależny od innych
+    stron, więc bufor porządkujący jest tu tylko dla przewidywalnej
+    kolejności logów/liczenia - nie ma ryzyka pominięcia danych przy
+    wznowieniu jak przy ITEMS.
+    """
     try:
         # Użyj tej samej daty startu co ITEMS z poprawnym formatowaniem
         last_update = _get_last_items_update_time()
@@ -1276,9 +1412,6 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
         logger.info(
             f"📅 INVENTORY używam tej samej daty co ITEMS: {last_update}")
 
-        # Pobierz dane uwierzytelniające
-        from django.conf import settings
-        import requests
         api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
         if not api_key:
             api_key = f"{username}:{password}"
@@ -1289,64 +1422,59 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
         }
 
         updated_count = 0
-        page = 1
         limit = 1000
 
-        while True:
-            try:
-                # Pobierz dane z INVENTORY API z last_update
-                url = f"{api_url}/B2BAPI/ITEMS/INVENTORY/?page={page}&limit={limit}&last_update={last_update}"
-                logger.info(f"🔗 INVENTORY Request URL: {url}")
+        pending = {}  # page -> Future - bufor odpowiedzi czekających na zapis
+        next_to_launch = 1
+        next_to_process = 1
+        stop_launching = False
 
-                response = requests.get(url, headers=headers, timeout=120)
-                time.sleep(0.6)  # Ograniczenie API: max 2 requests/sekundę
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
+        try:
+            while True:
+                if not stop_launching:
+                    pending[next_to_launch] = executor.submit(
+                        _fetch_inventory_page, next_to_launch, api_url, headers, limit, last_update)
+                    next_to_launch += 1
 
-                logger.info(
-                    f"🔍 INVENTORY API Response strona {page}: status={response.status_code}")
-
-                if response.status_code == 200:
-                    if not response.text.strip():
-                        logger.info(
-                            "📊 INVENTORY - pusta odpowiedź - koniec danych")
-                        break
-
-                    try:
-                        inventory_data = response.json()
-                        if not inventory_data:
-                            logger.info(
-                                "📊 INVENTORY - brak danych na stronie - koniec")
+                    # Wczesny stop - patrz _import_products_from_items, ten sam wzorzec.
+                    for fut in pending.values():
+                        if fut.done() and fut.result()['outcome'] != 'ok':
+                            stop_launching = True
                             break
 
-                        logger.info(
-                            f"📥 INVENTORY - pobrano {len(inventory_data)} rekordów ze strony {page}")
+                # Przetwórz WSZYSTKO co już gotowe, ściśle w kolejności stron.
+                reached_stop = False
+                while next_to_process in pending and pending[next_to_process].done():
+                    result = pending.pop(next_to_process).result()
+                    current_page = next_to_process
 
-                        if not dry_run:
-                            # Bulk update stanów magazynowych
-                            page_updated = _bulk_update_inventory(
-                                inventory_data)
-                            updated_count += page_updated
-                            logger.info(
-                                f"✅ INVENTORY - zaktualizowano {page_updated} produktów na stronie {page}")
-
-                        page += 1
-
-                    except Exception as e:
-                        logger.error(f"❌ Błąd parsowania JSON INVENTORY: {e}")
+                    if result['outcome'] != 'ok':
+                        reached_stop = True
                         break
 
-                elif response.status_code == 404:
-                    logger.info(
-                        "📊 INVENTORY - strona nie istnieje - koniec danych")
-                    break
-                else:
-                    logger.warning(
-                        f"⚠️ Błąd INVENTORY API {response.status_code}")
+                    inventory_data = result['items']
+                    if not dry_run:
+                        page_updated = _bulk_update_inventory(inventory_data)
+                        updated_count += page_updated
+                        logger.info(
+                            f"✅ INVENTORY - zaktualizowano {page_updated} produktów na stronie {current_page}")
+
+                    next_to_process += 1
+
+                if reached_stop:
                     break
 
-            except Exception as e:
-                logger.error(
-                    f"❌ Błąd podczas pobierania INVENTORY strony {page}: {e}")
-                break
+                if stop_launching:
+                    # Nic już nie wystrzeliwujemy - tylko czekamy, aż to co w
+                    # locie się skończy, więc krótszy odstęp niż tempo launchera.
+                    time.sleep(0.2)
+                else:
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
+        finally:
+            for f in pending.values():
+                f.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
 
         logger.info(
             f"📊 INVENTORY zakończony: {updated_count} zaktualizowanych produktów")
