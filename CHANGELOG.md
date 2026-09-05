@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.8](https://github.com/pawlo884/nc/compare/v1.44.7...v1.44.8) (2026-09-05)
+
+### Performance Improvements
+
+* **matterhorn:** pipeline pobierania stron ITEMS zamiast sekwencyjnego ([#226](https://github.com/pawlo884/nc/issues/226)) ([edec429](https://github.com/pawlo884/nc/commit/edec429e3bc95ba62055217d85a956244d7bcbaf)), references [#214](https://github.com/pawlo884/nc/issues/214)
+
 ## [1.44.7](https://github.com/pawlo884/nc/compare/v1.44.6...v1.44.7) (2026-09-04)
 
 ### Performance Improvements
