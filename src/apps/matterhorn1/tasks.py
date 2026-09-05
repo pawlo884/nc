@@ -1,4 +1,5 @@
 import time
+import threading
 import concurrent.futures
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
@@ -401,17 +402,30 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         logger.info(f"🔍 Używam bulk API ITEMS z last_update i limit={limit}")
 
         # Pipeline: WSZYSTKIE strony lecą w locie naraz (bez sztucznego okna),
-        # nowa co PAGE_LAUNCH_INTERVAL sekund - aż do trafienia na koniec danych
-        # (pusta strona/404) albo błąd. Limit API Matterhorn to 2 requesty/
-        # sekundę (docs/matterhorn/MATTERHORN1_*.md), więc to spory margines.
-        # Sens: pojedyncza strona odpowiada 30-60s (wolne API), więc wiele w
-        # locie realnie skraca czas importu. Odpowiedzi trafiają do `pending`
-        # (odpowiednik "JSONa" z buforem) w miarę jak są gotowe; zapis do bazy
-        # i checkpoint (current_page) idą jednak ŚCIŚLE w kolejności stron -
-        # strona 2 z bufora dopiero gdy strona 1 już zapisana - niezależnie od
-        # tego, która odpowiedź HTTP wróci pierwsza. Inaczej wznowienie po
-        # awarii mogłoby pominąć stronę, która akurat odpowiedziała później.
-        # Wystrzeliwanie nowych stron kończy się, jak tylko KTÓRAKOLWIEK już
+        # nowa co MATTERHORN_PAGE_LAUNCH_INTERVAL sekund - aż do trafienia na
+        # koniec danych (pusta strona/404) albo błąd. Limit API Matterhorn to
+        # 2 requesty/sekundę (docs/matterhorn/MATTERHORN1_*.md), więc to spory
+        # margines. Sens: pojedyncza strona odpowiada 30-60s (wolne API), więc
+        # wiele w locie realnie skraca czas importu. Odpowiedzi trafiają do
+        # `pending` (odpowiednik "JSONa" z buforem) w miarę jak są gotowe;
+        # zapis do bazy i checkpoint (current_page) idą jednak ŚCIŚLE w
+        # kolejności stron - strona 2 z bufora dopiero gdy strona 1 już
+        # zapisana - niezależnie od tego, która odpowiedź HTTP wróci pierwsza.
+        # Inaczej wznowienie po awarii mogłoby pominąć stronę, która akurat
+        # odpowiedziała później.
+        #
+        # Wystrzeliwanie NOWYCH stron dzieje się na OSOBNYM wątku (_launcher
+        # niżej), niezależnie od tego, jak długo trwa przetwarzanie/zapis
+        # zaległości w wątku głównym. Bez tego, gdy kilka stron odpowie naraz
+        # (bo strona z przodu kolejki akurat była wolna - realne API zwalnia
+        # pod współbieżnym obciążeniem, patrz test na żywo: 4 duże strony
+        # naraz = 52s/68s/90s/94s zamiast ~30-60s każda z osobna), wątek
+        # główny ugrzązłby w pętli zapisującej cały ten backlog do bazy i przez
+        # ten czas w ogóle nie wystrzeliłby żadnego nowego requestu - dokładnie
+        # to, co widać w logach jako "pauza po ~30 requestach, potem wszystko
+        # naraz się zapisuje, potem dalej".
+        #
+        # Wystrzeliwanie kończy się wcześniej, jak tylko KTÓRAKOLWIEK już
         # gotowa strona w buforze okaże się końcem danych/błędem - nie trzeba
         # czekać, aż dojdzie do niej przetwarzanie w kolejności (puste strony
         # odpowiadają szybko, więc to realnie ogranicza liczbę zbędnych
@@ -426,121 +440,128 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         }
 
         pending = {}  # page -> Future - bufor odpowiedzi czekających na zapis
-        next_to_launch = page
+        pending_lock = threading.Lock()
         next_to_process = page
-        stop_launching = False
+        stop_launching = threading.Event()
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
+
+        def _launcher(start_page):
+            p = start_page
+            while not stop_launching.is_set():
+                with pending_lock:
+                    pending[p] = executor.submit(
+                        _fetch_items_page, p, api_url, headers, limit, last_update)
+                    p += 1
+                    # Wczesny stop - patrz komentarz wyżej. Skanujemy pod tym
+                    # samym lockiem co wstawianie/zdejmowanie z `pending`.
+                    for fut in list(pending.values()):
+                        if fut.done() and fut.result()['outcome'] != 'ok':
+                            stop_launching.set()
+                            break
+                if not stop_launching.is_set():
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
+
+        launcher_thread = threading.Thread(
+            target=_launcher, args=(page,), daemon=True,
+            name="matterhorn-items-launcher")
+        launcher_thread.start()
+
         try:
             while True:
-                if not stop_launching:
-                    pending[next_to_launch] = executor.submit(
-                        _fetch_items_page, next_to_launch, api_url, headers, limit, last_update)
-                    next_to_launch += 1
+                with pending_lock:
+                    fut = pending.get(next_to_process)
 
-                    # Wczesny stop: puste strony/błędy odpowiadają szybko (nie
-                    # trzeba czekać, aż strony z realnymi danymi z przodu
-                    # kolejki się doczekają) - jak tylko KTÓRAKOLWIEK już
-                    # zakończona strona w buforze okaże się końcem danych albo
-                    # błędem, przestań wystrzeliwać dalsze. Realny import
-                    # (patrz test na żywo): bez tego launcher strzelał aż do
-                    # strony 70, mimo że koniec danych był już na 24-tej -
-                    # 46 zbędnych requestów do zewnętrznego API. Przetwarzanie
-                    # i zapis niżej nadal idą ściśle w kolejności, bez zmian.
-                    for fut in pending.values():
-                        if fut.done() and fut.result()['outcome'] != 'ok':
-                            stop_launching = True
+                if fut is None or not fut.done():
+                    if stop_launching.is_set() and not launcher_thread.is_alive() and fut is None:
+                        # Launcher stanął i nic więcej nie wystrzeli - a strona,
+                        # na którą czekamy, nigdy nie została wystrzelona
+                        # (nie powinno się zdarzyć, ale nie wisimy w nieskończoność).
+                        break
+                    time.sleep(0.2)
+                    continue
+
+                with pending_lock:
+                    result = pending.pop(next_to_process).result()  # propaguje wyjątki (np. SoftTimeLimitExceeded)
+                current_page = next_to_process
+
+                if result['outcome'] == 'error':
+                    stop_launching.set()
+                    logger.error(
+                        f"❌ Import przerwany błędem (current_page={next_to_process} zachowany do wznowienia): "
+                        f"{result['error']}")
+                    return {
+                        'status': 'error',
+                        'imported_count': imported_count,
+                        'error': result['error'],
+                    }
+
+                if result['outcome'] == 'end_of_data':
+                    stop_launching.set()
+                    return {
+                        'status': 'completed',
+                        'imported_count': imported_count,
+                        'reason': result['reason'],
+                    }
+
+                items = result['items']
+                logger.info(f"📥 Przetwarzam stronę {current_page} ({len(items)} produktów)")
+
+                # Bulk import/update
+                if not dry_run:
+                    bulk_result = None
+                    for db_attempt in range(1, max_page_db_retries + 1):
+                        bulk_result = _bulk_import_products(items)
+                        if bulk_result.get('status') != 'error':
                             break
 
-                # Przetwórz WSZYSTKO co już gotowe, ściśle w kolejności stron -
-                # mogło odpowiedzieć kilka naraz, podczas gdy czekaliśmy.
-                hit_max_products = False
-                while next_to_process in pending and pending[next_to_process].done():
-                    result = pending.pop(next_to_process).result()  # propaguje wyjątki (np. SoftTimeLimitExceeded)
-                    current_page = next_to_process
+                        if db_attempt < max_page_db_retries:
+                            delay = min(page_db_retry_delay * (2 ** (db_attempt - 1)), 30)
+                            logger.warning(
+                                f"⏳ Błąd zapisu DB dla strony {current_page} "
+                                f"(próba {db_attempt}/{max_page_db_retries}): "
+                                f"{bulk_result.get('error', 'unknown_error')}. "
+                                f"Ponowienie tej samej strony za {delay}s..."
+                            )
+                            time.sleep(delay)
+                        else:
+                            logger.error(
+                                f"❌ Wyczerpano retry zapisu DB dla strony {current_page} "
+                                f"({max_page_db_retries} prób)"
+                            )
 
-                    if result['outcome'] == 'error':
-                        logger.error(
-                            f"❌ Import przerwany błędem (current_page={next_to_process} zachowany do wznowienia): "
-                            f"{result['error']}")
+                    if bulk_result is None or bulk_result.get('status') == 'error':
+                        stop_launching.set()
                         return {
                             'status': 'error',
-                            'imported_count': imported_count,
-                            'error': result['error'],
+                            'error': bulk_result.get('error', f'Bulk import failed for page {current_page}') if bulk_result else f'Bulk import failed for page {current_page}',
                         }
-
-                    if result['outcome'] == 'end_of_data':
-                        return {
-                            'status': 'completed',
-                            'imported_count': imported_count,
-                            'reason': result['reason'],
-                        }
-
-                    items = result['items']
-                    logger.info(f"📥 Przetwarzam stronę {current_page} ({len(items)} produktów)")
-
-                    # Bulk import/update
-                    if not dry_run:
-                        bulk_result = None
-                        for db_attempt in range(1, max_page_db_retries + 1):
-                            bulk_result = _bulk_import_products(items)
-                            if bulk_result.get('status') != 'error':
-                                break
-
-                            if db_attempt < max_page_db_retries:
-                                delay = min(page_db_retry_delay * (2 ** (db_attempt - 1)), 30)
-                                logger.warning(
-                                    f"⏳ Błąd zapisu DB dla strony {current_page} "
-                                    f"(próba {db_attempt}/{max_page_db_retries}): "
-                                    f"{bulk_result.get('error', 'unknown_error')}. "
-                                    f"Ponowienie tej samej strony za {delay}s..."
-                                )
-                                time.sleep(delay)
-                            else:
-                                logger.error(
-                                    f"❌ Wyczerpano retry zapisu DB dla strony {current_page} "
-                                    f"({max_page_db_retries} prób)"
-                                )
-
-                        if bulk_result is None or bulk_result.get('status') == 'error':
-                            return {
-                                'status': 'error',
-                                'error': bulk_result.get('error', f'Bulk import failed for page {current_page}') if bulk_result else f'Bulk import failed for page {current_page}',
-                            }
-                        imported_count += bulk_result['imported_count']
-                    else:
-                        # Dry run - tylko zlicz
-                        for item in items:
-                            if imported_count >= max_products:
-                                break
-                            if item.get("creation_date") is not None:
-                                imported_count += 1
-
-                    next_to_process += 1
-                    # Aktualizuj current_page w bazie danych
-                    if not dry_run:
-                        _update_items_import_status(
-                            'running', imported_count, next_to_process,
-                            updated_count=bulk_result.get('updated_count', 0),
-                            processed_count=imported_count)
-
-                    if imported_count >= max_products:
-                        hit_max_products = True
-                        break
-
-                if hit_max_products:
-                    break
-
-                if stop_launching:
-                    # Nic już nie wystrzeliwujemy - tylko czekamy, aż to co w
-                    # locie się skończy (przetworzone wyżej w kolejności), więc
-                    # krótszy odstęp niż tempo launchera.
-                    time.sleep(0.2)
+                    imported_count += bulk_result['imported_count']
                 else:
-                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
+                    # Dry run - tylko zlicz
+                    for item in items:
+                        if imported_count >= max_products:
+                            break
+                        if item.get("creation_date") is not None:
+                            imported_count += 1
+
+                next_to_process += 1
+                # Aktualizuj current_page w bazie danych
+                if not dry_run:
+                    _update_items_import_status(
+                        'running', imported_count, next_to_process,
+                        updated_count=bulk_result.get('updated_count', 0),
+                        processed_count=imported_count)
+
+                if imported_count >= max_products:
+                    stop_launching.set()
+                    break
         finally:
-            for f in pending.values():
-                f.cancel()
+            stop_launching.set()
+            launcher_thread.join(timeout=5)
+            with pending_lock:
+                for f in pending.values():
+                    f.cancel()
             executor.shutdown(wait=False, cancel_futures=True)
 
         # imported_count >= max_products osiągnięte w trakcie pipeline'u -
@@ -1424,56 +1445,71 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
         updated_count = 0
         limit = 1000
 
+        # Wystrzeliwanie na osobnym wątku, niezależnie od zapisu - patrz
+        # obszerny komentarz w _import_products_from_items. Bez tego seria
+        # kilku stron odpowiadających naraz (bo strona z przodu kolejki była
+        # wolna) blokowałaby wystrzeliwanie nowych na czas całego zapisu
+        # backlogu do bazy.
         pending = {}  # page -> Future - bufor odpowiedzi czekających na zapis
-        next_to_launch = 1
+        pending_lock = threading.Lock()
         next_to_process = 1
-        stop_launching = False
+        stop_launching = threading.Event()
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
+
+        def _launcher(start_page):
+            p = start_page
+            while not stop_launching.is_set():
+                with pending_lock:
+                    pending[p] = executor.submit(
+                        _fetch_inventory_page, p, api_url, headers, limit, last_update)
+                    p += 1
+                    # Wczesny stop - patrz _import_products_from_items.
+                    for fut in list(pending.values()):
+                        if fut.done() and fut.result()['outcome'] != 'ok':
+                            stop_launching.set()
+                            break
+                if not stop_launching.is_set():
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
+
+        launcher_thread = threading.Thread(
+            target=_launcher, args=(1,), daemon=True,
+            name="matterhorn-inventory-launcher")
+        launcher_thread.start()
+
         try:
             while True:
-                if not stop_launching:
-                    pending[next_to_launch] = executor.submit(
-                        _fetch_inventory_page, next_to_launch, api_url, headers, limit, last_update)
-                    next_to_launch += 1
+                with pending_lock:
+                    fut = pending.get(next_to_process)
 
-                    # Wczesny stop - patrz _import_products_from_items, ten sam wzorzec.
-                    for fut in pending.values():
-                        if fut.done() and fut.result()['outcome'] != 'ok':
-                            stop_launching = True
-                            break
-
-                # Przetwórz WSZYSTKO co już gotowe, ściśle w kolejności stron.
-                reached_stop = False
-                while next_to_process in pending and pending[next_to_process].done():
-                    result = pending.pop(next_to_process).result()
-                    current_page = next_to_process
-
-                    if result['outcome'] != 'ok':
-                        reached_stop = True
+                if fut is None or not fut.done():
+                    if stop_launching.is_set() and not launcher_thread.is_alive() and fut is None:
                         break
+                    time.sleep(0.2)
+                    continue
 
-                    inventory_data = result['items']
-                    if not dry_run:
-                        page_updated = _bulk_update_inventory(inventory_data)
-                        updated_count += page_updated
-                        logger.info(
-                            f"✅ INVENTORY - zaktualizowano {page_updated} produktów na stronie {current_page}")
+                with pending_lock:
+                    result = pending.pop(next_to_process).result()
+                current_page = next_to_process
 
-                    next_to_process += 1
-
-                if reached_stop:
+                if result['outcome'] != 'ok':
+                    stop_launching.set()
                     break
 
-                if stop_launching:
-                    # Nic już nie wystrzeliwujemy - tylko czekamy, aż to co w
-                    # locie się skończy, więc krótszy odstęp niż tempo launchera.
-                    time.sleep(0.2)
-                else:
-                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
+                inventory_data = result['items']
+                if not dry_run:
+                    page_updated = _bulk_update_inventory(inventory_data)
+                    updated_count += page_updated
+                    logger.info(
+                        f"✅ INVENTORY - zaktualizowano {page_updated} produktów na stronie {current_page}")
+
+                next_to_process += 1
         finally:
-            for f in pending.values():
-                f.cancel()
+            stop_launching.set()
+            launcher_thread.join(timeout=5)
+            with pending_lock:
+                for f in pending.values():
+                    f.cancel()
             executor.shutdown(wait=False, cancel_futures=True)
 
         logger.info(
