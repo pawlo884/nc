@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.10](https://github.com/pawlo884/nc/compare/v1.44.9...v1.44.10) (2026-09-05)
+
+### Bug Fixes
+
+* **matterhorn:** kontekst zadania Celery w logach z wątków pipeline'u ([#228](https://github.com/pawlo884/nc/issues/228)) ([dbb6fc5](https://github.com/pawlo884/nc/commit/dbb6fc551588c8285d735794ee22bd5232ffd030))
+
 ## [1.44.9](https://github.com/pawlo884/nc/compare/v1.44.8...v1.44.9) (2026-09-05)
 
 ### Performance Improvements
