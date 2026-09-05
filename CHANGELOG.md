@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.9](https://github.com/pawlo884/nc/compare/v1.44.8...v1.44.9) (2026-09-05)
+
+### Performance Improvements
+
+* **matterhorn:** odseparuj wystrzeliwanie stron od zapisu do bazy ([#227](https://github.com/pawlo884/nc/issues/227)) ([91a398e](https://github.com/pawlo884/nc/commit/91a398e1bbf7732f49b93766df08218ac2689298))
+
 ## [1.44.8](https://github.com/pawlo884/nc/compare/v1.44.7...v1.44.8) (2026-09-05)
 
 ### Performance Improvements
