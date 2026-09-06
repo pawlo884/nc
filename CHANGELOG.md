@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.18](https://github.com/pawlo884/nc/compare/v1.44.17...v1.44.18) (2026-09-06)
+
+### Bug Fixes
+
+* **matterhorn1:** nie kończ inventory po cichu jako sukces przy błędzie API ([#247](https://github.com/pawlo884/nc/issues/247)) ([81bb094](https://github.com/pawlo884/nc/commit/81bb0943c9f512f464b88df0591c309e50419b6d))
+
 ## [1.44.17](https://github.com/pawlo884/nc/compare/v1.44.16...v1.44.17) (2026-09-06)
 
 ### Performance Improvements
