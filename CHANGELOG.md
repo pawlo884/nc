@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.13](https://github.com/pawlo884/nc/compare/v1.44.12...v1.44.13) (2026-09-06)
+
+### Bug Fixes
+
+* **tabu:** pomijaj sync stanow tylko przy IDENTYCZNYCH danych, nie tej samej liczbie ([#235](https://github.com/pawlo884/nc/issues/235)) ([9af0fb6](https://github.com/pawlo884/nc/commit/9af0fb69990c49d4157235d2bc321c2dd1bd5b3f))
+
 ## [1.44.12](https://github.com/pawlo884/nc/compare/v1.44.11...v1.44.12) (2026-09-05)
 
 ### Bug Fixes
