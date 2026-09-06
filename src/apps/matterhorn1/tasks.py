@@ -126,6 +126,7 @@ def full_import_and_update(self, start_id=None, max_products=200000,
     total_updated = 0
     iteration = 0
     items_error = None  # ustawiane gdy _import_products_from_items zwróci błąd
+    inventory_degraded = None  # komunikat, gdy któraś aktualizacja INVENTORY padła (5xx/brak JSON/sieć)
 
     try:
         logger.info(
@@ -176,14 +177,19 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                     dry_run=dry_run
                 )
 
-                if inventory_result['status'] == 'success':
-                    updated_count = inventory_result.get('updated_count', 0)
-                    total_updated += updated_count
-                    logger.info(
-                        f"✅ Iteracja {iteration} - Zaktualizowano {updated_count} produktów w INVENTORY")
-                else:
+                updated_count = inventory_result.get('updated_count', 0)
+                total_updated += updated_count
+                if inventory_result['status'] == 'partial':
+                    inventory_degraded = inventory_result.get('error') or 'INVENTORY nie dokończone'
+                    logger.error(
+                        f"❌ INVENTORY w iteracji {iteration} PRZERWANE - import NIE zostanie "
+                        f"oznaczony jako 'completed' (okno stanów nadgoni kolejny tick): {inventory_degraded}")
+                elif inventory_result['status'] != 'success':
                     logger.warning(
                         f"⚠️ Błąd aktualizacji INVENTORY w iteracji {iteration}: {inventory_result.get('error')}")
+                else:
+                    logger.info(
+                        f"✅ Iteracja {iteration} - Zaktualizowano {updated_count} produktów w INVENTORY")
                 break
             elif items_result['status'] != 'success':
                 logger.error(
@@ -205,14 +211,19 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                 dry_run=dry_run
             )
 
-            if inventory_result['status'] == 'success':
-                updated_count = inventory_result.get('updated_count', 0)
-                total_updated += updated_count
-                logger.info(
-                    f"✅ Iteracja {iteration} - Zaktualizowano {updated_count} produktów w INVENTORY")
-            else:
+            updated_count = inventory_result.get('updated_count', 0)
+            total_updated += updated_count
+            if inventory_result['status'] == 'partial':
+                inventory_degraded = inventory_result.get('error') or 'INVENTORY nie dokończone'
+                logger.error(
+                    f"❌ INVENTORY w iteracji {iteration} PRZERWANE - import NIE zostanie "
+                    f"oznaczony jako 'completed' (okno stanów nadgoni kolejny tick): {inventory_degraded}")
+            elif inventory_result['status'] != 'success':
                 logger.warning(
                     f"⚠️ Błąd aktualizacji INVENTORY w iteracji {iteration}: {inventory_result.get('error')}")
+            else:
+                logger.info(
+                    f"✅ Iteracja {iteration} - Zaktualizowano {updated_count} produktów w INVENTORY")
 
             # Jeśli nie zaimportowano żadnych produktów, zakończ po aktualizacji INVENTORY
             if imported_count == 0:
@@ -248,6 +259,22 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             return {
                 'status': 'error',
                 'error': items_error,
+                'total_imported': total_imported,
+                'total_updated': total_updated,
+                'iterations': iteration,
+                'task_id': task_id_value,
+            }
+
+        if inventory_degraded:
+            # ITEMS przeszło, ale któraś strona INVENTORY padła. NIE oznaczamy
+            # importu jako 'completed' — status 'inventory_failed' jest pomijany
+            # przez _get_last_items_update_time (znacznik last_update nie
+            # przeskakuje) i przez _get_last_items_page (ITEMS rusza od strony 1),
+            # więc kolejny tick nadgoni pominięte okno stanów magazynowych.
+            return {
+                'status': 'partial',
+                'reason': 'inventory_failed',
+                'error': inventory_degraded,
                 'total_imported': total_imported,
                 'total_updated': total_updated,
                 'iterations': iteration,
@@ -306,6 +333,17 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                 _update_items_import_status(
                     'completed', total_imported, updated_count=total_updated, processed_count=total_imported + total_updated)
                 logger.info("✅ Task zakończony jako 'completed'")
+            elif inventory_degraded:
+                # ITEMS OK, INVENTORY padło. Status 'inventory_failed' (pomijany
+                # przez _get_last_items_update_time) + current_page=1 (żeby ITEMS
+                # ruszył od początku szerszego okna) → kolejny tick nadgoni stany.
+                _update_items_import_status(
+                    'inventory_failed', total_imported, current_page=1,
+                    updated_count=total_updated, processed_count=total_imported + total_updated,
+                    error_details=f'INVENTORY nie dokończone: {inventory_degraded}')
+                logger.warning(
+                    "⚠️ Task zakończony jako 'inventory_failed' — ITEMS OK, ale INVENTORY "
+                    "przerwane; last_update NIE przeskakuje, kolejny tick nadgoni okno stanów")
             else:
                 _update_items_import_status(
                     'error', total_imported, updated_count=total_updated, processed_count=total_imported + total_updated)
@@ -682,6 +720,9 @@ def _get_last_items_update_time():
             from matterhorn1.models import ApiSyncLog
             import pytz
 
+            # 'inventory_failed' celowo POMIJANE — run, w którym padło INVENTORY,
+            # nie może przesunąć znacznika do przodu (kolejny tick musi nadgonić
+            # okno stanów, którego ten run nie dopobrał).
             last_sync = ApiSyncLog.objects.using('matterhorn1').filter(
                 sync_type__in=['items_import', 'items_sync'],
                 status__in=['success', 'partial', 'completed']
@@ -796,7 +837,8 @@ def _save_items_import_start_time():
                     "❌ Osiągnięto maksymalną liczbę prób zapisywania czasu rozpoczęcia importu")
 
 
-def _update_items_import_status(status, imported_count, current_page=None, updated_count=0, processed_count=0):
+def _update_items_import_status(status, imported_count, current_page=None, updated_count=0,
+                                processed_count=0, error_details=None):
     """Aktualizuje status ostatniego importu ITEMS z retry logic"""
     max_retries = 5
     retry_delay = 10  # 10 sekund między próbami
@@ -823,6 +865,9 @@ def _update_items_import_status(status, imported_count, current_page=None, updat
                 # Aktualizuj current_page jeśli podane
                 if current_page is not None:
                     last_running.current_page = current_page
+
+                if error_details is not None:
+                    last_running.error_details = error_details
 
                 last_running.save()
                 logger.info(
@@ -1395,53 +1440,97 @@ def _prepare_product_update(product, item, brand=None, category=None):
 
 
 def _fetch_inventory_page(page, api_url, headers, limit, last_update):
-    """Pobiera jedną stronę B2BAPI/ITEMS/INVENTORY. Bez retry - tak jak
-    oryginalnie: każdy błąd (JSON/status/sieć) albo koniec danych (pusta
-    strona/404) po prostu kończy pobieranie tej strony jako 'stop' (oryginalny
-    kod na każdym z tych przypadków po prostu przerywał pętlę i zwracał
-    'success' z tym, co już zdążono zaktualizować - to zachowanie zostaje).
+    """Pobiera jedną stronę B2BAPI/ITEMS/INVENTORY z retry/backoff (do 5 prób,
+    20 s między próbami) - jak `_fetch_items_page`.
 
-    Zwraca:
+    Rozróżnia KONIEC DANYCH od BŁĘDU (wcześniej jedno i drugie było 'stop' i
+    kończyło INVENTORY jako 'success', przez co np. HTTP 200 z ciałem które nie
+    jest JSON-em - strona błędu / rate-limit / WAF - było po cichu traktowane
+    jak koniec danych, a okno stanów magazynowych przepadało):
+
       {'outcome': 'ok', 'items': [...]}
-      {'outcome': 'stop'}
+      {'outcome': 'end_of_data'}          # pusta odpowiedź / [] / 404 - czysty koniec
+      {'outcome': 'error', 'error': str}  # 5xx / brak JSON / sieć po wyczerpaniu prób
     """
-    try:
-        import requests
+    max_attempts = 5
+    attempt = 1
 
-        url = f"{api_url}/B2BAPI/ITEMS/INVENTORY/?page={page}&limit={limit}&last_update={last_update}"
-        logger.info(f"🔗 INVENTORY Request URL: {url}")
-        response = requests.get(url, headers=headers, timeout=120)
+    while attempt <= max_attempts:
+        try:
+            import requests
 
-        logger.info(f"🔍 INVENTORY API Response strona {page}: status={response.status_code}")
+            url = f"{api_url}/B2BAPI/ITEMS/INVENTORY/?page={page}&limit={limit}&last_update={last_update}"
+            logger.info(f"🔗 INVENTORY Request URL: {url}")
+            response = requests.get(url, headers=headers, timeout=120)
 
-        if response.status_code == 200:
-            if not response.text.strip():
-                logger.info(f"📊 INVENTORY (strona {page}) - pusta odpowiedź - koniec danych")
-                return {'outcome': 'stop'}
+            logger.info(
+                f"🔍 INVENTORY API Response strona {page}: status={response.status_code}, "
+                f"content_length={len(response.text)}")
 
-            try:
-                inventory_data = response.json()
-            except Exception as e:
-                logger.error(f"❌ Błąd parsowania JSON INVENTORY (strona {page}): {e}")
-                return {'outcome': 'stop'}
+            if response.status_code == 200:
+                if not response.text.strip():
+                    logger.info(f"📊 INVENTORY (strona {page}) - pusta odpowiedź - koniec danych")
+                    return {'outcome': 'end_of_data'}
 
-            if not inventory_data:
-                logger.info(f"📊 INVENTORY (strona {page}) - brak danych na stronie - koniec")
-                return {'outcome': 'stop'}
+                try:
+                    inventory_data = response.json()
+                except SoftTimeLimitExceeded:
+                    raise
+                except Exception as e:
+                    logger.error(f"❌ Błąd parsowania JSON INVENTORY (strona {page}): {e}")
+                    logger.error(
+                        f"❌ INVENTORY (strona {page}) treść odpowiedzi (pierwsze 500 znaków): "
+                        f"{response.text[:500]!r}")
+                    if attempt < max_attempts:
+                        logger.warning(
+                            f"⚠️ Próba {attempt}/{max_attempts} (INVENTORY strona {page}) - ponawiam za 20 s...")
+                        time.sleep(20)
+                        attempt += 1
+                        continue
+                    return {
+                        'outcome': 'error',
+                        'error': f'INVENTORY strona {page}: HTTP 200 bez poprawnego JSON po {max_attempts} próbach',
+                    }
 
-            logger.info(f"📥 INVENTORY - pobrano {len(inventory_data)} rekordów ze strony {page}")
-            return {'outcome': 'ok', 'items': inventory_data}
+                if not inventory_data:
+                    logger.info(f"📊 INVENTORY (strona {page}) - brak danych na stronie - koniec")
+                    return {'outcome': 'end_of_data'}
 
-        elif response.status_code == 404:
-            logger.info(f"📊 INVENTORY (strona {page}) - strona nie istnieje - koniec danych")
-            return {'outcome': 'stop'}
-        else:
-            logger.warning(f"⚠️ Błąd INVENTORY API {response.status_code} (strona {page})")
-            return {'outcome': 'stop'}
+                logger.info(f"📥 INVENTORY - pobrano {len(inventory_data)} rekordów ze strony {page}")
+                return {'outcome': 'ok', 'items': inventory_data}
 
-    except Exception as e:
-        logger.error(f"❌ Błąd podczas pobierania INVENTORY strony {page}: {e}")
-        return {'outcome': 'stop'}
+            elif response.status_code == 404:
+                logger.info(f"📊 INVENTORY (strona {page}) - strona nie istnieje - koniec danych")
+                return {'outcome': 'end_of_data'}
+            else:
+                logger.warning(f"⚠️ Błąd INVENTORY API {response.status_code} (strona {page})")
+                if attempt < max_attempts:
+                    logger.warning(
+                        f"⚠️ Próba {attempt}/{max_attempts} (INVENTORY strona {page}) - ponawiam za 20 s...")
+                    time.sleep(20)
+                    attempt += 1
+                    continue
+                return {
+                    'outcome': 'error',
+                    'error': f'INVENTORY strona {page}: HTTP {response.status_code} po {max_attempts} próbach',
+                }
+
+        except SoftTimeLimitExceeded:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Błąd podczas pobierania INVENTORY strony {page}: {e}")
+            if attempt < max_attempts:
+                logger.warning(
+                    f"⚠️ Próba {attempt}/{max_attempts} (INVENTORY strona {page}) - ponawiam za 20 s...")
+                time.sleep(20)
+                attempt += 1
+                continue
+            return {
+                'outcome': 'error',
+                'error': f'INVENTORY strona {page} nieosiągalna po {max_attempts} próbach: {e}',
+            }
+
+    return {'outcome': 'error', 'error': f'INVENTORY strona {page}: wyczerpano próby'}
 
 
 def _update_inventory_from_api(api_url, username, password, batch_size, dry_run):
@@ -1449,13 +1538,20 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
 
     Ten sam pipeline co w _import_products_from_items: WSZYSTKIE strony lecą
     w locie naraz, nowa co MATTERHORN_PAGE_LAUNCH_INTERVAL sekund, aż do
-    trafienia na koniec danych/błąd (a wystrzeliwanie kończy się wcześniej,
-    jak tylko którakolwiek już gotowa strona w buforze okaże się takim
-    "stop"). INVENTORY nie ma checkpointu do wznowienia (zawsze zaczyna od
+    trafienia na koniec danych albo błąd (a wystrzeliwanie kończy się
+    wcześniej, jak tylko którakolwiek już gotowa strona w buforze okaże się
+    nie-'ok'). INVENTORY nie ma checkpointu do wznowienia (zawsze zaczyna od
     strony 1) i _bulk_update_inventory per strona jest niezależny od innych
     stron, więc bufor porządkujący jest tu tylko dla przewidywalnej
-    kolejności logów/liczenia - nie ma ryzyka pominięcia danych przy
-    wznowieniu jak przy ITEMS.
+    kolejności logów/liczenia.
+
+    Zwraca:
+      {'status': 'success', 'updated_count': N}          - czysty przebieg
+      {'status': 'partial', 'updated_count': N, 'error'}  - któraś strona padła
+          (5xx / brak JSON / sieć) po wyczerpaniu prób; wołający NIE powinien
+          oznaczać importu jako 'completed', żeby znacznik last_update nie
+          przeskoczył i kolejny tick nadgonił pominięte okno stanów
+      {'status': 'error', 'error'}                        - nie dało się w ogóle wystartować
     """
     try:
         # Użyj tej samej daty startu co ITEMS z poprawnym formatowaniem
@@ -1484,6 +1580,7 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
 
         updated_count = 0
         limit = 1000
+        inventory_error = None  # ustawiane gdy strona INVENTORY padnie (nie: koniec danych)
 
         # Wystrzeliwanie na osobnym wątku, niezależnie od zapisu - patrz
         # obszerny komentarz w _import_products_from_items. Bez tego seria
@@ -1534,7 +1631,14 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
                     result = pending.pop(next_to_process).result()
                 current_page = next_to_process
 
-                if result['outcome'] != 'ok':
+                if result['outcome'] == 'error':
+                    stop_launching.set()
+                    inventory_error = result.get('error') or f'INVENTORY strona {current_page} - błąd'
+                    logger.error(
+                        f"❌ INVENTORY przerwane błędem na stronie {current_page}: {inventory_error}")
+                    break
+
+                if result['outcome'] == 'end_of_data':
                     stop_launching.set()
                     break
 
@@ -1555,7 +1659,18 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
             executor.shutdown(wait=False, cancel_futures=True)
 
         logger.info(
-            f"📊 INVENTORY zakończony: {updated_count} zaktualizowanych produktów")
+            f"📊 INVENTORY zakończony: {updated_count} zaktualizowanych produktów"
+            + (f" (PRZERWANE BŁĘDEM: {inventory_error})" if inventory_error else ""))
+
+        if inventory_error:
+            # Nie 'success' - wołający NIE oznaczy importu jako 'completed',
+            # więc znacznik last_update nie przeskoczy i kolejny tick nadgoni
+            # okno stanów, którego ten run nie zdążył pobrać.
+            return {
+                'status': 'partial',
+                'updated_count': updated_count,
+                'error': inventory_error,
+            }
 
         return {
             'status': 'success',

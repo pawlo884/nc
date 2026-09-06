@@ -11,7 +11,7 @@ import pytest
 from matterhorn1.models import ApiSyncLog, Product, ProductVariant
 from matterhorn1.tasks import full_import_and_update
 
-from .mock_matterhorn import mock_inventory, mock_items
+from .mock_matterhorn import mock_inventory, mock_inventory_unparseable, mock_items
 
 pytestmark = [pytest.mark.e2e, pytest.mark.django_db(databases=["default", "matterhorn1"])]
 
@@ -50,6 +50,54 @@ def test_trwaly_500_na_stronie_przerywa_import_zamiast_petlic(
         sync_type="items_import").order_by("-started_at").first()
     assert last.status == "error"
     assert last.current_page == 2  # zachowane do wznowienia
+
+
+def test_inventory_nie_json_nie_przechodzi_po_cichu_jako_completed(
+    matterhorn_api, mocked_responses, prior_items_sync, api_item
+):
+    """Regresja: INVENTORY strona 1 = HTTP 200 z ciałem nie-JSON. ITEMS przeszło,
+    ale import NIE może być 'completed' (inaczej znacznik last_update przeskakuje
+    i okno stanów przepada). Status 'inventory_failed' + current_page=1 →
+    kolejny tick nadgoni."""
+    mock_items(mocked_responses, [[api_item(id=6001)], []])
+    mock_inventory_unparseable(mocked_responses)
+
+    result = full_import_and_update(auto_continue=False, dry_run=False)
+
+    assert result["status"] == "partial"
+    assert result["reason"] == "inventory_failed"
+
+    # produkt z ITEMS zaimportowany mimo błędu INVENTORY
+    assert Product.objects.using("matterhorn1").filter(product_uid=6001).exists()
+
+    last = ApiSyncLog.objects.using("matterhorn1").filter(
+        sync_type="items_import").order_by("-started_at").first()
+    assert last.status == "inventory_failed"
+    assert last.current_page == 1
+    assert "INVENTORY" in (last.error_details or "")
+
+    # znacznik last_update NIE przeskoczył — okno bierze się nadal z prior_items_sync
+    window_row = ApiSyncLog.objects.using("matterhorn1").filter(
+        sync_type__in=["items_import", "items_sync"],
+        status__in=["success", "partial", "completed"],
+    ).order_by("-started_at").first()
+    assert window_row.pk == prior_items_sync.pk
+
+
+def test_inventory_chwilowy_500_dogania_sie_i_konczy_completed(
+    matterhorn_api, mocked_responses, prior_items_sync, api_item
+):
+    """Chwilowy 5xx na stronie INVENTORY jest ponawiany — po sukcesie import
+    kończy się normalnie jako 'success'."""
+    mock_items(mocked_responses, [[api_item(id=6100)], []])
+    mock_inventory(mocked_responses, [[], []], transient_errors={1: [500, 503]})
+
+    result = full_import_and_update(auto_continue=False, dry_run=False)
+
+    assert result["status"] == "success"
+    last = ApiSyncLog.objects.using("matterhorn1").filter(
+        sync_type="items_import").order_by("-started_at").first()
+    assert last.status == "completed"
 
 
 def test_blokada_rownoleglego_importu_zwraca_skipped(
