@@ -195,15 +195,15 @@ jobs:
       - name: Testy (pytest)
         # Konfiguracja w pyproject.toml [tool.pytest.ini_options] + [tool.coverage.*].
         # Uruchamiane są WSZYSTKIE testy (testpaths=src/apps); próg pokrycia
-        # (--cov-fail-under) pilnuje matterhorn1 + tabu (management/commands
+        # (--cov-fail-under) pilnuje matterhorn1 + tabu + mada (management/commands
         # celowo poza pomiarem — patrz [tool.coverage.run] omit). Kolejne apki:
         # dopisać ścieżkę. Próg = wspólny dla wszystkich --cov, trzymany
         # zachowawczo poniżej realnego pokrycia — podnosić przy okazji.
         run: >-
           pytest
-          --cov=src/apps/matterhorn1 --cov=src/apps/tabu
+          --cov=src/apps/matterhorn1 --cov=src/apps/tabu --cov=src/apps/mada
           --cov-report=term-missing:skip-covered
-          --cov-fail-under=53
+          --cov-fail-under=55
 
   check-code-quality:
     name: Sprawdź jakość kodu (linting i formatowanie)
