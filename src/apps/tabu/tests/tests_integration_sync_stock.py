@@ -103,12 +103,12 @@ class TestSyncTabuStockCommand:
         assert log.status == "completed"
         assert log.products_processed == 2
 
-    def test_skip_gdy_ta_sama_liczba_rekordow_co_poprzednio(self, tabu_api, mocked_responses):
-        # OBECNE zachowanie (znane ograniczenie #233 pkt 2): jeśli poprzedni
-        # zakończony run stock_update miał tyle samo `products_processed`,
-        # cały bieżący run jest pomijany.
+    def test_ta_sama_liczba_ale_inne_dane_NIE_pomija(self, tabu_api, mocked_responses):
+        # #233 pkt 2: dawniej "ta sama liczba rekordów" = skip, co gubiło
+        # realne zmiany innych wariantów. Teraz liczy się odcisk DANYCH.
         ApiSyncLog.objects.create(
-            sync_type="stock_update", status="completed", products_processed=1)
+            sync_type="stock_update", status="completed", products_processed=1,
+            raw_response={"fetch_fingerprint": "cos-zupelnie-innego"})
         p = factories.tabu_product(api_id=2)
         factories.tabu_variant(p, api_id=21, store=5)
         mock_products_basic(mocked_responses, tabu_api, [
@@ -118,8 +118,26 @@ class TestSyncTabuStockCommand:
 
         self._run(**{"update_from": "2026-01-01 00:00:00"})
 
-        # zmiana 5->1 NIE została zastosowana - run pominięty
-        assert TabuProductVariant.objects.get(api_id=21).store == 5
+        assert TabuProductVariant.objects.get(api_id=21).store == 1  # zmiana zastosowana
+        assert StockHistory.objects.count() == 1
+
+    def test_identyczne_dane_jak_poprzednio_pomija_run(self, tabu_api, mocked_responses):
+        p = factories.tabu_product(api_id=3)
+        factories.tabu_variant(p, api_id=31, store=9)
+        pages = [
+            [factories.basic_record(product_api_id=3, variant_api_id=31, store=4)],
+            [],
+        ]
+        mock_products_basic(mocked_responses, tabu_api, pages)
+        # 1. run: stosuje 9->4, zapisuje odcisk
+        self._run(**{"update_from": "2026-01-01 00:00:00"})
+        assert TabuProductVariant.objects.get(api_id=31).store == 4
+        StockHistory.objects.all().delete()
+
+        # 2. run: API zwraca DOKŁADNIE to samo -> pomijamy
+        mock_products_basic(mocked_responses, tabu_api, pages)
+        self._run(**{"update_from": "2026-01-02 00:00:00"})
+
         assert StockHistory.objects.count() == 0
         log = ApiSyncLog.objects.filter(sync_type="stock_update").latest("started_at")
-        assert log.raw_response.get("skipped_reason") == "same_count_as_previous_run"
+        assert log.raw_response.get("skipped_reason") == "identical_fetch_as_previous_run"
