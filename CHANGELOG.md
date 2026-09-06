@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.17](https://github.com/pawlo884/nc/compare/v1.44.16...v1.44.17) (2026-09-06)
+
+### Performance Improvements
+
+* **mada:** idempotentny upsert stanów + batch historii + brand cache ([#244](https://github.com/pawlo884/nc/issues/244)) ([8b55e5f](https://github.com/pawlo884/nc/commit/8b55e5f20535aedf9403ff95f5b2e10b3746383e)), references [#230](https://github.com/pawlo884/nc/issues/230) [#236](https://github.com/pawlo884/nc/issues/236)
+
 ## [1.44.16](https://github.com/pawlo884/nc/compare/v1.44.15...v1.44.16) (2026-09-06)
 
 ### Bug Fixes
