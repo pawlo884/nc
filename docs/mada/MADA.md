@@ -48,10 +48,10 @@ Feed nie ma tokenów uwierzytelniających w nagłówkach — login (`l`) i hasł
 `MadaApiClient` (`mada/api_client.py`), `base_url = MADA_API_BASE_URL`,
 auth = `MADA_API_LOGIN` / `MADA_API_PASSWORD`.
 
-| Wywołanie | Zwraca |
-| --- | --- |
+| Wywołanie                      | Zwraca                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------- |
 | `GET get_xml.php` (bez `file`) | manifest: `<FILES><FILE><NAME/><DATE/><TYPE>full\|partial</TYPE></FILE>…</FILES>` |
-| `GET get_xml.php?file=<NAME>` | ZIP zawierający `products.xml` |
+| `GET get_xml.php?file=<NAME>`  | ZIP zawierający `products.xml`                                                    |
 
 Metody klienta:
 
@@ -77,16 +77,16 @@ mieści się wygodnie w DOM:
 
 Baza `mada` (`db_table` bez prefiksu app; patrz `mada/models.py`).
 
-| Model | Klucz | Uwagi |
-| --- | --- | --- |
-| `Brand` | `producer_id` (unique) | z `<PRODUCERS>` |
-| `Category` | `category_id` (unique) | `c1-c2` z `<CATEGORY>`; self-FK `parent` (drzewo `c1` → `c1-c2`) |
-| `MadaProduct` | `api_id` (unique) | `<ID>`; `is_active`, `mapped_product_uid`, `raw_data` (JSON: attributes, similar, producer info) |
-| `MadaProductImage` | `(product, api_image_id)` unique | `<IMG id>` + URL + `order` |
-| `MadaProductVariant` | `(product, variant_key)` unique | **`variant_key` = EAN gdy jest, inaczej `"color\|size"`** — feed nie nadaje wariantom id; `stock`, `mapped_variant_uid`, `is_mapped` |
-| `ApiSyncLog` | — | `sync_type` = `full_import` / `partial_import`; `status`, `file_name`, liczniki |
-| `StockHistory` | — | audyt zmian stanu: `product_api_id`, `variant_key`, `old/new_stock`, `change_type` |
-| `Saga` / `SagaStep` | — | log kroków saga Mada↔MPD (`core.saga_models`) |
+| Model                | Klucz                            | Uwagi                                                                                                                                |
+| -------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `Brand`              | `producer_id` (unique)           | z `<PRODUCERS>`                                                                                                                      |
+| `Category`           | `category_id` (unique)           | `c1-c2` z `<CATEGORY>`; self-FK `parent` (drzewo `c1` → `c1-c2`)                                                                     |
+| `MadaProduct`        | `api_id` (unique)                | `<ID>`; `is_active`, `mapped_product_uid`, `raw_data` (JSON: attributes, similar, producer info)                                     |
+| `MadaProductImage`   | `(product, api_image_id)` unique | `<IMG id>` + URL + `order`                                                                                                           |
+| `MadaProductVariant` | `(product, variant_key)` unique  | **`variant_key` = EAN gdy jest, inaczej `"color\|size"`** — feed nie nadaje wariantom id; `stock`, `mapped_variant_uid`, `is_mapped` |
+| `ApiSyncLog`         | —                                | `sync_type` = `full_import` / `partial_import`; `status`, `file_name`, liczniki                                                      |
+| `StockHistory`       | —                                | audyt zmian stanu: `product_api_id`, `variant_key`, `old/new_stock`, `change_type`                                                   |
+| `Saga` / `SagaStep`  | —                                | log kroków saga Mada↔MPD (`core.saga_models`)                                                                                        |
 
 Cena jest **na produkcie** (`MadaProduct.price`), nie na wariancie — inaczej niż tabu/matterhorn1.
 
@@ -101,16 +101,16 @@ Cena jest **na produkcie** (`MadaProduct.price`), nie na wariancie — inaczej n
 
 ## 5. Komendy
 
-| Komenda | Rola |
-| --- | --- |
-| `sync_mada_full [--file=<NAZWA>]` | pełny import (§6) |
-| `sync_mada_partial` | import przyrostowy po kursorze (§7) |
-| `cleanup_empty_mada_products [--dry-run]` | usuwa produkty bez `NAME` w feedzie i bez `mapped_product_uid` (CASCADE na warianty/zdjęcia) |
-| `cleanup_orphaned_mada_mapping [--dry-run]` | zeruje `mapped_*_uid` wskazujące na nieistniejące już rekordy MPD |
-| `clear_mada_data` | czyści bazę-lustro mada |
-| `setup_mada_sync_task [--partial-interval N] [--full-hour H --full-minute M] [--disable] [--delete]` | rejestruje periodic tasks |
-| `setup_mada_cleanup_task` | rejestruje `cleanup_empty_products` |
-| `test_mada_connection` | sanity-check połączenia z feedem |
+| Komenda                                                                                              | Rola                                                                                         |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `sync_mada_full [--file=<NAZWA>]`                                                                    | pełny import (§6)                                                                            |
+| `sync_mada_partial`                                                                                  | import przyrostowy po kursorze (§7)                                                          |
+| `cleanup_empty_mada_products [--dry-run]`                                                            | usuwa produkty bez `NAME` w feedzie i bez `mapped_product_uid` (CASCADE na warianty/zdjęcia) |
+| `cleanup_orphaned_mada_mapping [--dry-run]`                                                          | zeruje `mapped_*_uid` wskazujące na nieistniejące już rekordy MPD                            |
+| `clear_mada_data`                                                                                    | czyści bazę-lustro mada                                                                      |
+| `setup_mada_sync_task [--partial-interval N] [--full-hour H --full-minute M] [--disable] [--delete]` | rejestruje periodic tasks                                                                    |
+| `setup_mada_cleanup_task`                                                                            | rejestruje `cleanup_empty_products`                                                          |
+| `test_mada_connection`                                                                               | sanity-check połączenia z feedem                                                             |
 
 ## 6. Import pełny — `sync_mada_full`
 
@@ -207,11 +207,11 @@ Sprzątanie mapowań: `MPD/signals.py` (`post_delete` na `Products`) zeruje
 
 `mada/tasks.py` — cienkie wrappery na komendy, każdy z advisory lockiem:
 
-| Task | Lock | Domyślny cykl (`setup_mada_sync_task`) |
-| --- | --- | --- |
-| `mada.tasks.sync_mada_full` | `mada:sync_mada_full` | codziennie 00:15 |
-| `mada.tasks.sync_mada_partial` | `mada:sync_mada_partial` | co 15 min |
-| `mada.tasks.cleanup_empty_products` | `mada:cleanup_empty_products` | dziennie (osobny setup) |
+| Task                                | Lock                          | Domyślny cykl (`setup_mada_sync_task`) |
+| ----------------------------------- | ----------------------------- | -------------------------------------- |
+| `mada.tasks.sync_mada_full`         | `mada:sync_mada_full`         | codziennie 00:15                       |
+| `mada.tasks.sync_mada_partial`      | `mada:sync_mada_partial`      | co 15 min                              |
+| `mada.tasks.cleanup_empty_products` | `mada:cleanup_empty_products` | dziennie (osobny setup)                |
 
 Lock nie zdobyty → `{'status': 'skipped', 'reason': 'already_running'}`.
 Błąd komendy → `self.retry`.
@@ -235,16 +235,16 @@ Ewentualne ujednolicenie locka → osobna decyzja (#243).
 
 ## 13. Różnice względem matterhorn1 / tabu
 
-| Aspekt | Mada | matterhorn1 / tabu |
-| --- | --- | --- |
-| Transport | feed XML w ZIP (manifest + pliki) | REST JSON |
-| Auth | login/hasło w query stringu (redakcja w logach) | token w nagłówku |
-| Id wariantu | brak — `variant_key` = EAN \| `"color\|size"` | numeryczne `variant_uid` / `api_id` |
-| Cena | na produkcie | na wariancie |
-| Przyrostowość | kursor po `file_name` plików partial | `update_from` / `last_update` z `ApiSyncLog` |
-| Wygaszanie | `is_active=False` dla nieobecnych w `full` | brak / miękkie |
-| Most stanów do MPD | pull przez `MadaAdapter` (na żywo) | push (`update_stock_from_matterhorn1`) + adapter |
-| Lock importu | pg advisory lock, **osobny full vs partial** | matterhorn1: Redis `cache.add`; tabu: pg advisory (jeden) |
+| Aspekt             | Mada                                            | matterhorn1 / tabu                                        |
+| ------------------ | ----------------------------------------------- | --------------------------------------------------------- |
+| Transport          | feed XML w ZIP (manifest + pliki)               | REST JSON                                                 |
+| Auth               | login/hasło w query stringu (redakcja w logach) | token w nagłówku                                          |
+| Id wariantu        | brak — `variant_key` = EAN \| `"color\|size"`   | numeryczne `variant_uid` / `api_id`                       |
+| Cena               | na produkcie                                    | na wariancie                                              |
+| Przyrostowość      | kursor po `file_name` plików partial            | `update_from` / `last_update` z `ApiSyncLog`              |
+| Wygaszanie         | `is_active=False` dla nieobecnych w `full`      | brak / miękkie                                            |
+| Most stanów do MPD | pull przez `MadaAdapter` (na żywo)              | push (`update_stock_from_matterhorn1`) + adapter          |
+| Lock importu       | pg advisory lock, **osobny full vs partial**    | matterhorn1: Redis `cache.add`; tabu: pg advisory (jeden) |
 
 Wspólne: idempotentny warunkowy UPDATE stanów + `bulk_create` historii,
 wzorzec saga `core.saga`, `ApiSyncLog`, `StockHistory`.
@@ -254,18 +254,18 @@ wzorzec saga `core.saga`, `ApiSyncLog`, `StockHistory`.
 `src/apps/mada/tests/` (pakiet, pytest) + starsze płaskie `tests_*.py`
 (`django.test.TestCase`):
 
-| Plik | Zakres |
-| --- | --- |
-| `tests/factories.py` | buildery DB (`brand`, `category`, `mada_product`, `mada_variant`) + dictów feedu (`product_dict`, `variant_dict`) |
-| `tests/mock_mada.py` | buildery manifestu / `products.xml` / ZIP dla `responses` |
-| `tests/tests_unit_api_client.py` | manifest, wybór full/partial, ZIP, redakcja hasła |
-| `tests/tests_integration_tasks.py` | advisory lock (skip), retry, regresja: osobne locki full vs partial |
-| `tests/tests_integration_sync_full.py` | import + log, wygaszanie nieobecnych, izolacja błędu produktu, `--file`, idempotencja |
-| `tests/tests_integration_sync_partial.py` | kursor plików, no-op, brak duplikatów przy redelivery |
-| `tests/tests_integration_importer_idempotent.py` | warunkowy UPDATE, brak duplikatów historii, zmiana atrybutu bez wpisu |
-| `tests/tests_performance_importer.py` | `brand_cache` = 0 SELECT-ów `mada_brand` w pętli, historia jednym INSERT |
-| `tests/tests_integration_cleanup_commands.py` | `cleanup_empty_mada_products` |
-| `tests_importer.py` / `tests_parser.py` / `tests_models.py` / `tests_saga.py` | logika importu, parser, modele, saga Mada↔MPD |
+| Plik                                                                          | Zakres                                                                                                            |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `tests/factories.py`                                                          | buildery DB (`brand`, `category`, `mada_product`, `mada_variant`) + dictów feedu (`product_dict`, `variant_dict`) |
+| `tests/mock_mada.py`                                                          | buildery manifestu / `products.xml` / ZIP dla `responses`                                                         |
+| `tests/tests_unit_api_client.py`                                              | manifest, wybór full/partial, ZIP, redakcja hasła                                                                 |
+| `tests/tests_integration_tasks.py`                                            | advisory lock (skip), retry, regresja: osobne locki full vs partial                                               |
+| `tests/tests_integration_sync_full.py`                                        | import + log, wygaszanie nieobecnych, izolacja błędu produktu, `--file`, idempotencja                             |
+| `tests/tests_integration_sync_partial.py`                                     | kursor plików, no-op, brak duplikatów przy redelivery                                                             |
+| `tests/tests_integration_importer_idempotent.py`                              | warunkowy UPDATE, brak duplikatów historii, zmiana atrybutu bez wpisu                                             |
+| `tests/tests_performance_importer.py`                                         | `brand_cache` = 0 SELECT-ów `mada_brand` w pętli, historia jednym INSERT                                          |
+| `tests/tests_integration_cleanup_commands.py`                                 | `cleanup_empty_mada_products`                                                                                     |
+| `tests_importer.py` / `tests_parser.py` / `tests_models.py` / `tests_saga.py` | logika importu, parser, modele, saga Mada↔MPD                                                                     |
 
 CI (`check-branch.yml`): `--cov=src/apps/mada` w puli progu `--cov-fail-under`
 (management/commands poza pomiarem wg `[tool.coverage.run] omit`).
