@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.16](https://github.com/pawlo884/nc/compare/v1.44.15...v1.44.16) (2026-09-06)
+
+### Bug Fixes
+
+* **tabu:** update_from tylko z zakonczonych syncow stanow ([#233](https://github.com/pawlo884/nc/issues/233) pkt 4) ([#240](https://github.com/pawlo884/nc/issues/240)) ([83e3ce9](https://github.com/pawlo884/nc/commit/83e3ce9c6370ba50a82756a7c773ca8ae1ce981b))
+
 ## [1.44.15](https://github.com/pawlo884/nc/compare/v1.44.14...v1.44.15) (2026-09-06)
 
 ### Bug Fixes
