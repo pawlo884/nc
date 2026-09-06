@@ -6,6 +6,7 @@ strona za końcem zwraca `{'products': []}` (command traktuje to jako koniec).
 from __future__ import annotations
 
 import json
+import re
 
 import responses
 
@@ -38,3 +39,25 @@ def mock_products_basic(rsps, settings, pages: list[list[dict]],
 
 def mock_products_basic_error(rsps, settings, status: int = 500) -> None:
     rsps.add(responses.GET, f"{_base(settings)}/{BASIC_PATH}", status=status)
+
+
+def mock_product_detail(rsps, settings, by_id: dict[int, dict | None]) -> None:
+    """`GET products/{id}`. `by_id`: {api_id: dict_produktu} albo {api_id: None}
+    dla 404. ID spoza mapy też dają 404."""
+    base = _base(settings)
+
+    def _cb(request):
+        try:
+            api_id = int(request.url.rstrip("/").rsplit("/", 1)[-1].split("?")[0])
+        except (TypeError, ValueError):
+            api_id = -1
+        body = by_id.get(api_id)
+        if body is None:
+            return (404, {}, "")
+        return (200, {"Content-Type": "application/json"}, json.dumps(body))
+
+    rsps.add_callback(
+        responses.GET,
+        re.compile(rf"^{re.escape(base)}/products/\d+/?(\?.*)?$"),
+        callback=_cb,
+    )

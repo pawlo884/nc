@@ -14,6 +14,7 @@ import pytest
 def no_sleep(monkeypatch):
     for target in (
         "tabu.management.commands.sync_tabu_stock.time.sleep",
+        "tabu.management.commands.sync_tabu_new_products.time.sleep",
         "tabu.management.commands.base_tabu_api_command.time.sleep",
     ):
         monkeypatch.setattr(target, lambda *_a, **_k: None, raising=False)
