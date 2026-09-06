@@ -60,13 +60,27 @@ def mock_items(rsps, pages: list[list[dict]], transient_errors: dict[int, list[i
     )
 
 
-def mock_inventory(rsps, pages: list[list[dict]]) -> None:
-    """`pages` = lista stron, każda to lista rekordów INVENTORY."""
+def mock_inventory(rsps, pages: list[list[dict]],
+                   transient_errors: dict[int, list[int]] | None = None) -> None:
+    """`pages` = lista stron, każda to lista rekordów INVENTORY.
+    `transient_errors` — patrz `_paginated_callback`."""
     rsps.add_callback(
         responses.GET,
         f"{_base_url()}{INVENTORY_PATH}",
-        callback=_paginated_callback(pages),
+        callback=_paginated_callback(pages, transient_errors),
         content_type="application/json",
+    )
+
+
+def mock_inventory_unparseable(rsps, body: str = "<html>Rate limit exceeded</html>",
+                               status: int = 200) -> None:
+    """Endpoint INVENTORY zwraca zawsze `status` z ciałem, które nie jest JSON-em
+    (strona błędu / WAF / rate-limit). Do regresji: taki przypadek MUSI zostać
+    zgłoszony jako błąd, a nie po cichu potraktowany jak koniec danych."""
+    rsps.add_callback(
+        responses.GET,
+        f"{_base_url()}{INVENTORY_PATH}",
+        callback=lambda request: (status, {}, body),
     )
 
 

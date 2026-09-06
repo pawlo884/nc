@@ -34,7 +34,7 @@ def test_strony_przetwarzane_w_kolejnosci_mimo_odwroconej_kolejnosci_odpowiedzi(
         if page == 2:
             page2_done.set()
             return {'outcome': 'ok', 'items': [{'id': 2, 'inventory': []}]}
-        return {'outcome': 'stop'}
+        return {'outcome': 'end_of_data'}
 
     processed_order = []
 
@@ -55,19 +55,17 @@ def test_strony_przetwarzane_w_kolejnosci_mimo_odwroconej_kolejnosci_odpowiedzi(
     assert processed_order == [1, 2]
 
 
-def test_stop_na_stronie_przerywa_i_ignoruje_juz_wystrzelone_strony(monkeypatch):
-    """Strona 2 kończy się "stop" (koniec danych/błąd - bez retry, jak
-    oryginalnie) - aktualizacja ma się zatrzymać, a wynik już pobranej
-    strony 3+ (wystrzelonej spekulatywnie zanim strona 2 zdążyła odpowiedzieć)
-    ma zostać zignorowany. W przeciwieństwie do ITEMS - to nadal 'success'
-    (częściowy wynik), bo INVENTORY tak działało już wcześniej."""
+def test_koniec_danych_przerywa_i_ignoruje_juz_wystrzelone_strony(monkeypatch):
+    """Strona 2 = 'end_of_data' (czysty koniec) - aktualizacja ma się
+    zatrzymać, a wynik już pobranej strony 3+ (wystrzelonej spekulatywnie)
+    ma zostać zignorowany. Wynik to 'success' - to normalny koniec danych."""
     monkeypatch.setattr("matterhorn1.tasks.time.sleep", lambda *_a, **_k: None)
 
     def fake_fetch(page, api_url, headers, limit, last_update):
         if page == 1:
             return {'outcome': 'ok', 'items': [{'id': 1, 'inventory': []}]}
         if page == 2:
-            return {'outcome': 'stop'}
+            return {'outcome': 'end_of_data'}
         # strona 3 (i dalsze) - wystrzelona spekulatywnie, ma dane, ale nie
         # może zostać zapisana, bo stoi za stroną 2, która kończy pipeline.
         return {'outcome': 'ok', 'items': [{'id': page, 'inventory': []}]}
@@ -91,13 +89,42 @@ def test_stop_na_stronie_przerywa_i_ignoruje_juz_wystrzelone_strony(monkeypatch)
     assert processed_order == [1]
 
 
+def test_blad_strony_zwraca_partial_z_liczba_juz_zapisanych(monkeypatch):
+    """Strona 2 = 'error' (5xx / brak JSON po wyczerpaniu prób). Strona 1 już
+    zapisana. Wynik: 'partial' + komunikat błędu + updated_count z już
+    zapisanych stron - żeby wołający NIE oznaczył importu jako 'completed'."""
+    monkeypatch.setattr("matterhorn1.tasks.time.sleep", lambda *_a, **_k: None)
+
+    def fake_fetch(page, api_url, headers, limit, last_update):
+        if page == 1:
+            return {'outcome': 'ok', 'items': [{'id': 1, 'inventory': []}]}
+        if page == 2:
+            return {'outcome': 'error', 'error': 'INVENTORY strona 2: HTTP 200 bez poprawnego JSON po 5 próbach'}
+        return {'outcome': 'ok', 'items': [{'id': page, 'inventory': []}]}
+
+    def fake_bulk_update(inventory_data):
+        return len(inventory_data)
+
+    with patch("matterhorn1.tasks._fetch_inventory_page", side_effect=fake_fetch), \
+            patch("matterhorn1.tasks._bulk_update_inventory", side_effect=fake_bulk_update), \
+            patch("matterhorn1.tasks._get_last_items_update_time", return_value="2026-01-01 00:00:00"):
+        result = _update_inventory_from_api(
+            api_url="https://matterhorn.example", username="u", password="p",
+            batch_size=100, dry_run=False,
+        )
+
+    assert result["status"] == "partial"
+    assert result["updated_count"] == 1
+    assert "JSON" in result["error"]
+
+
 def test_dry_run_nie_woła_bulk_update(monkeypatch):
     monkeypatch.setattr("matterhorn1.tasks.time.sleep", lambda *_a, **_k: None)
 
     def fake_fetch(page, api_url, headers, limit, last_update):
         if page == 1:
             return {'outcome': 'ok', 'items': [{'id': 1, 'inventory': []}]}
-        return {'outcome': 'stop'}
+        return {'outcome': 'end_of_data'}
 
     with patch("matterhorn1.tasks._fetch_inventory_page", side_effect=fake_fetch), \
             patch("matterhorn1.tasks._bulk_update_inventory") as mock_bulk, \
