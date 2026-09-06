@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.15](https://github.com/pawlo884/nc/compare/v1.44.14...v1.44.15) (2026-09-06)
+
+### Bug Fixes
+
+* **docker:** kopiuj src/templates/ do obrazu prod ([#239](https://github.com/pawlo884/nc/issues/239)) ([784a04a](https://github.com/pawlo884/nc/commit/784a04ab6f22e34a37abc6da2d68ccd13863f446)), references [#229](https://github.com/pawlo884/nc/issues/229)
+
 ## [1.44.14](https://github.com/pawlo884/nc/compare/v1.44.13...v1.44.14) (2026-09-06)
 
 ### Performance Improvements
