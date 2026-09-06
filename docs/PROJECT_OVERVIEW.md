@@ -40,7 +40,7 @@ lokalny serwer MCP (read-only).
 | **matterhorn1** | Import z Matterhorn B2B API (własna baza-lustro), saga mapująca produkty/warianty do MPD, tracker stanów, watchdog importu — **dok.: [`matterhorn/MATTERHORN1.md`](matterhorn/MATTERHORN1.md)**                       |
 | **web_agent**   | Automatyzacja: taski Celery + Selenium wypełniające formularze MPD, procesor AI (OpenAI / LangChain), modele `AutomationRun` / `ProductProcessingLog`, API `/api/web-agent/…`                                      |
 | **tabu**        | Import z Tabu REST API + saga do MPD, `services.py`, pg-advisory-locki — **dok.: [`tabu/TABU.md`](tabu/TABU.md)**                                                                                                     |
-| **mada**        | Import z feedu XML Mada (`parser.py` + `importer.py` + `api_client.py`) + saga, cleanup osieroconych mapowań                                                                                                       |
+| **mada**        | Import z feedu XML Mada (`parser.py` + `importer.py` + `api_client.py`) + saga, cleanup osieroconych mapowań — **dok.: [`mada/MADA.md`](mada/MADA.md)**                                                              |
 | **prestashop**  | Kanał wyjściowy (nie import): budowa i push produktów MPD do PrestaShop WebAPI. Faza 1 gotowa, uruchamiany ręcznie (`manage.py push_prestashop_product`)                                                           |
 
 ## 4. `src/core/`
