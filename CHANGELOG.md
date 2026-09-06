@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.14](https://github.com/pawlo884/nc/compare/v1.44.13...v1.44.14) (2026-09-06)
+
+### Performance Improvements
+
+* **tabu:** batch _apply_stock_updates zamiast query-per-wariant ([#233](https://github.com/pawlo884/nc/issues/233) faza 3) ([#236](https://github.com/pawlo884/nc/issues/236)) ([c841126](https://github.com/pawlo884/nc/commit/c841126c063a183b095041eaa5607a18f9477912)), references [#230](https://github.com/pawlo884/nc/issues/230)
+
 ## [1.44.13](https://github.com/pawlo884/nc/compare/v1.44.12...v1.44.13) (2026-09-06)
 
 ### Bug Fixes
