@@ -47,6 +47,9 @@ ENV PYTHONPATH=/app:/app/apps
 COPY src/manage.py .
 COPY src/core/ ./core/
 COPY src/apps/ ./apps/
+# Szablony projektowe (TEMPLATES['DIRS'] = BASE_DIR/'templates'): admin/input_filter.html,
+# admin/app_list.html, robots.txt, index.html. Bez tego 500 na changelistach z InputFilter.
+COPY src/templates/ ./templates/
 # COPY static/ ./static/  # Nie kopiujemy - zostanie utworzony przez collectstatic
 COPY deployments/nginx/nginx.conf ./nginx.conf
 COPY deployments/redis.conf ./redis.conf
