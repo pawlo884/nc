@@ -57,6 +57,22 @@ class TestSyncTabuStockTask:
         assert result["update_from"] == ts.strftime("%Y-%m-%d %H:%M:%S")
         assert cc.call_args[0][2] == ts.strftime("%Y-%m-%d %H:%M:%S")
 
+    def test_update_from_ignoruje_niezakonczone_logi(self):
+        # ostatni udany run 5 h temu; potem run 'failed' 1 h temu (nie zdążył
+        # zaimportować swojego okna) → update_from ma się cofnąć do udanego.
+        good = timezone.now() - timedelta(hours=5)
+        bad = timezone.now() - timedelta(hours=1)
+        g = ApiSyncLog.objects.create(sync_type="stock_update", status="completed")
+        ApiSyncLog.objects.filter(pk=g.pk).update(started_at=good)
+        b = ApiSyncLog.objects.create(sync_type="stock_update", status="failed")
+        ApiSyncLog.objects.filter(pk=b.pk).update(started_at=bad)
+
+        with patch.object(tasks, "advisory_lock", lambda name: _lock(True)), \
+                patch.object(tasks, "call_command") as cc:
+            result = tasks.sync_tabu_stock.apply().get()
+
+        assert result["update_from"] == good.strftime("%Y-%m-%d %H:%M:%S")
+
     def test_blad_komendy_powoduje_retry(self):
         with patch.object(tasks, "advisory_lock", lambda name: _lock(True)), \
                 patch.object(tasks, "call_command", side_effect=RuntimeError("boom")), \
