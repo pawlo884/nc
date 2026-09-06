@@ -73,3 +73,39 @@ def basic_record(*, product_api_id: int, variant_api_id: int, store: int,
     if price_gross is not None:
         r["price_gross"] = str(price_gross)
     return r
+
+
+def api_variant_detail(*, api_id: int, store: int = 3, color="czarny", size="M", **over):
+    v = {
+        "id": api_id,
+        "symbol": f"V{api_id}",
+        "ean": "5901234567890",
+        "store": store,
+        "price_net": "100.00",
+        "price_gross": "123.00",
+        "items": [{"name": "Kolor", "value": color}, {"name": "Rozmiar", "value": size}],
+    }
+    v.update(over)
+    return v
+
+
+def api_product_detail(*, api_id: int, variants=None, gallery=None, **over) -> dict:
+    """Odpowiedź `GET products/{id}` (pełne dane) — kształt zgodny z
+    `map_api_product_to_model`."""
+    p = {
+        "id": api_id,
+        "symbol": f"P{api_id}",
+        "name": f"Produkt {api_id}",
+        "ean": "5900000000001",
+        "producer_id": 7,
+        "producer": "Marko",
+        "category_id": 42,
+        "category": "Damskie/Bluzki",
+        "price_net": "100.00",
+        "price_gross": "123.00",
+        "last_update": "2026-01-15T10:00:00",
+        "variants": variants if variants is not None else [api_variant_detail(api_id=api_id * 10)],
+        "gallery": gallery if gallery is not None else [],
+    }
+    p.update(over)
+    return p
