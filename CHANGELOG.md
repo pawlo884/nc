@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.19](https://github.com/pawlo884/nc/compare/v1.44.18...v1.44.19) (2026-09-06)
+
+### Bug Fixes
+
+* **matterhorn1:** advisory lock + acks_late=False dla full_import ([#238](https://github.com/pawlo884/nc/issues/238)) ([#251](https://github.com/pawlo884/nc/issues/251)) ([2359c33](https://github.com/pawlo884/nc/commit/2359c333ce2a87add938611119dc89948aa0ea20)), references [204/#214](https://github.com/pawlo884/nc/issues/214)
+
 ## [1.44.18](https://github.com/pawlo884/nc/compare/v1.44.17...v1.44.18) (2026-09-06)
 
 ### Bug Fixes
