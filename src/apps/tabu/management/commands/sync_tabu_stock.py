@@ -94,10 +94,12 @@ class Command(BaseTabuAPICommand):
 
             self.stdout.write(f'   Pobrano {len(all_products)} rekordów (wariantów)')
 
-            if update_from and not dry_run and self._should_skip_processing(len(all_products)):
+            fetch_fingerprint = self._fetch_fingerprint(all_products)
+
+            if update_from and not dry_run and self._should_skip_processing(fetch_fingerprint):
                 self.stdout.write(
                     self.style.WARNING(
-                        '   Pomijam aktualizację: liczba rekordów jest taka sama jak poprzednio.'
+                        '   Pomijam aktualizację: pobrane dane identyczne jak w poprzednim runie.'
                     )
                 )
                 self.update_sync_log(
@@ -107,8 +109,9 @@ class Command(BaseTabuAPICommand):
                     raw_response={
                         'stock_changes_logged': 0,
                         'update_from': update_from,
-                        'skipped_reason': 'same_count_as_previous_run',
+                        'skipped_reason': 'identical_fetch_as_previous_run',
                         'fetched_variants': len(all_products),
+                        'fetch_fingerprint': fetch_fingerprint,
                     },
                 )
                 self.complete_sync_log('completed')
@@ -153,6 +156,7 @@ class Command(BaseTabuAPICommand):
                     raw_response={
                         'stock_changes_logged': history_count,
                         'update_from': update_from,
+                        'fetch_fingerprint': fetch_fingerprint,
                     },
                 )
                 self.complete_sync_log('completed' if fail_count == 0 else 'completed')
@@ -184,10 +188,31 @@ class Command(BaseTabuAPICommand):
                 self.complete_sync_log('failed', str(e))
             raise
 
-    def _should_skip_processing(self, fetched_count):
+    @staticmethod
+    def _fetch_fingerprint(records):
+        """Stabilny odcisk pobranej listy wariantów - `(variant_id, store,
+        price_net, price_gross)` posortowane. Dwa runy o tym samym odcisku
+        pobrały DOKŁADNIE te same dane (nie tylko tyle samo rekordów - stąd
+        stary bug: 'ta sama liczba' pomijał realne zmiany innych wariantów).
         """
-        Pomija przetwarzanie stock_update, jeśli liczba pobranych rekordów
-        jest taka sama jak w poprzednim zakończonym uruchomieniu.
+        import hashlib
+
+        rows = sorted(
+            (
+                int(r.get('variant_id') or 0),
+                int(r.get('store') or 0),
+                str(r.get('price_net') or ''),
+                str(r.get('price_gross') or ''),
+            )
+            for r in records
+            if isinstance(r, dict) and r.get('variant_id') is not None
+        )
+        return hashlib.sha1(repr(rows).encode()).hexdigest()
+
+    def _should_skip_processing(self, fetch_fingerprint):
+        """
+        Pomija przetwarzanie stock_update tylko jeśli pobrane dane są
+        IDENTYCZNE jak w poprzednim zakończonym uruchomieniu (ten sam odcisk).
         """
         if not self.sync_log:
             return False
@@ -197,14 +222,14 @@ class Command(BaseTabuAPICommand):
             .filter(sync_type='stock_update', status='completed')
             .exclude(pk=self.sync_log.pk)
             .order_by('-started_at')
-            .only('products_processed')
+            .values('raw_response')
             .first()
         )
 
-        if not previous_log:
+        if not previous_log or not previous_log.get('raw_response'):
             return False
 
-        return previous_log.products_processed == fetched_count
+        return previous_log['raw_response'].get('fetch_fingerprint') == fetch_fingerprint
 
     def _update_variant(self, api_variant):
         """
