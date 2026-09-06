@@ -11,7 +11,7 @@ from django.db import router, transaction
 from django.utils import timezone
 
 from mada.api_client import MadaApiClient, MadaApiError
-from mada.importer import import_product_dict, sync_brands
+from mada.importer import import_product_dict, load_brand_cache, sync_brands
 from mada.models import ApiSyncLog, MadaProduct
 from mada.parser import iter_products, parse_producers
 
@@ -57,12 +57,13 @@ class Command(BaseCommand):
             producers = parse_producers(xml_bytes)
             self.stdout.write(f'Producenci w feedzie: {len(producers)}')
             sync_brands(db, producers)
+            brand_cache = load_brand_cache(db)
 
             batch = []
             for product_dict in iter_products(xml_bytes):
                 batch.append(product_dict)
                 if len(batch) >= BATCH_SIZE:
-                    c, e = self._process_batch(db, batch, category_cache)
+                    c, e = self._process_batch(db, batch, category_cache, brand_cache)
                     created += c
                     errors += e
                     processed += len(batch)
@@ -70,7 +71,7 @@ class Command(BaseCommand):
                     self.stdout.write(f'  ... przetworzono {processed}')
                     batch = []
             if batch:
-                c, e = self._process_batch(db, batch, category_cache)
+                c, e = self._process_batch(db, batch, category_cache, brand_cache)
                 created += c
                 errors += e
                 processed += len(batch)
@@ -99,7 +100,7 @@ class Command(BaseCommand):
             self._fail(db, log, str(exc)[:2000])
             raise
 
-    def _process_batch(self, db, batch, category_cache):
+    def _process_batch(self, db, batch, category_cache, brand_cache=None):
         # Osobna transakcja (savepoint) na produkt - błąd jednego nie psuje reszty
         # batcha (błąd w atomic() na Postgresie unieważnia całą otaczającą transakcję).
         created = 0
@@ -107,7 +108,7 @@ class Command(BaseCommand):
         for product_dict in batch:
             try:
                 with transaction.atomic(using=db):
-                    was_created = import_product_dict(db, product_dict, category_cache)
+                    was_created = import_product_dict(db, product_dict, category_cache, brand_cache)
                     if was_created:
                         created += 1
             except Exception:
