@@ -8,12 +8,12 @@ Użycie:
 """
 import logging
 import time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
-from django.db import router, transaction
+from django.db import router
+from django.db.models import Sum
 
-from tabu.models import ApiSyncLog, TabuProduct, TabuProductVariant
-from tabu.stock_tracker import track_stock_change
+from tabu.models import ApiSyncLog, StockHistory, TabuProduct, TabuProductVariant
 
 from .base_tabu_api_command import BaseTabuAPICommand
 
@@ -117,36 +117,16 @@ class Command(BaseTabuAPICommand):
                 self.complete_sync_log('completed')
                 return
 
-            success_count = 0
-            fail_count = 0
             history_count = 0
             variants_compared = 0
             variants_with_change = 0
+            fail_count = 0
 
-            for i, api_variant in enumerate(all_products):
-                if not dry_run:
-                    try:
-                        h, cmp_count, chg_count = self._update_variant(api_variant)
-                        success_count += 1
-                        history_count += h
-                        variants_compared += cmp_count
-                        variants_with_change += chg_count
-                    except Exception as e:
-                        fail_count += 1
-                        logger.error(
-                            f'Błąd aktualizacji wariantu {api_variant.get("variant_id")}: {e}'
-                        )
-                else:
-                    success_count += 1
-
-                if (i + 1) % 500 == 0:
-                    self.stdout.write(f'   Przetworzono {i + 1}/{len(all_products)}...')
-                    if not dry_run and self.sync_log:
-                        self.update_sync_log(
-                            products_processed=i + 1,
-                            products_success=success_count,
-                            products_failed=fail_count,
-                        )
+            if not dry_run:
+                history_count, variants_compared, variants_with_change, fail_count = (
+                    self._apply_stock_updates(all_products)
+                )
+            success_count = variants_compared
 
             if not dry_run:
                 self.update_sync_log(
@@ -231,69 +211,108 @@ class Command(BaseTabuAPICommand):
 
         return previous_log['raw_response'].get('fetch_fingerprint') == fetch_fingerprint
 
-    def _update_variant(self, api_variant):
-        """
-        products/basic zwraca płaską listę – każdy element to wariant (id=product_id, variant_id=variant).
-        Aktualizuj stan, ceny wariantu i produktu. Zwraca (history_count, 1 lub 0, 1 lub 0).
-        """
-        variant_id = api_variant.get('variant_id')
-        product_api_id = api_variant.get('id')
-        if variant_id is None:
-            logger.debug(f'Brak variant_id w rekordzie, pomijam')
-            return 0, 0, 0
+    @staticmethod
+    def _parse_price(value):
+        if value is None:
+            return None
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError):
+            return None
 
-        variant_id = int(variant_id)
-        product_api_id = int(product_api_id or 0)
-        new_store = int(api_variant.get('store') or 0)
-
+    def _apply_stock_updates(self, records):
+        """Batch: 1 SELECT wariantów po `api_id__in` zamiast query per rekord;
+        warunkowy `filter(pk=..., store=old).update(...)` per zmieniony wariant
+        (idempotencja + brak wyścigu jak matterhorn1 #230); `bulk_create`
+        historii; `store_total` policzony z SUMY wariantów produktu (bez dryfu
+        - #233 pkt 3). Zwraca (history_count, compared, with_change, fail_count).
+        """
         db = router.db_for_write(TabuProduct)
-        history_count = 0
-        compared = 0
-        with_change = 0
 
-        with transaction.atomic(using=db):
+        parsed, fail_count = [], 0
+        for r in records:
+            if not isinstance(r, dict) or r.get('variant_id') is None:
+                continue
             try:
-                variant = TabuProductVariant.objects.using(db).select_related('product').get(
-                    api_id=variant_id
-                )
-            except TabuProductVariant.DoesNotExist:
-                logger.debug(f'Wariant {variant_id} nie istnieje, pomijam')
-                return 0, 0, 0
+                parsed.append({
+                    'variant_id': int(r['variant_id']),
+                    'new_store': int(r.get('store') or 0),
+                    'price_net': self._parse_price(r.get('price_net')),
+                    'price_gross': self._parse_price(r.get('price_gross')),
+                })
+            except (ValueError, TypeError) as e:
+                fail_count += 1
+                logger.error(f'Zły rekord stanu (variant_id={r.get("variant_id")}): {e}')
 
-            product = variant.product
-            old_store = variant.store
-            compared = 1
+        if not parsed:
+            return 0, 0, 0, fail_count
 
-            variant.store = new_store
-            vf = ['store']
-            if api_variant.get('price_net') is not None:
-                variant.price_net = Decimal(str(api_variant.get('price_net') or 0))
-                vf.append('price_net')
-            if api_variant.get('price_gross') is not None:
-                variant.price_gross = Decimal(str(api_variant.get('price_gross') or 0))
-                vf.append('price_gross')
-            variant.save(update_fields=vf)
+        variants_by_api = {
+            v.api_id: v for v in
+            TabuProductVariant.objects.using(db).select_related('product').filter(
+                api_id__in=[p['variant_id'] for p in parsed])
+        }
 
-            product.store_total = max(
-                0,
-                (product.store_total or 0) - (old_store or 0) + new_store
-            )
-            product.save(update_fields=['store_total'])
+        history_to_create = []
+        price_only = []
+        affected_products = set()
+        compared = 0
+
+        for p in parsed:
+            v = variants_by_api.get(p['variant_id'])
+            if v is None:
+                continue
+            compared += 1
+            old_store, new_store = v.store, p['new_store']
 
             if old_store != new_store:
-                with_change = 1
-                sh = track_stock_change(
-                    variant_api_id=variant_id,
-                    product_api_id=product.api_id,
+                fields = {'store': new_store}
+                if p['price_net'] is not None:
+                    fields['price_net'] = p['price_net']
+                if p['price_gross'] is not None:
+                    fields['price_gross'] = p['price_gross']
+                changed = TabuProductVariant.objects.using(db).filter(
+                    pk=v.pk, store=old_store).update(**fields)
+                if not changed:
+                    continue  # inny run już złapał tę zmianę
+                affected_products.add(v.product_id)
+                history_to_create.append(StockHistory(
+                    variant_api_id=v.api_id,
+                    product_api_id=v.product.api_id,
+                    product_name=v.product.name,
+                    variant_symbol=v.symbol,
                     old_stock=old_store,
                     new_stock=new_store,
-                    product_name=product.name,
-                    variant_symbol=variant.symbol,
-                )
-                if sh:
-                    history_count = 1
+                    stock_change=new_store - old_store,
+                    change_type='increase' if new_store > old_store else 'decrease',
+                ))
+            elif p['price_net'] is not None or p['price_gross'] is not None:
+                if p['price_net'] is not None:
+                    v.price_net = p['price_net']
+                if p['price_gross'] is not None:
+                    v.price_gross = p['price_gross']
+                price_only.append(v)
 
-        return history_count, compared, with_change
+        if price_only:
+            TabuProductVariant.objects.using(db).bulk_update(
+                price_only, ['price_net', 'price_gross'], batch_size=200)
+
+        if affected_products:
+            totals = dict(
+                TabuProductVariant.objects.using(db)
+                .filter(product_id__in=affected_products)
+                .values('product_id').annotate(t=Sum('store'))
+                .values_list('product_id', 't')
+            )
+            prods = list(TabuProduct.objects.using(db).filter(pk__in=affected_products))
+            for prod in prods:
+                prod.store_total = max(0, totals.get(prod.pk, 0) or 0)
+            TabuProduct.objects.using(db).bulk_update(prods, ['store_total'], batch_size=200)
+
+        if history_to_create:
+            StockHistory.objects.using(db).bulk_create(history_to_create, batch_size=200)
+
+        return len(history_to_create), compared, len(history_to_create), fail_count
 
     def _debug_sample(self, options):
         """Diagnostyka: products/basic zwraca płaską listę wariantów (id=product, variant_id=variant)."""
