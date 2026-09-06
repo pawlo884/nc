@@ -6,6 +6,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.cache import cache
+from core.pg_locks import advisory_lock
 from .stock_tracker import track_stock_change, track_bulk_stock_changes, sync_stock_changes_from_api
 from .defs_db import normalize_storage_key
 
@@ -60,7 +61,8 @@ MATTERHORN_PAGE_LAUNCH_INTERVAL = 2.0
 MATTERHORN_PIPELINE_MAX_WORKERS = 50
 
 
-@shared_task(bind=True, name='matterhorn1.tasks.full_import_and_update', queue='import')
+@shared_task(bind=True, name='matterhorn1.tasks.full_import_and_update', queue='import',
+             acks_late=False)
 def full_import_and_update(self, start_id=None, max_products=200000,
                            api_url=None, username=None, password=None,
                            batch_size=100, dry_run=False, auto_continue=True):
@@ -91,35 +93,34 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             'task_id': getattr(getattr(self, 'request', None), 'id', 'direct_call')
         }
 
-    # BLOKADA - zapobiega równoległemu wykonaniu (działa dla Celery i bezpośrednich wywołań)
-    lock_id = 'matterhorn1_full_import_lock'
-    lock_timeout = 3600  # 1 godzina
+    task_id_value = getattr(getattr(self, 'request', None), 'id', None) or 'direct_call'
 
-    # Użyj task_id jeśli dostępny (Celery), w przeciwnym razie 'direct_call'
-    task_identifier = getattr(self, 'request', None)
-    task_id_value = task_identifier.id if task_identifier else 'direct_call'
+    # BLOKADA: PostgreSQL advisory lock zamiast cache.add na Redisie (#238).
+    # Zwalnia się SAM, gdy proces trzymający połączenie padnie - bez TTL, bez
+    # "ghost locków", bez watchdoga do sprzątania blokady. Razem z acks_late=False
+    # (dekorator): ubity w połowie run NIE jest redeliverowany po godzinie -
+    # kolejny tick Celery Beat wznawia od current_page (mechanizm #204/#214).
+    with advisory_lock('matterhorn1:full_import_and_update') as acquired:
+        if not acquired:
+            logger.warning("❌ Import już w trakcie wykonywania (advisory lock zajęty). Pominięty.")
+            return {'status': 'skipped', 'reason': 'already_running', 'task_id': task_id_value}
 
-    # CZYŚĆ STARE RUNNING REKORDY (starsze niż 2 godziny)
-    _cleanup_old_running_imports()
+        # Trzymamy WYŁĄCZNY lock → żaden inny run nie działa, więc każdy rekord
+        # 'running' to sierota po ubitym workerze. Oznacz 'error' (current_page
+        # zostaje do wznowienia przez _get_last_items_page).
+        _fail_stale_running_imports()
 
-    # CZYŚĆ WSZYSTKIE RUNNING REKORDY (rozwiązuje problem z ręcznym przerywaniem)
-    _cleanup_all_running_imports()
+        return _run_full_import_locked(
+            self, task_id_value, start_id, max_products, api_url, username, password,
+            batch_size, dry_run, auto_continue,
+        )
 
-    # ATOMOWA OPERACJA BLOKADY - zapobiega race condition
-    # Sprawdź czy blokada istnieje i ustaw ją w jednej operacji
-    acquired = cache.add(lock_id, task_id_value, lock_timeout)
 
-    if not acquired:
-        current_lock = cache.get(lock_id)
-        logger.warning(
-            f"❌ Import już w trakcie wykonywania (lock: {current_lock}). Pominięty.")
-        return {
-            'status': 'skipped',
-            'reason': 'already_running',
-            'current_lock': current_lock,
-            'task_id': task_id_value
-        }
-
+def _run_full_import_locked(self, task_id_value, start_id, max_products, api_url,
+                            username, password, batch_size, dry_run, auto_continue):
+    """Ciało importu ITEMS + INVENTORY. Wołane po zdobyciu advisory locka
+    (patrz `full_import_and_update`). Advisory lock jest zwalniany przez context
+    manager w wołającym - tu tylko aktualizacja statusu w ApiSyncLog."""
     task_completed_successfully = False
     soft_timeout_hit = False
     total_imported = 0
@@ -320,11 +321,7 @@ def full_import_and_update(self, start_id=None, max_products=200000,
         }
 
     finally:
-        # Zawsze zwalniaj blokadę i zaktualizuj status
-        if cache.get(lock_id) == task_id_value:
-            cache.delete(lock_id)
-            logger.info(f"🔓 Blokada zwolniona dla {task_id_value}")
-
+        # Advisory lock zwalnia context manager w full_import_and_update.
         # Aktualizuj status na podstawie tego czy task się zakończył sukcesem.
         # Przy soft-timeout zostawiamy status 'error' z zachowanym current_page —
         # _get_last_items_page wznowi od tej strony.
@@ -1895,14 +1892,22 @@ def test_periodic_task():
 # simple_import_task usunięty - był redundantny z full_import_and_update
 
 
-def _cleanup_old_running_imports():
-    """
-    Czyści stare rekordy 'running' starsze niż 2 godziny.
-    To zapobiega kumulowaniu się zawieszonych importów.
+def _fail_stale_running_imports(older_than_minutes=None):
+    """Oznacza rekordy ITEMS w statusie 'running' jako 'error' (zachowując
+    current_page — `_get_last_items_page` wznowi od tej strony).
+
+    Wołane w dwóch miejscach:
+    * `full_import_and_update` PO zdobyciu advisory locka, bez `older_than_minutes`:
+      skoro trzymamy wyłączny lock, żaden inny run nie działa → każdy 'running'
+      to sierota po ubitym/zrestartowanym workerze.
+    * `watchdog_import_healthcheck` z `older_than_minutes=180`: siatka
+      bezpieczeństwa dla runa wiszącego mimo żywego workera (advisory lock się
+      wtedy NIE zwolnił — nie da się go bezpiecznie sprzątnąć spoza tej sesji).
+
     Z retry logic dla połączenia z bazą danych.
     """
     max_retries = 5
-    retry_delay = 10  # 10 sekund między próbami
+    retry_delay = 10
 
     for attempt in range(max_retries):
         try:
@@ -1910,126 +1915,32 @@ def _cleanup_old_running_imports():
             from django.utils import timezone
             from datetime import timedelta
 
-            # Znajdź stare running rekordy (starsze niż 2 godziny)
-            cutoff_time = timezone.now() - timedelta(hours=2)
-            old_running = ApiSyncLog.objects.using('matterhorn1').filter(
-                sync_type='items_import',
-                status='running',
-                started_at__lt=cutoff_time
-            )
+            qs = ApiSyncLog.objects.using('matterhorn1').filter(
+                sync_type='items_import', status='running')
+            if older_than_minutes is not None:
+                qs = qs.filter(
+                    started_at__lt=timezone.now() - timedelta(minutes=older_than_minutes))
 
-            count = old_running.count()
-            if count > 0:
-                logger.warning(
-                    f"🧹 Znaleziono {count} starych 'running' rekordów - oznaczam jako 'error'")
-
-                # Oznacz jako 'error' zamiast usuwać
-                old_running.update(
+            count = qs.count()
+            if count:
+                qs.update(
                     status='error',
                     completed_at=timezone.now(),
-                    error_details='Zawieszone - automatycznie oznaczone jako błąd po 2 godzinach'
+                    error_details=(
+                        'Sierota po ubitym workerze — advisory lock wolny, rekord '
+                        'został "running"' if older_than_minutes is None
+                        else f'Zawieszone > {older_than_minutes} min bez zakończenia'),
                 )
-                logger.info(
-                    f"✅ Oznaczono {count} starych rekordów jako 'error'")
-            else:
-                logger.info("✅ Brak starych 'running' rekordów do czyszczenia")
-
-            # Jeśli dotarliśmy tutaj, operacja się powiodła
+                logger.warning(f"🧹 Oznaczono {count} zawieszonych 'running' rekordów ITEMS jako 'error'")
             return
 
         except Exception as e:
             logger.error(
-                f"❌ Błąd podczas czyszczenia starych running rekordów (próba {attempt + 1}/{max_retries}): {e}")
-
+                f"❌ Błąd czyszczenia zawieszonych 'running' (próba {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
-                logger.warning(
-                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą...")
                 time.sleep(retry_delay)
             else:
-                logger.error(
-                    "❌ Osiągnięto maksymalną liczbę prób czyszczenia starych rekordów")
-
-
-def _cleanup_all_running_imports():
-    """
-    Sprawdza czy są zawieszone taski i czyści blokadę Redis tylko jeśli task został przerwany.
-    NIE czyści aktywnych tasków - tylko sprawdza czy blokada Redis jest spójna z DB.
-    Z retry logic dla połączenia z bazą danych.
-    """
-    max_retries = 5
-    retry_delay = 10  # 10 sekund między próbami
-
-    for attempt in range(max_retries):
-        try:
-            from matterhorn1.models import ApiSyncLog
-            from django.utils import timezone
-            from django.core.cache import cache
-
-            # Znajdź WSZYSTKIE running rekordy (niezależnie od wieku)
-            all_running = ApiSyncLog.objects.using('matterhorn1').filter(
-                sync_type='items_import',
-                status='running'
-            )
-
-            count = all_running.count()
-
-            # Sprawdź blokadę Redis
-            lock_id = 'matterhorn1_full_import_lock'
-            current_lock = cache.get(lock_id)
-
-            if count > 0 and current_lock:
-                # Są running rekordy w DB I blokada Redis - task działa normalnie
-                logger.info(
-                    f"✅ Znaleziono {count} aktywnych 'running' rekordów - task działa normalnie")
-                logger.info(
-                    "✅ Blokada Redis pozostaje aktywna - task nie został przerwany")
-
-            elif count > 0 and not current_lock:
-                # Są running rekordy w DB ale BRAK blokady Redis - task został przerwany
-                logger.warning(
-                    f"🧹 Znaleziono {count} 'running' rekordów bez blokady Redis - task został przerwany")
-
-                # Oznacz jako 'error' - task został przerwany
-                all_running.update(
-                    status='error',
-                    completed_at=timezone.now(),
-                    error_details='Zawieszone - task został przerwany (restart/stop systemu)'
-                )
-
-                logger.info(
-                    f"✅ Oznaczono {count} przerwanych rekordów jako 'error'")
-
-            elif count == 0 and current_lock:
-                # BRAK running rekordów w DB ale jest blokada Redis - ghost lock
-                logger.warning(
-                    f"🔒 Znaleziono blokadę Redis bez aktywnych tasków: {current_lock}")
-                logger.info("🗑️  Usuwam ghost lock Redis")
-
-                cache.delete(lock_id)
-
-                if not cache.get(lock_id):
-                    logger.info("✅ Ghost lock Redis został usunięty")
-                else:
-                    logger.error("❌ Nie udało się usunąć ghost lock Redis")
-
-            else:
-                # Brak running rekordów i brak blokady Redis - wszystko OK
-                logger.info("✅ Brak aktywnych tasków - system gotowy")
-
-            # Jeśli dotarliśmy tutaj, operacja się powiodła
-            return
-
-        except Exception as e:
-            logger.error(
-                f"❌ Błąd podczas sprawdzania running rekordów (próba {attempt + 1}/{max_retries}): {e}")
-
-            if attempt < max_retries - 1:
-                logger.warning(
-                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą...")
-                time.sleep(retry_delay)
-            else:
-                logger.error(
-                    "❌ Osiągnięto maksymalną liczbę prób sprawdzania running rekordów")
+                logger.error("❌ Osiągnięto maksymalną liczbę prób czyszczenia 'running'")
 
 
 @shared_task(bind=True, name='matterhorn1.tasks.track_stock_changes', queue='default')
@@ -2172,18 +2083,20 @@ def clean_old_stock_history_task(self, days_to_keep=90):
 @shared_task(bind=True, name='matterhorn1.tasks.watchdog_import_healthcheck')
 def watchdog_import_healthcheck(self):
     """
-    Watchdog task - sprząta stare running oraz ghost locki importu ITEMS.
-    Sprawdza czy taski rzeczywiście pracują na podstawie postępu.
+    Watchdog task - siatka bezpieczeństwa dla zawieszonych importów ITEMS.
+    Blokadą importu jest teraz PostgreSQL advisory lock (#238), który zwalnia
+    się sam po padzie workera - nie ma "ghost locków" do sprzątania. Zostaje
+    tylko wykrywanie rekordów 'running' bez postępu (worker żywy, ale wiszący).
     Uruchamiany co 5 minut przez Celery Beat.
     """
-    logger.info("🔍 Watchdog: Sprawdzam i czyszczę stare blokady importu")
+    logger.info("🔍 Watchdog: sprawdzam zawieszone importy ITEMS")
 
     try:
         from matterhorn1.models import ApiSyncLog
         import datetime
 
-        # Wyczyść stare running rekordy (starsze niż 2 godziny)
-        cleaned_running = _cleanup_old_running_imports()
+        # Bardzo stare 'running' (> 3 h) - twardo na 'error' niezależnie od postępu
+        _fail_stale_running_imports(older_than_minutes=180)
 
         # Sprawdź ghost taski - taski w statusie 'running' bez postępu
         ghost_tasks_cleaned = 0
@@ -2285,37 +2198,15 @@ def watchdog_import_healthcheck(self):
                 logger.info(
                     f"✅ Watchdog: Task ID {task.id} młody ({int(task_age_minutes)} min) - prawdopodobnie pracuje")
 
-        # Wyczyść cache blokady jeśli są stare
-        lock_id = 'matterhorn1_full_import_lock'
-        current_lock = cache.get(lock_id)
-        if current_lock:
-            # Sprawdź czy task nadal istnieje w Celery
-            from celery.result import AsyncResult
-            try:
-                result = AsyncResult(current_lock)
-                if result.state in ['PENDING', 'RETRY']:
-                    # Task nadal istnieje - nie ruszaj blokady
-                    logger.info(
-                        f"🔒 Watchdog: Blokada aktywna (task: {current_lock})")
-                else:
-                    # Task nie istnieje - wyczyść blokadę
-                    cache.delete(lock_id)
-                    logger.info(
-                        f"🧹 Watchdog: Usunięto starą blokadę (task: {current_lock})")
-            except Exception:
-                # Nie można sprawdzić task - wyczyść blokadę
-                cache.delete(lock_id)
-                logger.info(
-                    f"🧹 Watchdog: Usunięto nieznaną blokadę (task: {current_lock})")
+        # Blokada importu = PostgreSQL advisory lock (#238) - zwalnia się sama
+        # po padzie workera, nie ma "ghost locków" Redis do sprzątania.
 
         logger.info(
-            f"✅ Watchdog: Zakończono czyszczenie (running: {cleaned_running}, ghost: {ghost_tasks_cleaned})")
+            f"✅ Watchdog: zakończono (ghost: {ghost_tasks_cleaned})")
 
         return {
             'status': 'success',
-            'cleaned_running': cleaned_running,
             'ghost_tasks_cleaned': ghost_tasks_cleaned,
-            'lock_cleaned': current_lock is not None
         }
 
     except Exception as e:

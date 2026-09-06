@@ -12,9 +12,15 @@ from datetime import datetime, timezone as dt_timezone
 import pytest
 from django.utils import timezone
 
-from matterhorn1.tasks import _parse_creation_date
+from matterhorn1.tasks import _parse_creation_date, full_import_and_update
 
 pytestmark = pytest.mark.unit
+
+
+def test_full_import_ma_acks_late_false():
+    """#238: bez acks_late ubity w połowie run byłby redeliverowany po
+    visibility_timeout (1 h) i leciał drugi raz na nieaktualnym oknie."""
+    assert full_import_and_update.acks_late is False
 
 
 class TestParseCreationDate:

@@ -444,9 +444,9 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 }
 
 # Cache Configuration - PostgreSQL (DatabaseCache)
-# Używane przez: throttling DRF, wartości porównawcze watchdoga importu matterhorn1
-# oraz blokadę matterhorn1_full_import_lock. Krótkie blokady tasków (tabu/mada)
-# używają natomiast PostgreSQL advisory locks - patrz core.pg_locks.
+# Używane przez: throttling DRF, wartości porównawcze watchdoga importu matterhorn1.
+# Blokady tasków (matterhorn1/tabu/mada) używają PostgreSQL advisory locks -
+# patrz core.pg_locks.
 # Tabelę tworzy `manage.py createcachetable` (odpalane w krokach migracji deployu).
 CACHES = {
     'default': {

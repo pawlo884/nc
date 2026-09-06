@@ -103,13 +103,40 @@ def test_inventory_chwilowy_500_dogania_sie_i_konczy_completed(
 def test_blokada_rownoleglego_importu_zwraca_skipped(
     matterhorn_api, prior_items_sync, monkeypatch
 ):
-    monkeypatch.setattr("matterhorn1.tasks.cache.add", lambda *a, **k: False)
+    # advisory lock zajęty przez inny run → skip (#238)
+    import contextlib
+
+    @contextlib.contextmanager
+    def _busy_lock(name, **kw):
+        yield False
+
+    monkeypatch.setattr("matterhorn1.tasks.advisory_lock", _busy_lock)
 
     result = full_import_and_update(auto_continue=False, dry_run=False)
 
     assert result["status"] == "skipped"
     assert result["reason"] == "already_running"
     assert Product.objects.using("matterhorn1").count() == 0
+
+
+def test_osierocony_running_oznaczony_error_gdy_nowy_run_ma_lock(
+    matterhorn_api, mocked_responses, prior_items_sync, api_item
+):
+    """#238: po restarcie workera advisory lock się zwolnił, ale rekord ITEMS
+    został 'running'. Nowy run trzyma WYŁĄCZNY lock → sierota zostaje oznaczona
+    'error', import leci dalej normalnie."""
+    stale = ApiSyncLog.objects.using("matterhorn1").create(
+        sync_type="items_import", status="running")
+
+    mock_items(mocked_responses, [[api_item(id=7001)], []])
+    mock_inventory(mocked_responses, [[]])
+
+    full_import_and_update(auto_continue=False, dry_run=False)
+
+    stale.refresh_from_db()
+    assert stale.status == "error"
+    assert "Sierota" in (stale.error_details or "")
+    assert Product.objects.using("matterhorn1").filter(product_uid=7001).exists()
 
 
 def test_wznowienie_od_przerwanej_strony(
