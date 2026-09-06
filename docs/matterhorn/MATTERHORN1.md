@@ -56,17 +56,17 @@ Matterhorn to jedna z trzech działających hurtowni (obok `tabu` i `mada`);
 `src/apps/matterhorn1/models.py`. Tabele bez prefiksu (`brand`, `product`, …)
 poza `matterhorn1_stock_history`.
 
-| Model | Tabela | Rola | Klucz z API |
-| --- | --- | --- | --- |
-| `Brand` | `brand` | marka | `brand_id` (unique) |
-| `Category` | `category` | kategoria + `path` | `category_id` (unique) |
-| `Product` | `product` | produkt | `product_uid` (IntegerField, **unique**) |
-| `ProductDetails` | `productdetails` | 1:1 — waga, tabela rozmiarów | — |
-| `ProductImage` | `productimage` | zdjęcia, `unique(product, image_url)` | — |
-| `ProductVariant` | `productvariant` | wariant/rozmiar, **`stock`** | `variant_uid` (CharField, **unique globalnie**) |
-| `ApiSyncLog` | `apisynclog` | log + **checkpoint** (`current_page`, `status`) | — |
-| `StockHistory` | `matterhorn1_stock_history` | historia zmian stanu | — |
-| `Saga` / `SagaStep` | `saga_logs` / `saga_steps` | saga mapowania do MPD (`core.saga`) | — |
+| Model               | Tabela                      | Rola                                            | Klucz z API                                     |
+| ------------------- | --------------------------- | ----------------------------------------------- | ----------------------------------------------- |
+| `Brand`             | `brand`                     | marka                                           | `brand_id` (unique)                             |
+| `Category`          | `category`                  | kategoria + `path`                              | `category_id` (unique)                          |
+| `Product`           | `product`                   | produkt                                         | `product_uid` (IntegerField, **unique**)        |
+| `ProductDetails`    | `productdetails`            | 1:1 — waga, tabela rozmiarów                    | —                                               |
+| `ProductImage`      | `productimage`              | zdjęcia, `unique(product, image_url)`           | —                                               |
+| `ProductVariant`    | `productvariant`            | wariant/rozmiar, **`stock`**                    | `variant_uid` (CharField, **unique globalnie**) |
+| `ApiSyncLog`        | `apisynclog`                | log + **checkpoint** (`current_page`, `status`) | —                                               |
+| `StockHistory`      | `matterhorn1_stock_history` | historia zmian stanu                            | —                                               |
+| `Saga` / `SagaStep` | `saga_logs` / `saga_steps`  | saga mapowania do MPD (`core.saga`)             | —                                               |
 
 Mapowanie do MPD: `Product.mapped_product_uid` / `is_mapped`,
 `ProductVariant.mapped_variant_uid` / `is_mapped`. Ustawiane ręcznie w adminie
@@ -114,13 +114,16 @@ full_import_and_update(start_id=None, max_products=200000, api_url=None,
 Przebieg:
 
 1. `_check_database_connection()` — retry x3, przerwij jak baza niedostępna.
-2. `_cleanup_old_running_imports()` — oznacz jako `error` runy `running`
-   starsze niż 2 h.
-3. `_cleanup_all_running_imports()` — jeśli są rekordy `running` **bez**
-   blokady Redis → oznacz `error` (task przerwany); jeśli blokada **bez**
-   rekordów → usuń ghost lock. (Nie łapie przypadku "oba istnieją" — patrz §12.)
-4. **Blokada:** `cache.add('matterhorn1_full_import_lock', task_id, 3600)`.
-   Nie udało się zdobyć → `return {'status': 'skipped', 'reason': 'already_running'}`.
+2. **Blokada:** `advisory_lock('matterhorn1:full_import_and_update')` — PostgreSQL
+   advisory lock (`core.pg_locks`, jak `tabu`). Zwalnia się sam po padzie workera,
+   bez TTL i ghost-locków. Nie zdobyta → `return {'status': 'skipped', 'reason': 'already_running'}`.
+   Dekorator taska: `acks_late=False` — ubity w połowie run **nie** jest
+   redeliverowany po `visibility_timeout` (1 h); kolejny tick beat wznawia od
+   `current_page`.
+3. `_fail_stale_running_imports()` — trzymamy wyłączny lock, więc każdy rekord
+   `items_import` w statusie `running` to sierota po ubitym workerze → `error`
+   (`current_page` zostaje do wznowienia).
+4. `_run_full_import_locked(...)` — właściwe ciało importu.
 5. Pętla iteracji (`while True`, bezpiecznik 100 iteracji):
    - **KROK 1 — ITEMS:** `_import_products_from_items(...)`.
      - `status == 'completed'` (koniec danych) → zrób ostatni INVENTORY i `break`.
@@ -129,8 +132,9 @@ Przebieg:
      - `status == 'success'` (osiągnięto `max_products`) → leć dalej.
    - **KROK 2 — INVENTORY:** `_update_inventory_from_api(...)`.
    - `imported_count == 0` albo `auto_continue == False` → `break`.
-6. Zwolnij blokadę, zapisz `ApiSyncLog` (`success` / `completed` / `error`),
-   `return {'status': 'success'|'error', 'total_imported', 'total_updated', ...}`.
+6. Zapisz `ApiSyncLog` (`success` / `completed` / `error` / `inventory_failed`),
+   `return {'status': 'success'|'error'|'partial', 'total_imported', 'total_updated', ...}`.
+   Advisory lock zwalnia context manager.
 
 `dry_run=True` — pobiera z API i liczy, ale **nie** pisze do bazy i nie
 aktualizuje `ApiSyncLog`.
@@ -164,6 +168,7 @@ API; pod obciążeniem współbieżnym jeszcze wolniej). Sekwencyjnie: godzina+.
   logi z wątków miały `full_import_and_update[<task_id>]` zamiast `???[???]`.
 
 Fetch pojedynczej strony (`_fetch_items_page` / `_fetch_inventory_page`):
+
 - ITEMS: do 10 prób, 20 s między próbami; zwraca `{'outcome': 'ok'|'end_of_data'|'error'}`.
 - INVENTORY: **bez retry** (historycznie tak było) — każdy błąd/koniec = `{'outcome': 'ok'|'stop'}`.
 
@@ -175,6 +180,7 @@ Fetch pojedynczej strony (`_fetch_items_page` / `_fetch_inventory_page`):
 per strona (w kolejności).
 
 `_bulk_import_products` (batch, bez N+1):
+
 1. `_resolve_brands_categories(items)` — batch `get_or_create` marek/kategorii.
 2. Batch pre-fetch istniejących produktów po `product_uid`
    (`filter(product_uid__in=...)`).
@@ -198,6 +204,7 @@ Item bez `creation_date` jest pomijany.
 per strona (w kolejności).
 
 `_bulk_update_inventory`:
+
 1. Batch pre-fetch produktów (po `product_uid`) i wariantów (po
    `str(variant_uid)`, `select_related('product')`).
 2. Dla każdego wariantu, którego stan się różni — **warunkowy UPDATE**:
@@ -236,7 +243,7 @@ filtruje warianty po `updated_at`.
   strony. Wszystkie przerwane runy używają **tego samego** `last_update`
   (znacznik przeskakuje dopiero po `completed`), więc numer strony jest spójny.
 - Po zapisaniu każdej strony ITEMS: `_update_items_import_status('running',
-  imported_count, next_page, ...)` — utrwala checkpoint.
+imported_count, next_page, ...)` — utrwala checkpoint.
 - Import ITEMS, który padł na stronie N (5xx/sieć po wyczerpaniu prób), **nie**
   jest oznaczany `completed`. Kolejny tick celery-beat wznowi od strony N.
 - Bug #214 (naprawiony): dawniej `page` rosło tylko po sukcesie, więc trwały
@@ -253,11 +260,11 @@ tam tylko dla przewidywalnej kolejności logów).
 
 Schedule w bazie (`django_celery_beat`, `DatabaseScheduler`), nie w kodzie:
 
-| Zadanie | Harmonogram | Uwaga |
-| --- | --- | --- |
-| `matterhorn1.tasks.full_import_and_update` | crontab `2,12,22,32,42,52 * * * *` (Europe/Warsaw) | co 10 min |
-| `matterhorn1.tasks.watchdog_import_healthcheck` | co 5 min | sprawdza spójność blokada↔DB, sprząta ghost locki |
-| `MPD.tasks.update_stock_from_matterhorn1` | co 5 min | most stanów matterhorn1 → MPD |
+| Zadanie                                         | Harmonogram                                        | Uwaga                                                                                                                                                            |
+| ----------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `matterhorn1.tasks.full_import_and_update`      | crontab `2,12,22,32,42,52 * * * *` (Europe/Warsaw) | co 10 min                                                                                                                                                        |
+| `matterhorn1.tasks.watchdog_import_healthcheck` | co 5 min                                           | siatka bezpieczeństwa: `running` bez postępu > 15 min → `error`, bardzo stare (> 3 h) → `error`. Blokada = advisory lock, więc nie ma ghost-locków do sprzątania |
+| `MPD.tasks.update_stock_from_matterhorn1`       | co 5 min                                           | most stanów matterhorn1 → MPD                                                                                                                                    |
 
 Pozostałe taski (bez harmonogramu / punktowe):
 `clean_old_stock_history` (kasuje wpisy `StockHistory` starsze niż N dni —
@@ -280,6 +287,7 @@ domyślne zachowanie, nie bug (widoczne w logach jako run o "dziwnej" minucie).
 `stock_tracker.track_stock_change()` (punktowo).
 
 Most do MPD: **`MPD.tasks.update_stock_from_matterhorn1`** (co 5 min):
+
 1. Bierze warianty `matterhorn1` z `is_mapped=True` zmienione w oknie
    (`updated_at` w ostatnich ~15 min).
 2. Po `mapped_variant_uid` znajduje wariant w MPD.
@@ -314,14 +322,13 @@ Wspólna baza: `core/wholesaler_admin/` (`RouterScopedQuerysetMixin`,
 
 ## 12. Znane problemy i pułapki
 
-| Problem | Opis | Status |
-| --- | --- | --- |
-| **Redeliver ubitych tasków / nakładające się runy** | Restart `celery-import` w połowie taska → Celery nie dostaje ACK → redeliveruje po czasie (do ~1 h). Wraca, bierze wolną blokadę, przelatuje ponownie na przesuniętym `last_update` — równolegle z runem z beat. Powodowało duplikaty w `StockHistory` i "zawieszone" locki. | Objawy złagodzone (#230 idempotencja INVENTORY); root cause = osobne issue |
-| **Self-healing nie łapie "oba istnieją"** | `_cleanup_all_running_imports` naprawia tylko gdy jest rekord `running` **bez** blokady albo blokada **bez** rekordów. Twarde ubicie procesu zostawia oba → wygląda jak "działa normalnie", blokuje kolejne importy do wygaśnięcia locka (1 h) lub aż `watchdog_import_healthcheck` posprząta. | osobne issue |
-| **Deploy nie jest automatyczny** | `deploy-vps.yml` nie odpala się po tagu (`GITHUB_TOKEN` nie triggeruje workflowów). Każdy deploy na prod jest w praktyce ręczny. | issue #224 |
-| **Niezalogowane restocki** | Gdy między dwoma runami stan poszedł `0→N→0`, run widzi `0` i `0` → nic nie loguje. W `StockHistory` widać serię `1→0` "pod rząd" bez `0→1` między nimi (to nie duplikaty). | drobne, nietknięte |
-| **`limit=1000` w URL, serwer daje 500** | API tnie stronę do 500 pozycji niezależnie od `limit`. Kosmetyka. | — |
-| **`.isdigit()` bez `str()`** | `variant_data.get('stock','0').isdigit()` w `_bulk_update_inventory` — pre-istniejący edge case (rzuci `AttributeError` gdy `stock` nie jest stringiem). Poza zakresem dotychczasowych fixów. | — |
+| Problem                                             | Opis                                                                                                                                                                                                                      | Status                                                                                                                                                                                                                                                 |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Redeliver ubitych tasków / nakładające się runy** | Restart `celery-import` w połowie taska → Celery nie dostaje ACK → redeliveruje po czasie (do ~1 h) na przesuniętym `last_update`, równolegle z runem z beat. Powodowało duplikaty w `StockHistory` i "zawieszone" locki. | **Naprawione** (#238): `acks_late=False` (brak redeliveru) + advisory lock zamiast `cache.add` (brak ghost-locków, auto-release po padzie); `_fail_stale_running_imports` sprząta osierocone rekordy `running`. #230 dodatkowo utrzymuje idempotencję. |
+| **Deploy nie jest automatyczny**                    | `deploy-vps.yml` nie odpala się po tagu (`GITHUB_TOKEN` nie triggeruje workflowów). Każdy deploy na prod jest w praktyce ręczny.                                                                                          | issue #224                                                                                                                                                                                                                                             |
+| **Niezalogowane restocki**                          | Gdy między dwoma runami stan poszedł `0→N→0`, run widzi `0` i `0` → nic nie loguje. W `StockHistory` widać serię `1→0` "pod rząd" bez `0→1` między nimi (to nie duplikaty).                                               | drobne, nietknięte                                                                                                                                                                                                                                     |
+| **`limit=1000` w URL, serwer daje 500**             | API tnie stronę do 500 pozycji niezależnie od `limit`. Kosmetyka.                                                                                                                                                         | —                                                                                                                                                                                                                                                      |
+| **`.isdigit()` bez `str()`**                        | `variant_data.get('stock','0').isdigit()` w `_bulk_update_inventory` — pre-istniejący edge case (rzuci `AttributeError` gdy `stock` nie jest stringiem). Poza zakresem dotychczasowych fixów.                             | —                                                                                                                                                                                                                                                      |
 
 Czyszczenie historycznych duplikatów: `python manage.py dedupe_stock_history`
 (§14).
@@ -353,32 +360,32 @@ Uruchomienie: `pytest src/apps/matterhorn1` (CI: `working-directory: src`,
 
 `src/apps/matterhorn1/management/commands/`:
 
-| Komenda | Rola |
-| --- | --- |
-| `celery_import --action import` / `status` | ręczne odpalenie / status `full_import_and_update` |
-| `dedupe_stock_history [--execute] [--window-minutes N]` | czyści historyczne duplikaty `StockHistory` (dry-run domyślnie); idempotentna |
-| `best_sellers` | eksport CSV bestsellerów |
-| `sync_products` / `sync_variants` / `sync_inventory` / `sync_brands_categories` / `sync_all` | starsze, punktowe importy (przed `full_import_and_update`) |
-| `import_products_bulk` / `_optimized` / `_sequence` | j.w. |
+| Komenda                                                                                      | Rola                                                                          |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `celery_import --action import` / `status`                                                   | ręczne odpalenie / status `full_import_and_update`                            |
+| `dedupe_stock_history [--execute] [--window-minutes N]`                                      | czyści historyczne duplikaty `StockHistory` (dry-run domyślnie); idempotentna |
+| `best_sellers`                                                                               | eksport CSV bestsellerów                                                      |
+| `sync_products` / `sync_variants` / `sync_inventory` / `sync_brands_categories` / `sync_all` | starsze, punktowe importy (przed `full_import_and_update`)                    |
+| `import_products_bulk` / `_optimized` / `_sequence`                                          | j.w.                                                                          |
 
 ---
 
 ## 15. Historia zmian (istotne PR-y)
 
-| PR | Zmiana |
-| --- | --- |
-| #204 | wznawianie importu ITEMS od przerwanej strony |
-| #210–#216, #219, #222 | migracja na pytest-django + pokrycie testami `matterhorn1` (98 → 213 testów) |
-| #217 (issue #214) | trwały 5xx na stronie przerywa import zamiast pętlić do soft-timeoutu |
-| #222 (issue #221) | `product_id` → `product_uid` w `views.py` (FieldError → 500) |
-| #223 | batch zapytań w imporcie ITEMS zamiast N+1 |
-| #225 | batch zapytań w `_bulk_update_inventory` (N+1) |
-| #226 | pipeline pobierania stron ITEMS zamiast sekwencyjnego (wątek launcher, wczesny stop) |
-| #227 | odseparowanie wystrzeliwania stron od zapisu do bazy (osobny wątek) |
-| #228 | kontekst zadania Celery w logach z wątków (`???[???]` → `[<task_id>]`) |
-| #229 | przyspieszenie changelist admina `StockHistory` |
-| #230 | idempotentny `_bulk_update_inventory` (duplikaty w `StockHistory`) |
-| #231 | komenda `dedupe_stock_history` |
+| PR                    | Zmiana                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| #204                  | wznawianie importu ITEMS od przerwanej strony                                        |
+| #210–#216, #219, #222 | migracja na pytest-django + pokrycie testami `matterhorn1` (98 → 213 testów)         |
+| #217 (issue #214)     | trwały 5xx na stronie przerywa import zamiast pętlić do soft-timeoutu                |
+| #222 (issue #221)     | `product_id` → `product_uid` w `views.py` (FieldError → 500)                         |
+| #223                  | batch zapytań w imporcie ITEMS zamiast N+1                                           |
+| #225                  | batch zapytań w `_bulk_update_inventory` (N+1)                                       |
+| #226                  | pipeline pobierania stron ITEMS zamiast sekwencyjnego (wątek launcher, wczesny stop) |
+| #227                  | odseparowanie wystrzeliwania stron od zapisu do bazy (osobny wątek)                  |
+| #228                  | kontekst zadania Celery w logach z wątków (`???[???]` → `[<task_id>]`)               |
+| #229                  | przyspieszenie changelist admina `StockHistory`                                      |
+| #230                  | idempotentny `_bulk_update_inventory` (duplikaty w `StockHistory`)                   |
+| #231                  | komenda `dedupe_stock_history`                                                       |
 
 Powiązane: [`../HOW_IT_WORKS.md`](../HOW_IT_WORKS.md) §1 (import z hurtowni),
 [`../PROJECT_OVERVIEW.md`](../PROJECT_OVERVIEW.md),

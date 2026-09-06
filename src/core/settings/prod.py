@@ -311,9 +311,9 @@ CELERY_TASK_ROUTES = {
 }
 
 # Cache Configuration - PostgreSQL (DatabaseCache), tabela w bazie 'default'.
-# Używane przez throttling DRF, watchdog importu matterhorn1 oraz blokadę
-# matterhorn1_full_import_lock. Tabelę tworzy `manage.py createcachetable`
-# (krok w migracji deployu). Krótkie blokady tasków tabu/mada -> core.pg_locks.
+# Używane przez throttling DRF i watchdog importu matterhorn1. Tabelę tworzy
+# `manage.py createcachetable` (krok w migracji deployu).
+# Blokady tasków (matterhorn1/tabu/mada) -> PostgreSQL advisory locks, core.pg_locks.
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
