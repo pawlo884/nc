@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.21](https://github.com/pawlo884/nc/compare/v1.44.20...v1.44.21) (2026-09-07)
+
+### Performance Improvements
+
+* **tabu:** sync stanów porcjami + redukcja pamięci (fix OOM/SIGKILL) ([#262](https://github.com/pawlo884/nc/issues/262)) ([7949106](https://github.com/pawlo884/nc/commit/79491062f76ef49a6f70700b091f138389223ba9)), references [#261](https://github.com/pawlo884/nc/issues/261)
+
 ## [1.44.20](https://github.com/pawlo884/nc/compare/v1.44.19...v1.44.20) (2026-09-07)
 
 ### Performance Improvements
