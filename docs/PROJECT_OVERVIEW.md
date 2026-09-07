@@ -19,18 +19,18 @@ lokalny serwer MCP (read-only).
 
 ## 2. Stack
 
-| Warstwa  | Technologia                                                                                                              |
-| -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Backend  | Django 6.0, DRF 3.17, Python 3.13                                                                                        |
-| Async    | Celery 5.4 + Redis (**tylko broker**); wyniki i harmonogram w PostgreSQL (`django-celery-results`, `django-celery-beat`) |
-| Bazy     | PostgreSQL, **osobna baza per aplikacja** + routery; w DEV prefiks `zzz_`                                                |
-| Pliki    | MinIO / S3 (`django-storages`) — wygenerowane XML-e i zdjęcia                                                            |
-| Frontend | React 19 + Vite + TS, TanStack Query, react-router (`frontend/mpd/`), SPA pod `/mpd-app/`                                |
-| AI       | `openai` + `openai-agents` + `langchain-openai` (web_agent); `mcp` (serwer katalogu)                                     |
-| Scraping | Selenium (web_agent — wypełnianie formularzy)                                                                            |
-| Docs API | drf-spectacular (`/api/docs/`, `/api/redoc/`)                                                                            |
-| Deploy   | prod: k3s (`deployments/k8s/nc-prod`); dev: docker-compose + tunel SSH do bazy                                           |
-| CI/CD    | GitHub Actions, semantic-release (Conventional Commits → CHANGELOG → tag → deploy), husky + commitlint                   |
+| Warstwa  | Technologia                                                                                                                                                            |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend  | Django 6.0, DRF 3.17, Python 3.13                                                                                                                                      |
+| Async    | Celery 5.4 + Redis (**tylko broker**); wyniki i harmonogram w PostgreSQL (`django-celery-results`, `django-celery-beat`)                                               |
+| Bazy     | PostgreSQL, **osobna baza per aplikacja** + routery; w DEV prefiks `zzz_`                                                                                              |
+| Pliki    | MinIO / S3 (`django-storages`) — wygenerowane XML-e i zdjęcia                                                                                                          |
+| Frontend | React 19 + Vite + TS, TanStack Query, react-router (`frontend/mpd/`), SPA pod `/mpd-app/`                                                                              |
+| AI       | `openai` + `openai-agents` + `langchain-openai` (web_agent); `mcp` (serwer katalogu)                                                                                   |
+| Scraping | Selenium (web_agent — wypełnianie formularzy)                                                                                                                          |
+| Docs API | drf-spectacular (`/api/docs/`, `/api/redoc/`)                                                                                                                          |
+| Deploy   | prod + dev: **jeden `docker-compose`** (prod: obraz wypalony, NPM z przodu; dev: bind-mount + tunel SSH). Patrz [DEPLOY.md](DEPLOY.md)                                 |
+| CI/CD    | GitHub Actions, semantic-release (Conventional Commits → CHANGELOG → tag); deploy prod **ręczny** (`workflow_dispatch` / `scripts/deploy-prod.sh`), husky + commitlint |
 
 ## 3. Aplikacje (`src/apps/`)
 
@@ -83,9 +83,21 @@ na `:5173`.
 
 ## 9. Deploy
 
-- **Prod = k3s na VPS.** `Release` workflow (semantic-release) tworzy tag `v*` → `deploy-vps.yml` → `scripts/k8s-prod/deploy.sh`. `collectstatic --clear` wypalany w `Dockerfile.prod` na etapie build. Manifesty: `web`, `celery`, `flower`, `redis`, `ingress`, `migrate-job`.
-- **Dev:** `docker-compose/docker-compose.dev.yml` — `web`, `nginx` (:8090), `celery-fast`, `celery-heavy`, `celery-beat`, `flower`, `redis`, `postgres-ssh-tunnel` (baza dev zdalna, przez tunel SSH), `static-init`. `src/` bind-mount = hot reload; statyki wypalone przy starcie (nowy plik statyczny wymaga ręcznego `collectstatic`).
-- **`docker-compose.services.yml`** (dawniej `docker-compose.blue-green.yml`) — `web-blue`/`web-green`/`nginx-router` i skrypty `scripts/deploy/` są **DEPRECATED** (tylko awaryjny rollback, produkcja web działa na k3s). Reszta pliku jest **aktywna**: `postgres` (profil `shared`), `redis`, `celery-default`, `celery-import`, `celery-beat`, `flower` nadal realnie działają z tego pliku na Dockerze — nie zostały jeszcze przeniesione na k3s, mimo że gotowe manifesty (`deployments/k8s/nc-prod/celery.yaml`, `flower.yaml`) już tam leżą.
+Pełny opis: **[DEPLOY.md](DEPLOY.md)**. k3s i blue-green **usunięte** (#259).
+
+- **Prod:** jeden `docker-compose/docker-compose.prod.yml` na VPS. Obraz
+  `nc-django-app:latest` z wypalonym kodem + React SPA + `collectstatic`
+  (`Dockerfile.prod`). **NPM** (Nginx Proxy Manager) → `web:8000` (gunicorn +
+  whitenoise). Serwisy: `web`, `celery-fast`, `celery-heavy`, `celery-beat`,
+  `flower`, `redis`, `migrate` (profil). Postgres (`nc-postgres-1`) osobno
+  (profil `shared`). Deploy: `scripts/deploy-prod.sh <ref>` (`git reset` →
+  build → migracje → `up -d`), ręcznie albo `deploy-vps.yml` (`workflow_dispatch`).
+- **Dev:** `docker-compose/docker-compose.dev.yml` — `web`, `nginx` (:8090),
+  `celery-fast`, `celery-heavy`, `celery-beat`, `flower`, `redis`,
+  `postgres-ssh-tunnel` (baza dev zdalna przez tunel SSH), `static-init`.
+  `src/` bind-mount = hot reload.
+- **ML:** `docker-compose.dev.ml.yml` — nakładka z `celery-ml` (`-Q ml`),
+  szkielet, nieużywana (`ML_CONTAINER_TODO.md`).
 
 ## 10. Testy
 

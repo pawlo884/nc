@@ -1,6 +1,6 @@
 # Konfiguracja Nginx Proxy Manager dla produkcji
 
-> ⚠️ **DEPRECATED (część blue-green)**: fragmenty odnoszące się do routingu blue/green kontenerów opisują nieaktywny mechanizm — produkcja działa na k3s + Traefik (patrz `docs/K8S_PROD.md`).
+> ⚠️ **Historyczne (blue-green)**: fragmenty o deployu produkcyjnym przez blue-green / k3s są nieaktualne — produkcja to jeden `docker-compose`, patrz [`DEPLOY.md`](DEPLOY.md). Sekcje o DEV zostają aktualne.
 
 ## 🎯 Cel
 
@@ -9,6 +9,7 @@ Skonfigurować Nginx Proxy Manager (NPM) do automatycznego zarządzania blue-gre
 ## ✨ Rozwiązanie
 
 Używamy **load balancing z backup** - NPM automatycznie:
+
 - Używa primary kontenera (`nc-web-blue`) gdy działa
 - Przełącza się na backup (`nc-web-green`) gdy primary nie odpowiada
 - Wraca na primary gdy znów zacznie działać
@@ -34,6 +35,7 @@ Używamy **load balancing z backup** - NPM automatycznie:
 **⚠️ WAŻNE**: Dla blue-green deployment użyjemy load balancing, żeby NPM automatycznie przełączał się między kontenerami.
 
 **Details Tab:**
+
 - **Domain Names**: `212.127.93.27` (lub zostaw puste dla IP)
 - **Scheme**: `http`
 - **Forward Hostname/IP**: `nc-web-blue` (tymczasowo - zmienimy to w Advanced)
@@ -51,7 +53,7 @@ Przejdź do zakładki **Advanced** i w sekcji **Custom Nginx Configuration** dod
 upstream django_backend {
     # Primary - aktywny kontener (domyślnie blue)
     server nc-web-blue:8000 max_fails=3 fail_timeout=30s;
-    
+
     # Backup - standby kontener (domyślnie green)
     # Nginx automatycznie przełączy się na green jeśli blue nie działa
     server nc-web-green:8000 max_fails=3 fail_timeout=30s backup;
@@ -95,7 +97,7 @@ location / {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-Host $host;
     proxy_set_header X-Forwarded-Port $server_port;
-    
+
     proxy_connect_timeout 60s;
     proxy_send_timeout 300s;
     proxy_read_timeout 300s;
@@ -119,13 +121,13 @@ upstream django_backend {
 
 **LUB** użyj sekcji **Custom Headers** w NPM (jeśli dostępna):
 
-| Header Name | Header Value |
-|------------|--------------|
-| `X-Forwarded-Host` | `$host` |
-| `X-Forwarded-Port` | `$server_port` |
-| `X-Real-IP` | `$remote_addr` |
-| `X-Forwarded-For` | `$proxy_add_x_forwarded_for` |
-| `X-Forwarded-Proto` | `$scheme` |
+| Header Name         | Header Value                 |
+| ------------------- | ---------------------------- |
+| `X-Forwarded-Host`  | `$host`                      |
+| `X-Forwarded-Port`  | `$server_port`               |
+| `X-Real-IP`         | `$remote_addr`               |
+| `X-Forwarded-For`   | `$proxy_add_x_forwarded_for` |
+| `X-Forwarded-Proto` | `$scheme`                    |
 
 ### Krok 5: Health Checks (zalecane)
 
@@ -136,13 +138,14 @@ Dodaj health checks w **Advanced** → **Custom Nginx Configuration**:
 upstream django_backend {
     server nc-web-blue:8000 max_fails=3 fail_timeout=30s;
     server nc-web-green:8000 max_fails=3 fail_timeout=30s backup;
-    
+
     # Health check (jeśli nginx ma moduł health check)
     # keepalive 32;
 }
 ```
 
 **Lub użyj health check przez location:**
+
 ```nginx
 location /health {
     access_log off;
@@ -154,6 +157,7 @@ location /health {
 ### Krok 6: Konfiguracja SSL (opcjonalnie)
 
 Jeśli używasz HTTPS:
+
 - **SSL Certificate**: Wybierz certyfikat lub użyj Let's Encrypt
 - **Force SSL**: ✅ (zalecane dla produkcji)
 - **HTTP/2 Support**: ✅
@@ -163,6 +167,7 @@ Jeśli używasz HTTPS:
 Jeśli chcesz używać portu 8001 zamiast domyślnego 80:
 
 **Opcja A - Streams (jeśli NPM obsługuje):**
+
 1. Przejdź do **Streams** w NPM
 2. Utwórz stream:
    - **Listen Port**: `8001`
@@ -170,6 +175,7 @@ Jeśli chcesz używać portu 8001 zamiast domyślnego 80:
    - **Forward Port**: `8000`
 
 **Opcja B - Drugi Proxy Host:**
+
 1. Utwórz kolejny Proxy Host w NPM
 2. Użyj tej samej konfiguracji co pierwszy
 3. W **Details** ustaw:
@@ -185,7 +191,7 @@ W **Advanced** → **Custom Nginx Configuration** dodaj:
 server {
     listen 8001;
     server_name _;
-    
+
     location / {
         proxy_pass http://django_backend;
         # ... reszta konfiguracji jak wyżej
@@ -208,7 +214,9 @@ docker inspect <nazwa-kontenera-npm> | grep -A 10 "Networks"
 ```
 
 **Ważne**: Kontenery muszą być w tej samej sieci Docker! Jeśli nie są:
+
 1. Dodaj kontener NPM do sieci `nc_network`:
+
    ```bash
    docker network connect nc_network <nazwa-kontenera-npm>
    ```
@@ -233,12 +241,15 @@ curl -v http://localhost:8001/admin/
 ### Problem: "502 Bad Gateway"
 
 **Rozwiązanie:**
+
 1. Sprawdź czy kontener Django działa:
+
    ```bash
    docker ps | grep nc-web
    ```
 
 2. Sprawdź logi Django:
+
    ```bash
    docker logs nc-web-blue
    ```
@@ -251,6 +262,7 @@ curl -v http://localhost:8001/admin/
 ### Problem: "Invalid HTTP_HOST header"
 
 **Rozwiązanie:**
+
 - Upewnij się, że w `nc/settings/prod.py` masz:
   ```python
   ALLOWED_HOSTS = ['212.127.93.27', ...]
@@ -259,6 +271,7 @@ curl -v http://localhost:8001/admin/
 ### Problem: "CSRF verification failed"
 
 **Rozwiązanie:**
+
 - Upewnij się, że w `nc/settings/prod.py` masz:
   ```python
   CSRF_TRUSTED_ORIGINS = [
@@ -270,6 +283,7 @@ curl -v http://localhost:8001/admin/
 ### Problem: Nagłówki nie są przekazywane
 
 **Rozwiązanie:**
+
 - Sprawdź konfigurację Custom Headers w NPM
 - Upewnij się, że używasz Advanced → Custom Nginx Configuration
 - Sprawdź logi NPM:
@@ -290,6 +304,7 @@ Z konfiguracją load balancing z `backup` (jak w Kroku 3), NPM automatycznie:
 Jeśli chcesz ręcznie zmienić który kontener jest primary, edytuj w NPM → Advanced → Custom Nginx Configuration:
 
 **Aby użyć Green jako primary:**
+
 ```nginx
 upstream django_backend {
     server nc-web-green:8000 max_fails=3 fail_timeout=30s;
@@ -298,6 +313,7 @@ upstream django_backend {
 ```
 
 **Aby użyć Blue jako primary:**
+
 ```nginx
 upstream django_backend {
     server nc-web-blue:8000 max_fails=3 fail_timeout=30s;
@@ -310,6 +326,7 @@ upstream django_backend {
 Twój skrypt `deploy-blue-green.sh` może automatycznie aktualizować konfigurację NPM przez API (jeśli NPM ma API) lub przez edycję pliku konfiguracyjnego NPM.
 
 **Przykład skryptu do aktualizacji NPM:**
+
 ```bash
 # W deploy-blue-green.sh, po przełączeniu kontenera:
 # Zaktualizuj upstream w NPM (jeśli masz dostęp do plików NPM)
@@ -342,7 +359,7 @@ Oto kompletna konfiguracja do wklejenia w **Advanced** → **Custom Nginx Config
 upstream django_backend {
     # Primary kontener (zmień kolejność aby przełączyć primary/backup)
     server nc-web-blue:8000 max_fails=3 fail_timeout=30s;
-    
+
     # Backup kontener - automatycznie użyty gdy primary nie działa
     server nc-web-green:8000 max_fails=3 fail_timeout=30s backup;
 }
@@ -350,7 +367,7 @@ upstream django_backend {
 # Nadpisz location block
 location / {
     proxy_pass http://django_backend;
-    
+
     # Headers dla Django
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -358,22 +375,22 @@ location / {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-Host $host;
     proxy_set_header X-Forwarded-Port $server_port;
-    
+
     # Timeouts
     proxy_connect_timeout 60s;
     proxy_send_timeout 300s;
     proxy_read_timeout 300s;
-    
+
     # HTTP 1.1
     proxy_http_version 1.1;
     proxy_set_header Connection "";
-    
+
     # Buffering
     proxy_buffering on;
     proxy_buffer_size 4k;
     proxy_buffers 8 4k;
     proxy_busy_buffers_size 8k;
-    
+
     # Error handling
     proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
     proxy_next_upstream_tries 2;

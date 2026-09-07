@@ -1,8 +1,9 @@
 # NC (nc_project)
 
-Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa na k3s** (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`). Tryb blue‑green (`docker-compose.services.yml`) jest **DEPRECATED** — zachowany tylko do wglądu/awaryjnego rollbacku.
+Projekt Django + PostgreSQL + Celery/Redis. **Produkcja i dev: jeden `docker-compose`** — patrz [`docs/DEPLOY.md`](docs/DEPLOY.md). (k3s i blue‑green usunięte — #259.)
 
 ## Wymagania
+
 - **Docker + Docker Compose** (w praktyce: Docker Desktop na Windows).
 - **PostgreSQL** dostępny z kontenerów (w DEV najczęściej `host.docker.internal:5432`).
 - **Git**.
@@ -12,6 +13,7 @@ Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa na k3s** (`deplo
   - **Konfiguracja pyenv**: Zobacz `docs/PYENV_SETUP.md` jeśli masz problemy z konfiguracją.
 
 ## Struktura repo (najważniejsze)
+
 - `src/core/` – konfiguracja projektu (settings, urls, celery, db_routers)
 - `src/apps/` – aplikacje Django (poniżej opis)
 - **manage.py** – w katalogu `src/` (uruchomienie: `cd src && python manage.py ...` lub `python src/manage.py ...`)
@@ -43,11 +45,12 @@ Projekt Django + PostgreSQL + Celery/Redis. **Produkcja działa na k3s** (`deplo
   - logika mapowania produktów Tabu → MPD (analogicznie do `matterhorn1`).
 
 - **Inne elementy**
-  - **Celery + Redis** – kolejki (`celery-default`, opcjonalnie ML worker), monitoring przez Flower.
+  - **Celery + Redis** – workery `celery-fast` / `celery-heavy` (+ szkielet `celery-ml`), monitoring przez Flower.
   - **drf-spectacular** – dokumentacja REST API pod `/api/schema/`, `/api/docs/`, `/api/redoc/`.
-  - **Deploy na k3s** – pełny pipeline deployu na VPS (`deployments/k8s/nc-prod`, `scripts/k8s-prod`, `.github/workflows/deploy-vps.yml`). Blue‑green (`scripts/deploy`) jest **DEPRECATED**.
+  - **Deploy** – jeden `docker-compose` na VPS, `scripts/deploy-prod.sh` / `deploy-vps.yml` (`workflow_dispatch`). Patrz `docs/DEPLOY.md`.
 
 ## Konfiguracja środowiska (`.env.dev`)
+
 Plik **`.env.dev` nie jest wersjonowany** (jest ignorowany) – musisz go mieć lokalnie.
 
 - **Szablon**: `docs/env.sample.md` (skopiuj do `.env.dev` i uzupełnij).
@@ -55,29 +58,35 @@ Plik **`.env.dev` nie jest wersjonowany** (jest ignorowany) – musisz go mieć 
 - Redis w DEV jest w compose i używa hasła `dev_password`.
 
 ## Uruchomienie DEV (Docker – zalecane)
+
 ### Pierwszy start (Windows)
+
 ```powershell
 .\scripts\build\build-fast.ps1
 docker-compose -f docker-compose.dev.yml up -d
 ```
 
 ### Pierwszy start (Linux/Mac)
+
 ```bash
 ./scripts/build/build-fast.sh
 docker-compose -f docker-compose.dev.yml up -d
 ```
 
 ### Dostęp
+
 - **Aplikacja przez Nginx (zalecane)**: `http://localhost:8090/`
 - **Bezpośrednio (web)**: `http://localhost:8000/`
 - **Flower**: `http://localhost:5555/`
 
 ### DEV z ML workerem (opcjonalnie)
+
 ```bash
 docker-compose -f docker-compose.dev.yml -f docker-compose.dev.ml.yml up -d --build
 ```
 
 ## Najczęstsze komendy (DEV)
+
 ```bash
 # Logi
 docker-compose -f docker-compose.dev.yml logs -f
@@ -92,32 +101,25 @@ docker-compose -f docker-compose.dev.yml exec web bash
 docker-compose -f docker-compose.dev.yml down
 ```
 
-## Produkcja (k3s)
-Deploy robimy przez GitHub Actions (`Release` → `deploy-vps.yml`), który uruchamia `scripts/k8s-prod/deploy.sh` na k3s. Szczegóły: `docs/K8S_PROD.md`.
+## Produkcja
 
-> ⚠️ **DEPRECATED**: poniższe skrypty blue‑green (`scripts/deploy/*`) nie są już używane na produkcji — zachowane do wglądu/awaryjnego rollbacku.
+Jeden `docker-compose/docker-compose.prod.yml` na VPS. Deploy przez GitHub
+Actions (`Deploy to VPS` → `workflow_dispatch`, podajesz tag/branch) albo
+ręcznie:
 
 ```bash
-export ENVIRONMENT=prod
-./scripts/deploy/deploy-blue-green.sh deploy
-./scripts/deploy/deploy-blue-green.sh status
-./scripts/deploy/deploy-blue-green.sh rollback
+cd /home/pawel/apps/nc
+./scripts/deploy-prod.sh v1.44.21     # albo main
 ```
 
-### Migracje na produkcji (blue/green, DEPRECATED)
-```bash
-./scripts/deploy/run-migrations.sh
-```
-
-### ML worker na produkcji (blue/green, DEPRECATED)
-```bash
-docker-compose -f docker-compose.services.yml -f docker-compose.services.ml.yml up -d celery-ml
-```
+Skrypt: `git reset --hard <ref>` → `docker compose build` →
+`--profile migrate run --rm migrate` → `up -d --remove-orphans` → health check.
+Pełny opis, NPM, rollback, migracje: **`docs/DEPLOY.md`**.
 
 ## Dokumentacja
+
+- `docs/DEPLOY.md` (deploy produkcyjny)
 - `docs/QUICK_START.md`
 - `docs/DOCKER_QUICK_GUIDE.md`
 - `docs/SCRIPTS_GUIDE.md`
-- `docs/K8S_PROD.md` (aktualny deploy produkcyjny)
-- `docs/BLUE_GREEN_DEPLOYMENT.md` (DEPRECATED)
 - **Zewnętrzne API:** `docs/IDOSELL_API.md` (linki do IdoSell: [Getting Started](https://idosell.readme.io/docs/getting-started), [developers](https://www.idosell.com/developers))

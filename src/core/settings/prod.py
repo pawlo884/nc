@@ -51,10 +51,8 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     '212.127.93.27',  # VPS IP
     '192.168.50.31',  # IP serwera w sieci lokalnej
-    'app-web-1',  # Nazwa kontenera Docker
     'web',  # Alias kontenera w sieci Docker
-    'nc-web-blue',   # Kontener blue (health check, proxy wewnętrzny)
-    'nc-web-green',  # Kontener green (health check, proxy wewnętrzny)
+    'nc-web',  # Nazwa kontenera (NPM → nc-web:8000)
     'nc.sowa.ch',  # Główna domena aplikacji
     'sowa.ch',  # Domena główna (bez poddomeny)
     # Dodaj konkretne domeny zamiast '*'
@@ -194,12 +192,9 @@ SECURE_PROXY_SSL_HEADER = None
 CSRF_TRUSTED_ORIGINS = [
     'http://212.127.93.27',
     'http://212.127.93.27:8000',
-    'http://212.127.93.27:8001',
     'https://212.127.93.27',
     'http://192.168.50.31',
     'http://192.168.50.31:8000',
-    'http://192.168.50.31:8001',
-    'http://172.24.0.1:8001',  # Adres bramy sieci Docker dla NPM
     'https://nc.sowa.ch',
     'https://sowa.ch',
 ]
