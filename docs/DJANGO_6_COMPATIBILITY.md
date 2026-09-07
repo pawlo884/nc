@@ -69,7 +69,6 @@ Na PyPI dostępna jest też linia **5.2.16** (LTS). Branch `feature/sentry-monit
 - [ ] API / Swagger (drf-spectacular)
 - [ ] Celery beat + results
 - [ ] Build Docker (`deployments/docker/Dockerfile.prod`)
-- [ ] Deploy testowy na k3s nc-test
 
 ## Komendy weryfikacji
 

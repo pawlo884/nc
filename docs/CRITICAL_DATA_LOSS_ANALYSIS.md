@@ -1,5 +1,10 @@
 # 🚨 KRYTYCZNA ANALIZA - Utrata danych PostgreSQL
 
+> Historyczne (2025-12). `docker-compose.blue-green.yml` już nie istnieje.
+> Wniosek nadal aktualny: **`docker compose ... down -v` / `up --force-recreate`
+> na stacku z Postgresem = ryzyko volumenu**. Dlatego `docker-compose.prod.yml`
+> trzyma `postgres` za profilem `shared` (nie rusza go `deploy-prod.sh`).
+
 ## Problem
 
 PostgreSQL został **ODTWORZONY DZISIAJ** (2025-12-03 10:18:58) podczas deploy!

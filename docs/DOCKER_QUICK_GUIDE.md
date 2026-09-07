@@ -1,6 +1,6 @@
 # 🚀 Docker - Szybki przewodnik
 
-> ⚠️ **DEPRECATED (część blue-green)**: sekcje o blue-green (docker-compose) opisują nieaktywny mechanizm produkcyjny — produkcja działa na k3s (`deployments/k8s/nc-prod`, patrz `docs/K8S_PROD.md`). Sekcje o środowisku DEV pozostają aktualne.
+> ⚠️ **Historyczne (blue-green)**: fragmenty o deployu produkcyjnym przez blue-green / k3s są nieaktualne — produkcja to jeden `docker-compose`, patrz [`DEPLOY.md`](DEPLOY.md). Sekcje o DEV zostają aktualne.
 
 ## 📋 Wybór środowiska
 

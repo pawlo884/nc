@@ -1,6 +1,6 @@
 # Konfiguracja Nginx Proxy Manager dla produkcji
 
-> ⚠️ **DEPRECATED (część blue-green)**: fragmenty odnoszące się do routingu blue/green kontenerów opisują nieaktywny mechanizm — produkcja działa na k3s + Traefik (patrz `docs/K8S_PROD.md`).
+> ⚠️ **Historyczne (blue-green)**: fragmenty o deployu produkcyjnym przez blue-green / k3s są nieaktualne — produkcja to jeden `docker-compose`, patrz [`DEPLOY.md`](DEPLOY.md). Sekcje o DEV zostają aktualne.
 
 ## 🎯 Cel
 

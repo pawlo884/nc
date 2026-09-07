@@ -20,8 +20,8 @@ chmod 666 /app/logs/django.log
 if [ "$DJANGO_SETTINGS_MODULE" = "nc.settings.prod" ]; then
     echo "🔧 Sprawdzanie plików statycznych w produkcji..."
     
-    # Migracje NIE są uruchamiane w entrypoincie.
-    # W trybie blue-green wykonuj migracje ręcznie przed deploymentem (np. scripts/deploy/run-migrations.sh).
+    # Migracje NIE są uruchamiane w entrypoincie — robi je serwis `migrate`
+    # (profil) w docker-compose.prod.yml, patrz scripts/deploy-prod.sh.
     
     # Sprawdź czy pliki admin_interface istnieją
     if [ ! -d "/app/staticfiles/admin_interface" ]; then

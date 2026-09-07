@@ -1,6 +1,7 @@
 # 🚀 Quick Start - NC Project
 
-> ⚠️ **DEPRECATED (część blue-green)**: sekcje o deployu produkcyjnym przez blue-green (docker-compose) opisują nieaktywny mechanizm — produkcja działa na k3s (patrz `docs/K8S_PROD.md`). Sekcje o środowisku DEV pozostają aktualne.
+> Deploy produkcyjny: **`docs/DEPLOY.md`** (jeden `docker-compose`). Ten
+> dokument opisuje głównie środowisko DEV.
 
 ## Pierwsze uruchomienie (5 minut)
 
@@ -83,17 +84,11 @@ docker-compose -f docker-compose.dev.yml restart web
 
 ## Deployment do Production
 
-### Blue-Green Deploy (prod)
-```bash
-export ENVIRONMENT=prod
-./scripts/deploy/deploy-blue-green.sh deploy
-./scripts/deploy/deploy-blue-green.sh status
-```
+Jeden `docker-compose` na VPS — patrz **[DEPLOY.md](DEPLOY.md)**.
 
-### Rollback
-```powershell
-# Rollback (blue-green)
-./scripts/deploy/deploy-blue-green.sh rollback
+```bash
+cd /home/pawel/apps/nc
+./scripts/deploy-prod.sh v1.44.21     # albo main; rollback = poprzedni tag
 ```
 
 ---
@@ -299,21 +294,10 @@ CACHES = {
 ## Następne kroki
 
 1. 📚 Przeczytaj dokumentację:
-   - [ZERO_DOWNTIME_DEPLOYMENT.md](ZERO_DOWNTIME_DEPLOYMENT.md)
+   - [DEPLOY.md](DEPLOY.md)
    - [BUILD_OPTIMIZATION.md](BUILD_OPTIMIZATION.md)
-   - [DEPLOYMENT_SCRIPTS.md](DEPLOYMENT_SCRIPTS.md)
 
-2. 🧪 Przetestuj deployment:
-   ```bash
-   ./scripts/deploy/deploy-blue-green.sh status
-   ```
-
-3. 🔙 Przetestuj rollback:
-   ```powershell
-   ./scripts/deploy/deploy-blue-green.sh rollback
-   ```
-
-4. 📊 Sprawdź monitoring:
+2. 📊 Sprawdź monitoring:
    - Flower: http://localhost:5555
    - Django Admin: http://localhost:8000/admin/
 
@@ -334,9 +318,6 @@ docker-compose -f docker-compose.dev.yml up -d --force-recreate
 
 # Logi
 docker-compose -f docker-compose.dev.yml logs -f
-
-# Rollback
-./scripts/deploy/deploy-blue-green.sh rollback
 
 # Cleanup
 docker system prune -a

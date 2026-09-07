@@ -30,7 +30,7 @@ przepływ po przepływie. Stan: v1.44.3 (2026-09-03).
 | Automatyzacja formularzy (Selenium)              | ✅ prod           | `automate_mpd_form_filling` (Matterhorn/przeglądarka), `automate_tabu_to_mpd` (backend)    |
 | MCP server (katalog MPD read-only)               | ✅ v1.43          | stdio, 4 narzędzia, `sync_to_async` fix v1.43.2                                            |
 | Frontend SPA (React)                             | ✅ prod           | login, lista, szczegół produktu                                                            |
-| Deploy k3s                                       | ✅ prod           | od #206 jeden `COPY src/apps/`                                                             |
+| Deploy docker-compose (prod)                     | ✅ prod           | jeden stack, obraz wypalony, NPM z przodu (#259 — k3s/blue-green usunięte)                 |
 | wega (4. hurtownia)                              | 🔴 R&D            | brak dostępu do API; `zzz_wega` + `WEGA_DB_NAME` to celowa infra                           |
 | producer_catalog (scraper AVA), dashboard_pydash | 🔴 dead           | kod usunięty, zostały puste katalogi                                                       |
 
@@ -236,16 +236,17 @@ detaliczne. Build → obraz Dockera, serwowany przez Django pod `/mpd-app/`
   `setup_*_task.py`): stany MPD ← Matterhorn co ~5 min, Tabu stany ~10 min /
   produkty ~60 min / kategorie dziennie, Mada partial ~15 min / full 00:15 /
   cleanup 01:00, eksport XML full + change co godzinę.
-- **Deploy prod**: `Release` (semantic-release, Conventional Commits →
-  CHANGELOG → tag `v*`) → `deploy-vps.yml` → `scripts/k8s-prod/deploy.sh` na
-  k3s. Manifesty `deployments/k8s/nc-prod/` (web, celery, flower, redis,
-  ingress, migrate-job). `Dockerfile.prod` wypala `collectstatic --clear`
-  w build.
+- **Deploy prod**: `scripts/deploy-prod.sh <ref>` (`git reset --hard` → build
+  obrazu → `--profile migrate run` → `up -d`) — ręcznie na VPS albo przez
+  `deploy-vps.yml` (`workflow_dispatch`). Jeden `docker-compose.prod.yml`:
+  web, celery-fast, celery-heavy, celery-beat, flower, redis. Obraz wypala
+  kod + React SPA + `collectstatic`. NPM → `web:8000`. Postgres osobno.
+  `Release` (semantic-release) tworzy tag, ale **nie** triggeruje deployu
+  (#224). Patrz `docs/DEPLOY.md`.
 - **Deploy dev**: `docker-compose/docker-compose.dev.yml` — web, nginx `:8090`,
-  3× celery, flower `:5555`, redis, `postgres-ssh-tunnel` (baza zdalna),
-  `static-init`. `src/` bind-mount = hot reload.
-- **CI**: `check-branch.yml` (PR), `deploy-test.yml` (k3s test), `release.yml`.
-  `deploy.yml` (DigitalOcean) DEPRECATED.
+  celery-fast/heavy/beat, flower `:5555`, redis, `postgres-ssh-tunnel` (baza
+  zdalna), `static-init`. `src/` bind-mount = hot reload.
+- **CI**: `check-branch.yml` (PR), `release.yml`.
 - **Testy**: ~38 plików, ~56 migracji.
 
 ---

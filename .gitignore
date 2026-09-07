@@ -56,3 +56,6 @@ frontend/mpd/dist/
 coverage.xml
 coverage*.json
 htmlcov/
+
+# Subagent git worktrees (isolation: worktree)
+.claude/worktrees/
