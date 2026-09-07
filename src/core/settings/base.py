@@ -410,69 +410,65 @@ STATICFILES_DIRS = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# Celery Configuration
-# Broker: Redis (jedyne zastosowanie Redis w projekcie).
-# Result backend: PostgreSQL przez django-celery-results (tabele w bazie 'default').
-CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
-CELERY_RESULT_BACKEND = 'django-db'
-# Zapisuj nazwę taska/argumenty w wynikach (czytelny admin django-celery-results,
-# częściowa rekompensata za słabszy historyczny widok Flowera przy backendzie DB).
-CELERY_RESULT_EXTENDED = True
-CELERY_ACCEPT_CONTENT = ['json']
+# ============================================================================
+# Celery — JEDYNE źródło prawdy. core/celery.py robi tylko config_from_object.
+# prod.py nadpisuje wyłącznie broker URL (z env) i result backend.
+# ============================================================================
+# Broker: Redis (jedyne użycie Redis). Wyniki + harmonogram: PostgreSQL.
+CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'   # dev; prod składa z env
+CELERY_RESULT_BACKEND = 'django-db'                        # django-celery-results
+CELERY_RESULT_EXTENDED = True                              # nazwa/argumenty w wyniku
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TIMEZONE = 'Europe/Warsaw'
-CELERY_TASK_ACKS_LATE = True
+CELERY_ENABLE_UTC = True
 
-# Celery Redis connection settings - fix dla connection timeouts
-CELERY_BROKER_CONNECTION_RETRY = True
+# ACK po wykonaniu. full_import_and_update ma acks_late=False (#238 — redeliver
+# po padzie = źle dla długiego nie-idempotentnego z checkpointem).
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = False
+CELERY_TASK_TRACK_STARTED = True
+
+# Limity czasu — bezpiecznik na zawieszone taski. Długie taski nadpisują
+# per-task w dekoratorze (sync_tabu_products_update, web_agent.automate_*,
+# full_import_and_update — patrz ich @shared_task).
+CELERY_TASK_SOFT_TIME_LIMIT = 3600     # 1 h → SoftTimeLimitExceeded (łapialny)
+CELERY_TASK_TIME_LIMIT = 4200          # 70 min → twardy SIGKILL childa
+
+# Worker
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1          # 1 task naraz, bez rezerwacji
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = 500000    # ~488 MB → recykling childa (KB)
+CELERY_WORKER_DISABLE_RATE_LIMITS = True
+CELERY_WORKER_POOL_RESTARTS = True
+CELERY_WORKER_HEARTBEAT = 0                    # wyłączony (stabilność)
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False       # Django LOGGING rządzi
+CELERY_WORKER_LOG_COLOR = False
+CELERY_WORKER_SEND_TASK_EVENTS = True          # Flower
+CELERY_TASK_SEND_SENT_EVENT = True
+
+# Redis broker — retry na starcie + keepalive
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
 CELERY_BROKER_POOL_LIMIT = 10
 CELERY_REDIS_MAX_CONNECTIONS = 50
-
-# Celery Redis transport options - uproszczona konfiguracja keepalive
 CELERY_BROKER_TRANSPORT_OPTIONS = {
-    'visibility_timeout': 3600,
+    'visibility_timeout': 3600,        # task bez ACK 1 h → redeliver
     'max_connections': 50,
     'socket_keepalive': True,
-    'socket_timeout': 120,  # Socket timeout (2 minuty)
-    'socket_connect_timeout': 30,  # Connection timeout (30 sekund)
+    'socket_timeout': 120,
+    'socket_connect_timeout': 30,
     'retry_on_timeout': True,
-    # Health check co 25 sekund
     'health_check_interval': 25,
 }
 
-# Cache Configuration - PostgreSQL (DatabaseCache)
-# Używane przez: throttling DRF, wartości porównawcze watchdoga importu matterhorn1.
-# Blokady tasków (matterhorn1/tabu/mada) używają PostgreSQL advisory locks -
-# patrz core.pg_locks.
-# Tabelę tworzy `manage.py createcachetable` (odpalane w krokach migracji deployu).
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-        'LOCATION': 'nc_cache_table',
-    }
-}
-CELERY_TASK_TRACK_STARTED = True
-
-# Celery Beat Configuration
-CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
-
-# Celery Task Configuration
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'Europe/Warsaw'
-CELERY_ENABLE_UTC = True
-
-# Celery Task Routes - routing do kolejek. Workery: celery-fast (-Q default),
-# celery-heavy (-Q import,heavy). Musi być zsynchronizowane z app.conf.task_routes
-# w core/celery.py (dedup obu kopii zaplanowany osobno).
-CELERY_TASK_DEFAULT_QUEUE = 'default'
+# Routing. Workery: celery-fast (-Q default, conc 3), celery-heavy (-Q import,heavy, conc 2).
+CELERY_TASK_DEFAULT_QUEUE = 'default'          # nieroutowane → celery-fast
 CELERY_TASK_ROUTES = {
     'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
-    # długie / rzadkie → celery-heavy (concurrency 2, nie blokują full_import)
+    # długie / rzadkie → celery-heavy (nie blokują 5-min krytycznych na fast)
     'tabu.tasks.sync_tabu_products_update': {'queue': 'heavy'},
     'mada.tasks.sync_mada_full': {'queue': 'heavy'},
     'web_agent.tasks.*': {'queue': 'heavy'},
@@ -484,8 +480,15 @@ CELERY_TASK_ROUTES = {
     'mada.tasks.*': {'queue': 'default'},
 }
 
-# Celery Beat Schedule - używaj Django periodic tasks zamiast tego
-# CELERY_BEAT_SCHEDULE = {}
+# Cache — PostgreSQL (DatabaseCache). Throttling DRF + wartości porównawcze
+# watchdoga importu matterhorn1. Blokady tasków → advisory locks (core.pg_locks).
+# Tabelę tworzy `manage.py createcachetable` (krok migracji deployu).
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'nc_cache_table',
+    }
+}
 
 # WhiteNoise usunięty - Nginx obsługuje pliki statyczne w obu środowiskach
 

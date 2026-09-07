@@ -271,44 +271,9 @@ if DEBUG:
     logger = logging.getLogger(__name__)
     logger.info(f"Celery Configuration: BROKER_URL={CELERY_BROKER_URL[:30]}..., RESULT_BACKEND={CELERY_RESULT_BACKEND}")
     logger.info(f"Redis Configuration: HOST={REDIS_HOST}, PASSWORD={'***' if REDIS_PASSWORD else 'NOT SET'}")
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'Europe/Warsaw'
-CELERY_TASK_ACKS_LATE = True
-CELERY_TASK_TRACK_STARTED = True
-
-# Celery Redis connection settings - fix dla connection timeouts
-CELERY_BROKER_CONNECTION_RETRY = True
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
-CELERY_BROKER_POOL_LIMIT = 10
-CELERY_REDIS_MAX_CONNECTIONS = 50
-
-# Celery Redis transport options - uproszczona konfiguracja keepalive
-CELERY_BROKER_TRANSPORT_OPTIONS = {
-    'visibility_timeout': 3600,
-    'max_connections': 50,
-    'socket_keepalive': True,
-    'socket_timeout': 120,  # Socket timeout (2 minuty)
-    'socket_connect_timeout': 30,  # Connection timeout (30 sekund)
-    'retry_on_timeout': True,
-    # Health check co 25 sekund
-    'health_check_interval': 25,
-}
-
-# Celery Beat Configuration
-CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
-
-# Celery Task Routes - routing do odpowiednich kolejek
-CELERY_TASK_ROUTES = {
-    # Task importu trafia do kolejki 'import'
-    'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
-    # Pozostałe taski używają kolejki 'default'
-    'matterhorn1.tasks.*': {'queue': 'default'},
-    'MPD.tasks.*': {'queue': 'default'},
-    'tabu.tasks.*': {'queue': 'default'},
-}
+# Reszta konfiguracji Celery (serializery, acks_late, limity czasu, transport
+# options, routing, worker) → base.py (CELERY_*). Prod nadpisuje TYLKO broker URL
+# (wyżej, z env) i result backend (wyżej — compose/k8s ustawiają pusty string).
 
 # Cache Configuration - PostgreSQL (DatabaseCache), tabela w bazie 'default'.
 # Używane przez throttling DRF i watchdog importu matterhorn1. Tabelę tworzy

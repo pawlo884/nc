@@ -180,41 +180,9 @@ if cors_origins_env:
     CORS_ALLOWED_ORIGINS.extend([origin.strip()
                                 for origin in cors_origins_env.split(',')])
 
-# Celery Configuration for development
-# Broker: Redis; result backend: PostgreSQL (django-celery-results).
-CELERY_BROKER_URL = 'redis://:dev_password@redis:6379/0'
-CELERY_RESULT_BACKEND = 'django-db'
-
-# Celery Redis connection settings - fix dla connection timeouts
-CELERY_BROKER_CONNECTION_RETRY = True
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
-CELERY_BROKER_POOL_LIMIT = 10
-CELERY_REDIS_MAX_CONNECTIONS = 50
-
-# Celery Redis transport options - uproszczona konfiguracja keepalive
-CELERY_BROKER_TRANSPORT_OPTIONS = {
-    'visibility_timeout': 3600,
-    'max_connections': 50,
-    'socket_keepalive': True,
-    'socket_timeout': 120,  # Socket timeout (2 minuty)
-    'socket_connect_timeout': 30,  # Connection timeout (30 sekund)
-    'retry_on_timeout': True,
-    # Health check co 25 sekund
-    'health_check_interval': 25,
-}
-
-# Celery heartbeat configuration - wyłączony dla development
-CELERY_WORKER_HEARTBEAT = 0  # Wyłączony heartbeat dla development
-CELERY_WORKER_SEND_TASK_EVENTS = True
-CELERY_TASK_SEND_SENT_EVENT = True
-CELERY_WORKER_PREFETCH_MULTIPLIER = 1
-CELERY_TASK_ACKS_LATE = True
-CELERY_TASK_REJECT_ON_WORKER_LOST = False  # Zmieniony na False dla development
-CELERY_WORKER_DISABLE_RATE_LIMITS = True  # Wyłącz limity dla development
-# Zwiększone limity dla długotrwałych tasków importu (3600s = 1 godzina)
-CELERY_TASK_TIME_LIMIT = 3600  # 1 godzina hard limit dla tasków
-CELERY_TASK_SOFT_TIME_LIMIT = 3300  # 55 minut soft limit
+# Celery: cała konfiguracja w base.py (CELERY_*). Dev broker = ten sam co base
+# (redis://:dev_password@redis:6379/0), więc nic do nadpisania.
+# Testy: CELERY_TASK_ALWAYS_EAGER pod `if RUNNING_TESTS` niżej.
 
 # Static files configuration for development with Nginx
 # Nginx obsługuje pliki statyczne, nie WhiteNoise

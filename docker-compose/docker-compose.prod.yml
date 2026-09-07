@@ -140,7 +140,7 @@ services:
       - -c
       - >
         celery -A core.celery worker -Q default --loglevel=info --concurrency=3
-        --max-memory-per-child=500000 --without-gossip --without-mingle --without-heartbeat
+        --without-gossip --without-mingle --without-heartbeat
     env_file:
       - ../.env.prod
     environment:
@@ -171,7 +171,7 @@ services:
       - -c
       - >
         celery -A core.celery worker -Q import,heavy --loglevel=info --concurrency=2
-        --max-memory-per-child=500000 --without-gossip --without-mingle --without-heartbeat
+        --without-gossip --without-mingle --without-heartbeat
     env_file:
       - ../.env.prod
     environment:
