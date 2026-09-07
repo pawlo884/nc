@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.20](https://github.com/pawlo884/nc/compare/v1.44.19...v1.44.20) (2026-09-07)
+
+### Performance Improvements
+
+* **matterhorn1:** backpressure w pipeline importu + wyższy max-memory-per-child ([#261](https://github.com/pawlo884/nc/issues/261)) ([cac120d](https://github.com/pawlo884/nc/commit/cac120d26e24d23ea605debccaf4ab46f4ca67af)), references [#238](https://github.com/pawlo884/nc/issues/238)
+
 ## [1.44.19](https://github.com/pawlo884/nc/compare/v1.44.18...v1.44.19) (2026-09-06)
 
 ### Bug Fixes
