@@ -1,15 +1,9 @@
-name: Deploy Test (k3s)
+name: Deploy Test (k3s) — WYGASZANE (#259)
 
+# Klaster nc-test schodzi razem z prod k3s (issue #259). Auto-trigger wyłączony;
+# workflow i scripts/k8s-test/ + deployments/k8s/nc-test/ do usunięcia w Fazie 2.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'deployments/k8s/nc-test/**'
-      - 'deployments/docker/Dockerfile.prod'
-      - 'scripts/k8s-test/**'
-      - 'src/**'
 
 permissions:
   contents: read

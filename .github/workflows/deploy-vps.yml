@@ -1,18 +1,14 @@
 name: Deploy to VPS
 
+# Deploy produkcji na VPS = jeden stack docker-compose (docker-compose.prod.yml).
+# Tylko RĘCZNE uruchomienie (workflow_dispatch). Auto-deploy na tagu jest
+# świadomie wyłączony — GITHUB_TOKEN z release.yml i tak nie triggeruje
+# workflowów (issue #224), a deploy prod ma być decyzją człowieka.
 on:
-  # Deployment tylko gdy zostanie utworzony tag (np. v1.0.0, v1.1.0)
-  # Tagi są tworzone przez semantic-release w workflow Release
-  push:
-    tags:
-      - 'v*'  # Wszystkie tagi zaczynające się od 'v'
-    branches:
-      - k8s-nc-test  # tymczasowo: deploy k3s z brancha testowego
-  # Ręczne wywołanie z UI (możesz wybrać tag lub branch)
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Tag lub branch do deployowania (np. v1.0.0 lub main)'
+        description: 'Tag lub branch do zdeployowania (np. v1.44.20 lub main)'
         required: false
         default: 'main'
         type: string
@@ -23,109 +19,17 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Test SSH connection
-      uses: appleboy/ssh-action@master
-      id: ssh-test
-      continue-on-error: true
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USER }}
-        key: ${{ secrets.VPS_SSH_KEY }}
-        port: 22
-        timeout: 30s
-        script: |
-          echo "Testing SSH connection..."
-          whoami
-          echo "✅ SSH connection successful!"
-    
-    - name: Check SSH connection result
-      if: steps.ssh-test.outcome != 'success'
-      run: |
-        echo "❌ SSH connection failed!"
-        echo "Please check:"
-        echo "1. Port 22 is forwarded in router (external port 22 → internal IP:22)"
-        echo "2. Firewall allows port 22 on server"
-        echo "3. SSH service is running on server"
-        echo "4. VPS_HOST secret is correct (public IP or domain)"
-        echo "5. Server is accessible from internet"
-        exit 1
-    
-    - name: Deploy to VPS via SSH
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USER }}
-        key: ${{ secrets.VPS_SSH_KEY }}
-        port: 22
-        debug: true
-        timeout: 60s
-        command_timeout: 20m
-        script: |
-          set -euo pipefail
-          echo "🚀 Starting deployment..."
-          
-          # Aktualizuj kod aplikacji
-          cd /home/pawel/apps/nc
-          echo "📥 Pulling latest code..."
-          git fetch origin --tags
-          
-          # Określ co deployować
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Ręczne wywołanie - użyj podanego ref (tag lub branch)
-            DEPLOY_REF="${{ github.event.inputs.ref }}"
-            echo "🔧 Manual deployment: ${DEPLOY_REF}"
-          elif [ "${{ github.ref_type }}" = "branch" ]; then
-            DEPLOY_REF="${{ github.ref_name }}"
-            echo "🌿 Branch deployment: ${DEPLOY_REF}"
-          else
-            # Deployment z tagu - użyj tagu który wywołał workflow
-            DEPLOY_REF="${{ github.ref_name }}"
-            echo "🏷️ Tag deployment: ${DEPLOY_REF}"
-          fi
-          
-          # Sprawdź czy ref istnieje
-          if git rev-parse --verify "origin/${DEPLOY_REF}" >/dev/null 2>&1; then
-            echo "✅ Found branch: ${DEPLOY_REF}"
-            git reset --hard "origin/${DEPLOY_REF}"
-          elif git rev-parse --verify "${DEPLOY_REF}" >/dev/null 2>&1; then
-            echo "✅ Found tag: ${DEPLOY_REF}"
-            git reset --hard "${DEPLOY_REF}"
-          else
-            echo "❌ Ref ${DEPLOY_REF} not found!"
-            exit 1
-          fi
-          
-          echo "📌 Deploying: $(git rev-parse HEAD) ($(git log -1 --pretty=format:'%h - %s'))"
-          
-          export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
-          chmod +x scripts/k8s-prod/*.sh
-          if [[ ! -f "$KUBECONFIG" ]]; then
-            ./scripts/k8s-prod/setup-kubeconfig.sh
-          fi
-          export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
-
-          ./scripts/k8s-prod/expose-traefik.sh
-
-          if [[ ! -f .env.prod ]]; then
-            echo "Brak .env.prod na serwerze — wymagany przed pierwszym deployem k3s."
-            exit 1
-          fi
-          
-          echo "=== k3s prod deploy (Traefik + repliki) ==="
-          ./scripts/k8s-prod/create-secret.sh
-          ./scripts/k8s-prod/build-image.sh
-          ./scripts/k8s-prod/deploy.sh --migrate
-          
-          echo "=== Status nc-prod ==="
-          kubectl get pods,ingress,deployments -n nc-prod
-          POD_COUNT="$(kubectl get pods -n nc-prod --no-headers 2>/dev/null | wc -l | tr -d ' ')"
-          if [[ "${POD_COUNT:-0}" -lt 1 ]]; then
-            echo "❌ Brak podow w nc-prod — deploy nieudany!"
-            kubectl get events -n nc-prod --sort-by='.lastTimestamp' | tail -20
-            exit 1
-          fi
-          curl -sf -H "Host: nc.sowa.ch" http://127.0.0.1/health/ && echo " health OK" || echo "⚠️ health check failed (sprawdz NPM/Traefik)"
-          
-          echo "✅ Deployment completed!"
+      - name: Deploy przez SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            cd /home/pawel/apps/nc
+            chmod +x scripts/deploy-prod.sh
+            ./scripts/deploy-prod.sh "${{ github.event.inputs.ref }}"
