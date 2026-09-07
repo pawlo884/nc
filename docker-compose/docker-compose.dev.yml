@@ -93,7 +93,7 @@ services:
       [
         '/bin/bash',
         '-c',
-        'sleep 10 && celery -A core.celery worker -Q default --loglevel=info --concurrency=2',
+        'sleep 10 && celery -A core.celery worker -Q default --loglevel=info --concurrency=2 --max-memory-per-child=500000',
       ]
     volumes:
       - ../src:/app
@@ -148,7 +148,7 @@ services:
       [
         '/bin/bash',
         '-c',
-        'sleep 10 && celery -A core.celery worker -Q import --loglevel=info --concurrency=1',
+        'sleep 10 && celery -A core.celery worker -Q import --loglevel=info --concurrency=1 --max-memory-per-child=500000',
       ]
     volumes:
       - ../src:/app
