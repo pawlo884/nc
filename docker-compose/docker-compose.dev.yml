@@ -93,7 +93,7 @@ services:
       [
         '/bin/bash',
         '-c',
-        'celery -A core.celery worker -Q default --loglevel=info --concurrency=3 --max-memory-per-child=500000',
+        'celery -A core.celery worker -Q default --loglevel=info --concurrency=3',
       ]
     volumes:
       - ../src:/app
@@ -148,7 +148,7 @@ services:
       [
         '/bin/bash',
         '-c',
-        'celery -A core.celery worker -Q import,heavy --loglevel=info --concurrency=2 --max-memory-per-child=500000',
+        'celery -A core.celery worker -Q import,heavy --loglevel=info --concurrency=2',
       ]
     volumes:
       - ../src:/app
