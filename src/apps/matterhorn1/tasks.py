@@ -51,14 +51,19 @@ def _capture_task_context():
 
 
 # Pipeline pobierania stron B2BAPI (ITEMS i ITEMS/INVENTORY): nowa strona co
-# tyle sekund, niezależnie od tego, ile poprzednich jeszcze nie odpowiedziało.
+# tyle sekund, dopóki bufor `pending` nie jest pełny (patrz MAX_INFLIGHT niżej).
 # Limit API Matterhorn to 2 requesty/sekundę (docs/matterhorn/MATTERHORN1_*.md),
 # więc to spory margines. MAX_PIPELINE_WORKERS to tylko górna granica liczby
-# wątków (nie throttling - o tempie decyduje wyłącznie interval powyżej),
-# zabezpieczenie przed nieograniczonym tworzeniem wątków, gdyby detekcja końca
-# danych z jakiegoś powodu zawiodła.
+# wątków (zabezpieczenie przed nieograniczonym tworzeniem wątków, gdyby
+# detekcja końca danych zawiodła).
 MATTERHORN_PAGE_LAUNCH_INTERVAL = 2.0
 MATTERHORN_PIPELINE_MAX_WORKERS = 50
+# Backpressure: maksymalna liczba stron w buforze `pending` (pobrane/pobierane,
+# jeszcze nie zapisane do bazy). Bez tego przy zatorze na zapisie (burst do DB,
+# kontencja locka) bufor puchnie o stronę co MATTERHORN_PAGE_LAUNCH_INTERVAL
+# sekund — kilkadziesiąt stron × ~1,5 MB JSON = worker dostaje OOM (SIGKILL).
+# Launcher wstrzymuje wystrzeliwanie, aż writer nadgoni.
+MATTERHORN_PIPELINE_MAX_INFLIGHT = 8
 
 
 @shared_task(bind=True, name='matterhorn1.tasks.full_import_and_update', queue='import',
@@ -523,11 +528,16 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
         def _launcher(start_page):
             p = start_page
             while not stop_launching.is_set():
+                launched = False
                 with pending_lock:
-                    pending[p] = executor.submit(
-                        _run_with_task_context, task_ctx, _fetch_items_page,
-                        p, api_url, headers, limit, last_update)
-                    p += 1
+                    # Backpressure - nie wystrzeliwuj nowej strony, gdy bufor pełny
+                    # (writer nie nadąża z zapisem). Chroni przed OOM.
+                    if len(pending) < MATTERHORN_PIPELINE_MAX_INFLIGHT:
+                        pending[p] = executor.submit(
+                            _run_with_task_context, task_ctx, _fetch_items_page,
+                            p, api_url, headers, limit, last_update)
+                        p += 1
+                        launched = True
                     # Wczesny stop - patrz komentarz wyżej. Skanujemy pod tym
                     # samym lockiem co wstawianie/zdejmowanie z `pending`.
                     for fut in list(pending.values()):
@@ -535,7 +545,7 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
                             stop_launching.set()
                             break
                 if not stop_launching.is_set():
-                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL if launched else 0.5)
 
         launcher_thread = threading.Thread(
             target=_run_with_task_context, args=(task_ctx, _launcher, page),
@@ -1595,18 +1605,22 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
         def _launcher(start_page):
             p = start_page
             while not stop_launching.is_set():
+                launched = False
                 with pending_lock:
-                    pending[p] = executor.submit(
-                        _run_with_task_context, task_ctx, _fetch_inventory_page,
-                        p, api_url, headers, limit, last_update)
-                    p += 1
+                    # Backpressure - patrz _import_products_from_items.
+                    if len(pending) < MATTERHORN_PIPELINE_MAX_INFLIGHT:
+                        pending[p] = executor.submit(
+                            _run_with_task_context, task_ctx, _fetch_inventory_page,
+                            p, api_url, headers, limit, last_update)
+                        p += 1
+                        launched = True
                     # Wczesny stop - patrz _import_products_from_items.
                     for fut in list(pending.values()):
                         if fut.done() and fut.result()['outcome'] != 'ok':
                             stop_launching.set()
                             break
                 if not stop_launching.is_set():
-                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL)
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL if launched else 0.5)
 
         launcher_thread = threading.Thread(
             target=_run_with_task_context, args=(task_ctx, _launcher, 1),

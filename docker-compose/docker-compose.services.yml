@@ -242,7 +242,7 @@ services:
       - -c
       - >
         sleep 20 && celery -A core.celery worker -Q default --loglevel=info --concurrency=1
-        --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
+        --max-memory-per-child=500000 --without-gossip --without-mingle --without-heartbeat
     volumes:
       - ../src:/app
       - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
@@ -266,6 +266,7 @@ services:
       - nc_network
       - nc_dbnet
     user: 1001:1001
+    mem_limit: 1g          # cgroup OOM zamiast OOM killera hosta (izolacja)
 
   celery-import:
     build:
@@ -278,7 +279,7 @@ services:
       - -c
       - >
         sleep 20 && celery -A core.celery worker -Q import --loglevel=info --concurrency=1
-        --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
+        --max-memory-per-child=500000 --without-gossip --without-mingle --without-heartbeat
     volumes:
       - ../src:/app
       - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
@@ -298,6 +299,7 @@ services:
       - nc_network
       - nc_dbnet
     user: 1001:1001
+    mem_limit: 1g          # cgroup OOM zamiast OOM killera hosta (izolacja)
 
   celery-beat:
     build:

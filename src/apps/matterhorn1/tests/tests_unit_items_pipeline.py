@@ -10,13 +10,66 @@ weryfikacja logiki orkiestratora, bez DB/HTTP.
 from __future__ import annotations
 
 import threading
+import time
 from unittest.mock import patch
 
 import pytest
 
+from matterhorn1 import tasks
 from matterhorn1.tasks import _import_products_from_items
 
 pytestmark = pytest.mark.unit
+
+
+def _run_import_in_thread(fake_fetch, fake_bulk_import):
+    def run():
+        with patch("matterhorn1.tasks._fetch_items_page", side_effect=fake_fetch), \
+                patch("matterhorn1.tasks._bulk_import_products", side_effect=fake_bulk_import), \
+                patch("matterhorn1.tasks._get_last_items_update_time", return_value="2026-01-01 00:00:00"), \
+                patch("matterhorn1.tasks._get_last_items_page", return_value=1), \
+                patch("matterhorn1.tasks._save_items_import_start_time"), \
+                patch("matterhorn1.tasks._update_items_import_status"):
+            _import_products_from_items(
+                start_id=None, max_products=200000, api_url="https://matterhorn.example",
+                username="u", password="p", batch_size=100, dry_run=False,
+            )
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return t
+
+
+def test_launcher_nie_przekracza_limitu_bufora_gdy_writer_utknie(monkeypatch):
+    """#238/OOM: gdy zapis do bazy utyka, launcher przestaje wystrzeliwać nowe
+    strony po MATTERHORN_PIPELINE_MAX_INFLIGHT — inaczej bufor puchnie o stronę
+    co 2 s i worker dostaje SIGKILL (OOM)."""
+    monkeypatch.setattr(tasks.time, "sleep", lambda *_a, **_k: None)
+    monkeypatch.setattr(tasks, "MATTERHORN_PAGE_LAUNCH_INTERVAL", 0)
+
+    fetched = []
+    first_write = threading.Event()
+    release_writer = threading.Event()
+
+    def fake_fetch(page, *a):
+        fetched.append(page)
+        if page > 40:
+            return {"outcome": "end_of_data", "reason": "no_more_products"}
+        return {"outcome": "ok", "items": [{"id": page, "creation_date": "2026-01-01"}]}
+
+    def fake_bulk_import(items):
+        first_write.set()
+        release_writer.wait(5)           # writer stoi na pierwszej stronie
+        return {"status": "success", "imported_count": len(items), "updated_count": 0}
+
+    t = _run_import_in_thread(fake_fetch, fake_bulk_import)
+    try:
+        assert first_write.wait(5), "import nie doszedł do pierwszego zapisu"
+        time.sleep(0.5)                  # launcher miałby czas wystrzelić ~dziesiątki stron bez capa
+        assert max(fetched) <= tasks.MATTERHORN_PIPELINE_MAX_INFLIGHT + 2, (
+            f"launcher wystrzelił do strony {max(fetched)} mimo zablokowanego writera")
+    finally:
+        release_writer.set()
+        t.join(10)
 
 
 def test_strony_przetwarzane_w_kolejnosci_mimo_odwroconej_kolejnosci_odpowiedzi(monkeypatch):
