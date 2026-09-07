@@ -130,20 +130,22 @@ services:
   # ==========================================
   # CELERY
   # ==========================================
-  celery-default:
+  # celery-fast — częste/krótkie taski (-Q default). Concurrency 3, żeby wolny
+  # task nie zablokował 5-minutowych krytycznych (most stanów MPD, watchdog).
+  celery-fast:
     <<: *django-image
-    container_name: nc-celery-default
+    container_name: nc-celery-fast
     command:
       - /bin/bash
       - -c
       - >
-        celery -A core.celery worker -Q default --loglevel=info --concurrency=1
+        celery -A core.celery worker -Q default --loglevel=info --concurrency=3
         --max-memory-per-child=500000 --without-gossip --without-mingle --without-heartbeat
     env_file:
       - ../.env.prod
     environment:
       <<: *django-env
-      CELERY_STATE_DB: /var/lib/celery/worker_state_default
+      CELERY_STATE_DB: /var/lib/celery/worker_state_fast
     volumes:
       - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
     networks:
@@ -156,23 +158,25 @@ services:
     user: "1001:1001"
     deploy:
       resources:
-        limits: { memory: 1G, cpus: "1.0" }
+        limits: { memory: 1.5G, cpus: "1.5" }
         reservations: { memory: 512M }
 
-  celery-import:
+  # celery-heavy — długie/pamięciożerne (-Q import,heavy). Concurrency 2, żeby
+  # full_import_and_update (co 10 min) nie czekał na 3h sync_tabu_products_update.
+  celery-heavy:
     <<: *django-image
-    container_name: nc-celery-import
+    container_name: nc-celery-heavy
     command:
       - /bin/bash
       - -c
       - >
-        celery -A core.celery worker -Q import --loglevel=info --concurrency=1
+        celery -A core.celery worker -Q import,heavy --loglevel=info --concurrency=2
         --max-memory-per-child=500000 --without-gossip --without-mingle --without-heartbeat
     env_file:
       - ../.env.prod
     environment:
       <<: *django-env
-      CELERY_STATE_DB: /var/lib/celery/worker_state_import
+      CELERY_STATE_DB: /var/lib/celery/worker_state_heavy
     volumes:
       - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
     networks:
@@ -185,7 +189,7 @@ services:
     user: "1001:1001"
     deploy:
       resources:
-        limits: { memory: 1G, cpus: "1.0" }
+        limits: { memory: 2G, cpus: "2.0" }
         reservations: { memory: 512M }
 
   celery-beat:

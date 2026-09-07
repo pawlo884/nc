@@ -63,7 +63,7 @@ W testach routing jest wyłączony — wszystko idzie do `default`, reszta baz t
 
 ## 6. Celery / zadania okresowe
 
-- Kolejki: `default` (worker `celery-default`), `import` (osobny worker dla ciężkiego `matterhorn1.full_import_and_update`), opcjonalnie `ml`.
+- Workery: **`celery-fast`** (`-Q default`, concurrency 3) — częste/krótkie taski; **`celery-heavy`** (`-Q import,heavy`, concurrency 2) — `matterhorn1.full_import_and_update` + długie/rzadkie (`tabu.sync_tabu_products_update`, `web_agent.automate_*`, `mada.sync_mada_full`, `MPD.link_all_products_to_new_source`); `celery-beat`; `flower`. `celery-ml` (`-Q ml`) = szkielet, nieużywany.
 - Harmonogram w Django Admin → Periodic Tasks; rejestrują go komendy `setup_*_task.py` w każdej appce.
 - Cykle: import hurtowni ~co 10 min; eksport `full.xml` / `full_change.xml` przyrostowo co godzinę, pełny raz dziennie (domyślnie wyłączony); sync stanów Mada 15 min / dziennie.
 - Monitoring: Flower (`:5555`).
@@ -84,7 +84,7 @@ na `:5173`.
 ## 9. Deploy
 
 - **Prod = k3s na VPS.** `Release` workflow (semantic-release) tworzy tag `v*` → `deploy-vps.yml` → `scripts/k8s-prod/deploy.sh`. `collectstatic --clear` wypalany w `Dockerfile.prod` na etapie build. Manifesty: `web`, `celery`, `flower`, `redis`, `ingress`, `migrate-job`.
-- **Dev:** `docker-compose/docker-compose.dev.yml` — `web`, `nginx` (:8090), `celery-default`, `celery-import`, `celery-beat`, `flower`, `redis`, `postgres-ssh-tunnel` (baza dev zdalna, przez tunel SSH), `static-init`. `src/` bind-mount = hot reload; statyki wypalone przy starcie (nowy plik statyczny wymaga ręcznego `collectstatic`).
+- **Dev:** `docker-compose/docker-compose.dev.yml` — `web`, `nginx` (:8090), `celery-fast`, `celery-heavy`, `celery-beat`, `flower`, `redis`, `postgres-ssh-tunnel` (baza dev zdalna, przez tunel SSH), `static-init`. `src/` bind-mount = hot reload; statyki wypalone przy starcie (nowy plik statyczny wymaga ręcznego `collectstatic`).
 - **`docker-compose.services.yml`** (dawniej `docker-compose.blue-green.yml`) — `web-blue`/`web-green`/`nginx-router` i skrypty `scripts/deploy/` są **DEPRECATED** (tylko awaryjny rollback, produkcja web działa na k3s). Reszta pliku jest **aktywna**: `postgres` (profil `shared`), `redis`, `celery-default`, `celery-import`, `celery-beat`, `flower` nadal realnie działają z tego pliku na Dockerze — nie zostały jeszcze przeniesione na k3s, mimo że gotowe manifesty (`deployments/k8s/nc-prod/celery.yaml`, `flower.yaml`) już tam leżą.
 
 ## 10. Testy

@@ -466,12 +466,18 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Warsaw'
 CELERY_ENABLE_UTC = True
 
-# Celery Task Routes - routing do odpowiednich kolejek
-# Musi być zsynchronizowane z app.conf.task_routes w core/celery.py
+# Celery Task Routes - routing do kolejek. Workery: celery-fast (-Q default),
+# celery-heavy (-Q import,heavy). Musi być zsynchronizowane z app.conf.task_routes
+# w core/celery.py (dedup obu kopii zaplanowany osobno).
+CELERY_TASK_DEFAULT_QUEUE = 'default'
 CELERY_TASK_ROUTES = {
-    # Task importu trafia do kolejki 'import'
     'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
-    # Pozostałe taski używają kolejki 'default' (worker celery-default z -Q default)
+    # długie / rzadkie → celery-heavy (concurrency 2, nie blokują full_import)
+    'tabu.tasks.sync_tabu_products_update': {'queue': 'heavy'},
+    'mada.tasks.sync_mada_full': {'queue': 'heavy'},
+    'web_agent.tasks.*': {'queue': 'heavy'},
+    'MPD.tasks.link_all_products_to_new_source': {'queue': 'heavy'},
+    # reszta → celery-fast
     'matterhorn1.tasks.*': {'queue': 'default'},
     'MPD.tasks.*': {'queue': 'default'},
     'tabu.tasks.*': {'queue': 'default'},

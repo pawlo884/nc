@@ -27,12 +27,26 @@ app.conf.update(
     worker_drop_privileges=False,
 )
 
-# Konfiguracja routingu tasków - routing do odpowiednich kolejek
+# Routing tasków do kolejek. Workery:
+#   celery-fast  (-Q default)       — częste/krótkie: stock tracking, watchdog,
+#                                     most stanów MPD, synci przyrostowe, eksport XML
+#   celery-heavy (-Q import,heavy)  — długie/pamięciożerne, żeby nie blokowały fast
+#                                     (import przed heavy = priorytet dla full_import)
+#   celery-beat / flower / celery-ml (szkielet, -Q ml)
+# UWAGA: druga kopia tej mapy jest w settings/base.py (CELERY_TASK_ROUTES) —
+# trzymać zsynchronizowane (dedup zaplanowany osobno).
+app.conf.task_default_queue = 'default'  # cokolwiek bez reguły → celery-fast
 app.conf.task_routes = {
-    # Task importu trafia do kolejki 'import'
+    # Ciężki import z pipeline'em — własna kolejka 'import' (celery-heavy)
     'matterhorn1.tasks.full_import_and_update': {'queue': 'import'},
 
-    # Pozostałe taski używają domyślnej kolejki
+    # Długie / rzadkie → 'heavy' (celery-heavy, concurrency 2 → nie blokują full_import)
+    'tabu.tasks.sync_tabu_products_update': {'queue': 'heavy'},
+    'mada.tasks.sync_mada_full': {'queue': 'heavy'},
+    'web_agent.tasks.*': {'queue': 'heavy'},
+    'MPD.tasks.link_all_products_to_new_source': {'queue': 'heavy'},
+
+    # Reszta → 'default' (celery-fast)
     'matterhorn1.tasks.*': {'queue': 'default'},
     'MPD.tasks.*': {'queue': 'default'},
     'tabu.tasks.*': {'queue': 'default'},
