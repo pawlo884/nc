@@ -20,6 +20,7 @@ nc_project/
 ## 🔧 Development (Lokalne środowisko)
 
 ### Pliki:
+
 - **Dockerfile.dev** - obraz dla developmentu
   - Python 3.12-slim
   - Django settings: `nc.settings.dev`
@@ -34,6 +35,7 @@ nc_project/
   - Volumes z kodem (live editing)
 
 ### Użycie:
+
 ```bash
 # Build
 docker-compose -f docker-compose.dev.yml build
@@ -49,6 +51,7 @@ docker-compose -f docker-compose.dev.yml down
 ```
 
 ### Env file: `.env.dev`
+
 ```env
 DB_NAME=zzz_default
 REDIS_PASSWORD=dev_password
@@ -60,6 +63,7 @@ DJANGO_SETTINGS_MODULE=nc.settings.dev
 ## 🚀 Production (blue-green)
 
 ### Pliki:
+
 - **Dockerfile.prod** - zoptymalizowany obraz produkcyjny
   - Python 3.12-slim
   - Django settings: `nc.settings.prod`
@@ -76,6 +80,7 @@ DJANGO_SETTINGS_MODULE=nc.settings.dev
   - Restart policies
 
 ### Użycie (na serwerze):
+
 ```bash
 # Blue-green deploy (zero-downtime)
 ./scripts/deploy/deploy-blue-green.sh deploy
@@ -85,6 +90,7 @@ DJANGO_SETTINGS_MODULE=nc.settings.dev
 ```
 
 ### Env file: `.env.prod`
+
 ```env
 DB_NAME=default
 REDIS_PASSWORD=prod_password
@@ -105,46 +111,48 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          file: ./Dockerfile.prod  # ← Używa Dockerfile.prod
+          file: ./Dockerfile.prod # ← Używa Dockerfile.prod
           cache-from: type=registry,ref=pawlo884/django-app:buildcache
           cache-to: type=registry,ref=pawlo884/django-app:buildcache,mode=max
-          
+
       # 2. Deploy (blue-green)
       - name: Deploy
-        run: ./scripts/deploy/deploy-blue-green.sh deploy  # ← Używa docker-compose.services.yml
+        run: ./scripts/deploy/deploy-blue-green.sh deploy # ← Używa docker-compose.services.yml
 ```
 
 ### Czasy buildów:
-| Zmiana | Czas | Cache |
-|--------|------|-------|
-| Tylko kod | ~2-3 min | ✅ Pełny |
-| + requirements | ~4-5 min | ⚡ Częściowy |
-| Wszystko od zera | ~8-10 min | ❌ Brak |
+
+| Zmiana           | Czas      | Cache        |
+| ---------------- | --------- | ------------ |
+| Tylko kod        | ~2-3 min  | ✅ Pełny     |
+| + requirements   | ~4-5 min  | ⚡ Częściowy |
+| Wszystko od zera | ~8-10 min | ❌ Brak      |
 
 ---
 
 ## 🎯 Kluczowe różnice DEV vs PROD
 
-| Aspekt | Development | Production |
-|--------|-------------|------------|
-| **Dockerfile** | `Dockerfile.dev` | `Dockerfile.prod` |
-| **Compose** | `docker-compose.dev.yml` | `docker-compose.services.yml` |
-| **Build** | Lokalnie | GitHub Actions |
-| **Image source** | Build local | Build na serwerze (blue-green) |
-| **Bazy danych** | Prefiks `zzz_*` | Bez prefiksu |
-| **Redis password** | `dev_password` | `prod_password` |
-| **Django settings** | `nc.settings.dev` | `nc.settings.prod` |
-| **Debug** | `DEBUG=True` | `DEBUG=False` |
-| **Hot reload** | ✅ Tak | ❌ Nie |
-| **Volumes** | Kod z hosta | Tylko dane |
-| **Memory limits** | ❌ Brak | ✅ Tak |
-| **Flower auth** | ❌ Bez | ✅ Basic auth |
+| Aspekt              | Development              | Production                     |
+| ------------------- | ------------------------ | ------------------------------ |
+| **Dockerfile**      | `Dockerfile.dev`         | `Dockerfile.prod`              |
+| **Compose**         | `docker-compose.dev.yml` | `docker-compose.services.yml`  |
+| **Build**           | Lokalnie                 | GitHub Actions                 |
+| **Image source**    | Build local              | Build na serwerze (blue-green) |
+| **Bazy danych**     | Prefiks `zzz_*`          | Bez prefiksu                   |
+| **Redis password**  | `dev_password`           | `prod_password`                |
+| **Django settings** | `nc.settings.dev`        | `nc.settings.prod`             |
+| **Debug**           | `DEBUG=True`             | `DEBUG=False`                  |
+| **Hot reload**      | ✅ Tak                   | ❌ Nie                         |
+| **Volumes**         | Kod z hosta              | Tylko dane                     |
+| **Memory limits**   | ❌ Brak                  | ✅ Tak                         |
+| **Flower auth**     | ❌ Bez                   | ✅ Basic auth                  |
 
 ---
 
 ## 📦 Dependencje
 
 ### requirements.txt (wspólne):
+
 ```txt
 Django==6.0.7
 celery==5.5.0
@@ -161,8 +169,9 @@ djangorestframework==3.16.0
 # numpy==2.2.0
 ```
 
-💡 **Uwaga**: Pakiety ML zakomentowane dla szybszego builda. 
+💡 **Uwaga**: Pakiety ML zakomentowane dla szybszego builda.
 Jeśli potrzebujesz ML, możesz:
+
 1. Odkomentować pakiety
 2. Lub stworzyć osobny kontener ML (zobacz ML_CONTAINER.md)
 
@@ -171,6 +180,7 @@ Jeśli potrzebujesz ML, możesz:
 ## 🔍 Diagnostyka
 
 ### Sprawdź używany Dockerfile:
+
 ```bash
 # Dev
 grep "dockerfile:" docker-compose.dev.yml
@@ -182,6 +192,7 @@ grep "image:" docker-compose.services.yml
 ```
 
 ### Sprawdź settings Django:
+
 ```bash
 # Dev
 docker-compose -f docker-compose.dev.yml exec web python -c "from django.conf import settings; print(settings.SETTINGS_MODULE)"
@@ -197,6 +208,7 @@ docker exec nc-web-blue python -c "from django.conf import settings; print(setti
 ## 🚦 Quick Start
 
 ### Dla developera (lokalne środowisko):
+
 ```bash
 # 1. Skopiuj env
 cp .env.sample .env.dev
@@ -209,6 +221,7 @@ docker-compose -f docker-compose.dev.yml ps
 ```
 
 ### Dla CI/CD (GitHub Actions):
+
 ```bash
 # 1. Push na main
 git push origin main
@@ -243,4 +256,3 @@ Jeśli migrujesz ze starej struktury:
 ---
 
 **Ostatnia aktualizacja**: 2025-10-07
-

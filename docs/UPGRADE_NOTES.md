@@ -5,6 +5,7 @@
 ## Co się zmieniło?
 
 ### PRZED (tradycyjny deploy):
+
 ```bash
 docker-compose pull          # 30s downtime
 docker-compose up -d         # 2-3 min downtime
@@ -12,6 +13,7 @@ docker-compose up -d         # 2-3 min downtime
 ```
 
 ### PO (zero-downtime deploy):
+
 ```bash
 ./scripts/deploy/deploy-blue-green.sh deploy
 # Pull nowego obrazu (stary DZIAŁA)
@@ -30,15 +32,16 @@ docker-compose up -d         # 2-3 min downtime
 
 ## 📊 Porównanie:
 
-| Operacja | Przed | Po | Oszczędność |
-|----------|-------|-----|-------------|
-| **Downtime** | 2-3.5 min | 3-5s | **99%** 🎉 |
-| **Rollback** | Manual | Auto | ✅ |
-| **Backup** | Nie | Tak | ✅ |
+| Operacja     | Przed     | Po   | Oszczędność |
+| ------------ | --------- | ---- | ----------- |
+| **Downtime** | 2-3.5 min | 3-5s | **99%** 🎉  |
+| **Rollback** | Manual    | Auto | ✅          |
+| **Backup**   | Nie       | Tak  | ✅          |
 
 ## 🎯 Jak używać?
 
 ### Automatycznie (GitHub Actions) - już skonfigurowane!
+
 ```bash
 git add .
 git commit -m "Nowa funkcja"
@@ -52,6 +55,7 @@ git push origin main
 ```
 
 ### Ręcznie na serwerze:
+
 ```bash
 ssh user@server
 cd /srv/app
@@ -91,7 +95,7 @@ git push origin main
 
 📋 Konfiguracja:
    Registry: pawlo884/django-app:latest
-   
+
 📥 Pobieram NOWY obraz (stary nadal działa)...
 ✅ Nowy obraz pobrany
 
@@ -136,11 +140,13 @@ docker-compose up -d --force-recreate
 ## 💡 Pro Tips
 
 1. **Monitoruj deployment:**
+
    ```
    GitHub → Actions → Zobacz live logs
    ```
 
 2. **Sprawdź na serwerze:**
+
    ```bash
    docker-compose ps
    docker-compose logs -f web
@@ -162,4 +168,3 @@ docker-compose up -d --force-recreate
 Następny `git push origin main` użyje zero-downtime deployment!
 
 **Downtime: 2-3.5 minuty → 3-5 sekund (99% mniej!)** 🚀
-

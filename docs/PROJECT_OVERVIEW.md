@@ -19,17 +19,17 @@ lokalny serwer MCP (read-only).
 
 ## 2. Stack
 
-| Warstwa  | Technologia                                                                                                              |
-| -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Backend  | Django 6.0, DRF 3.17, Python 3.13                                                                                        |
-| Async    | Celery 5.4 + Redis (**tylko broker**); wyniki i harmonogram w PostgreSQL (`django-celery-results`, `django-celery-beat`) |
-| Bazy     | PostgreSQL, **osobna baza per aplikacja** + routery; w DEV prefiks `zzz_`                                                |
-| Pliki    | MinIO / S3 (`django-storages`) — wygenerowane XML-e i zdjęcia                                                            |
-| Frontend | React 19 + Vite + TS, TanStack Query, react-router (`frontend/mpd/`), SPA pod `/mpd-app/`                                |
-| AI       | `openai` + `openai-agents` + `langchain-openai` (web_agent); `mcp` (serwer katalogu)                                     |
-| Scraping | Selenium (web_agent — wypełnianie formularzy)                                                                            |
-| Docs API | drf-spectacular (`/api/docs/`, `/api/redoc/`)                                                                            |
-| Deploy   | prod + dev: **jeden `docker-compose`** (prod: obraz wypalony, NPM z przodu; dev: bind-mount + tunel SSH). Patrz [DEPLOY.md](DEPLOY.md) |
+| Warstwa  | Technologia                                                                                                                                                            |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend  | Django 6.0, DRF 3.17, Python 3.13                                                                                                                                      |
+| Async    | Celery 5.4 + Redis (**tylko broker**); wyniki i harmonogram w PostgreSQL (`django-celery-results`, `django-celery-beat`)                                               |
+| Bazy     | PostgreSQL, **osobna baza per aplikacja** + routery; w DEV prefiks `zzz_`                                                                                              |
+| Pliki    | MinIO / S3 (`django-storages`) — wygenerowane XML-e i zdjęcia                                                                                                          |
+| Frontend | React 19 + Vite + TS, TanStack Query, react-router (`frontend/mpd/`), SPA pod `/mpd-app/`                                                                              |
+| AI       | `openai` + `openai-agents` + `langchain-openai` (web_agent); `mcp` (serwer katalogu)                                                                                   |
+| Scraping | Selenium (web_agent — wypełnianie formularzy)                                                                                                                          |
+| Docs API | drf-spectacular (`/api/docs/`, `/api/redoc/`)                                                                                                                          |
+| Deploy   | prod + dev: **jeden `docker-compose`** (prod: obraz wypalony, NPM z przodu; dev: bind-mount + tunel SSH). Patrz [DEPLOY.md](DEPLOY.md)                                 |
 | CI/CD    | GitHub Actions, semantic-release (Conventional Commits → CHANGELOG → tag); deploy prod **ręczny** (`workflow_dispatch` / `scripts/deploy-prod.sh`), husky + commitlint |
 
 ## 3. Aplikacje (`src/apps/`)

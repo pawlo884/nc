@@ -12,6 +12,7 @@ PostgreSQL został **ODTWORZONY DZISIAJ** (2025-12-03 10:18:58) podczas deploy!
 ## Co się stało
 
 ### Timeline:
+
 1. **2025-11-27 - 2025-12-02**: Dane były importowane normalnie
 2. **2025-12-03 10:18**: Deploy z `--force-recreate`
 3. **PostgreSQL został odtworzony** (kontener + prawdopodobnie baza)
@@ -29,6 +30,7 @@ docker-compose -f docker-compose.blue-green.yml up -d --force-recreate
 ## Możliwe scenariusze
 
 ### Scenariusz 1: Volume został usunięty
+
 ```bash
 # Ktoś mógł przypadkowo wykonać:
 docker volume rm nc_postgres_data
@@ -37,21 +39,25 @@ rm -rf /mnt/data2tb/docker/volumes/nc_postgres_data
 ```
 
 ### Scenariusz 2: Volume był pusty
+
 - Volume istniał ale był pusty
 - PostgreSQL utworzył nową bazę od zera
 - Wszystkie dane znikły
 
 ### Scenariusz 3: Permissions problem
+
 - PostgreSQL nie mógł odczytać starego volume (uprawnienia)
 - Utworzył nową bazę w innym miejscu
 
 ### Scenariusz 4: Initdb.d nadpisał bazę
+
 - Skrypty w `deployments/docker/postgres/initdb.d/` nadpisały dane
 - **ALE:** katalog jest pusty, więc to NIE TO
 
 ## Weryfikacja
 
 ### Krok 1: Sprawdź volume na serwerze
+
 ```bash
 ssh pawel@VPS_IP
 cd /home/pawel/apps/nc
@@ -59,16 +65,19 @@ bash check_postgres_volume.sh
 ```
 
 ### Krok 2: Sprawdź logi PostgreSQL
+
 ```bash
 docker logs nc-postgres-1 --tail 100
 ```
 
 Szukaj:
+
 - `initdb: database system was initialized`
 - `PostgreSQL init process complete`
 - Błędów uprawnień
 
 ### Krok 3: Sprawdź czy są backupy
+
 ```bash
 ls -lah /mnt/data2tb/backups/postgres/ 2>/dev/null
 ls -lah /home/pawel/backups/ 2>/dev/null
@@ -77,6 +86,7 @@ ls -lah /home/pawel/backups/ 2>/dev/null
 ## Rozwiązanie
 
 ### Natychmiastowe (jeśli są backupy):
+
 ```bash
 # 1. Zatrzymaj PostgreSQL
 docker stop nc-postgres-1
@@ -89,6 +99,7 @@ docker start nc-postgres-1
 ```
 
 ### Jeśli NIE MA backupów:
+
 ```bash
 # Odzyskaj dane z API (27.11 - 02.12)
 docker exec -it nc-web-1 python manage.py shell --settings=nc.settings.prod
@@ -122,12 +133,14 @@ print(result)
 ### 1. NIE używaj `--force-recreate` dla PostgreSQL
 
 **PRZED** (deploy-vps.yml linia 75-76):
+
 ```bash
 docker-compose -f docker-compose.blue-green.yml build --no-cache
 docker-compose -f docker-compose.blue-green.yml up -d --force-recreate  # ❌ KASUJE WSZYSTKO
 ```
 
 **PO**:
+
 ```bash
 # Zatrzymaj tylko kontenery aplikacji (BEZ postgres i redis)
 docker-compose -f docker-compose.blue-green.yml stop web-blue web-green celery-default celery-import celery-beat flower nginx-router
@@ -173,12 +186,12 @@ Dodaj do periodic tasks:
 def check_postgres_volume():
     """Sprawdza czy volume PostgreSQL jest OK"""
     import subprocess
-    
+
     result = subprocess.run(
         ['docker', 'exec', 'nc-postgres-1', 'psql', '-U', 'postgres', '-c', 'SELECT COUNT(*) FROM pg_database'],
         capture_output=True
     )
-    
+
     if result.returncode != 0:
         logger.error("⚠️ PostgreSQL volume problem!")
         # Wyślij alert
@@ -188,7 +201,8 @@ def check_postgres_volume():
 
 **Przyczyna:** `--force-recreate` odtworzył PostgreSQL, prawdopodobnie z pustym volume  
 **Skutek:** Utrata 7 dni danych (27.11 - 02.12)  
-**Rozwiązanie:** 
+**Rozwiązanie:**
+
 1. Sprawdź czy są backupy
 2. Jeśli nie - odzyskaj z API
 3. Napraw deploy workflow (NIE używaj --force-recreate dla postgres)
@@ -201,4 +215,3 @@ def check_postgres_volume():
 3. ⏳ Szukaj backupów
 4. ⏳ Odzyskaj dane (backup lub API)
 5. ✅ Napraw deploy workflow (już zrobione w poprzednich commitach)
-

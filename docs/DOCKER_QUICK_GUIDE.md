@@ -17,6 +17,7 @@ docker-compose -f docker-compose.services.yml [command]
 ## 💻 Development (localhost)
 
 ### Start projektu
+
 ```bash
 # Build (pierwszy raz lub po zmianach w Dockerfile.dev)
 docker-compose -f docker-compose.dev.yml build
@@ -33,6 +34,7 @@ docker-compose -f docker-compose.dev.yml logs -f celery-import
 ```
 
 ### Praca z kontenerami
+
 ```bash
 # Wejdź do kontenera
 docker-compose -f docker-compose.dev.yml exec web bash
@@ -52,6 +54,7 @@ docker-compose -f docker-compose.dev.yml down -v
 ```
 
 ### Rebuild po zmianach
+
 ```bash
 # Szybki rebuild (tylko kod)
 docker-compose -f docker-compose.dev.yml up -d --build
@@ -62,6 +65,7 @@ docker-compose -f docker-compose.dev.yml up -d
 ```
 
 ### Dostęp
+
 - 🌐 Django: http://localhost:8080
 - 🌺 Flower (Celery monitoring): http://localhost:5555
 - 📊 Django Admin: http://localhost:8080/admin
@@ -72,6 +76,7 @@ docker-compose -f docker-compose.dev.yml up -d
 ## 🚀 Production (blue-green)
 
 ### Deploy (przez GitHub Actions)
+
 ```bash
 # Push na main - automatyczny deploy
 git add .
@@ -84,6 +89,7 @@ git push origin main
 ```
 
 ### Ręczny deploy na serwerze
+
 ```bash
 # SSH na serwer
 ssh user@your-server
@@ -106,6 +112,7 @@ docker-compose -f docker-compose.services.yml logs -f web-green
 ```
 
 ### Monitoring produkcji
+
 ```bash
 # Status wszystkich kontenerów
 docker-compose -f docker-compose.services.yml ps
@@ -122,6 +129,7 @@ docker-compose -f docker-compose.services.yml logs -f celery-import celery-defau
 ```
 
 ### Rollback (awaria)
+
 ```bash
 # Rollback
 ./scripts/deploy/deploy-blue-green.sh rollback
@@ -132,6 +140,7 @@ docker-compose -f docker-compose.services.yml logs -f celery-import celery-defau
 ## 🔍 Diagnostyka
 
 ### Sprawdź używane pliki
+
 ```bash
 # Dev
 ls -la | grep -E "Dockerfile.dev|docker-compose.dev.yml"
@@ -141,6 +150,7 @@ ls -la | grep -E "Dockerfile.prod|docker-compose.services.yml|nginx-blue-green.c
 ```
 
 ### Sprawdź settings Django
+
 ```bash
 # Dev
 docker-compose -f docker-compose.dev.yml exec web python -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])"
@@ -152,6 +162,7 @@ docker exec nc-web-blue python -c "from django.conf import settings; print(setti
 ```
 
 ### Sprawdź połączenia
+
 ```bash
 # Redis
 docker-compose -f docker-compose.dev.yml exec web python -c "import redis; r=redis.Redis(host='redis', port=6379, password='dev_password'); print(r.ping())"
@@ -165,6 +176,7 @@ docker-compose -f docker-compose.dev.yml exec web python manage.py dbshell
 ## 🧹 Czyszczenie
 
 ### Bezpieczne (tylko stopped containers)
+
 ```bash
 docker system prune
 
@@ -173,6 +185,7 @@ docker image prune -a
 ```
 
 ### Uwaga - usuwa volumes!
+
 ```bash
 # Usuń wszystko łącznie z danymi
 docker-compose -f docker-compose.dev.yml down -v
@@ -183,19 +196,20 @@ docker system prune -a --volumes
 
 ## 📊 Porównanie komend
 
-| Akcja | Development | Production |
-|-------|-------------|------------|
-| **Build** | `docker-compose -f docker-compose.dev.yml build` | GitHub Actions |
-| **Start** | `docker-compose -f docker-compose.dev.yml up -d` | `./scripts/deploy/deploy-blue-green.sh deploy` |
-| **Logs** | `docker-compose -f docker-compose.dev.yml logs -f` | `docker-compose -f docker-compose.services.yml logs -f` |
-| **Shell** | `docker-compose -f docker-compose.dev.yml exec web bash` | `docker exec -it nc-web-blue bash` |
-| **Stop** | `docker-compose -f docker-compose.dev.yml down` | `docker-compose -f docker-compose.services.yml stop web-blue web-green nginx-router celery-default celery-import celery-beat flower` |
+| Akcja     | Development                                              | Production                                                                                                                           |
+| --------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **Build** | `docker-compose -f docker-compose.dev.yml build`         | GitHub Actions                                                                                                                       |
+| **Start** | `docker-compose -f docker-compose.dev.yml up -d`         | `./scripts/deploy/deploy-blue-green.sh deploy`                                                                                       |
+| **Logs**  | `docker-compose -f docker-compose.dev.yml logs -f`       | `docker-compose -f docker-compose.services.yml logs -f`                                                                              |
+| **Shell** | `docker-compose -f docker-compose.dev.yml exec web bash` | `docker exec -it nc-web-blue bash`                                                                                                   |
+| **Stop**  | `docker-compose -f docker-compose.dev.yml down`          | `docker-compose -f docker-compose.services.yml stop web-blue web-green nginx-router celery-default celery-import celery-beat flower` |
 
 ---
 
 ## ⚡ Pro Tips
 
 ### Aliasy (dodaj do ~/.bashrc lub ~/.zshrc)
+
 ```bash
 # Development
 alias dc-dev='docker-compose -f docker-compose.dev.yml'
@@ -209,6 +223,7 @@ alias dc-prod-logs='docker-compose -f docker-compose.services.yml logs -f'
 ```
 
 Użycie:
+
 ```bash
 dc-dev up          # Zamiast docker-compose -f docker-compose.dev.yml up -d
 dc-dev-logs web    # Szybkie logi
@@ -220,6 +235,7 @@ dc-dev-shell       # Szybki shell
 ## 🆘 Najczęstsze problemy
 
 ### "Cannot connect to database"
+
 ```bash
 # Sprawdź czy Redis działa
 docker-compose -f docker-compose.dev.yml ps redis
@@ -229,6 +245,7 @@ docker-compose -f docker-compose.dev.yml restart redis
 ```
 
 ### "Port already in use"
+
 ```bash
 # Znajdź proces na porcie 8000
 lsof -i :8000  # Mac/Linux
@@ -239,6 +256,7 @@ kill -9 <PID>
 ```
 
 ### "Out of disk space"
+
 ```bash
 # Sprawdź użycie
 docker system df
@@ -251,4 +269,3 @@ docker volume prune
 ---
 
 **Więcej info**: [DOCKER_STRUCTURE.md](DOCKER_STRUCTURE.md)
-

@@ -6,17 +6,20 @@
 ## Pierwsze uruchomienie (5 minut)
 
 ### 1️⃣ Sklonuj projekt (już masz ✅)
+
 ```powershell
 cd C:\Users\pawlo\Desktop\kodowanie\nc_project
 ```
 
 ### 2️⃣ Skonfiguruj środowisko
+
 ```powershell
 # Skopiuj przykładowy .env
 # (plik .env.dev już istnieje - sprawdź konfigurację)
 ```
 
 ### 3️⃣ Zbuduj obrazy Docker (z cache!)
+
 ```powershell
 # Windows
 .\scripts\build\build-fast.ps1
@@ -24,20 +27,25 @@ cd C:\Users\pawlo\Desktop\kodowanie\nc_project
 # Linux/Mac
 ./scripts/build/build-fast.sh
 ```
+
 ⏱️ Pierwszy build: ~5-10 minut (pobieranie pakietów)
 
 ### 4️⃣ Uruchom kontenery
+
 ```powershell
 docker-compose -f docker-compose.dev.yml up -d
 ```
+
 ⏱️ Start: ~30 sekund
 
 ### 5️⃣ Sprawdź status
+
 ```powershell
 docker-compose -f docker-compose.dev.yml ps
 ```
 
 ### 6️⃣ Otwórz aplikację
+
 ```
 🌐 Django Admin: http://localhost:8080/admin/
 🌸 Flower (Celery): http://localhost:5555
@@ -49,16 +57,19 @@ docker-compose -f docker-compose.dev.yml ps
 ## Codzienne użycie
 
 ### Uruchomienie aplikacji
+
 ```powershell
 docker-compose -f docker-compose.dev.yml up -d
 ```
 
 ### Zatrzymanie aplikacji
+
 ```powershell
 docker-compose -f docker-compose.dev.yml down
 ```
 
 ### Zobacz logi
+
 ```powershell
 # Wszystkie serwisy
 docker-compose -f docker-compose.dev.yml logs -f
@@ -67,10 +78,11 @@ docker-compose -f docker-compose.dev.yml logs -f
 docker-compose -f docker-compose.dev.yml logs -f web
 
 # Tylko celery
-docker-compose -f docker-compose.dev.yml logs -f celery-default
+docker-compose -f docker-compose.dev.yml logs -f celery-fast
 ```
 
 ### Restart po zmianie kodu
+
 ```powershell
 # Opcja 1: Rebuild (jeśli zmieniłeś requirements.txt)
 .\scripts\build\build-fast.ps1
@@ -96,6 +108,7 @@ cd /home/pawel/apps/nc
 ## Przydatne komendy
 
 ### Docker
+
 ```powershell
 # Status wszystkich kontenerów
 docker-compose -f docker-compose.dev.yml ps
@@ -114,37 +127,40 @@ docker system prune -a
 ```
 
 ### Django
+
 ```powershell
 # Wejdź do shell Django
-docker-compose -f docker-compose.dev.yml exec web python manage.py shell --settings=nc.settings.dev
+docker-compose -f docker-compose.dev.yml exec web python manage.py shell --settings=core.settings.dev
 
 # Stwórz superusera
-docker-compose -f docker-compose.dev.yml exec web python manage.py createsuperuser --settings=nc.settings.dev
+docker-compose -f docker-compose.dev.yml exec web python manage.py createsuperuser --settings=core.settings.dev
 
 # Migracje
-docker-compose -f docker-compose.dev.yml exec web python manage.py makemigrations --settings=nc.settings.dev
-docker-compose -f docker-compose.dev.yml exec web python manage.py migrate --database=zzz_default --settings=nc.settings.dev
+docker-compose -f docker-compose.dev.yml exec web python manage.py makemigrations --settings=core.settings.dev
+docker-compose -f docker-compose.dev.yml exec web python manage.py migrate --database=zzz_default --settings=core.settings.dev
 
 # Collectstatic
-docker-compose -f docker-compose.dev.yml exec web python manage.py collectstatic --noinput --settings=nc.settings.dev
+docker-compose -f docker-compose.dev.yml exec web python manage.py collectstatic --noinput --settings=core.settings.dev
 ```
 
 ### Celery
+
 ```powershell
 # Lista aktywnych tasków
-docker-compose -f docker-compose.dev.yml exec celery-default celery -A nc.celery inspect active
+docker-compose -f docker-compose.dev.yml exec celery-fast celery -A core.celery inspect active
 
 # Lista scheduled tasków
-docker-compose -f docker-compose.dev.yml exec celery-beat celery -A nc.celery inspect scheduled
+docker-compose -f docker-compose.dev.yml exec celery-beat celery -A core.celery inspect scheduled
 
 # Restart celery worker
-docker-compose -f docker-compose.dev.yml restart celery-default
+docker-compose -f docker-compose.dev.yml restart celery-fast
 
 # Purge all tasks
-docker-compose -f docker-compose.dev.yml exec celery-default celery -A nc.celery purge
+docker-compose -f docker-compose.dev.yml exec celery-fast celery -A core.celery purge
 ```
 
 ### Redis
+
 ```powershell
 # Połącz się z Redis (hasło: dev_password)
 docker-compose -f docker-compose.dev.yml exec redis redis-cli -a dev_password
@@ -161,6 +177,7 @@ docker-compose -f docker-compose.dev.yml exec redis redis-cli -a dev_password FL
 ## Troubleshooting
 
 ### Problem: Kontenery nie startują
+
 ```powershell
 # Sprawdź logi
 docker-compose -f docker-compose.dev.yml logs
@@ -174,6 +191,7 @@ docker-compose -f docker-compose.dev.yml up -d
 ```
 
 ### Problem: Port już zajęty (8000, 5555, 6379)
+
 ```powershell
 # Windows - sprawdź co używa portu
 netstat -ano | findstr :8000
@@ -187,6 +205,7 @@ taskkill /PID <PID> /F
 ```
 
 ### Problem: Brak miejsca na dysku
+
 ```powershell
 # Sprawdź zużycie
 docker system df
@@ -199,6 +218,7 @@ docker volume prune
 ```
 
 ### Problem: Build trwa zbyt długo
+
 ```powershell
 # Sprawdź czy BuildKit jest włączony
 $env:DOCKER_BUILDKIT
@@ -213,6 +233,7 @@ $env:COMPOSE_DOCKER_CLI_BUILD = "1"
 ```
 
 ### Problem: Baza danych nie działa
+
 ```powershell
 # Sprawdź logi PostgreSQL na hoście
 # Połączenie jest do hosta, nie kontenera!
@@ -226,24 +247,29 @@ $env:COMPOSE_DOCKER_CLI_BUILD = "1"
 ## Monitoring
 
 ### Flower (Celery)
+
 ```
 http://localhost:5555
 ```
+
 - Zobacz aktywne taski
 - Monitor workers
 - Task history
 - Task routing
 
 ### Docker Stats
+
 ```powershell
 docker stats
 ```
+
 - CPU usage
 - Memory usage
 - Network I/O
 - Disk I/O
 
 ### Logi
+
 ```powershell
 # Tail logs
 docker-compose -f docker-compose.dev.yml logs -f
@@ -260,15 +286,18 @@ docker-compose -f docker-compose.dev.yml logs -f -t
 ## Performance Tips
 
 ### 1. Używaj BuildKit cache
+
 ```powershell
 .\scripts\build\build-fast.ps1  # Nie docker-compose build!
 ```
 
 ### 2. Zmniejsz liczbę rebuilds
+
 - Zmieniaj tylko kod? Nie rebuild, tylko restart
 - Dodałeś pakiet? Rebuild z cache będzie szybki
 
 ### 3. Limit memory dla Celery
+
 ```yaml
 # W docker-compose.dev.yml
 deploy:
@@ -278,6 +307,7 @@ deploy:
 ```
 
 ### 4. Cache na PostgreSQL (DatabaseCache)
+
 ```python
 # core/settings/base.py — Redis jest już tylko brokerem Celery
 CACHES = {
@@ -328,4 +358,3 @@ docker system prune -a
 **Happy coding! 🚀**
 
 Potrzebujesz pomocy? Sprawdź [README.md](../README.md) lub [DEPLOYMENT_SCRIPTS.md](DEPLOYMENT_SCRIPTS.md)
-
