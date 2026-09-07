@@ -92,7 +92,8 @@ class Command(BaseTabuAPICommand):
                     self.stdout.write(f'   Strona {page}...')
                 time.sleep(1)  # Limit API: 100 req/min
 
-            self.stdout.write(f'   Pobrano {len(all_products)} rekordów (wariantów)')
+            fetched_count = len(all_products)
+            self.stdout.write(f'   Pobrano {fetched_count} rekordów (wariantów)')
 
             fetch_fingerprint = self._fetch_fingerprint(all_products)
 
@@ -103,19 +104,30 @@ class Command(BaseTabuAPICommand):
                     )
                 )
                 self.update_sync_log(
-                    products_processed=len(all_products),
+                    products_processed=fetched_count,
                     products_success=0,
                     products_failed=0,
                     raw_response={
                         'stock_changes_logged': 0,
                         'update_from': update_from,
                         'skipped_reason': 'identical_fetch_as_previous_run',
-                        'fetched_variants': len(all_products),
+                        'fetched_variants': fetched_count,
                         'fetch_fingerprint': fetch_fingerprint,
                     },
                 )
                 self.complete_sync_log('completed')
                 return
+
+            # Redukcja pamięci: rekordy z products/basic bywają bogate, a
+            # _apply_stock_updates trzyma dane przez cały (wielominutowy przy
+            # dużym oknie) zapis do bazy. Zostawiamy tylko 4 potrzebne pola
+            # i zwalniamy surową listę — bez tego przy ~10k+ wariantów worker
+            # Celery dostawał OOM (SIGKILL).
+            lean = [
+                (r.get('variant_id'), r.get('store'), r.get('price_net'), r.get('price_gross'))
+                for r in all_products if isinstance(r, dict)
+            ]
+            del all_products
 
             history_count = 0
             variants_compared = 0
@@ -124,13 +136,13 @@ class Command(BaseTabuAPICommand):
 
             if not dry_run:
                 history_count, variants_compared, variants_with_change, fail_count = (
-                    self._apply_stock_updates(all_products)
+                    self._apply_stock_updates(lean)
                 )
             success_count = variants_compared
 
             if not dry_run:
                 self.update_sync_log(
-                    products_processed=len(all_products),
+                    products_processed=fetched_count,
                     products_success=success_count,
                     products_failed=fail_count,
                     raw_response={
@@ -156,7 +168,7 @@ class Command(BaseTabuAPICommand):
                 )
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'\n✅ Zakończono! Przetworzono: {len(all_products)}, '
+                    f'\n✅ Zakończono! Przetworzono: {fetched_count}, '
                     f'sukces: {success_count}, błędy: {fail_count}, '
                     f'zmiany w historii: {history_count}'
                 )
@@ -220,33 +232,79 @@ class Command(BaseTabuAPICommand):
         except (InvalidOperation, ValueError, TypeError):
             return None
 
+    @staticmethod
+    def _record_fields(rec):
+        """(variant_id, store, price_net, price_gross) z rekordu API (dict) albo
+        z krotki lean, którą buduje `handle`, żeby nie trzymać bogatych dictów
+        w pamięci przez cały czas zapisu do bazy."""
+        if isinstance(rec, dict):
+            return (rec.get('variant_id'), rec.get('store'),
+                    rec.get('price_net'), rec.get('price_gross'))
+        return tuple(rec)
+
+    _CHUNK = 1000
+
     def _apply_stock_updates(self, records):
-        """Batch: 1 SELECT wariantów po `api_id__in` zamiast query per rekord;
-        warunkowy `filter(pk=..., store=old).update(...)` per zmieniony wariant
-        (idempotencja + brak wyścigu jak matterhorn1 #230); `bulk_create`
-        historii; `store_total` policzony z SUMY wariantów produktu (bez dryfu
-        - #233 pkt 3). Zwraca (history_count, compared, with_change, fail_count).
+        """Batch + PORCJAMI po `_CHUNK` (żeby nie ładować ~10k+ wariantów +
+        produktów do pamięci naraz — powodowało OOM/SIGKILL workera).
+
+        Per porcja: 1 SELECT wariantów po `api_id__in`, warunkowy
+        `filter(pk=..., store=old).update(...)` per zmieniony wariant
+        (idempotencja + brak wyścigu jak matterhorn1 #230), `bulk_create`
+        historii. `store_total` liczony z SUMY wariantów dotkniętych produktów
+        na końcu (bez dryfu - #233 pkt 3), również porcjami.
+
+        Zwraca (history_count, compared, with_change, fail_count).
         """
         db = router.db_for_write(TabuProduct)
+        total_history = total_compared = fail_count = 0
+        affected_products = set()
 
-        parsed, fail_count = [], 0
-        for r in records:
-            if not isinstance(r, dict) or r.get('variant_id') is None:
+        buf = []
+        for rec in records:
+            vid, store, pn, pg = self._record_fields(rec)
+            if vid is None:
                 continue
             try:
-                parsed.append({
-                    'variant_id': int(r['variant_id']),
-                    'new_store': int(r.get('store') or 0),
-                    'price_net': self._parse_price(r.get('price_net')),
-                    'price_gross': self._parse_price(r.get('price_gross')),
+                buf.append({
+                    'variant_id': int(vid),
+                    'new_store': int(store or 0),
+                    'price_net': self._parse_price(pn),
+                    'price_gross': self._parse_price(pg),
                 })
             except (ValueError, TypeError) as e:
                 fail_count += 1
-                logger.error(f'Zły rekord stanu (variant_id={r.get("variant_id")}): {e}')
+                logger.error(f'Zły rekord stanu (variant_id={vid}): {e}')
+            if len(buf) >= self._CHUNK:
+                h, c, aff = self._apply_stock_chunk(db, buf)
+                total_history += h
+                total_compared += c
+                affected_products |= aff
+                buf = []
+        if buf:
+            h, c, aff = self._apply_stock_chunk(db, buf)
+            total_history += h
+            total_compared += c
+            affected_products |= aff
 
-        if not parsed:
-            return 0, 0, 0, fail_count
+        affected_sorted = sorted(affected_products)
+        for i in range(0, len(affected_sorted), self._CHUNK):
+            chunk = affected_sorted[i:i + self._CHUNK]
+            totals = dict(
+                TabuProductVariant.objects.using(db)
+                .filter(product_id__in=chunk)
+                .values('product_id').annotate(t=Sum('store'))
+                .values_list('product_id', 't')
+            )
+            prods = list(TabuProduct.objects.using(db).filter(pk__in=chunk))
+            for prod in prods:
+                prod.store_total = max(0, totals.get(prod.pk, 0) or 0)
+            TabuProduct.objects.using(db).bulk_update(prods, ['store_total'], batch_size=200)
 
+        return total_history, total_compared, total_history, fail_count
+
+    def _apply_stock_chunk(self, db, parsed):
+        """Jedna porcja: zwraca (history_count, compared, affected_product_ids)."""
         variants_by_api = {
             v.api_id: v for v in
             TabuProductVariant.objects.using(db).select_related('product').filter(
@@ -296,23 +354,10 @@ class Command(BaseTabuAPICommand):
         if price_only:
             TabuProductVariant.objects.using(db).bulk_update(
                 price_only, ['price_net', 'price_gross'], batch_size=200)
-
-        if affected_products:
-            totals = dict(
-                TabuProductVariant.objects.using(db)
-                .filter(product_id__in=affected_products)
-                .values('product_id').annotate(t=Sum('store'))
-                .values_list('product_id', 't')
-            )
-            prods = list(TabuProduct.objects.using(db).filter(pk__in=affected_products))
-            for prod in prods:
-                prod.store_total = max(0, totals.get(prod.pk, 0) or 0)
-            TabuProduct.objects.using(db).bulk_update(prods, ['store_total'], batch_size=200)
-
         if history_to_create:
             StockHistory.objects.using(db).bulk_create(history_to_create, batch_size=200)
 
-        return len(history_to_create), compared, len(history_to_create), fail_count
+        return len(history_to_create), compared, affected_products
 
     def _debug_sample(self, options):
         """Diagnostyka: products/basic zwraca płaską listę wariantów (id=product, variant_id=variant)."""

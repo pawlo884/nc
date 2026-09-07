@@ -113,6 +113,24 @@ class TestApplyStockUpdates:
             f"{len(ctx.captured_queries)} zapytań dla 20 wariantów (10 zmian)"
         )
 
+    def test_przetwarza_porcjami_bez_ladowania_wszystkiego_naraz(self, cmd, monkeypatch):
+        """`_CHUNK` mały → rekordy przekraczające jedną porcję są poprawnie
+        przetworzone (ochrona przed OOM przy ~10k+ wariantów)."""
+        monkeypatch.setattr(cmd, "_CHUNK", 3)
+        p = factories.tabu_product(api_id=1006, store_total=0)
+        for i in range(10):
+            factories.tabu_variant(p, api_id=6000 + i, store=1)
+
+        # lean krotki (tak jak `handle` po redukcji), wszystkie ze zmianą 1 → 5
+        lean = [(6000 + i, 5, None, None) for i in range(10)]
+        hist, compared, changed, failed = cmd._apply_stock_updates(lean)
+
+        assert (hist, compared, changed, failed) == (10, 10, 10, 0)
+        assert TabuProductVariant.objects.filter(product=p, store=5).count() == 10
+        assert StockHistory.objects.filter(product_api_id=p.api_id).count() == 10
+        p.refresh_from_db()
+        assert p.store_total == 50   # store_total z sumy po wszystkich porcjach
+
 
 class TestSyncTabuStockCommand:
     """Pełny przebieg `call_command('sync_tabu_stock', ...)`."""
