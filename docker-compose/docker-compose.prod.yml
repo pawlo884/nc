@@ -1,0 +1,288 @@
+# Produkcja — JEDEN stack docker-compose (zastępuje k3s + blue-green).
+#
+# Model: obraz `nc-django-app:latest` budowany z Dockerfile.prod (kod + React SPA
+# + collectstatic WYPALONE w obrazie, bez bind-mountów — tak jak działały pody
+# k3s). Deploy = git reset --hard <ref> → build → migracje → up -d.
+# Patrz scripts/deploy-prod.sh oraz issue #259.
+#
+# Wejście publiczne: NPM (Nginx Proxy Manager) → `web` (gunicorn + whitenoise
+# dla /static/). Media → MinIO/S3. Bez dodatkowego nginx.
+#
+# Postgres (`nc-postgres-1`) NIE jest zarządzany z tego pliku — profile "shared",
+# zawiera dane produkcyjne, uruchamiany osobno. Definicja tylko dla `config`.
+
+x-django-image: &django-image
+  build:
+    context: ..
+    dockerfile: deployments/docker/Dockerfile.prod
+  image: nc-django-app:latest
+
+x-django-env: &django-env
+  DJANGO_SETTINGS_MODULE: core.settings.prod
+  DJANGO_ENV: prod
+  TZ: Europe/Warsaw
+  REDIS_HOST: redis
+  CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+  CELERY_RESULT_BACKEND: ""
+
+services:
+  # ==========================================
+  # WEB — gunicorn + whitenoise (/static/), 1 kontener
+  # ==========================================
+  web:
+    <<: *django-image
+    container_name: nc-web
+    command:
+      - /bin/bash
+      - -c
+      - >
+        gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 4
+        --worker-class sync --timeout 300 --keep-alive 5
+        --max-requests 1000 --max-requests-jitter 100 --preload
+        --access-logfile - --error-logfile - --log-level warning
+        --capture-output --worker-tmp-dir /dev/shm --graceful-timeout 30
+        --limit-request-line 8190 --limit-request-fields 100 --limit-request-field_size 8190
+    env_file:
+      - ../.env.prod
+    environment:
+      <<: *django-env
+    ports:
+      - "127.0.0.1:8000:8000"          # NPM przez host: Forward -> IP:8000
+    networks:
+      - nc_network                      # NPM przez sieć: Forward Hostname -> nc-web:8000
+      - nc_dbnet
+      - nginx_proxy_manager_network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+    user: "1001:1001"
+    deploy:
+      resources:
+        limits: { memory: 2G, cpus: "2.0" }
+        reservations: { memory: 1G }
+    labels:
+      - "nc.type=web"
+
+  # ==========================================
+  # MIGRACJE — jednorazowo: docker compose --profile migrate run --rm migrate
+  # ==========================================
+  migrate:
+    <<: *django-image
+    container_name: nc-migrate
+    profiles: ["migrate"]
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        echo "== Migracje prod =="
+        python manage.py migrate --database=default --noinput
+        python manage.py migrate matterhorn1 --database=matterhorn1 --noinput
+        python manage.py migrate MPD --database=MPD --noinput
+        python manage.py migrate web_agent --database=web_agent --noinput
+        python manage.py migrate tabu --database=tabu --noinput
+        python manage.py migrate mada --database=mada --noinput
+        python manage.py createcachetable --database=default
+        echo "== Migracje OK =="
+    env_file:
+      - ../.env.prod
+    environment:
+      <<: *django-env
+    networks:
+      - nc_network
+      - nc_dbnet
+    restart: "no"
+
+  # ==========================================
+  # REDIS — broker Celery + cache/locki DRF
+  # ==========================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: nc-redis-1
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-prod_password}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - /mnt/data2tb/docker/volumes/nc_redis_data:/data
+      - ../deployments/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - nc_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-prod_password}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { memory: 512M, cpus: "0.5" }
+    labels:
+      - "nc.protected=true"
+
+  # ==========================================
+  # CELERY
+  # ==========================================
+  celery-default:
+    <<: *django-image
+    container_name: nc-celery-default
+    command:
+      - /bin/bash
+      - -c
+      - >
+        celery -A core.celery worker -Q default --loglevel=info --concurrency=1
+        --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
+    env_file:
+      - ../.env.prod
+    environment:
+      <<: *django-env
+      CELERY_STATE_DB: /var/lib/celery/worker_state_default
+    volumes:
+      - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
+    networks:
+      - nc_network
+      - nc_dbnet
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    user: "1001:1001"
+    deploy:
+      resources:
+        limits: { memory: 1G, cpus: "1.0" }
+        reservations: { memory: 512M }
+
+  celery-import:
+    <<: *django-image
+    container_name: nc-celery-import
+    command:
+      - /bin/bash
+      - -c
+      - >
+        celery -A core.celery worker -Q import --loglevel=info --concurrency=1
+        --max-memory-per-child=150000 --without-gossip --without-mingle --without-heartbeat
+    env_file:
+      - ../.env.prod
+    environment:
+      <<: *django-env
+      CELERY_STATE_DB: /var/lib/celery/worker_state_import
+    volumes:
+      - /mnt/data2tb/docker/volumes/nc_celery_data:/var/lib/celery
+    networks:
+      - nc_network
+      - nc_dbnet
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    user: "1001:1001"
+    deploy:
+      resources:
+        limits: { memory: 1G, cpus: "1.0" }
+        reservations: { memory: 512M }
+
+  celery-beat:
+    <<: *django-image
+    container_name: nc-celery-beat
+    command:
+      - /bin/bash
+      - -c
+      - celery -A core.celery beat --loglevel=info
+    env_file:
+      - ../.env.prod
+    environment:
+      <<: *django-env
+    networks:
+      - nc_network
+      - nc_dbnet
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    user: "1001:1001"
+    deploy:
+      resources:
+        limits: { memory: 512M, cpus: "0.5" }
+
+  flower:
+    <<: *django-image
+    container_name: nc-flower
+    command:
+      - /bin/bash
+      - -c
+      - >
+        celery -A core.celery --broker=redis://:${REDIS_PASSWORD:-prod_password}@redis:6379/0
+        flower --port=5555 --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower}
+        --persistent=True --db=/var/lib/flower/flower.db --inspect_timeout=30
+    ports:
+      - "127.0.0.1:5555:5555"
+    env_file:
+      - ../.env.prod
+    environment:
+      <<: *django-env
+    volumes:
+      - /mnt/data2tb/docker/volumes/nc_flower_data:/var/lib/flower
+    networks:
+      - nc_network
+      - nc_dbnet
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    user: "1001:1001"
+    deploy:
+      resources:
+        limits: { memory: 512M, cpus: "0.5" }
+
+  # ==========================================
+  # ⚠️ NIETYKALNY — Postgres z danymi produkcyjnymi. profile "shared" = NIE
+  # uruchamiany zwykłym `up`. Definicja tylko do `docker compose config`.
+  # Zarządzany osobno.
+  # ==========================================
+  postgres:
+    profiles: ["shared"]
+    image: postgres:18-alpine
+    container_name: nc-postgres-1
+    restart: unless-stopped
+    env_file:
+      - ../.env.prod
+    environment:
+      POSTGRES_USER: ${DEFAULT_DB_USER:-nc}
+      POSTGRES_PASSWORD: ${DEFAULT_DB_PASSWORD:-prod_password}
+      POSTGRES_DB: ${DEFAULT_DB_NAME:-zzz_default}
+      TZ: Europe/Warsaw
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DEFAULT_DB_USER:-nc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - /mnt/data2tb/docker/volumes/nc_postgres_data:/var/lib/postgresql/data
+      - ../deployments/docker/postgres/initdb.d:/docker-entrypoint-initdb.d:ro
+      - ../deployments/docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    networks:
+      - nc_network
+    labels:
+      - "nc.protected=true"
+
+networks:
+  nc_network:
+    name: nc_nc_network
+    external: true
+  nc_dbnet:
+    name: nc_dbnet
+    external: true
+  nginx_proxy_manager_network:
+    name: nginx_proxy_manager_network
+    external: true
