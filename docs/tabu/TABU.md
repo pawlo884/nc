@@ -51,16 +51,16 @@ Kod: `src/apps/tabu/`.
 
 `src/apps/tabu/models.py`. Wszystkie tabele z prefiksem `tabu_`.
 
-| Model | Tabela | Rola | Klucz z API |
-| --- | --- | --- | --- |
-| `Brand` | `tabu_brand` | marka | `brand_id` = `str(producer_id)` (unique) |
-| `Category` | `tabu_category` | kategoria + `path`, `parent` | `category_id` = `str(api_category_id)` (unique) |
-| `TabuProduct` | `tabu_product_detail` | produkt, **`store_total`** (suma wariantów) | `api_id` (IntegerField, **unique**) |
-| `TabuProductImage` | `tabu_product_gallery` | gallery, `unique(product, api_image_id)` | `api_image_id` |
-| `TabuProductVariant` | `tabu_product_variant` | wariant, **`store`**, ceny | `api_id` (IntegerField, **unique**) |
-| `ApiSyncLog` | `tabu_apisynclog` | log syncu (`sync_type`, `status`, `raw_response`) | — |
-| `StockHistory` | `tabu_stock_history` | historia zmian stanu | — |
-| `Saga` / `SagaStep` | `tabu_saga_logs` / `tabu_saga_steps` | saga mapowania do MPD | — |
+| Model                | Tabela                               | Rola                                              | Klucz z API                                     |
+| -------------------- | ------------------------------------ | ------------------------------------------------- | ----------------------------------------------- |
+| `Brand`              | `tabu_brand`                         | marka                                             | `brand_id` = `str(producer_id)` (unique)        |
+| `Category`           | `tabu_category`                      | kategoria + `path`, `parent`                      | `category_id` = `str(api_category_id)` (unique) |
+| `TabuProduct`        | `tabu_product_detail`                | produkt, **`store_total`** (suma wariantów)       | `api_id` (IntegerField, **unique**)             |
+| `TabuProductImage`   | `tabu_product_gallery`               | gallery, `unique(product, api_image_id)`          | `api_image_id`                                  |
+| `TabuProductVariant` | `tabu_product_variant`               | wariant, **`store`**, ceny                        | `api_id` (IntegerField, **unique**)             |
+| `ApiSyncLog`         | `tabu_apisynclog`                    | log syncu (`sync_type`, `status`, `raw_response`) | —                                               |
+| `StockHistory`       | `tabu_stock_history`                 | historia zmian stanu                              | —                                               |
+| `Saga` / `SagaStep`  | `tabu_saga_logs` / `tabu_saga_steps` | saga mapowania do MPD                             | —                                               |
 
 Mapowanie do MPD: `TabuProduct.mapped_product_uid`, `TabuProductVariant.mapped_variant_uid`
 / `is_mapped`. Ustawiane ręcznie w adminie (`mpd_create` / `assign_mapping`,
@@ -92,12 +92,12 @@ factory tworzą obiekty bez `.using()` → też `default`. Spójnie.
 Taski Celery (`tabu/tasks.py`) to cienkie wrappery wokół management commands
 (`tabu/management/commands/`):
 
-| Task | Komenda | Endpoint | Częstość |
-| --- | --- | --- | --- |
-| `sync_tabu_stock` | `sync_tabu_stock` | `products/basic` | co 10 min |
-| `sync_tabu_products_update` | `sync_tabu_new_products` | `products/{id}` | co 240 min |
-| `sync_tabu_categories` | `sync_tabu_categories` | `products/categories` | co 7 dni |
-| `watchdog_tabu_stock_lock` | — (no-op) | — | co 5 min |
+| Task                        | Komenda                  | Endpoint              | Częstość   |
+| --------------------------- | ------------------------ | --------------------- | ---------- |
+| `sync_tabu_stock`           | `sync_tabu_stock`        | `products/basic`      | co 10 min  |
+| `sync_tabu_products_update` | `sync_tabu_new_products` | `products/{id}`       | co 240 min |
+| `sync_tabu_categories`      | `sync_tabu_categories`   | `products/categories` | co 7 dni   |
+| `watchdog_tabu_stock_lock`  | — (no-op)                | —                     | co 5 min   |
 
 Pozostałe komendy: `sync_tabu_products` (pełny import po ID),
 `import_tabu_by_id`, `find_common_eans`, `check_tabu_mpd_db`, `clear_tabu_data`,
@@ -126,7 +126,7 @@ Komenda `sync_tabu_stock`:
 
 1. Stronicowane `GET products/basic?update_from=…` → płaska lista rekordów.
 2. **Wczesny stop:** jeśli odcisk (`sha1` z posortowanych `(variant_id, store,
-   price_net, price_gross)`) == odcisk z poprzedniego zakończonego runu →
+price_net, price_gross)`) == odcisk z poprzedniego zakończonego runu →
    pomiń cały run (`skipped_reason: identical_fetch_as_previous_run`). To nie
    „ta sama liczba rekordów" — porównanie **danych** (poprawka #233).
 3. **`_apply_stock_updates(records)` — batch, bez N+1:**
@@ -191,14 +191,21 @@ Tabu (mapowanie per kolor hurtowni, v1.41).
 
 Schedule w bazie (`django_celery_beat`, `DatabaseScheduler`):
 
-| Zadanie | Częstość |
-| --- | --- |
-| `tabu.tasks.sync_tabu_stock` | co 10 min |
-| `tabu.tasks.sync_tabu_products_update` | co 240 min |
-| `tabu.tasks.sync_tabu_categories` | co 7 dni |
-| `tabu.tasks.watchdog_tabu_stock_lock` | co 5 min (no-op — advisory lock nie wymaga watchdoga) |
+| Zadanie                                | Częstość                                              |
+| -------------------------------------- | ----------------------------------------------------- |
+| `tabu.tasks.sync_tabu_stock`           | co 10 min                                             |
+| `tabu.tasks.sync_tabu_products_update` | co 240 min                                            |
+| `tabu.tasks.sync_tabu_categories`      | co 7 dni                                              |
+| `tabu.tasks.watchdog_tabu_stock_lock`  | co 5 min (no-op — advisory lock nie wymaga watchdoga) |
 
-Wszystkie taski działają na kolejce `default` (worker `celery-default`).
+**Routing kolejki** (`CELERY_TASK_ROUTES`, #263/#265): `sync_tabu_products_update`
+idzie na **`celery-heavy`** — długi task (do 3h, `time_limit=10800`) nie może
+blokować 3 slotów `celery-fast` zarezerwowanych pod 5-minutowe krytyczne
+taski. Reszta (`sync_tabu_stock`, `sync_tabu_categories`,
+`watchdog_tabu_stock_lock`) leci na `celery-fast`. `PeriodicTask`
+(`setup_tabu_sync_task`) **musi** mieć `queue=None` — jawny `queue` w
+`apply_async` wygrywa z `CELERY_TASK_ROUTES` i wysyła task na złego workera
+(ten sam bug co w mada, patrz #267).
 
 ---
 
@@ -224,7 +231,7 @@ z `is_mapped=True` zmienione w oknie po `updated_at`). Dlatego
   (scoped), `last_update`; akcje mapowania do MPD.
 - `TabuProductVariantAdmin`, `TabuProductImageAdmin`, `BrandAdmin`, `CategoryAdmin`.
 - `StockHistoryAdmin` (`ReadOnlyLogAdminMixin`) — prosty: `list_filter =
-  ['change_type', 'timestamp']`. **Brak** buga z filtrem dużej kardynalności /
+['change_type', 'timestamp']`. **Brak** buga z filtrem dużej kardynalności /
   N+1 w linku (który dotknął matterhorn1 — #229).
 - `ApiSyncLogAdmin`, `SagaAdmin`, `SagaStepAdmin` — read-only.
 
@@ -232,14 +239,14 @@ z `is_mapped=True` zmienione w oknie po `updated_at`). Dlatego
 
 ## 12. Różnice względem matterhorn1
 
-| | matterhorn1 | tabu |
-| --- | --- | --- |
-| Blokada importu | Redis `cache.add` (TTL 1 h) — **ryzyko zawieszonego locka** po padzie workera (issue #238) | **PostgreSQL advisory lock** — auto-release, bez TTL, bez watchdoga |
-| Idempotencja stanów | warunkowy `UPDATE` (#230) | warunkowy `UPDATE` (analogicznie) |
-| `store_total` / `stock_total` | `@property` (suma na żądanie) | pole liczone z sumy przy syncu |
-| Pipeline pobierania stron | współbieżny (wątek launcher, #226/#227) | sekwencyjny (`products/basic` szybkie, mniejszy wolumen) |
-| Checkpoint/wznawianie ITEMS | tak (`current_page`) | nie ma (nowe produkty przez `check_range`) |
-| Admin StockHistory | wymagał optymalizacji (#229) | od początku prosty |
+|                               | matterhorn1                                                                                | tabu                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Blokada importu               | Redis `cache.add` (TTL 1 h) — **ryzyko zawieszonego locka** po padzie workera (issue #238) | **PostgreSQL advisory lock** — auto-release, bez TTL, bez watchdoga |
+| Idempotencja stanów           | warunkowy `UPDATE` (#230)                                                                  | warunkowy `UPDATE` (analogicznie)                                   |
+| `store_total` / `stock_total` | `@property` (suma na żądanie)                                                              | pole liczone z sumy przy syncu                                      |
+| Pipeline pobierania stron     | współbieżny (wątek launcher, #226/#227)                                                    | sekwencyjny (`products/basic` szybkie, mniejszy wolumen)            |
+| Checkpoint/wznawianie ITEMS   | tak (`current_page`)                                                                       | nie ma (nowe produkty przez `check_range`)                          |
+| Admin StockHistory            | wymagał optymalizacji (#229)                                                               | od początku prosty                                                  |
 
 **Wzorzec advisory lock z tabu jest rekomendowany dla matterhorn1** (issue #238).
 

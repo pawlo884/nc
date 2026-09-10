@@ -51,8 +51,12 @@ class Command(BaseCommand):
             )
             existing_task.interval = schedule
             existing_task.enabled = not options['disable']
-            if not existing_task.queue:
-                existing_task.queue = 'default'
+            # Bez sztywnego queue - decyduje CELERY_TASK_ROUTES (base.py), gdzie
+            # sync_tabu_products_update -> heavy. Jawny queue tutaj wygrywałby
+            # z routingiem (apply_async z queue= bije task_routes) i wysyłał ten
+            # task (do 3h - time_limit=10800) na celery-fast, zabierając jeden
+            # z 3 slotów krytycznym 5-minutowym taskom - patrz #263/#265/#267.
+            existing_task.queue = None
             existing_task.save()
 
             status = 'wyłączony' if options['disable'] else 'włączony'
@@ -60,7 +64,7 @@ class Command(BaseCommand):
                 self.style.SUCCESS(
                     f'✅ Zaktualizowano periodic task: {task_name}\n'
                     f'   - Interwał: co {interval_minutes} minut\n'
-                    f'   - Queue: {existing_task.queue or "default"}\n'
+                    f'   - Queue: {existing_task.queue or "(routing z CELERY_TASK_ROUTES)"}\n'
                     f'   - Status: {status}'
                 )
             )
@@ -80,7 +84,8 @@ class Command(BaseCommand):
                 interval=schedule,
                 name=task_name,
                 task=task_path,
-                queue='default',
+                # j.w. - bez sztywnego queue, CELERY_TASK_ROUTES kieruje ten task na heavy.
+                queue=None,
                 enabled=not options['disable'],
                 start_time=timezone.now(),
                 description='Sprawdza nowe produkty: max(api_id)+1, 404=brak',
@@ -112,7 +117,7 @@ class Command(BaseCommand):
                     if task.interval
                     else str(task.crontab or '')
                 )
-                queue_info = task.queue or '(pusta – używa default)'
+                queue_info = task.queue or '(routing z CELERY_TASK_ROUTES)'
                 self.stdout.write(
                     f'\n{icon} {task.name}\n'
                     f'   Task: {task.task}\n'
