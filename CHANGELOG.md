@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.22](https://github.com/pawlo884/nc/compare/v1.44.21...v1.44.22) (2026-09-10)
+
+### Bug Fixes
+
+* **mada:** watchdog + self-heal dla zawieszonych 'running' + fix routingu kolejki ([#268](https://github.com/pawlo884/nc/issues/268)) ([4592db7](https://github.com/pawlo884/nc/commit/4592db7267c82a2f1dea0e9eea4d4a3d6e03ff07)), closes [#267](https://github.com/pawlo884/nc/issues/267), references [#238](https://github.com/pawlo884/nc/issues/238)
+
 ## [1.44.21](https://github.com/pawlo884/nc/compare/v1.44.20...v1.44.21) (2026-09-07)
 
 ### Performance Improvements
