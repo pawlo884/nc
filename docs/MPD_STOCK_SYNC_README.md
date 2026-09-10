@@ -9,14 +9,14 @@
 
 ## Opis
 
-Task Celery `update_stock_from_matterhorn1` synchronizuje stany magazynowe z bazy danych Matterhorn1 do bazy MPD. 
+Task Celery `update_stock_from_matterhorn1` synchronizuje stany magazynowe z bazy danych Matterhorn1 do bazy MPD.
 
 **Kluczowa optymalizacja:** Task sprawdza tylko warianty zaktualizowane w określonym oknie czasowym (domyślnie ostatnie 15 minut), co znacznie zwiększa wydajność.
 
 ## Proces synchronizacji
 
 1. **Pobiera zmapowane warianty** z `matterhorn1.ProductVariant` gdzie:
-   - `is_mapped=True` 
+   - `is_mapped=True`
    - `mapped_variant_uid` jest ustawione
    - `updated_at >= (current_time - time_window_minutes)` - tylko ostatnie X minut
 2. **Znajduje odpowiednie warianty** w MPD używając `mapped_variant_uid` jako klucza
@@ -138,13 +138,14 @@ PeriodicTask.objects.create(
 
 ### Rekomendowane ustawienia
 
-| Wielkość sklepu | Interval | Time Window | Opis |
-|----------------|----------|-------------|------|
-| Mały (<1000)   | 5 min    | 15 min      | Szybkie reakcje na zmiany |
-| Średni (1k-5k) | 5 min    | 15 min      | Balans między wydajnością a aktualnością |
-| Duży (>5k)     | 10 min   | 20 min      | Mniej częste, ale bardziej wydajne |
+| Wielkość sklepu | Interval | Time Window | Opis                                     |
+| --------------- | -------- | ----------- | ---------------------------------------- |
+| Mały (<1000)    | 5 min    | 15 min      | Szybkie reakcje na zmiany                |
+| Średni (1k-5k)  | 5 min    | 15 min      | Balans między wydajnością a aktualnością |
+| Duży (>5k)      | 10 min   | 20 min      | Mniej częste, ale bardziej wydajne       |
 
 **Dlaczego time_window > interval?**
+
 - Bufor bezpieczeństwa (np. 3x)
 - Nie przegapisz zmian jeśli task się opóźni
 - Pokrycie dla overlapping updates
@@ -208,6 +209,7 @@ INFO:    - Błędy: 5
 ```
 
 **Rozwiązanie**: Upewnij się, że warianty w Matterhorn1 mają:
+
 - `is_mapped = True`
 - `mapped_variant_uid` ustawiony na prawidłowy `variant_id` z MPD
 
@@ -217,7 +219,8 @@ INFO:    - Błędy: 5
 ⚠️ Nie znaleziono wariantu MPD dla mapped_variant_uid=123
 ```
 
-**Rozwiązanie**: 
+**Rozwiązanie**:
+
 - Sprawdź czy wariant o ID 123 istnieje w `MPD.ProductVariants`
 - Sprawdź czy istnieje rekord w `MPD.ProductvariantsSources` dla źródła Matterhorn
 
@@ -244,6 +247,7 @@ Sources.objects.create(
 ### Flower (Celery monitoring)
 
 Otwórz http://localhost:5555 aby:
+
 - Zobaczyć status tasków
 - Sprawdzić historię wykonań
 - Zobaczyć szczegóły błędów
@@ -269,7 +273,7 @@ docker-compose logs -f celery_worker
 Wszystkie zmiany stanów są zapisywane w `MPD.StockHistory`:
 
 ```sql
-SELECT 
+SELECT
     sh.*,
     pv.producer_code,
     p.name as product_name
@@ -293,14 +297,14 @@ from MPD.models import StockAndPrices, Sources
 
 class StockSyncTestCase(TransactionTestCase):
     databases = ['zzz_matterhorn1', 'zzz_MPD']
-    
+
     def test_update_stock(self):
         # Przygotuj dane testowe
         # ... (stwórz warianty z mapowaniem)
-        
+
         # Uruchom task
         result = update_stock_from_matterhorn1()
-        
+
         # Sprawdź wynik
         self.assertEqual(result['status'], 'success')
         self.assertGreater(result['stats']['checked'], 0)
@@ -311,6 +315,7 @@ class StockSyncTestCase(TransactionTestCase):
 ### Optymalizacja
 
 Task używa:
+
 - **Time window filtering** - sprawdza tylko ostatnie X minut (ogromny wzrost wydajności!)
 - `select_related('product')` dla matterhorn1 variants
 - `select_related('variant')` dla MPD variant sources
@@ -320,10 +325,12 @@ Task używa:
 ### Szacowany czas wykonania
 
 #### Z time window (15 minut):
+
 - Typowe obciążenie: ~1-5 sekund (tylko zmienione warianty)
 - Duże obciążenie: ~10-30 sekund (wiele zmian jednocześnie)
 
 #### Bez time window (wszystkie warianty):
+
 - 100 wariantów: ~5-10 sekund
 - 1000 wariantów: ~30-60 sekund
 - 10000 wariantów: ~5-10 minut
@@ -333,11 +340,11 @@ Task używa:
 Przykład: sklep z 10 000 wariantów, typowo 50 zmian na godzinę:
 
 | Time window | Warianty do sprawdzenia | Czas wykonania |
-|-------------|------------------------|----------------|
-| 5 minut     | ~4 warianty            | <1 sekunda     |
-| 15 minut    | ~12 wariantów          | ~1 sekunda     |
-| 60 minut    | ~50 wariantów          | ~5 sekund      |
-| Bez limitu  | 10 000 wariantów       | ~5-10 minut    |
+| ----------- | ----------------------- | -------------- |
+| 5 minut     | ~4 warianty             | <1 sekunda     |
+| 15 minut    | ~12 wariantów           | ~1 sekunda     |
+| 60 minut    | ~50 wariantów           | ~5 sekund      |
+| Bez limitu  | 10 000 wariantów        | ~5-10 minut    |
 
 **Wniosek:** Time window daje ~1000x przyspieszenie! 🚀
 
@@ -361,4 +368,3 @@ Przykład: sklep z 10 000 wariantów, typowo 50 zmian na godzinę:
 - [ ] Delta updates (tylko zmienione warianty)
 - [ ] Compression dla dużych synchronizacji
 - [ ] Parallel processing dla bardzo dużych zbiorów danych
-

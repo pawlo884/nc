@@ -262,16 +262,16 @@ Ewentualne ujednolicenie locka → osobna decyzja (#243).
 
 ## 13. Różnice względem matterhorn1 / tabu
 
-| Aspekt             | Mada                                            | matterhorn1 / tabu                                        |
-| ------------------ | ----------------------------------------------- | --------------------------------------------------------- |
-| Transport          | feed XML w ZIP (manifest + pliki)               | REST JSON                                                 |
-| Auth               | login/hasło w query stringu (redakcja w logach) | token w nagłówku                                          |
-| Id wariantu        | brak — `variant_key` = EAN \| `"color\|size"`   | numeryczne `variant_uid` / `api_id`                       |
-| Cena               | na produkcie                                    | na wariancie                                              |
-| Przyrostowość      | kursor po `file_name` plików partial            | `update_from` / `last_update` z `ApiSyncLog`              |
-| Wygaszanie         | `is_active=False` dla nieobecnych w `full`      | brak / miękkie                                            |
+| Aspekt             | Mada                                            | matterhorn1 / tabu                                           |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------------ |
+| Transport          | feed XML w ZIP (manifest + pliki)               | REST JSON                                                    |
+| Auth               | login/hasło w query stringu (redakcja w logach) | token w nagłówku                                             |
+| Id wariantu        | brak — `variant_key` = EAN \| `"color\|size"`   | numeryczne `variant_uid` / `api_id`                          |
+| Cena               | na produkcie                                    | na wariancie                                                 |
+| Przyrostowość      | kursor po `file_name` plików partial            | `update_from` / `last_update` z `ApiSyncLog`                 |
+| Wygaszanie         | `is_active=False` dla nieobecnych w `full`      | brak / miękkie                                               |
 | Most stanów do MPD | push `update_stock_from_mada` (#270, bez okna)  | matterhorn1: push z oknem 15 min; tabu: push bez okna (#270) |
-| Lock importu       | pg advisory lock, **osobny full vs partial**    | pg advisory lock (oba)                                     |
+| Lock importu       | pg advisory lock, **osobny full vs partial**    | pg advisory lock (oba)                                       |
 
 Wspólne: idempotentny warunkowy UPDATE stanów + `bulk_create` historii,
 wzorzec saga `core.saga`, `ApiSyncLog`, `StockHistory`.
