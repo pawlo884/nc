@@ -221,6 +221,89 @@ def track_recent_stock_changes(self):
         }
 
 
+def _mpd_db():
+    from core.db_routers import _get_mpd_db
+    return _get_mpd_db()
+
+
+@shared_task(bind=True, name='MPD.tasks.update_stock_from_tabu')
+def update_stock_from_tabu(self):
+    """
+    Most stanów magazynowych Tabu -> MPD (#270).
+
+    Bierze WSZYSTKIE warianty Tabu z is_mapped=True (TabuProductVariant nie ma
+    pola updated_at, więc nie ma jak filtrować oknem czasowym jak w
+    matterhorn1) i przekazuje do sync_stock_bridge - warunkowy zapis i tak nic
+    nie robi, gdy stan się nie zmienił.
+
+    Uruchamiany okresowo przez periodic task (np. co 5 minut,
+    `setup_stock_sync_task --source tabu`).
+    """
+    from core.db_routers import _get_tabu_db
+    from tabu.models import TabuProductVariant
+    from MPD.stock_bridge import sync_stock_bridge
+
+    start_time = timezone.now()
+    pairs = TabuProductVariant.objects.using(_get_tabu_db()).filter(
+        is_mapped=True, mapped_variant_uid__isnull=False,
+    ).values_list('mapped_variant_uid', 'store')
+
+    stats = sync_stock_bridge(
+        pairs,
+        source_name='Tabu API',
+        source_type_default='api',
+        source_location_default='https://b2b.tabu.com.pl',
+        mpd_db=_mpd_db(),
+    )
+    duration = (timezone.now() - start_time).total_seconds()
+    logger.info(
+        "✅ update_stock_from_tabu: sprawdzono=%s zaktualizowano=%s utworzono=%s błędy=%s (%.2fs)",
+        stats['checked'], stats['updated'], stats['created'], stats['errors'], duration,
+    )
+    return {
+        'status': 'success' if stats['errors'] == 0 else 'partial',
+        'stats': stats,
+        'duration_seconds': duration,
+    }
+
+
+@shared_task(bind=True, name='MPD.tasks.update_stock_from_mada')
+def update_stock_from_mada(self):
+    """
+    Most stanów magazynowych Mada -> MPD (#270). Jak update_stock_from_tabu -
+    bez okna czasowego, bierze wszystkie is_mapped=True warianty Mada.
+
+    Uruchamiany okresowo przez periodic task (np. co 5 minut,
+    `setup_stock_sync_task --source mada`).
+    """
+    from core.db_routers import _get_mada_db
+    from mada.models import MadaProductVariant
+    from MPD.stock_bridge import sync_stock_bridge
+
+    start_time = timezone.now()
+    pairs = MadaProductVariant.objects.using(_get_mada_db()).filter(
+        is_mapped=True, mapped_variant_uid__isnull=False,
+    ).values_list('mapped_variant_uid', 'stock')
+
+    stats = sync_stock_bridge(
+        pairs,
+        source_name='Mada API',
+        source_type_default='api',
+        source_location_default='https://www.mada.pl',
+        mpd_db=_mpd_db(),
+    )
+    duration = (timezone.now() - start_time).total_seconds()
+    logger.info(
+        "✅ update_stock_from_mada: sprawdzono=%s zaktualizowano=%s utworzono=%s błędy=%s (%.2fs)",
+        stats['checked'], stats['updated'], stats['created'], stats['errors'], duration,
+    )
+    return {
+        'status': 'success' if stats['errors'] == 0 else 'partial',
+        'stats': stats,
+        'duration_seconds': duration,
+    }
+
+
 @shared_task(bind=True, name='MPD.tasks.update_stock_from_matterhorn1')
 def update_stock_from_matterhorn1(self, time_window_minutes=15):
     """

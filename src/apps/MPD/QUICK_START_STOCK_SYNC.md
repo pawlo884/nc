@@ -1,5 +1,11 @@
 # Quick Start - Synchronizacja stanów magazynowych
 
+> Ten quick start opisuje `update_stock_from_matterhorn1`. Dla **tabu** i
+> **mada** jest analogiczny most bez okna czasowego — `update_stock_from_tabu`
+> / `update_stock_from_mada` (`MPD/stock_bridge.py`, #270), rejestracja
+> `setup_stock_sync_task --source tabu` / `--source mada`. Reszta (Flower,
+> `/admin/django_celery_beat/periodictask/`, format wyniku) identyczna.
+
 ## 1. Szybki start - Uruchom task ręcznie
 
 ```bash
@@ -37,6 +43,7 @@ python manage.py setup_stock_sync_task --interval 5 --time-window 15 --settings=
 ```
 
 Opcje:
+
 - `--interval 5` - jak często uruchamiać task (domyślnie: 5 minut)
 - `--time-window 15` - ile minut wstecz sprawdzać (domyślnie: 15 minut)
 - `--disable` - wyłącz task
@@ -47,12 +54,15 @@ Opcje:
 ## 3. Monitoring
 
 ### Flower (Celery monitoring)
+
 Otwórz: http://localhost:5555
 
 ### Django Admin
+
 Przejdź do: http://localhost:8000/admin/django_celery_beat/periodictask/
 
 ### Logi
+
 ```bash
 # Development
 tail -f logs/matterhorn/import_all_by_one.log
@@ -61,11 +71,12 @@ tail -f logs/matterhorn/import_all_by_one.log
 ## 4. Wymagania przed uruchomieniem
 
 ### Mapowanie wariantów
+
 Warianty w Matterhorn1 muszą być zmapowane:
 
 ```sql
 -- Sprawdź zmapowane warianty
-SELECT 
+SELECT
     pv.variant_uid,
     pv.product_id,
     pv.name as size,
@@ -93,6 +104,7 @@ mh1_variant.save(using='zzz_matterhorn1')
 ```
 
 ### Źródło w MPD
+
 Task automatycznie utworzy źródło "Matterhorn API" jeśli nie istnieje.
 
 ## 5. Przykładowy wynik
@@ -118,19 +130,25 @@ Task automatycznie utworzy źródło "Matterhorn API" jeśli nie istnieje.
 ## 6. Troubleshooting
 
 ### Brak zmapowanych wariantów
+
 ```
 ℹ️ Brak zmapowanych wariantów do synchronizacji
 ```
+
 **Rozwiązanie**: Zmapuj warianty (patrz punkt 4)
 
 ### Nie znaleziono wariantu MPD
+
 ```
 ⚠️ Nie znaleziono wariantu MPD dla mapped_variant_uid=123
 ```
+
 **Rozwiązanie**: Sprawdź czy wariant istnieje w MPD i czy ma rekord w ProductvariantsSources
 
 ### Błąd połączenia z bazą
+
 **Rozwiązanie**: Sprawdź czy:
+
 - PostgreSQL działa
 - Settings.dev ma poprawną konfigurację baz danych
 - Masz dostęp do obu baz (zzz_matterhorn1 i zzz_MPD)
@@ -138,4 +156,3 @@ Task automatycznie utworzy źródło "Matterhorn API" jeśli nie istnieje.
 ## 7. Pełna dokumentacja
 
 Zobacz `MPD_STOCK_SYNC_README.md` dla pełnej dokumentacji.
-

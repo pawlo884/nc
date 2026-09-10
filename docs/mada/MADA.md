@@ -30,9 +30,9 @@ Sąsiednie dokumenty: [`matterhorn/MATTERHORN1.md`](../matterhorn/MATTERHORN1.md
 ## 1. Przegląd
 
 ```
-Mada feed XML ──(import)──▶ baza mada ──(adapter źródłowy / saga)──▶ MPD ──▶ eksport ──▶ IdoSell / PrestaShop
-  get_xml.php (manifest)          MadaProduct / MadaProductVariant       MadaAdapter czyta .stock po EAN
-  get_xml.php?file=… (ZIP)        StockHistory (audyt zmian stanu)       (model pull, nie push)
+Mada feed XML ──(import)──▶ baza mada ──(saga, linkowanie)──▶ MPD ──▶ eksport ──▶ IdoSell / PrestaShop
+  get_xml.php (manifest)          MadaProduct / MadaProductVariant   StockAndPrices (cache)
+  get_xml.php?file=… (ZIP)        StockHistory (audyt zmian stanu)   ↑ update_stock_from_mada (push, #270)
 ```
 
 - **`full`** — pełny katalog (~24 MB `products.xml`), generowany raz dziennie
@@ -191,13 +191,20 @@ Różnice modelu Mada w sadze:
 
 ## 10. Most stanów do MPD
 
-**Model pull, nie push.** Nie ma taska „wypchnij stany Mada do MPD".
-`MPD/source_adapters/mada.py::MadaAdapter` czyta `MadaProductVariant.stock`
-**na żywo po EAN** (`get_variants_by_eans`, `get_all_variants_for_product`,
-`get_unmapped_variants_for_mpd_product`) podczas linkowania / eksportu MPD.
+**Sprostowanie (#270):** poniższe „model pull, na żywo" było mylące —
+`MadaAdapter` (`get_variants_by_eans` itd.) jest używany **tylko przy
+linkowaniu** (dopinanie wariantu do MPD), **NIE przy eksporcie**. Eksport do
+IdoSell/PrestaShop czyta wyłącznie `MPD.StockAndPrices` — bez osobnego mostu
+ten cache byłby więc zamrożony na stan z chwili linkowania.
 
-`mada.StockHistory` jest **tylko audytem** — nic z niego nie odczytuje MPD
-(inaczej niż `MPD.tasks.update_stock_from_matterhorn1` dla matterhorn1).
+Most: **`MPD.tasks.update_stock_from_mada`** (`MPD/stock_bridge.py`,
+współdzielony z tabu) — bierze **wszystkie** warianty z `is_mapped=True` i
+odświeża `StockAndPrices` + `MPD.StockHistory`. Bez okna czasowego (jak
+matterhorn1) — warunkowy zapis i tak nic nie robi, gdy stan się nie zmienił.
+Rejestracja: `setup_stock_sync_task --source mada` (`MPD` app).
+
+`mada.StockHistory` (ta w bazie mada, nie MPD) jest tylko audytem
+przyrostowego/pełnego importu — osobna tabela od `MPD.StockHistory` powyżej.
 
 Sprzątanie mapowań: `MPD/signals.py` (`post_delete` na `Products`) zeruje
 `mapped_product_uid` / `mapped_variant_uid` w Mada; historyczne sieroty czyści
@@ -255,16 +262,16 @@ Ewentualne ujednolicenie locka → osobna decyzja (#243).
 
 ## 13. Różnice względem matterhorn1 / tabu
 
-| Aspekt             | Mada                                            | matterhorn1 / tabu                                        |
-| ------------------ | ----------------------------------------------- | --------------------------------------------------------- |
-| Transport          | feed XML w ZIP (manifest + pliki)               | REST JSON                                                 |
-| Auth               | login/hasło w query stringu (redakcja w logach) | token w nagłówku                                          |
-| Id wariantu        | brak — `variant_key` = EAN \| `"color\|size"`   | numeryczne `variant_uid` / `api_id`                       |
-| Cena               | na produkcie                                    | na wariancie                                              |
-| Przyrostowość      | kursor po `file_name` plików partial            | `update_from` / `last_update` z `ApiSyncLog`              |
-| Wygaszanie         | `is_active=False` dla nieobecnych w `full`      | brak / miękkie                                            |
-| Most stanów do MPD | pull przez `MadaAdapter` (na żywo)              | push (`update_stock_from_matterhorn1`) + adapter          |
-| Lock importu       | pg advisory lock, **osobny full vs partial**    | matterhorn1: Redis `cache.add`; tabu: pg advisory (jeden) |
+| Aspekt             | Mada                                            | matterhorn1 / tabu                                           |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------------ |
+| Transport          | feed XML w ZIP (manifest + pliki)               | REST JSON                                                    |
+| Auth               | login/hasło w query stringu (redakcja w logach) | token w nagłówku                                             |
+| Id wariantu        | brak — `variant_key` = EAN \| `"color\|size"`   | numeryczne `variant_uid` / `api_id`                          |
+| Cena               | na produkcie                                    | na wariancie                                                 |
+| Przyrostowość      | kursor po `file_name` plików partial            | `update_from` / `last_update` z `ApiSyncLog`                 |
+| Wygaszanie         | `is_active=False` dla nieobecnych w `full`      | brak / miękkie                                               |
+| Most stanów do MPD | push `update_stock_from_mada` (#270, bez okna)  | matterhorn1: push z oknem 15 min; tabu: push bez okna (#270) |
+| Lock importu       | pg advisory lock, **osobny full vs partial**    | pg advisory lock (oba)                                       |
 
 Wspólne: idempotentny warunkowy UPDATE stanów + `bulk_create` historii,
 wzorzec saga `core.saga`, `ApiSyncLog`, `StockHistory`.

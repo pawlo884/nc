@@ -264,7 +264,10 @@ Schedule w bazie (`django_celery_beat`, `DatabaseScheduler`), nie w kodzie:
 | ----------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `matterhorn1.tasks.full_import_and_update`      | crontab `2,12,22,32,42,52 * * * *` (Europe/Warsaw) | co 10 min                                                                                                                                                        |
 | `matterhorn1.tasks.watchdog_import_healthcheck` | co 5 min                                           | siatka bezpieczeństwa: `running` bez postępu > 15 min → `error`, bardzo stare (> 3 h) → `error`. Blokada = advisory lock, więc nie ma ghost-locków do sprzątania |
-| `MPD.tasks.update_stock_from_matterhorn1`       | co 5 min                                           | most stanów matterhorn1 → MPD                                                                                                                                    |
+| `MPD.tasks.update_stock_from_matterhorn1`       | co 5 min                                           | most stanów matterhorn1 → MPD (jedyny most z oknem czasowym — patrz `MPD_STOCK_SYNC_README.md`)                                                                  |
+
+Tabu i mada mają analogiczne mosty (`update_stock_from_tabu`/`_mada`, bez
+okna czasowego) — #270, `docs/MPD_STOCK_SYNC_CHANGELOG.md` wersja 3.0.
 
 Pozostałe taski (bez harmonogramu / punktowe):
 `clean_old_stock_history` (kasuje wpisy `StockHistory` starsze niż N dni —

@@ -216,10 +216,14 @@ taski. Reszta (`sync_tabu_stock`, `sync_tabu_categories`,
 przez `_apply_stock_updates` (bulk_create) — `tabu.stock_tracker.track_stock_change`
 istnieje (tested), ale nie jest już wołany przez sync.
 
-Most do MPD: **`MPD.tasks.update_stock_from_matterhorn1`** — nazwa historyczna,
-ale obsługuje **wszystkie** hurtownie po `mapped_variant_uid` (bierze warianty
-z `is_mapped=True` zmienione w oknie po `updated_at`). Dlatego
-`_apply_stock_updates` ustawia `updated_at` wariantu przez warunkowy `UPDATE`.
+**Most do MPD (#270 — sprostowanie):** `MPD.tasks.update_stock_from_matterhorn1`
+obsługuje **tylko matterhorn1** (mimo nazwy sugerującej ogólność — importuje
+wprost `matterhorn1.models.ProductVariant`). Dla tabu jest osobny task:
+**`MPD.tasks.update_stock_from_tabu`** (`MPD/stock_bridge.py`, współdzielony
+z mada) — bierze **wszystkie** warianty z `is_mapped=True` (bez okna
+czasowego: `TabuProductVariant` **nie ma** pola `updated_at`, więc nie ma po
+czym filtrować "co się zmieniło"; warunkowy zapis i tak nic nie robi, gdy
+stan się nie zmienił). Rejestracja: `setup_stock_sync_task --source tabu`.
 
 ---
 
