@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.45.0](https://github.com/pawlo884/nc/compare/v1.44.23...v1.45.0) (2026-09-10)
+
+### Features
+
+* **MPD:** most stanów tabu/mada -> MPD.StockAndPrices ([#271](https://github.com/pawlo884/nc/issues/271)) ([80e2285](https://github.com/pawlo884/nc/commit/80e2285ea483c7fdc4ed9be1a21d5c7705cffc2d)), references [#270](https://github.com/pawlo884/nc/issues/270) [#270](https://github.com/pawlo884/nc/issues/270) [#270](https://github.com/pawlo884/nc/issues/270)
+
 ## [1.44.23](https://github.com/pawlo884/nc/compare/v1.44.22...v1.44.23) (2026-09-10)
 
 ### Bug Fixes
