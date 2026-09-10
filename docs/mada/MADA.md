@@ -207,12 +207,12 @@ Sprzątanie mapowań: `MPD/signals.py` (`post_delete` na `Products`) zeruje
 
 `mada/tasks.py` — cienkie wrappery na komendy, każdy z advisory lockiem:
 
-| Task                                | Lock                          | Domyślny cykl (`setup_mada_sync_task`) |
-| ----------------------------------- | ----------------------------- | -------------------------------------- |
-| `mada.tasks.sync_mada_full`         | `mada:sync_mada_full`         | codziennie 00:15                       |
-| `mada.tasks.sync_mada_partial`      | `mada:sync_mada_partial`      | co 15 min                              |
-| `mada.tasks.cleanup_empty_products` | `mada:cleanup_empty_products` | dziennie (osobny setup)                |
-| `mada.tasks.watchdog_import_healthcheck` | —                         | co 5 min (migracja `0002`)             |
+| Task                                     | Lock                          | Domyślny cykl (`setup_mada_sync_task`) |
+| ---------------------------------------- | ----------------------------- | -------------------------------------- |
+| `mada.tasks.sync_mada_full`              | `mada:sync_mada_full`         | codziennie 00:15                       |
+| `mada.tasks.sync_mada_partial`           | `mada:sync_mada_partial`      | co 15 min                              |
+| `mada.tasks.cleanup_empty_products`      | `mada:cleanup_empty_products` | dziennie (osobny setup)                |
+| `mada.tasks.watchdog_import_healthcheck` | —                             | co 5 min (migracja `0002`)             |
 
 Lock nie zdobyty → `{'status': 'skipped', 'reason': 'already_running'}`.
 Błąd komendy → `self.retry`.
@@ -224,6 +224,7 @@ Błąd komendy → `self.retry`.
 `ApiSyncLog` zostaje w `status='running'` na zawsze — advisory lock zwalnia się
 sam (koniec sesji DB), ale log nie. Dwie warstwy sprzątania, jak w matterhorn1
 (#238):
+
 - **samoleczenie** — `sync_mada_full`/`sync_mada_partial`, zaraz po zdobyciu
   locka, oznaczają jako `failed` każdy istniejący `running` tego samego
   `sync_type` (skoro mamy wyłączny lock, to na pewno sierota);
