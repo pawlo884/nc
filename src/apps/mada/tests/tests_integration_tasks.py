@@ -11,6 +11,7 @@ import pytest
 from celery.exceptions import Retry
 
 from mada import tasks
+from mada.models import ApiSyncLog
 
 pytestmark = pytest.mark.django_db
 
@@ -47,6 +48,38 @@ class TestLockedTasks:
                 patch.object(tasks, "call_command", side_effect=RuntimeError("boom")), \
                 pytest.raises(Retry):
             task_fn.apply(throw=True)
+
+
+@pytest.mark.parametrize("task_fn, sync_type", [
+    (tasks.sync_mada_full, "full_import"),
+    (tasks.sync_mada_partial, "partial_import"),
+])
+def test_osierocony_running_sprzatany_przed_nowym_przebiegiem(task_fn, sync_type):
+    """#267: log z poprzedniego runu, ubitego bez aktualizacji statusu (SIGKILL,
+    hard time limit Celery), nie może wisieć w 'running' bez końca - skoro
+    zdobyliśmy wyłączny lock, to na pewno sierota."""
+    orphan = ApiSyncLog.objects.create(sync_type=sync_type, status="running")
+
+    with patch.object(tasks, "advisory_lock", lambda name: _lock(True)), \
+            patch.object(tasks, "call_command"):
+        task_fn.apply().get()
+
+    orphan.refresh_from_db()
+    assert orphan.status == "failed"
+    assert orphan.completed_at is not None
+    assert "Osierocony" in orphan.error_message
+
+
+def test_running_innego_typu_nie_jest_ruszany():
+    """sync_mada_full nie powinien sprzątać running z partial_import i odwrotnie."""
+    other = ApiSyncLog.objects.create(sync_type="partial_import", status="running")
+
+    with patch.object(tasks, "advisory_lock", lambda name: _lock(True)), \
+            patch.object(tasks, "call_command"):
+        tasks.sync_mada_full.apply().get()
+
+    other.refresh_from_db()
+    assert other.status == "running"
 
 
 def test_full_i_partial_uzywaja_roznych_lockow():

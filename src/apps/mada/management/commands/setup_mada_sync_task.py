@@ -54,7 +54,12 @@ class Command(BaseCommand):
                 'crontab': crontab,
                 'interval': None,
                 'task': 'mada.tasks.sync_mada_full',
-                'queue': 'default',
+                # Bez sztywnego queue - decyduje CELERY_TASK_ROUTES (base.py),
+                # gdzie sync_mada_full -> heavy. Jawny queue tutaj nadpisywałby
+                # routing (apply_async z queue= wygrywa z task_routes) i wysyłał
+                # ten długi task na celery-fast, zabierając jeden z 3 slotów
+                # krytycznym 5-minutowym taskom - patrz #263/#265.
+                'queue': None,
                 'enabled': enabled,
                 'start_time': timezone.now(),
                 'description': 'Pełny import katalogu Mada (najnowszy plik TYPE=full).',
@@ -72,7 +77,9 @@ class Command(BaseCommand):
                 'interval': interval,
                 'crontab': None,
                 'task': 'mada.tasks.sync_mada_partial',
-                'queue': 'default',
+                # j.w. - bez sztywnego queue, mada.tasks.* i tak trafia domyślnie
+                # na 'default' z CELERY_TASK_ROUTES.
+                'queue': None,
                 'enabled': enabled,
                 'start_time': timezone.now(),
                 'description': 'Import przyrostowy Mada (pliki TYPE=partial nowsze niż ostatni przetworzony).',
