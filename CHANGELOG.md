@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.44.23](https://github.com/pawlo884/nc/compare/v1.44.22...v1.44.23) (2026-09-10)
+
+### Bug Fixes
+
+* **tabu:** usuń sztywny queue='default' z PeriodicTask sync_tabu_products_update ([#269](https://github.com/pawlo884/nc/issues/269)) ([9351deb](https://github.com/pawlo884/nc/commit/9351deb97c82c68273fce9250a9585d45a5eac46)), references [#267](https://github.com/pawlo884/nc/issues/267) [263/#265](https://github.com/pawlo884/nc/issues/265) [#263](https://github.com/pawlo884/nc/issues/263) [#263](https://github.com/pawlo884/nc/issues/263)
+
 ## [1.44.22](https://github.com/pawlo884/nc/compare/v1.44.21...v1.44.22) (2026-09-10)
 
 ### Bug Fixes
