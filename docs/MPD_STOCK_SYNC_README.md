@@ -1,5 +1,12 @@
 # Synchronizacja stanów magazynowych MPD z Matterhorn1
 
+> **#270:** ten dokument opisuje `update_stock_from_matterhorn1` (jedyny most
+> z oknem czasowym). Dla **tabu** i **mada** jest analogiczny most bez okna
+> (`update_stock_from_tabu` / `update_stock_from_mada`,
+> `MPD/stock_bridge.py`, rejestracja `setup_stock_sync_task --source tabu`/
+> `mada`) — patrz `MPD_STOCK_SYNC_CHANGELOG.md` wersja 3.0. Reszta poniżej
+> (Flower, format wyniku, troubleshooting) dotyczy tylko matterhorn1.
+
 ## Opis
 
 Task Celery `update_stock_from_matterhorn1` synchronizuje stany magazynowe z bazy danych Matterhorn1 do bazy MPD. 

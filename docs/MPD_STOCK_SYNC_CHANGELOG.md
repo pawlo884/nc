@@ -1,5 +1,32 @@
 # Changelog - Synchronizacja stanów magazynowych MPD
 
+## 2026-09-10 - Wersja 3.0 - Most dla tabu i mada (#270)
+
+### 🐛 Problem
+
+Eksport do IdoSell/PrestaShop czyta stan wyłącznie z `MPD.StockAndPrices`.
+Dla tabu i mada ten cache powstawał **raz**, przy linkowaniu wariantu — nic
+go później nie odświeżało (`MadaAdapter`/`TabuAdapter` są używane tylko przy
+linkowaniu, nie przy eksporcie — dokumentacja wcześniej twierdziła inaczej).
+Efekt: stan tabu/mada w eksporcie zamrożony na moment linkowania.
+
+### ✨ Nowe funkcje
+
+- Nowy współdzielony moduł `MPD/stock_bridge.py::sync_stock_bridge` — ta sama
+  logika co `update_stock_from_matterhorn1`, ale bez okna czasowego
+  (`TabuProductVariant` nie ma pola `updated_at`, więc bierze wszystkie
+  warianty `is_mapped=True`; warunkowy zapis i tak nic nie robi, gdy stan się
+  nie zmienił).
+- Nowe taski: `MPD.tasks.update_stock_from_tabu`, `MPD.tasks.update_stock_from_mada`.
+- `setup_stock_sync_task` rozszerzony o `--source {matterhorn1,tabu,mada}`
+  (domyślnie `matterhorn1` — zachowanie sprzed #270 bez zmian).
+
+### Bez zmian
+
+`update_stock_from_matterhorn1` (poniżej) **zostaje nietknięty** — działa na
+produkcji bez pokrycia testami, nie było powodu ryzykować regresji przy
+okazji dokładania tabu/mada.
+
 ## 2024-10-09 - Wersja 2.0 - Time Window Optimization 🚀
 
 ### ✨ Nowe funkcje

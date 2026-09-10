@@ -1,5 +1,11 @@
 # Quick Start - Synchronizacja stanów magazynowych
 
+> Ten quick start opisuje `update_stock_from_matterhorn1`. Dla **tabu** i
+> **mada** jest analogiczny most bez okna czasowego — `update_stock_from_tabu`
+> / `update_stock_from_mada` (`MPD/stock_bridge.py`, #270), rejestracja
+> `setup_stock_sync_task --source tabu` / `--source mada`. Reszta (Flower,
+> `/admin/django_celery_beat/periodictask/`, format wyniku) identyczna.
+
 ## 1. Szybki start - Uruchom task ręcznie
 
 ```bash
