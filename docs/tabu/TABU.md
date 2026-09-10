@@ -198,7 +198,14 @@ Schedule w bazie (`django_celery_beat`, `DatabaseScheduler`):
 | `tabu.tasks.sync_tabu_categories` | co 7 dni |
 | `tabu.tasks.watchdog_tabu_stock_lock` | co 5 min (no-op — advisory lock nie wymaga watchdoga) |
 
-Wszystkie taski działają na kolejce `default` (worker `celery-default`).
+**Routing kolejki** (`CELERY_TASK_ROUTES`, #263/#265): `sync_tabu_products_update`
+idzie na **`celery-heavy`** — długi task (do 3h, `time_limit=10800`) nie może
+blokować 3 slotów `celery-fast` zarezerwowanych pod 5-minutowe krytyczne
+taski. Reszta (`sync_tabu_stock`, `sync_tabu_categories`,
+`watchdog_tabu_stock_lock`) leci na `celery-fast`. `PeriodicTask`
+(`setup_tabu_sync_task`) **musi** mieć `queue=None` — jawny `queue` w
+`apply_async` wygrywa z `CELERY_TASK_ROUTES` i wysyła task na złego workera
+(ten sam bug co w mada, patrz #267).
 
 ---
 
