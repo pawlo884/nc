@@ -212,11 +212,30 @@ Sprzątanie mapowań: `MPD/signals.py` (`post_delete` na `Products`) zeruje
 | `mada.tasks.sync_mada_full`         | `mada:sync_mada_full`         | codziennie 00:15                       |
 | `mada.tasks.sync_mada_partial`      | `mada:sync_mada_partial`      | co 15 min                              |
 | `mada.tasks.cleanup_empty_products` | `mada:cleanup_empty_products` | dziennie (osobny setup)                |
+| `mada.tasks.watchdog_import_healthcheck` | —                         | co 5 min (migracja `0002`)             |
 
 Lock nie zdobyty → `{'status': 'skipped', 'reason': 'already_running'}`.
 Błąd komendy → `self.retry`.
 
 **Uwaga:** full i partial mają **różne** nazwy locka — mogą lecieć równolegle.
+
+**Sprzątanie osieroconych `running` (#267):** jeśli worker padnie w trakcie
+(SIGKILL, hard time limit Celery) zanim komenda dojdzie do `except`/`finally`,
+`ApiSyncLog` zostaje w `status='running'` na zawsze — advisory lock zwalnia się
+sam (koniec sesji DB), ale log nie. Dwie warstwy sprzątania, jak w matterhorn1
+(#238):
+- **samoleczenie** — `sync_mada_full`/`sync_mada_partial`, zaraz po zdobyciu
+  locka, oznaczają jako `failed` każdy istniejący `running` tego samego
+  `sync_type` (skoro mamy wyłączny lock, to na pewno sierota);
+- **watchdog** (`watchdog_import_healthcheck`, co 5 min) — backstop gdyby
+  kolejny przebieg się nie odpalił: `running` starszy niż 60 min (partial) /
+  180 min (full) → `failed`.
+
+**Routing kolejki:** `sync_mada_full` idzie na `celery-heavy`
+(`CELERY_TASK_ROUTES`, #263/#265) — długi task nie może blokować 3 slotów
+`celery-fast` zarezerwowanych pod 5-minutowe krytyczne taski. `PeriodicTask`
+(`setup_mada_sync_task`) **musi** mieć `queue=None`, inaczej jawny `queue` w
+`apply_async` wygrywa z `CELERY_TASK_ROUTES` i task ucieka na złego workera.
 Bezpieczeństwo stanów zapewnia idempotentny `upsert_variants` (§8), nie lock.
 Ewentualne ujednolicenie locka → osobna decyzja (#243).
 
