@@ -2,6 +2,12 @@
 
 Projekt Django + PostgreSQL + Celery/Redis. **Produkcja i dev: jeden `docker-compose`** — patrz [`docs/DEPLOY.md`](docs/DEPLOY.md). (k3s i blue‑green usunięte — #259.)
 
+## Jak to działa
+
+![Diagram: dane z trzech hurtowni trafiają do osobnych baz PostgreSQL, są mapowane do wspólnego katalogu MPD, uzupełniane przez agenta AI i publikowane jako feedy XML (IOF), do PrestaShop, panelu React i serwera MCP. Całość napędza Celery z Redisem w Docker Compose na VPS.](docs/img/jak-dziala-nc.svg)
+
+Szczegóły architektury: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 ## Wymagania
 
 - **Docker + Docker Compose** (w praktyce: Docker Desktop na Windows).
