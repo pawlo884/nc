@@ -1,5 +1,8 @@
 # 🚀 Matterhorn1 Celery Tasks - Dokumentacja
 
+> **⚠️ Nieaktualne.** Aktualna dokumentacja: [`MATTERHORN1.md`](MATTERHORN1.md).
+> Ten plik opisuje wcześniejszy wariant systemu importu.
+
 ## 📋 Przegląd
 
 System Celery tasks dla automatycznego importu produktów z API ITEMS i aktualizacji stanów magazynowych z API INVENTORY.

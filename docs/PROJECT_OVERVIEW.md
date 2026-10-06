@@ -1,7 +1,9 @@
 # nc_project — przegląd projektu
 
 Dokument wysokopoziomowy: co to jest, z czego się składa, jak dane płyną i
-jaki jest stan techniczny. Szczegóły przepływu danych: [ARCHITECTURE.md](ARCHITECTURE.md).
+jaki jest stan techniczny. Diagram: [ARCHITECTURE.md](ARCHITECTURE.md).
+Szczegółowy opis przepływów krok po kroku + status funkcji:
+[HOW_IT_WORKS.md](HOW_IT_WORKS.md).
 
 ## 1. Po co to jest
 
@@ -17,28 +19,28 @@ lokalny serwer MCP (read-only).
 
 ## 2. Stack
 
-| Warstwa  | Technologia                                                                                                              |
-| -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Backend  | Django 6.0, DRF 3.17, Python 3.13                                                                                        |
-| Async    | Celery 5.4 + Redis (**tylko broker**); wyniki i harmonogram w PostgreSQL (`django-celery-results`, `django-celery-beat`) |
-| Bazy     | PostgreSQL, **osobna baza per aplikacja** + routery; w DEV prefiks `zzz_`                                                |
-| Pliki    | MinIO / S3 (`django-storages`) — wygenerowane XML-e i zdjęcia                                                            |
-| Frontend | React 19 + Vite + TS, TanStack Query, react-router (`frontend/mpd/`), SPA pod `/mpd-app/`                                |
-| AI       | `openai` + `openai-agents` + `langchain-openai` (web_agent); `mcp` (serwer katalogu)                                     |
-| Scraping | Selenium (web_agent — wypełnianie formularzy)                                                                            |
-| Docs API | drf-spectacular (`/api/docs/`, `/api/redoc/`)                                                                            |
-| Deploy   | prod: k3s (`deployments/k8s/nc-prod`); dev: docker-compose + tunel SSH do bazy                                           |
-| CI/CD    | GitHub Actions, semantic-release (Conventional Commits → CHANGELOG → tag → deploy), husky + commitlint                   |
+| Warstwa  | Technologia                                                                                                                                                            |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend  | Django 6.0, DRF 3.17, Python 3.13                                                                                                                                      |
+| Async    | Celery 5.4 + Redis (**tylko broker**); wyniki i harmonogram w PostgreSQL (`django-celery-results`, `django-celery-beat`)                                               |
+| Bazy     | PostgreSQL, **osobna baza per aplikacja** + routery; w DEV prefiks `zzz_`                                                                                              |
+| Pliki    | MinIO / S3 (`django-storages`) — wygenerowane XML-e i zdjęcia                                                                                                          |
+| Frontend | React 19 + Vite + TS, TanStack Query, react-router (`frontend/mpd/`), SPA pod `/mpd-app/`                                                                              |
+| AI       | `openai` + `openai-agents` + `langchain-openai` (web_agent); `mcp` (serwer katalogu)                                                                                   |
+| Scraping | Selenium (web_agent — wypełnianie formularzy)                                                                                                                          |
+| Docs API | drf-spectacular (`/api/docs/`, `/api/redoc/`)                                                                                                                          |
+| Deploy   | prod + dev: **jeden `docker-compose`** (prod: obraz wypalony, NPM z przodu; dev: bind-mount + tunel SSH). Patrz [DEPLOY.md](DEPLOY.md)                                 |
+| CI/CD    | GitHub Actions, semantic-release (Conventional Commits → CHANGELOG → tag); deploy prod **ręczny** (`workflow_dispatch` / `scripts/deploy-prod.sh`), husky + commitlint |
 
 ## 3. Aplikacje (`src/apps/`)
 
 | App             | Rola                                                                                                                                                                                                               |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **MPD**         | Serce systemu. Modele katalogu, eksport XML (full / light / gateway / stocks / units), REST API `/api/mpd/…`, widoki zarządzania produktami, adaptery hurtowni (`source_adapters/`), linkowanie po EAN, serwer MCP |
-| **matterhorn1** | Import z Matterhorn B2B API (własna baza-lustro), saga mapująca produkty/warianty do MPD, tracker stanów, watchdog importu                                                                                         |
+| **matterhorn1** | Import z Matterhorn B2B API (własna baza-lustro), saga mapująca produkty/warianty do MPD, tracker stanów, watchdog importu — **dok.: [`matterhorn/MATTERHORN1.md`](matterhorn/MATTERHORN1.md)**                    |
 | **web_agent**   | Automatyzacja: taski Celery + Selenium wypełniające formularze MPD, procesor AI (OpenAI / LangChain), modele `AutomationRun` / `ProductProcessingLog`, API `/api/web-agent/…`                                      |
-| **tabu**        | Import z Tabu REST API + saga do MPD, `services.py`, pg-advisory-locki                                                                                                                                             |
-| **mada**        | Import z feedu XML Mada (`parser.py` + `importer.py` + `api_client.py`) + saga, cleanup osieroconych mapowań                                                                                                       |
+| **tabu**        | Import z Tabu REST API + saga do MPD, `services.py`, pg-advisory-locki — **dok.: [`tabu/TABU.md`](tabu/TABU.md)**                                                                                                  |
+| **mada**        | Import z feedu XML Mada (`parser.py` + `importer.py` + `api_client.py`) + saga, cleanup osieroconych mapowań — **dok.: [`mada/MADA.md`](mada/MADA.md)**                                                            |
 | **prestashop**  | Kanał wyjściowy (nie import): budowa i push produktów MPD do PrestaShop WebAPI. Faza 1 gotowa, uruchamiany ręcznie (`manage.py push_prestashop_product`)                                                           |
 
 ## 4. `src/core/`
@@ -61,7 +63,7 @@ W testach routing jest wyłączony — wszystko idzie do `default`, reszta baz t
 
 ## 6. Celery / zadania okresowe
 
-- Kolejki: `default` (worker `celery-default`), `import` (osobny worker dla ciężkiego `matterhorn1.full_import_and_update`), opcjonalnie `ml`.
+- Workery: **`celery-fast`** (`-Q default`, concurrency 3) — częste/krótkie taski; **`celery-heavy`** (`-Q import,heavy`, concurrency 2) — `matterhorn1.full_import_and_update` + długie/rzadkie (`tabu.sync_tabu_products_update`, `web_agent.automate_*`, `mada.sync_mada_full`, `MPD.link_all_products_to_new_source`); `celery-beat`; `flower`. `celery-ml` (`-Q ml`) = szkielet, nieużywany.
 - Harmonogram w Django Admin → Periodic Tasks; rejestrują go komendy `setup_*_task.py` w każdej appce.
 - Cykle: import hurtowni ~co 10 min; eksport `full.xml` / `full_change.xml` przyrostowo co godzinę, pełny raz dziennie (domyślnie wyłączony); sync stanów Mada 15 min / dziennie.
 - Monitoring: Flower (`:5555`).
@@ -81,9 +83,21 @@ na `:5173`.
 
 ## 9. Deploy
 
-- **Prod = k3s na VPS.** `Release` workflow (semantic-release) tworzy tag `v*` → `deploy-vps.yml` → `scripts/k8s-prod/deploy.sh`. `collectstatic --clear` wypalany w `Dockerfile.prod` na etapie build. Manifesty: `web`, `celery`, `flower`, `redis`, `ingress`, `migrate-job`.
-- **Dev:** `docker-compose/docker-compose.dev.yml` — `web`, `nginx` (:8090), `celery-default`, `celery-import`, `celery-beat`, `flower`, `redis`, `postgres-ssh-tunnel` (baza dev zdalna, przez tunel SSH), `static-init`. `src/` bind-mount = hot reload; statyki wypalone przy starcie (nowy plik statyczny wymaga ręcznego `collectstatic`).
-- **blue-green** (`docker-compose.blue-green*.yml`, `scripts/deploy/`) — **DEPRECATED**, tylko awaryjny rollback.
+Pełny opis: **[DEPLOY.md](DEPLOY.md)**. k3s i blue-green **usunięte** (#259).
+
+- **Prod:** jeden `docker-compose/docker-compose.prod.yml` na VPS. Obraz
+  `nc-django-app:latest` z wypalonym kodem + React SPA + `collectstatic`
+  (`Dockerfile.prod`). **NPM** (Nginx Proxy Manager) → `web:8000` (gunicorn +
+  whitenoise). Serwisy: `web`, `celery-fast`, `celery-heavy`, `celery-beat`,
+  `flower`, `redis`, `migrate` (profil). Postgres (`nc-postgres-1`) osobno
+  (profil `shared`). Deploy: `scripts/deploy-prod.sh <ref>` (`git reset` →
+  build → migracje → `up -d`), ręcznie albo `deploy-vps.yml` (`workflow_dispatch`).
+- **Dev:** `docker-compose/docker-compose.dev.yml` — `web`, `nginx` (:8090),
+  `celery-fast`, `celery-heavy`, `celery-beat`, `flower`, `redis`,
+  `postgres-ssh-tunnel` (baza dev zdalna przez tunel SSH), `static-init`.
+  `src/` bind-mount = hot reload.
+- **ML:** `docker-compose.dev.ml.yml` — nakładka z `celery-ml` (`-Q ml`),
+  szkielet, nieużywana (`ML_CONTAINER_TODO.md`).
 
 ## 10. Testy
 

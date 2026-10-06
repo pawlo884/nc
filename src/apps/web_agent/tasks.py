@@ -15,7 +15,8 @@ import os
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, name='web_agent.tasks.automate_tabu_to_mpd')
+@shared_task(bind=True, name='web_agent.tasks.automate_tabu_to_mpd',
+             soft_time_limit=10800, time_limit=11400)  # batch może lecieć godzinami
 def automate_tabu_to_mpd(
     self,
     brand_id: int = None,
@@ -127,7 +128,8 @@ def automate_tabu_to_mpd(
         raise
 
 
-@shared_task(bind=True, name='web_agent.tasks.automate_mpd_form_filling')
+@shared_task(bind=True, name='web_agent.tasks.automate_mpd_form_filling',
+             soft_time_limit=10800, time_limit=11400)  # Selenium batch — godziny
 def automate_mpd_form_filling(self, brand_id: int = None, category_id: int = None, filters: dict = None):
     """
     Task Celery do automatyzacji wypełniania formularzy MPD.

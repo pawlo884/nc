@@ -1,5 +1,8 @@
 # 🚀 Matterhorn1 - Inteligentny System Importu
 
+> **⚠️ Nieaktualne.** Aktualna dokumentacja: [`MATTERHORN1.md`](MATTERHORN1.md).
+> Ten plik opisuje wcześniejszy wariant systemu importu.
+
 ## 📋 Przegląd
 
 **Inteligentny system importu** z automatycznym sprawdzaniem luk w ID i planowanymi aktualizacjami:

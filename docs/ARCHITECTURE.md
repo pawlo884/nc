@@ -87,5 +87,5 @@ flowchart LR
   zadań w PostgreSQL (`django-celery-beat`, `django-celery-results`).
 - **Pliki i obrazy**: MinIO (S3-kompatybilne) dla wygenerowanych plików XML
   i zdjęć produktów.
-- **Środowiska**: produkcja na k3s; dev lokalnie przez docker-compose z
-  tunelem SSH do bazy.
+- **Środowiska**: produkcja i dev na **docker-compose** (prod: obraz wypalony,
+  NPM z przodu; dev: bind-mount + tunel SSH do bazy). Patrz `docs/DEPLOY.md`.

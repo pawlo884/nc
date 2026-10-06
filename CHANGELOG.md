@@ -1,5 +1,143 @@
 # Zmiany
 
+## [1.45.0](https://github.com/pawlo884/nc/compare/v1.44.23...v1.45.0) (2026-09-10)
+
+### Features
+
+* **MPD:** most stanów tabu/mada -> MPD.StockAndPrices ([#271](https://github.com/pawlo884/nc/issues/271)) ([80e2285](https://github.com/pawlo884/nc/commit/80e2285ea483c7fdc4ed9be1a21d5c7705cffc2d)), references [#270](https://github.com/pawlo884/nc/issues/270) [#270](https://github.com/pawlo884/nc/issues/270) [#270](https://github.com/pawlo884/nc/issues/270)
+
+## [1.44.23](https://github.com/pawlo884/nc/compare/v1.44.22...v1.44.23) (2026-09-10)
+
+### Bug Fixes
+
+* **tabu:** usuń sztywny queue='default' z PeriodicTask sync_tabu_products_update ([#269](https://github.com/pawlo884/nc/issues/269)) ([9351deb](https://github.com/pawlo884/nc/commit/9351deb97c82c68273fce9250a9585d45a5eac46)), references [#267](https://github.com/pawlo884/nc/issues/267) [263/#265](https://github.com/pawlo884/nc/issues/265) [#263](https://github.com/pawlo884/nc/issues/263) [#263](https://github.com/pawlo884/nc/issues/263)
+
+## [1.44.22](https://github.com/pawlo884/nc/compare/v1.44.21...v1.44.22) (2026-09-10)
+
+### Bug Fixes
+
+* **mada:** watchdog + self-heal dla zawieszonych 'running' + fix routingu kolejki ([#268](https://github.com/pawlo884/nc/issues/268)) ([4592db7](https://github.com/pawlo884/nc/commit/4592db7267c82a2f1dea0e9eea4d4a3d6e03ff07)), closes [#267](https://github.com/pawlo884/nc/issues/267), references [#238](https://github.com/pawlo884/nc/issues/238)
+
+## [1.44.21](https://github.com/pawlo884/nc/compare/v1.44.20...v1.44.21) (2026-09-07)
+
+### Performance Improvements
+
+* **tabu:** sync stanów porcjami + redukcja pamięci (fix OOM/SIGKILL) ([#262](https://github.com/pawlo884/nc/issues/262)) ([7949106](https://github.com/pawlo884/nc/commit/79491062f76ef49a6f70700b091f138389223ba9)), references [#261](https://github.com/pawlo884/nc/issues/261)
+
+## [1.44.20](https://github.com/pawlo884/nc/compare/v1.44.19...v1.44.20) (2026-09-07)
+
+### Performance Improvements
+
+* **matterhorn1:** backpressure w pipeline importu + wyższy max-memory-per-child ([#261](https://github.com/pawlo884/nc/issues/261)) ([cac120d](https://github.com/pawlo884/nc/commit/cac120d26e24d23ea605debccaf4ab46f4ca67af)), references [#238](https://github.com/pawlo884/nc/issues/238)
+
+## [1.44.19](https://github.com/pawlo884/nc/compare/v1.44.18...v1.44.19) (2026-09-06)
+
+### Bug Fixes
+
+* **matterhorn1:** advisory lock + acks_late=False dla full_import ([#238](https://github.com/pawlo884/nc/issues/238)) ([#251](https://github.com/pawlo884/nc/issues/251)) ([2359c33](https://github.com/pawlo884/nc/commit/2359c333ce2a87add938611119dc89948aa0ea20)), references [204/#214](https://github.com/pawlo884/nc/issues/214)
+
+## [1.44.18](https://github.com/pawlo884/nc/compare/v1.44.17...v1.44.18) (2026-09-06)
+
+### Bug Fixes
+
+* **matterhorn1:** nie kończ inventory po cichu jako sukces przy błędzie API ([#247](https://github.com/pawlo884/nc/issues/247)) ([81bb094](https://github.com/pawlo884/nc/commit/81bb0943c9f512f464b88df0591c309e50419b6d))
+
+## [1.44.17](https://github.com/pawlo884/nc/compare/v1.44.16...v1.44.17) (2026-09-06)
+
+### Performance Improvements
+
+* **mada:** idempotentny upsert stanów + batch historii + brand cache ([#244](https://github.com/pawlo884/nc/issues/244)) ([8b55e5f](https://github.com/pawlo884/nc/commit/8b55e5f20535aedf9403ff95f5b2e10b3746383e)), references [#230](https://github.com/pawlo884/nc/issues/230) [#236](https://github.com/pawlo884/nc/issues/236)
+
+## [1.44.16](https://github.com/pawlo884/nc/compare/v1.44.15...v1.44.16) (2026-09-06)
+
+### Bug Fixes
+
+* **tabu:** update_from tylko z zakonczonych syncow stanow ([#233](https://github.com/pawlo884/nc/issues/233) pkt 4) ([#240](https://github.com/pawlo884/nc/issues/240)) ([83e3ce9](https://github.com/pawlo884/nc/commit/83e3ce9c6370ba50a82756a7c773ca8ae1ce981b))
+
+## [1.44.15](https://github.com/pawlo884/nc/compare/v1.44.14...v1.44.15) (2026-09-06)
+
+### Bug Fixes
+
+* **docker:** kopiuj src/templates/ do obrazu prod ([#239](https://github.com/pawlo884/nc/issues/239)) ([784a04a](https://github.com/pawlo884/nc/commit/784a04ab6f22e34a37abc6da2d68ccd13863f446)), references [#229](https://github.com/pawlo884/nc/issues/229)
+
+## [1.44.14](https://github.com/pawlo884/nc/compare/v1.44.13...v1.44.14) (2026-09-06)
+
+### Performance Improvements
+
+* **tabu:** batch _apply_stock_updates zamiast query-per-wariant ([#233](https://github.com/pawlo884/nc/issues/233) faza 3) ([#236](https://github.com/pawlo884/nc/issues/236)) ([c841126](https://github.com/pawlo884/nc/commit/c841126c063a183b095041eaa5607a18f9477912)), references [#230](https://github.com/pawlo884/nc/issues/230)
+
+## [1.44.13](https://github.com/pawlo884/nc/compare/v1.44.12...v1.44.13) (2026-09-06)
+
+### Bug Fixes
+
+* **tabu:** pomijaj sync stanow tylko przy IDENTYCZNYCH danych, nie tej samej liczbie ([#235](https://github.com/pawlo884/nc/issues/235)) ([9af0fb6](https://github.com/pawlo884/nc/commit/9af0fb69990c49d4157235d2bc321c2dd1bd5b3f))
+
+## [1.44.12](https://github.com/pawlo884/nc/compare/v1.44.11...v1.44.12) (2026-09-05)
+
+### Bug Fixes
+
+* **matterhorn:** idempotentny _bulk_update_inventory (duplikaty w StockHistory) ([#230](https://github.com/pawlo884/nc/issues/230)) ([6407c8f](https://github.com/pawlo884/nc/commit/6407c8f5918903d5e459a355162118277c5b9029))
+
+## [1.44.11](https://github.com/pawlo884/nc/compare/v1.44.10...v1.44.11) (2026-09-05)
+
+### Performance Improvements
+
+* **matterhorn:** przyspiesz changelist admina StockHistory ([#229](https://github.com/pawlo884/nc/issues/229)) ([26542b5](https://github.com/pawlo884/nc/commit/26542b5331817c9b79101305e7e03c09f0724059))
+
+## [1.44.10](https://github.com/pawlo884/nc/compare/v1.44.9...v1.44.10) (2026-09-05)
+
+### Bug Fixes
+
+* **matterhorn:** kontekst zadania Celery w logach z wątków pipeline'u ([#228](https://github.com/pawlo884/nc/issues/228)) ([dbb6fc5](https://github.com/pawlo884/nc/commit/dbb6fc551588c8285d735794ee22bd5232ffd030))
+
+## [1.44.9](https://github.com/pawlo884/nc/compare/v1.44.8...v1.44.9) (2026-09-05)
+
+### Performance Improvements
+
+* **matterhorn:** odseparuj wystrzeliwanie stron od zapisu do bazy ([#227](https://github.com/pawlo884/nc/issues/227)) ([91a398e](https://github.com/pawlo884/nc/commit/91a398e1bbf7732f49b93766df08218ac2689298))
+
+## [1.44.8](https://github.com/pawlo884/nc/compare/v1.44.7...v1.44.8) (2026-09-05)
+
+### Performance Improvements
+
+* **matterhorn:** pipeline pobierania stron ITEMS zamiast sekwencyjnego ([#226](https://github.com/pawlo884/nc/issues/226)) ([edec429](https://github.com/pawlo884/nc/commit/edec429e3bc95ba62055217d85a956244d7bcbaf)), references [#214](https://github.com/pawlo884/nc/issues/214)
+
+## [1.44.7](https://github.com/pawlo884/nc/compare/v1.44.6...v1.44.7) (2026-09-04)
+
+### Performance Improvements
+
+* **matterhorn:** batchuj zapytania w _bulk_update_inventory (N+1) ([97f8b21](https://github.com/pawlo884/nc/commit/97f8b2100f5ab22abe78f04c6da6d9d0f05790c0)), references [#223](https://github.com/pawlo884/nc/issues/223)
+
+## [1.44.6](https://github.com/pawlo884/nc/compare/v1.44.5...v1.44.6) (2026-09-04)
+
+### Performance Improvements
+
+* **matterhorn:** batchuj zapytania w imporcie ITEMS zamiast N+1 ([1c25c16](https://github.com/pawlo884/nc/commit/1c25c1627ff7959565548c7dc9dde245b4561645))
+
+## [1.44.5](https://github.com/pawlo884/nc/compare/v1.44.4...v1.44.5) (2026-09-04)
+
+### Bug Fixes
+
+* **matterhorn:** views.py szukal produktu po nieistniejacym polu product_id ([c278391](https://github.com/pawlo884/nc/commit/c2783911a8940151c9f7312aa8390b103f0ba313)), references [#110](https://github.com/pawlo884/nc/issues/110)
+
+## [1.44.4](https://github.com/pawlo884/nc/compare/v1.44.3...v1.44.4) (2026-09-04)
+
+### Bug Fixes
+
+* **matterhorn:** przerwij import ITEMS zamiast pętlić na trwałym 5xx ([a0d8a3a](https://github.com/pawlo884/nc/commit/a0d8a3a5720839370cd0786d0758d52b1379f20e))
+
+## [1.44.3](https://github.com/pawlo884/nc/compare/v1.44.2...v1.44.3) (2026-09-03)
+
+### Bug Fixes
+
+* **docker:** kopiuj aplikację prestashop do obrazów prod i ml ([0e55e62](https://github.com/pawlo884/nc/commit/0e55e6236230e52b8f69bb31add67e579ff06ad6))
+
+## [1.44.2](https://github.com/pawlo884/nc/compare/v1.44.1...v1.44.2) (2026-09-02)
+
+### Bug Fixes
+
+* **matterhorn:** wznawiaj import ITEMS od przerwanej strony zamiast od 1 ([8e7f6b1](https://github.com/pawlo884/nc/commit/8e7f6b1e1336c7dfa0671da2bf77ed17b6373d47))
+
 ## [1.44.1](https://github.com/pawlo884/nc/compare/v1.44.0...v1.44.1) (2026-09-02)
 
 ### Bug Fixes

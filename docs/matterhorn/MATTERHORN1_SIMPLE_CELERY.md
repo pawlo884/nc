@@ -1,5 +1,8 @@
 # 🚀 Matterhorn1 - Prosty System Celery
 
+> **⚠️ Nieaktualne.** Aktualna dokumentacja: [`MATTERHORN1.md`](MATTERHORN1.md).
+> Ten plik opisuje wcześniejszy wariant systemu importu.
+
 ## 📋 Przegląd
 
 **Jeden główny task** do pełnego importu i aktualizacji:

@@ -1,15 +1,73 @@
 import time
+import threading
+import concurrent.futures
 from celery import shared_task
+from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.cache import cache
+from core.pg_locks import advisory_lock
 from .stock_tracker import track_stock_change, track_bulk_stock_changes, sync_stock_changes_from_api
 from .defs_db import normalize_storage_key
 
 logger = get_task_logger(__name__)
 
+try:
+    from celery._state import get_current_task as _celery_get_current_task, _task_stack as _celery_task_stack
+except Exception:  # pragma: no cover - obrona przed zmianą wewnętrznego API Celery
+    _celery_get_current_task = lambda: None
+    _celery_task_stack = None
 
-@shared_task(bind=True, name='matterhorn1.tasks.full_import_and_update', queue='import')
+
+def _run_with_task_context(task_and_request, fn, *args, **kwargs):
+    """Uruchamia `fn` w bieżącym wątku z kontekstem zadania Celery
+    wepchniętym na stos. Dzięki temu `get_task_logger`/`TaskFormatter` w
+    logach z wątków w tle (launcher pipeline'u, pool pobierający strony)
+    pokazuje nazwę i id zadania zamiast `???[???]` - i zadanie, i jego
+    request są w Celery thread-local, więc wątki poboczne ich nie widzą.
+
+    `task_and_request` = (task, request) złapane w wątku głównym, albo None."""
+    if not task_and_request or _celery_task_stack is None:
+        return fn(*args, **kwargs)
+    task, request = task_and_request
+    _celery_task_stack.push(task)
+    if request is not None:
+        task.request_stack.push(request)
+    try:
+        return fn(*args, **kwargs)
+    finally:
+        if request is not None:
+            task.request_stack.pop()
+        _celery_task_stack.pop()
+
+
+def _capture_task_context():
+    """(task, request) bieżącego zadania Celery - do przekazania wątkom w tle
+    przez _run_with_task_context. None gdy nie w zadaniu (np. w testach)."""
+    task = _celery_get_current_task()
+    if task is None:
+        return None
+    return (task, getattr(task, 'request', None))
+
+
+# Pipeline pobierania stron B2BAPI (ITEMS i ITEMS/INVENTORY): nowa strona co
+# tyle sekund, dopóki bufor `pending` nie jest pełny (patrz MAX_INFLIGHT niżej).
+# Limit API Matterhorn to 2 requesty/sekundę (docs/matterhorn/MATTERHORN1_*.md),
+# więc to spory margines. MAX_PIPELINE_WORKERS to tylko górna granica liczby
+# wątków (zabezpieczenie przed nieograniczonym tworzeniem wątków, gdyby
+# detekcja końca danych zawiodła).
+MATTERHORN_PAGE_LAUNCH_INTERVAL = 2.0
+MATTERHORN_PIPELINE_MAX_WORKERS = 50
+# Backpressure: maksymalna liczba stron w buforze `pending` (pobrane/pobierane,
+# jeszcze nie zapisane do bazy). Bez tego przy zatorze na zapisie (burst do DB,
+# kontencja locka) bufor puchnie o stronę co MATTERHORN_PAGE_LAUNCH_INTERVAL
+# sekund — kilkadziesiąt stron × ~1,5 MB JSON = worker dostaje OOM (SIGKILL).
+# Launcher wstrzymuje wystrzeliwanie, aż writer nadgoni.
+MATTERHORN_PIPELINE_MAX_INFLIGHT = 8
+
+
+@shared_task(bind=True, name='matterhorn1.tasks.full_import_and_update', queue='import',
+             acks_late=False)
 def full_import_and_update(self, start_id=None, max_products=200000,
                            api_url=None, username=None, password=None,
                            batch_size=100, dry_run=False, auto_continue=True):
@@ -40,39 +98,41 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             'task_id': getattr(getattr(self, 'request', None), 'id', 'direct_call')
         }
 
-    # BLOKADA - zapobiega równoległemu wykonaniu (działa dla Celery i bezpośrednich wywołań)
-    lock_id = 'matterhorn1_full_import_lock'
-    lock_timeout = 3600  # 1 godzina
+    task_id_value = getattr(getattr(self, 'request', None), 'id', None) or 'direct_call'
 
-    # Użyj task_id jeśli dostępny (Celery), w przeciwnym razie 'direct_call'
-    task_identifier = getattr(self, 'request', None)
-    task_id_value = task_identifier.id if task_identifier else 'direct_call'
+    # BLOKADA: PostgreSQL advisory lock zamiast cache.add na Redisie (#238).
+    # Zwalnia się SAM, gdy proces trzymający połączenie padnie - bez TTL, bez
+    # "ghost locków", bez watchdoga do sprzątania blokady. Razem z acks_late=False
+    # (dekorator): ubity w połowie run NIE jest redeliverowany po godzinie -
+    # kolejny tick Celery Beat wznawia od current_page (mechanizm #204/#214).
+    with advisory_lock('matterhorn1:full_import_and_update') as acquired:
+        if not acquired:
+            logger.warning("❌ Import już w trakcie wykonywania (advisory lock zajęty). Pominięty.")
+            return {'status': 'skipped', 'reason': 'already_running', 'task_id': task_id_value}
 
-    # CZYŚĆ STARE RUNNING REKORDY (starsze niż 2 godziny)
-    _cleanup_old_running_imports()
+        # Trzymamy WYŁĄCZNY lock → żaden inny run nie działa, więc każdy rekord
+        # 'running' to sierota po ubitym workerze. Oznacz 'error' (current_page
+        # zostaje do wznowienia przez _get_last_items_page).
+        _fail_stale_running_imports()
 
-    # CZYŚĆ WSZYSTKIE RUNNING REKORDY (rozwiązuje problem z ręcznym przerywaniem)
-    _cleanup_all_running_imports()
+        return _run_full_import_locked(
+            self, task_id_value, start_id, max_products, api_url, username, password,
+            batch_size, dry_run, auto_continue,
+        )
 
-    # ATOMOWA OPERACJA BLOKADY - zapobiega race condition
-    # Sprawdź czy blokada istnieje i ustaw ją w jednej operacji
-    acquired = cache.add(lock_id, task_id_value, lock_timeout)
 
-    if not acquired:
-        current_lock = cache.get(lock_id)
-        logger.warning(
-            f"❌ Import już w trakcie wykonywania (lock: {current_lock}). Pominięty.")
-        return {
-            'status': 'skipped',
-            'reason': 'already_running',
-            'current_lock': current_lock,
-            'task_id': task_id_value
-        }
-
+def _run_full_import_locked(self, task_id_value, start_id, max_products, api_url,
+                            username, password, batch_size, dry_run, auto_continue):
+    """Ciało importu ITEMS + INVENTORY. Wołane po zdobyciu advisory locka
+    (patrz `full_import_and_update`). Advisory lock jest zwalniany przez context
+    manager w wołającym - tu tylko aktualizacja statusu w ApiSyncLog."""
     task_completed_successfully = False
+    soft_timeout_hit = False
     total_imported = 0
     total_updated = 0
     iteration = 0
+    items_error = None  # ustawiane gdy _import_products_from_items zwróci błąd
+    inventory_degraded = None  # komunikat, gdy któraś aktualizacja INVENTORY padła (5xx/brak JSON/sieć)
 
     try:
         logger.info(
@@ -123,18 +183,24 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                     dry_run=dry_run
                 )
 
-                if inventory_result['status'] == 'success':
-                    updated_count = inventory_result.get('updated_count', 0)
-                    total_updated += updated_count
-                    logger.info(
-                        f"✅ Iteracja {iteration} - Zaktualizowano {updated_count} produktów w INVENTORY")
-                else:
+                updated_count = inventory_result.get('updated_count', 0)
+                total_updated += updated_count
+                if inventory_result['status'] == 'partial':
+                    inventory_degraded = inventory_result.get('error') or 'INVENTORY nie dokończone'
+                    logger.error(
+                        f"❌ INVENTORY w iteracji {iteration} PRZERWANE - import NIE zostanie "
+                        f"oznaczony jako 'completed' (okno stanów nadgoni kolejny tick): {inventory_degraded}")
+                elif inventory_result['status'] != 'success':
                     logger.warning(
                         f"⚠️ Błąd aktualizacji INVENTORY w iteracji {iteration}: {inventory_result.get('error')}")
+                else:
+                    logger.info(
+                        f"✅ Iteracja {iteration} - Zaktualizowano {updated_count} produktów w INVENTORY")
                 break
             elif items_result['status'] != 'success':
                 logger.error(
                     f"❌ Błąd importu ITEMS w iteracji {iteration}: {items_result.get('error')}")
+                items_error = items_result.get('error') or 'items import failed'
                 break
 
             logger.info(
@@ -151,14 +217,19 @@ def full_import_and_update(self, start_id=None, max_products=200000,
                 dry_run=dry_run
             )
 
-            if inventory_result['status'] == 'success':
-                updated_count = inventory_result.get('updated_count', 0)
-                total_updated += updated_count
-                logger.info(
-                    f"✅ Iteracja {iteration} - Zaktualizowano {updated_count} produktów w INVENTORY")
-            else:
+            updated_count = inventory_result.get('updated_count', 0)
+            total_updated += updated_count
+            if inventory_result['status'] == 'partial':
+                inventory_degraded = inventory_result.get('error') or 'INVENTORY nie dokończone'
+                logger.error(
+                    f"❌ INVENTORY w iteracji {iteration} PRZERWANE - import NIE zostanie "
+                    f"oznaczony jako 'completed' (okno stanów nadgoni kolejny tick): {inventory_degraded}")
+            elif inventory_result['status'] != 'success':
                 logger.warning(
                     f"⚠️ Błąd aktualizacji INVENTORY w iteracji {iteration}: {inventory_result.get('error')}")
+            else:
+                logger.info(
+                    f"✅ Iteracja {iteration} - Zaktualizowano {updated_count} produktów w INVENTORY")
 
             # Jeśli nie zaimportowano żadnych produktów, zakończ po aktualizacji INVENTORY
             if imported_count == 0:
@@ -187,6 +258,35 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             logger.info(
                 "📊 Łącznie zaktualizowano: %s produktów w INVENTORY", total_updated)
 
+        if items_error:
+            # import ITEMS padł na którejś stronie (5xx/sieć po wyczerpaniu prób).
+            # NIE oznaczamy jako 'completed' — current_page zostaje, kolejny tick
+            # Celery Beat wznowi od tej strony (patrz _get_last_items_page).
+            return {
+                'status': 'error',
+                'error': items_error,
+                'total_imported': total_imported,
+                'total_updated': total_updated,
+                'iterations': iteration,
+                'task_id': task_id_value,
+            }
+
+        if inventory_degraded:
+            # ITEMS przeszło, ale któraś strona INVENTORY padła. NIE oznaczamy
+            # importu jako 'completed' — status 'inventory_failed' jest pomijany
+            # przez _get_last_items_update_time (znacznik last_update nie
+            # przeskakuje) i przez _get_last_items_page (ITEMS rusza od strony 1),
+            # więc kolejny tick nadgoni pominięte okno stanów magazynowych.
+            return {
+                'status': 'partial',
+                'reason': 'inventory_failed',
+                'error': inventory_degraded,
+                'total_imported': total_imported,
+                'total_updated': total_updated,
+                'iterations': iteration,
+                'task_id': task_id_value,
+            }
+
         task_completed_successfully = True
 
         return {
@@ -195,6 +295,24 @@ def full_import_and_update(self, start_id=None, max_products=200000,
             'total_updated': total_updated,
             'iterations': iteration,
             'task_id': task_id_value
+        }
+
+    except SoftTimeLimitExceeded:
+        # Limit czasu tasku. NIE retry'ujemy i nie traktujemy jako twardego błędu:
+        # numer bieżącej strony (current_page) jest zapisywany w ApiSyncLog po
+        # każdej stronie, a dane z już przetworzonych stron są zacommitowane
+        # (każda strona to osobna transaction.atomic). Blok `finally` niżej oznaczy
+        # rekord jako 'error' zachowując current_page, a kolejny tick Celery Beat
+        # wznowi import od tej strony (patrz _get_last_items_page).
+        soft_timeout_hit = True
+        logger.warning(
+            "⏱️ Soft time limit importu ITEMS — przerywam czysto, wznowienie od "
+            "ostatniej strony przy kolejnym uruchomieniu (bez retry).")
+        return {
+            'status': 'interrupted',
+            'reason': 'soft_time_limit',
+            'total_imported': total_imported,
+            'task_id': task_id_value,
         }
 
     except Exception as e:
@@ -208,23 +326,123 @@ def full_import_and_update(self, start_id=None, max_products=200000,
         }
 
     finally:
-        # Zawsze zwalniaj blokadę i zaktualizuj status
-        if cache.get(lock_id) == task_id_value:
-            cache.delete(lock_id)
-            logger.info(f"🔓 Blokada zwolniona dla {task_id_value}")
-
-        # Aktualizuj status na podstawie tego czy task się zakończył sukcesem
+        # Advisory lock zwalnia context manager w full_import_and_update.
+        # Aktualizuj status na podstawie tego czy task się zakończył sukcesem.
+        # Przy soft-timeout zostawiamy status 'error' z zachowanym current_page —
+        # _get_last_items_page wznowi od tej strony.
         try:
             if task_completed_successfully:
                 _update_items_import_status(
                     'completed', total_imported, updated_count=total_updated, processed_count=total_imported + total_updated)
                 logger.info("✅ Task zakończony jako 'completed'")
+            elif inventory_degraded:
+                # ITEMS OK, INVENTORY padło. Status 'inventory_failed' (pomijany
+                # przez _get_last_items_update_time) + current_page=1 (żeby ITEMS
+                # ruszył od początku szerszego okna) → kolejny tick nadgoni stany.
+                _update_items_import_status(
+                    'inventory_failed', total_imported, current_page=1,
+                    updated_count=total_updated, processed_count=total_imported + total_updated,
+                    error_details=f'INVENTORY nie dokończone: {inventory_degraded}')
+                logger.warning(
+                    "⚠️ Task zakończony jako 'inventory_failed' — ITEMS OK, ale INVENTORY "
+                    "przerwane; last_update NIE przeskakuje, kolejny tick nadgoni okno stanów")
             else:
                 _update_items_import_status(
                     'error', total_imported, updated_count=total_updated, processed_count=total_imported + total_updated)
-                logger.info("❌ Task zakończony jako 'error'")
+                if soft_timeout_hit:
+                    logger.info("⏱️ Task przerwany soft-timeoutem — status 'error', current_page zachowany do wznowienia")
+                else:
+                    logger.info("❌ Task zakończony jako 'error'")
         except Exception as e:
             logger.error(f"❌ Błąd podczas aktualizacji statusu na końcu: {e}")
+
+
+def _fetch_items_page(page, api_url, headers, limit, last_update):
+    """Pobiera jedną stronę B2BAPI/ITEMS z retry/backoff (do 10 prób, 20s
+    między próbami). Wydzielone z `_import_products_from_items`, żeby dało
+    się to wołać równolegle z executora w pipeline pobierania (patrz niżej) -
+    wolne API (30-60s/strona) sekwencyjnie zjadało większość czasu importu.
+
+    Zwraca:
+      {'outcome': 'ok', 'items': [...]}
+      {'outcome': 'end_of_data', 'reason': 'empty_response'|'no_more_products'|'page_404'}
+      {'outcome': 'error', 'error': str}
+    """
+    max_attempts = 10
+    attempt = 1
+
+    while attempt <= max_attempts:
+        try:
+            import requests
+
+            url = f"{api_url}/B2BAPI/ITEMS/?page={page}&limit={limit}&last_update={last_update}"
+            logger.info(f"🔗 Request URL: {url}")
+            response = requests.get(url, headers=headers, timeout=120)
+
+            logger.info(
+                f"🔍 Bulk API Response strona {page}: status={response.status_code}, content_length={len(response.text)}")
+
+            if response.status_code == 200:
+                if not response.text.strip():
+                    logger.info(f"📊 Pusta odpowiedź (strona {page}) - koniec danych")
+                    return {'outcome': 'end_of_data', 'reason': 'empty_response'}
+
+                try:
+                    items = response.json()
+                except SoftTimeLimitExceeded:
+                    raise
+                except Exception as e:
+                    logger.error(f"❌ Błąd parsowania JSON (strona {page}): {e}")
+                    if attempt < max_attempts:
+                        logger.warning(
+                            f"⚠️ Próba {attempt}/{max_attempts} (strona {page}) - ponawiam za 20 sekund...")
+                        time.sleep(20)
+                        attempt += 1
+                        continue
+                    logger.error(f"❌ Osiągnięto maksymalną liczbę prób parsowania JSON (strona {page})")
+                    break
+
+                if not items:
+                    logger.info(f"📊 Brak produktów na stronie {page} - koniec danych")
+                    return {'outcome': 'end_of_data', 'reason': 'no_more_products'}
+
+                logger.info(f"📥 Pobrano {len(items)} produktów ze strony {page}")
+                return {'outcome': 'ok', 'items': items}
+
+            elif response.status_code == 404:
+                logger.info(f"📊 Strona {page} nie istnieje - koniec danych")
+                return {'outcome': 'end_of_data', 'reason': 'page_404'}
+            else:
+                logger.warning(f"⚠️ Błąd API {response.status_code} (strona {page})")
+                if attempt < max_attempts:
+                    logger.warning(
+                        f"⚠️ Próba {attempt}/{max_attempts} (strona {page}) - ponawiam za 20 sekund...")
+                    time.sleep(20)
+                    attempt += 1
+                    continue
+                logger.error(f"❌ Osiągnięto maksymalną liczbę prób API (strona {page})")
+                break
+
+        except SoftTimeLimitExceeded:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Błąd podczas pobierania strony {page}: {e}")
+            logger.error(f"❌ Typ błędu: {type(e).__name__}")
+            if "timeout" in str(e).lower():
+                logger.warning("⚠️ Timeout - API może być wolne, zwiększam timeout")
+            if attempt < max_attempts:
+                logger.warning(
+                    f"⚠️ Próba {attempt}/{max_attempts} (strona {page}) - ponawiam za 20 sekund...")
+                time.sleep(20)
+                attempt += 1
+                continue
+            logger.error(f"❌ Osiągnięto maksymalną liczbę prób połączenia (strona {page})")
+            break
+
+    return {
+        'outcome': 'error',
+        'error': f'Strona {page} nieosiągalna po {max_attempts} próbach (błąd API/sieci)',
+    }
 
 
 def _import_products_from_items(start_id, max_products, api_url, username, password, batch_size, dry_run):
@@ -261,149 +479,180 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
 
         logger.info(f"🔍 Używam bulk API ITEMS z last_update i limit={limit}")
 
-        while imported_count < max_products:
-            max_attempts = 10
-            attempt = 1
+        # Pipeline: WSZYSTKIE strony lecą w locie naraz (bez sztucznego okna),
+        # nowa co MATTERHORN_PAGE_LAUNCH_INTERVAL sekund - aż do trafienia na
+        # koniec danych (pusta strona/404) albo błąd. Limit API Matterhorn to
+        # 2 requesty/sekundę (docs/matterhorn/MATTERHORN1_*.md), więc to spory
+        # margines. Sens: pojedyncza strona odpowiada 30-60s (wolne API), więc
+        # wiele w locie realnie skraca czas importu. Odpowiedzi trafiają do
+        # `pending` (odpowiednik "JSONa" z buforem) w miarę jak są gotowe;
+        # zapis do bazy i checkpoint (current_page) idą jednak ŚCIŚLE w
+        # kolejności stron - strona 2 z bufora dopiero gdy strona 1 już
+        # zapisana - niezależnie od tego, która odpowiedź HTTP wróci pierwsza.
+        # Inaczej wznowienie po awarii mogłoby pominąć stronę, która akurat
+        # odpowiedziała później.
+        #
+        # Wystrzeliwanie NOWYCH stron dzieje się na OSOBNYM wątku (_launcher
+        # niżej), niezależnie od tego, jak długo trwa przetwarzanie/zapis
+        # zaległości w wątku głównym. Bez tego, gdy kilka stron odpowie naraz
+        # (bo strona z przodu kolejki akurat była wolna - realne API zwalnia
+        # pod współbieżnym obciążeniem, patrz test na żywo: 4 duże strony
+        # naraz = 52s/68s/90s/94s zamiast ~30-60s każda z osobna), wątek
+        # główny ugrzązłby w pętli zapisującej cały ten backlog do bazy i przez
+        # ten czas w ogóle nie wystrzeliłby żadnego nowego requestu - dokładnie
+        # to, co widać w logach jako "pauza po ~30 requestach, potem wszystko
+        # naraz się zapisuje, potem dalej".
+        #
+        # Wystrzeliwanie kończy się wcześniej, jak tylko KTÓRAKOLWIEK już
+        # gotowa strona w buforze okaże się końcem danych/błędem - nie trzeba
+        # czekać, aż dojdzie do niej przetwarzanie w kolejności (puste strony
+        # odpowiadają szybko, więc to realnie ogranicza liczbę zbędnych
+        # requestów - patrz test na żywym API: bez tego leciało aż do strony
+        # 70, mimo że koniec danych był na 24-tej).
+        api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
+        if not api_key:
+            api_key = f"{username}:{password}"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": api_key,
+        }
 
-            while attempt <= max_attempts:
-                try:
-                    # Pobierz dane uwierzytelniające
-                    from django.conf import settings
-                    import requests
-                    api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
-                    if not api_key:
-                        api_key = f"{username}:{password}"
+        pending = {}  # page -> Future - bufor odpowiedzi czekających na zapis
+        pending_lock = threading.Lock()
+        next_to_process = page
+        stop_launching = threading.Event()
+        task_ctx = _capture_task_context()  # (task, request) do logów z wątków w tle
 
-                    headers = {
-                        "Content-Type": "application/json",
-                        "Authorization": api_key
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
+
+        def _launcher(start_page):
+            p = start_page
+            while not stop_launching.is_set():
+                launched = False
+                with pending_lock:
+                    # Backpressure - nie wystrzeliwuj nowej strony, gdy bufor pełny
+                    # (writer nie nadąża z zapisem). Chroni przed OOM.
+                    if len(pending) < MATTERHORN_PIPELINE_MAX_INFLIGHT:
+                        pending[p] = executor.submit(
+                            _run_with_task_context, task_ctx, _fetch_items_page,
+                            p, api_url, headers, limit, last_update)
+                        p += 1
+                        launched = True
+                    # Wczesny stop - patrz komentarz wyżej. Skanujemy pod tym
+                    # samym lockiem co wstawianie/zdejmowanie z `pending`.
+                    for fut in list(pending.values()):
+                        if fut.done() and fut.result()['outcome'] != 'ok':
+                            stop_launching.set()
+                            break
+                if not stop_launching.is_set():
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL if launched else 0.5)
+
+        launcher_thread = threading.Thread(
+            target=_run_with_task_context, args=(task_ctx, _launcher, page),
+            daemon=True, name="matterhorn-items-launcher")
+        launcher_thread.start()
+
+        try:
+            while True:
+                with pending_lock:
+                    fut = pending.get(next_to_process)
+
+                if fut is None or not fut.done():
+                    if stop_launching.is_set() and not launcher_thread.is_alive() and fut is None:
+                        # Launcher stanął i nic więcej nie wystrzeli - a strona,
+                        # na którą czekamy, nigdy nie została wystrzelona
+                        # (nie powinno się zdarzyć, ale nie wisimy w nieskończoność).
+                        break
+                    time.sleep(0.2)
+                    continue
+
+                with pending_lock:
+                    result = pending.pop(next_to_process).result()  # propaguje wyjątki (np. SoftTimeLimitExceeded)
+                current_page = next_to_process
+
+                if result['outcome'] == 'error':
+                    stop_launching.set()
+                    logger.error(
+                        f"❌ Import przerwany błędem (current_page={next_to_process} zachowany do wznowienia): "
+                        f"{result['error']}")
+                    return {
+                        'status': 'error',
+                        'imported_count': imported_count,
+                        'error': result['error'],
                     }
 
-                    # Użyj bulk API z last_update
-                    url = f"{api_url}/B2BAPI/ITEMS/?page={page}&limit={limit}&last_update={last_update}"
-                    logger.info(f"🔗 Request URL: {url}")
-                    response = requests.get(url, headers=headers, timeout=120)
-                    time.sleep(1.0)  # Ograniczenie API: 1 request/sekundę
+                if result['outcome'] == 'end_of_data':
+                    stop_launching.set()
+                    return {
+                        'status': 'completed',
+                        'imported_count': imported_count,
+                        'reason': result['reason'],
+                    }
 
-                    logger.info(
-                        f"🔍 Bulk API Response strona {page}: status={response.status_code}, content_length={len(response.text)}")
+                items = result['items']
+                logger.info(f"📥 Przetwarzam stronę {current_page} ({len(items)} produktów)")
 
-                    if response.status_code == 200:
-                        if not response.text.strip():
-                            logger.info("📊 Pusta odpowiedź - koniec danych")
-                            return {
-                                'status': 'completed',
-                                'imported_count': imported_count,
-                                'reason': 'empty_response'
-                            }
-
-                        try:
-                            items = response.json()
-                            if not items:
-                                logger.info(
-                                    "📊 Brak produktów na stronie - koniec danych")
-                                return {
-                                    'status': 'completed',
-                                    'imported_count': imported_count,
-                                    'reason': 'no_more_products'
-                                }
-
-                            logger.info(
-                                f"📥 Pobrano {len(items)} produktów ze strony {page}")
-
-                            # Bulk import/update
-                            if not dry_run:
-                                bulk_result = None
-                                for db_attempt in range(1, max_page_db_retries + 1):
-                                    bulk_result = _bulk_import_products(items)
-                                    if bulk_result.get('status') != 'error':
-                                        break
-
-                                    if db_attempt < max_page_db_retries:
-                                        delay = min(page_db_retry_delay * (2 ** (db_attempt - 1)), 30)
-                                        logger.warning(
-                                            f"⏳ Błąd zapisu DB dla strony {page} "
-                                            f"(próba {db_attempt}/{max_page_db_retries}): "
-                                            f"{bulk_result.get('error', 'unknown_error')}. "
-                                            f"Ponowienie tej samej strony za {delay}s..."
-                                        )
-                                        time.sleep(delay)
-                                    else:
-                                        logger.error(
-                                            f"❌ Wyczerpano retry zapisu DB dla strony {page} "
-                                            f"({max_page_db_retries} prób)"
-                                        )
-
-                                if bulk_result is None or bulk_result.get('status') == 'error':
-                                    return {
-                                        'status': 'error',
-                                        'error': bulk_result.get('error', f'Bulk import failed for page {page}') if bulk_result else f'Bulk import failed for page {page}'
-                                    }
-                                imported_count += bulk_result['imported_count']
-                            else:
-                                # Dry run - tylko zlicz
-                                for item in items:
-                                    if imported_count >= max_products:
-                                        break
-                                    if item.get("creation_date") is not None:
-                                        imported_count += 1
-
-                            page += 1
-                            # Aktualizuj current_page w bazie danych
-                            if not dry_run:
-                                _update_items_import_status(
-                                    'running', imported_count, page, updated_count=bulk_result.get('updated_count', 0), processed_count=imported_count)
-                            break  # Sukces - wyjdź z retry loop
-
-                        except Exception as e:
-                            logger.error(f"❌ Błąd parsowania JSON: {e}")
-                            if attempt < max_attempts:
-                                logger.warning(
-                                    f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
-                                time.sleep(20)
-                                attempt += 1
-                                continue
-                            else:
-                                logger.error(
-                                    "❌ Osiągnięto maksymalną liczbę prób parsowania JSON")
-                                break
-
-                    elif response.status_code == 404:
-                        logger.info("📊 Strona nie istnieje - koniec danych")
-                        break
-                    else:
-                        logger.warning(f"⚠️ Błąd API {response.status_code}")
-                        if attempt < max_attempts:
-                            logger.warning(
-                                f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
-                            time.sleep(20)
-                            attempt += 1
-                            continue
-                        else:
-                            logger.error(
-                                "❌ Osiągnięto maksymalną liczbę prób API")
+                # Bulk import/update
+                if not dry_run:
+                    bulk_result = None
+                    for db_attempt in range(1, max_page_db_retries + 1):
+                        bulk_result = _bulk_import_products(items)
+                        if bulk_result.get('status') != 'error':
                             break
 
-                except Exception as e:
-                    logger.error(
-                        f"❌ Błąd podczas pobierania strony {page}: {e}")
-                    logger.error(f"❌ Typ błędu: {type(e).__name__}")
-                    if "timeout" in str(e).lower():
-                        logger.warning("⚠️ Timeout - API może być wolne, zwiększam timeout")
-                    if attempt < max_attempts:
-                        logger.warning(
-                            f"⚠️ Próba {attempt}/{max_attempts} - ponawiam za 20 sekund...")
-                        time.sleep(20)
-                        attempt += 1
-                        continue
-                    else:
-                        logger.error(
-                            "❌ Osiągnięto maksymalną liczbę prób połączenia")
-                        break
+                        if db_attempt < max_page_db_retries:
+                            delay = min(page_db_retry_delay * (2 ** (db_attempt - 1)), 30)
+                            logger.warning(
+                                f"⏳ Błąd zapisu DB dla strony {current_page} "
+                                f"(próba {db_attempt}/{max_page_db_retries}): "
+                                f"{bulk_result.get('error', 'unknown_error')}. "
+                                f"Ponowienie tej samej strony za {delay}s..."
+                            )
+                            time.sleep(delay)
+                        else:
+                            logger.error(
+                                f"❌ Wyczerpano retry zapisu DB dla strony {current_page} "
+                                f"({max_page_db_retries} prób)"
+                            )
 
-            # Jeśli osiągnięto maksymalną liczbę prób, przerwij główną pętlę
-            if attempt > max_attempts:
-                break
+                    if bulk_result is None or bulk_result.get('status') == 'error':
+                        stop_launching.set()
+                        return {
+                            'status': 'error',
+                            'error': bulk_result.get('error', f'Bulk import failed for page {current_page}') if bulk_result else f'Bulk import failed for page {current_page}',
+                        }
+                    imported_count += bulk_result['imported_count']
+                else:
+                    # Dry run - tylko zlicz
+                    for item in items:
+                        if imported_count >= max_products:
+                            break
+                        if item.get("creation_date") is not None:
+                            imported_count += 1
+
+                next_to_process += 1
+                # Aktualizuj current_page w bazie danych
+                if not dry_run:
+                    _update_items_import_status(
+                        'running', imported_count, next_to_process,
+                        updated_count=bulk_result.get('updated_count', 0),
+                        processed_count=imported_count)
+
+                if imported_count >= max_products:
+                    stop_launching.set()
+                    break
+        finally:
+            stop_launching.set()
+            launcher_thread.join(timeout=5)
+            with pending_lock:
+                for f in pending.values():
+                    f.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
+
+        # imported_count >= max_products osiągnięte w trakcie pipeline'u -
+        # spadamy do bloku "sukces" niżej (dokładnie jak wcześniej, gdy outer
+        # while kończył się naturalnie po przekroczeniu max_products). Ścieżki
+        # 'error'/'completed' (koniec danych) zwracają wyżej, wprost z pętli.
 
         # Zaktualizuj status importu na 'success' po zakończeniu
         if not dry_run:
@@ -418,6 +667,10 @@ def _import_products_from_items(start_id, max_products, api_url, username, passw
             'imported_count': imported_count
         }
 
+    except SoftTimeLimitExceeded:
+        # Propaguj do full_import_and_update — tam checkpoint (current_page już
+        # zapisany per-strona) i czyste wyjście bez retry.
+        raise
     except Exception as e:
         logger.error(f"❌ Błąd importu ITEMS: {e}")
         # Zaktualizuj status na 'error' jeśli nie dry_run
@@ -474,6 +727,9 @@ def _get_last_items_update_time():
             from matterhorn1.models import ApiSyncLog
             import pytz
 
+            # 'inventory_failed' celowo POMIJANE — run, w którym padło INVENTORY,
+            # nie może przesunąć znacznika do przodu (kolejny tick musi nadgonić
+            # okno stanów, którego ten run nie dopobrał).
             last_sync = ApiSyncLog.objects.using('matterhorn1').filter(
                 sync_type__in=['items_import', 'items_sync'],
                 status__in=['success', 'partial', 'completed']
@@ -516,10 +772,34 @@ def _get_last_items_update_time():
 
 
 def _get_last_items_page():
-    """Zawsze zaczyna od strony 1 - każdy task zaczyna od początku z last_update"""
+    """Wznawianie: jeśli poprzedni import ITEMS został przerwany (error / running /
+    interrupted) na stronie > 1 i jest świeży (< 24 h), zacznij od tej strony.
+    Wszystkie przerwane runy używają tego samego `last_update` (znacznik przeskakuje
+    tylko po statusie 'completed'), więc numer strony jest spójny.
+    W przeciwnym razie strona 1.
+    """
     try:
-        logger.info(
-            "📄 Zaczynam od strony 1 - każdy task zaczyna od początku z last_update")
+        from matterhorn1.models import ApiSyncLog
+        from django.utils import timezone
+        from datetime import timedelta
+
+        last = ApiSyncLog.objects.using('matterhorn1').filter(
+            sync_type__in=['items_import', 'items_sync']
+        ).order_by('-started_at').first()
+
+        if (
+            last
+            and last.status in ('error', 'running', 'interrupted')
+            and (last.current_page or 0) > 1
+            and last.started_at
+            and last.started_at > timezone.now() - timedelta(hours=24)
+        ):
+            logger.info(
+                f"🔄 Wznawiam import od strony {last.current_page} "
+                f"(poprzedni run #{last.id} status={last.status})")
+            return last.current_page
+
+        logger.info("📄 Zaczynam od strony 1")
         return 1
     except Exception as e:
         logger.error(f"Błąd podczas pobierania ostatniej strony: {e}")
@@ -564,7 +844,8 @@ def _save_items_import_start_time():
                     "❌ Osiągnięto maksymalną liczbę prób zapisywania czasu rozpoczęcia importu")
 
 
-def _update_items_import_status(status, imported_count, current_page=None, updated_count=0, processed_count=0):
+def _update_items_import_status(status, imported_count, current_page=None, updated_count=0,
+                                processed_count=0, error_details=None):
     """Aktualizuje status ostatniego importu ITEMS z retry logic"""
     max_retries = 5
     retry_delay = 10  # 10 sekund między próbami
@@ -591,6 +872,9 @@ def _update_items_import_status(status, imported_count, current_page=None, updat
                 # Aktualizuj current_page jeśli podane
                 if current_page is not None:
                     last_running.current_page = current_page
+
+                if error_details is not None:
+                    last_running.error_details = error_details
 
                 last_running.save()
                 logger.info(
@@ -655,6 +939,59 @@ def _parse_creation_date(date_string):
     return None
 
 
+def _resolve_brands_categories(items):
+    """Batchowy odpowiednik Brand/Category.get_or_create() na całą stronę
+    importu - jedno SELECT (+ ewentualny bulk_create) per model zamiast
+    dwóch get_or_create per produkt (do ~2000 zapytań na stronę 1000
+    pozycji). Semantyka jak get_or_create: pierwsza napotkana nazwa dla
+    danego id wygrywa przy tworzeniu; już istniejące rekordy w bazie NIE są
+    nadpisywane nazwą z eventu. Zwraca (brand_by_id, category_by_id)."""
+    from matterhorn1.models import Brand, Category
+
+    brand_names = {}      # brand_id -> name (pierwsza napotkana)
+    category_data = {}    # category_id -> (name, path)
+
+    for item in items:
+        if item.get("creation_date") is None:
+            continue
+        brand_names.setdefault(
+            item.get('brand_id') or 'unknown', item.get('brand') or 'Unknown')
+        category_data.setdefault(
+            item.get('category_id') or 'unknown',
+            (item.get('category_name') or 'Unknown', item.get('category_path') or ''))
+
+    brand_by_id = {
+        b.brand_id: b for b in
+        Brand.objects.using('matterhorn1').filter(brand_id__in=brand_names.keys())
+    }
+    missing_brand_ids = [bid for bid in brand_names if bid not in brand_by_id]
+    if missing_brand_ids:
+        Brand.objects.using('matterhorn1').bulk_create(
+            [Brand(brand_id=bid, name=brand_names[bid]) for bid in missing_brand_ids],
+            batch_size=100)
+        brand_by_id.update({
+            b.brand_id: b for b in
+            Brand.objects.using('matterhorn1').filter(brand_id__in=missing_brand_ids)
+        })
+
+    category_by_id = {
+        c.category_id: c for c in
+        Category.objects.using('matterhorn1').filter(category_id__in=category_data.keys())
+    }
+    missing_category_ids = [cid for cid in category_data if cid not in category_by_id]
+    if missing_category_ids:
+        Category.objects.using('matterhorn1').bulk_create(
+            [Category(category_id=cid, name=category_data[cid][0], path=category_data[cid][1])
+             for cid in missing_category_ids],
+            batch_size=100)
+        category_by_id.update({
+            c.category_id: c for c in
+            Category.objects.using('matterhorn1').filter(category_id__in=missing_category_ids)
+        })
+
+    return brand_by_id, category_by_id
+
+
 def _bulk_import_products(items):
     """Bulk import/update produktów"""
     try:
@@ -668,6 +1005,17 @@ def _bulk_import_products(items):
         products_to_create = []
         products_to_update = []
 
+        # Batch pre-fetch zamiast query per produkt/markę/kategorię (patrz
+        # docs/TESTING.md - N+1 spowalniał import ~500x na dev, gdzie baza
+        # jest za tunelem SSH).
+        valid_uids = [int(item['id']) for item in items
+                      if item.get("creation_date") is not None and item.get('id')]
+        existing_products_by_uid = {
+            p.product_uid: p for p in
+            Product.objects.using('matterhorn1').filter(product_uid__in=valid_uids)
+        } if valid_uids else {}
+        brand_by_id, category_by_id = _resolve_brands_categories(items)
+
         # Najpierw przygotuj wszystkie dane
         for item in items:
             if item.get("creation_date") is None:
@@ -677,16 +1025,17 @@ def _bulk_import_products(items):
             if not product_uid:
                 continue
 
-            # Sprawdź czy produkt istnieje - użyj get_or_create dla bezpieczeństwa
-            try:
-                existing_product = Product.objects.using(
-                    'matterhorn1').get(product_uid=int(product_uid))
+            brand = brand_by_id.get(item.get('brand_id') or 'unknown')
+            category = category_by_id.get(item.get('category_id') or 'unknown')
+
+            existing_product = existing_products_by_uid.get(int(product_uid))
+            if existing_product is not None:
                 # Aktualizuj istniejący
-                _prepare_product_update(existing_product, item)
+                _prepare_product_update(existing_product, item, brand=brand, category=category)
                 products_to_update.append(existing_product)
-            except Product.DoesNotExist:
+            else:
                 # Utwórz nowy
-                product_data = _prepare_product_create(item)
+                product_data = _prepare_product_create(item, brand=brand, category=category)
                 products_to_create.append(product_data)
 
             imported_count += 1
@@ -742,6 +1091,10 @@ def _bulk_import_products(items):
             'imported_count': imported_count
         }
 
+    except SoftTimeLimitExceeded:
+        # Limit czasu tasku — nie połykać, nie retry'ować per-strona; propaguj wyżej,
+        # żeby full_import_and_update zrobił checkpoint i czysto wyszedł.
+        raise
     except Exception as e:
         logger.error(f"❌ Błąd bulk import: {e}")
         # Nie ma fallback - tylko bulk operations
@@ -753,18 +1106,52 @@ def _bulk_import_products(items):
 
 
 def _create_related_objects_for_products(products):
-    """Utwórz warianty, obrazy i szczegóły dla produktów"""
+    """Utwórz warianty, obrazy i szczegóły dla produktów.
+
+    Trzy sprawdzenia istnienia (wariant po variant_uid / szczegóły po
+    produkcie / duplikat obrazu po product+image_url) są zbatchowane na całą
+    listę produktów - po jednym SELECT zamiast query per wariant/produkt/
+    obraz (do kilku tysięcy zapytań na stronę importu przy starym
+    get()/exists() w pętli)."""
     try:
         logger.info(
             f"🚀 ROZPOCZYNAM _create_related_objects_for_products dla {len(products)} produktów")
         from matterhorn1.models import ProductVariant, ProductImage, ProductDetails
         from django.utils import timezone
 
+        # ProductVariant.variant_uid to CharField - normalizuj do str, inaczej
+        # dict zbudowany z wartości zwróconych przez DB (zawsze str) nie
+        # dopasuje się do surowych wartości z API (bywają int), co wygląda
+        # jak "wariant nie istnieje" i wywala unique constraint na bulk_create.
+        all_variant_uids = [
+            str(vd.get('variant_uid'))
+            for p in products for vd in (getattr(p, '_variants_to_create', None) or [])
+            if vd.get('variant_uid')
+        ]
+        existing_variants_by_uid = {
+            v.variant_uid: v for v in
+            ProductVariant.objects.using('matterhorn1').filter(variant_uid__in=all_variant_uids)
+        } if all_variant_uids else {}
+
+        products_with_details = [p for p in products if getattr(p, '_details_to_create', None)]
+        existing_details_by_product_id = {
+            d.product_id: d for d in
+            ProductDetails.objects.using('matterhorn1').filter(product__in=products_with_details)
+        } if products_with_details else {}
+
+        products_with_images = [p for p in products if getattr(p, '_images_to_create', None)]
+        existing_image_keys = set(
+            ProductImage.objects.using('matterhorn1').filter(
+                product__in=products_with_images
+            ).values_list('product_id', 'image_url')
+        ) if products_with_images else set()
+
         variants_to_create = []
         variants_to_update = []
         images_to_create = []
         details_to_create = []
         details_to_update = []
+        skipped_duplicate_images = 0
 
         for product in products:
             if hasattr(product, '_variants_to_create') and product._variants_to_create:
@@ -773,10 +1160,8 @@ def _create_related_objects_for_products(products):
                     if not variant_uid:
                         continue
 
-                    try:
-                        # Sprawdź czy wariant istnieje
-                        existing_variant = ProductVariant.objects.using('matterhorn1').get(
-                            variant_uid=variant_uid)
+                    existing_variant = existing_variants_by_uid.get(str(variant_uid))
+                    if existing_variant is not None:
                         # Aktualizuj istniejący
                         existing_variant.name = variant_data.get(
                             'name', existing_variant.name)
@@ -788,7 +1173,7 @@ def _create_related_objects_for_products(products):
                             'ean', existing_variant.ean)
                         existing_variant.updated_at = timezone.now()
                         variants_to_update.append(existing_variant)
-                    except ProductVariant.DoesNotExist:
+                    else:
                         # Utwórz nowy
                         variants_to_create.append(ProductVariant(
                             variant_uid=variant_uid,
@@ -800,22 +1185,24 @@ def _create_related_objects_for_products(products):
                             ean=variant_data.get('ean', '')
                         ))
 
-            # Obsługa obrazków
+            # Obsługa obrazków - pomiń duplikat (product + image_url) już w bazie
             if hasattr(product, '_images_to_create') and product._images_to_create:
                 for image_data in product._images_to_create:
+                    image_url = image_data.get('image_url')
+                    if (product.id, image_url) in existing_image_keys:
+                        skipped_duplicate_images += 1
+                        continue
                     images_to_create.append(ProductImage(
                         product=product,
-                        image_url=image_data.get('image_url'),
+                        image_url=image_url,
                         order=image_data.get('order', 0)
                     ))
 
             # Obsługa szczegółów produktu
             if hasattr(product, '_details_to_create') and product._details_to_create:
                 details_data = product._details_to_create
-                try:
-                    # Sprawdź czy szczegóły istnieją
-                    existing_details = ProductDetails.objects.using('matterhorn1').get(
-                        product=product)
+                existing_details = existing_details_by_product_id.get(product.id)
+                if existing_details is not None:
                     # Aktualizuj istniejące
                     existing_details.weight = details_data.get(
                         'weight', existing_details.weight)
@@ -827,7 +1214,7 @@ def _create_related_objects_for_products(products):
                         'size_table_html', existing_details.size_table_html)
                     existing_details.updated_at = timezone.now()
                     details_to_update.append(existing_details)
-                except ProductDetails.DoesNotExist:
+                else:
                     # Utwórz nowe
                     details_to_create.append(ProductDetails(
                         product=product,
@@ -855,28 +1242,15 @@ def _create_related_objects_for_products(products):
             logger.info(
                 f"🔄 Zaktualizowano {len(variants_to_update)} wariantów")
 
-        # Bulk operations dla obrazków - sprawdź duplikaty
+        # Bulk operations dla obrazków (duplikaty już odfiltrowane wyżej)
         if images_to_create:
-            # Filtruj duplikaty - sprawdź które obrazki już istnieją
-            unique_images_to_create = []
-            for image in images_to_create:
-                # Sprawdź czy obrazek już istnieje (product + image_url)
-                image_exists = ProductImage.objects.using('matterhorn1').filter(
-                    product=image.product,
-                    image_url=image.image_url
-                ).exists()
-
-                if not image_exists:
-                    unique_images_to_create.append(image)
-
-            if unique_images_to_create:
-                ProductImage.objects.using('matterhorn1').bulk_create(
-                    unique_images_to_create, batch_size=100)
-                logger.info(
-                    f"✅ Utworzono {len(unique_images_to_create)} nowych obrazków (pominięto {len(images_to_create) - len(unique_images_to_create)} duplikatów)")
-            else:
-                logger.info(
-                    f"ℹ️ Wszystkie {len(images_to_create)} obrazków już istnieją - pominięto")
+            ProductImage.objects.using('matterhorn1').bulk_create(
+                images_to_create, batch_size=100)
+            logger.info(
+                f"✅ Utworzono {len(images_to_create)} nowych obrazków (pominięto {skipped_duplicate_images} duplikatów)")
+        elif skipped_duplicate_images:
+            logger.info(
+                f"ℹ️ Wszystkie {skipped_duplicate_images} obrazków już istnieją - pominięto")
 
         # Bulk operations dla szczegółów
         if details_to_create:
@@ -899,19 +1273,15 @@ def _create_related_objects_for_products(products):
         logger.error(f"❌ Błąd tworzenia powiązanych obiektów: {e}")
 
 
-def _prepare_product_create(item):
-    """Przygotuj dane do utworzenia nowego produktu"""
+def _prepare_product_create(item, brand=None, category=None):
+    """Przygotuj dane do utworzenia nowego produktu.
+
+    `brand`/`category` — przekaż gdy wywołujesz w pętli po wielu itemach
+    (np. z `_bulk_import_products`, przez `_resolve_brands_categories`),
+    żeby uniknąć get_or_create per produkt. Bez nich (domyślnie, np. do
+    pojedynczych wywołań/testów) resolvuje jak wcześniej."""
     from matterhorn1.models import Product
     from django.utils import timezone
-
-    # Marka
-    brand_id = item.get('brand_id') or 'unknown'
-    brand_name = item.get('brand') or 'Unknown'
-
-    # Kategoria
-    category_id = item.get('category_id') or 'unknown'
-    category_name = item.get('category_name') or 'Unknown'
-    category_path = item.get('category_path') or ''
 
     # Konwersje
     active_value = item.get('active', True)
@@ -922,21 +1292,21 @@ def _prepare_product_create(item):
     if isinstance(new_collection_value, str):
         new_collection_value = new_collection_value.upper() in ('Y', 'YES', 'TRUE', '1')
 
-    # Pobierz lub utwórz markę i kategorię
-    from matterhorn1.models import Brand, Category
-
-    brand, _ = Brand.objects.using('matterhorn1').get_or_create(
-        brand_id=brand_id,
-        defaults={'name': brand_name}
-    )
-
-    category, _ = Category.objects.using('matterhorn1').get_or_create(
-        category_id=category_id,
-        defaults={
-            'name': category_name,
-            'path': category_path
-        }
-    )
+    if brand is None or category is None:
+        from matterhorn1.models import Brand, Category
+        if brand is None:
+            brand, _ = Brand.objects.using('matterhorn1').get_or_create(
+                brand_id=item.get('brand_id') or 'unknown',
+                defaults={'name': item.get('brand') or 'Unknown'}
+            )
+        if category is None:
+            category, _ = Category.objects.using('matterhorn1').get_or_create(
+                category_id=item.get('category_id') or 'unknown',
+                defaults={
+                    'name': item.get('category_name') or 'Unknown',
+                    'path': item.get('category_path') or ''
+                }
+            )
 
     product = Product(
         product_uid=int(item.get('id')),
@@ -989,18 +1359,12 @@ def _prepare_product_create(item):
     return product
 
 
-def _prepare_product_update(product, item):
-    """Przygotuj dane do aktualizacji istniejącego produktu"""
+def _prepare_product_update(product, item, brand=None, category=None):
+    """Przygotuj dane do aktualizacji istniejącego produktu.
+
+    `brand`/`category` — jak w `_prepare_product_create`: przekaż z pętli
+    batch, żeby uniknąć get_or_create per produkt."""
     from django.utils import timezone
-
-    # Marka
-    brand_id = item.get('brand_id') or 'unknown'
-    brand_name = item.get('brand') or 'Unknown'
-
-    # Kategoria
-    category_id = item.get('category_id') or 'unknown'
-    category_name = item.get('category_name') or 'Unknown'
-    category_path = item.get('category_path') or ''
 
     # Konwersje
     active_value = item.get('active', True)
@@ -1011,21 +1375,21 @@ def _prepare_product_update(product, item):
     if isinstance(new_collection_value, str):
         new_collection_value = new_collection_value.upper() in ('Y', 'YES', 'TRUE', '1')
 
-    # Pobierz lub utwórz markę i kategorię
-    from matterhorn1.models import Brand, Category
-
-    brand, _ = Brand.objects.using('matterhorn1').get_or_create(
-        brand_id=brand_id,
-        defaults={'name': brand_name}
-    )
-
-    category, _ = Category.objects.using('matterhorn1').get_or_create(
-        category_id=category_id,
-        defaults={
-            'name': category_name,
-            'path': category_path
-        }
-    )
+    if brand is None or category is None:
+        from matterhorn1.models import Brand, Category
+        if brand is None:
+            brand, _ = Brand.objects.using('matterhorn1').get_or_create(
+                brand_id=item.get('brand_id') or 'unknown',
+                defaults={'name': item.get('brand') or 'Unknown'}
+            )
+        if category is None:
+            category, _ = Category.objects.using('matterhorn1').get_or_create(
+                category_id=item.get('category_id') or 'unknown',
+                defaults={
+                    'name': item.get('category_name') or 'Unknown',
+                    'path': item.get('category_path') or ''
+                }
+            )
 
     # Aktualizuj pola
     product.active = active_value
@@ -1082,8 +1446,120 @@ def _prepare_product_update(product, item):
 # Usunięto funkcje single import - używamy tylko bulk operations
 
 
+def _fetch_inventory_page(page, api_url, headers, limit, last_update):
+    """Pobiera jedną stronę B2BAPI/ITEMS/INVENTORY z retry/backoff (do 5 prób,
+    20 s między próbami) - jak `_fetch_items_page`.
+
+    Rozróżnia KONIEC DANYCH od BŁĘDU (wcześniej jedno i drugie było 'stop' i
+    kończyło INVENTORY jako 'success', przez co np. HTTP 200 z ciałem które nie
+    jest JSON-em - strona błędu / rate-limit / WAF - było po cichu traktowane
+    jak koniec danych, a okno stanów magazynowych przepadało):
+
+      {'outcome': 'ok', 'items': [...]}
+      {'outcome': 'end_of_data'}          # pusta odpowiedź / [] / 404 - czysty koniec
+      {'outcome': 'error', 'error': str}  # 5xx / brak JSON / sieć po wyczerpaniu prób
+    """
+    max_attempts = 5
+    attempt = 1
+
+    while attempt <= max_attempts:
+        try:
+            import requests
+
+            url = f"{api_url}/B2BAPI/ITEMS/INVENTORY/?page={page}&limit={limit}&last_update={last_update}"
+            logger.info(f"🔗 INVENTORY Request URL: {url}")
+            response = requests.get(url, headers=headers, timeout=120)
+
+            logger.info(
+                f"🔍 INVENTORY API Response strona {page}: status={response.status_code}, "
+                f"content_length={len(response.text)}")
+
+            if response.status_code == 200:
+                if not response.text.strip():
+                    logger.info(f"📊 INVENTORY (strona {page}) - pusta odpowiedź - koniec danych")
+                    return {'outcome': 'end_of_data'}
+
+                try:
+                    inventory_data = response.json()
+                except SoftTimeLimitExceeded:
+                    raise
+                except Exception as e:
+                    logger.error(f"❌ Błąd parsowania JSON INVENTORY (strona {page}): {e}")
+                    logger.error(
+                        f"❌ INVENTORY (strona {page}) treść odpowiedzi (pierwsze 500 znaków): "
+                        f"{response.text[:500]!r}")
+                    if attempt < max_attempts:
+                        logger.warning(
+                            f"⚠️ Próba {attempt}/{max_attempts} (INVENTORY strona {page}) - ponawiam za 20 s...")
+                        time.sleep(20)
+                        attempt += 1
+                        continue
+                    return {
+                        'outcome': 'error',
+                        'error': f'INVENTORY strona {page}: HTTP 200 bez poprawnego JSON po {max_attempts} próbach',
+                    }
+
+                if not inventory_data:
+                    logger.info(f"📊 INVENTORY (strona {page}) - brak danych na stronie - koniec")
+                    return {'outcome': 'end_of_data'}
+
+                logger.info(f"📥 INVENTORY - pobrano {len(inventory_data)} rekordów ze strony {page}")
+                return {'outcome': 'ok', 'items': inventory_data}
+
+            elif response.status_code == 404:
+                logger.info(f"📊 INVENTORY (strona {page}) - strona nie istnieje - koniec danych")
+                return {'outcome': 'end_of_data'}
+            else:
+                logger.warning(f"⚠️ Błąd INVENTORY API {response.status_code} (strona {page})")
+                if attempt < max_attempts:
+                    logger.warning(
+                        f"⚠️ Próba {attempt}/{max_attempts} (INVENTORY strona {page}) - ponawiam za 20 s...")
+                    time.sleep(20)
+                    attempt += 1
+                    continue
+                return {
+                    'outcome': 'error',
+                    'error': f'INVENTORY strona {page}: HTTP {response.status_code} po {max_attempts} próbach',
+                }
+
+        except SoftTimeLimitExceeded:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Błąd podczas pobierania INVENTORY strony {page}: {e}")
+            if attempt < max_attempts:
+                logger.warning(
+                    f"⚠️ Próba {attempt}/{max_attempts} (INVENTORY strona {page}) - ponawiam za 20 s...")
+                time.sleep(20)
+                attempt += 1
+                continue
+            return {
+                'outcome': 'error',
+                'error': f'INVENTORY strona {page} nieosiągalna po {max_attempts} próbach: {e}',
+            }
+
+    return {'outcome': 'error', 'error': f'INVENTORY strona {page}: wyczerpano próby'}
+
+
 def _update_inventory_from_api(api_url, username, password, batch_size, dry_run):
-    """Pomocnicza funkcja do aktualizacji INVENTORY z bulk operations i tą samą datą co ITEMS"""
+    """Pomocnicza funkcja do aktualizacji INVENTORY z bulk operations i tą samą datą co ITEMS.
+
+    Ten sam pipeline co w _import_products_from_items: WSZYSTKIE strony lecą
+    w locie naraz, nowa co MATTERHORN_PAGE_LAUNCH_INTERVAL sekund, aż do
+    trafienia na koniec danych albo błąd (a wystrzeliwanie kończy się
+    wcześniej, jak tylko którakolwiek już gotowa strona w buforze okaże się
+    nie-'ok'). INVENTORY nie ma checkpointu do wznowienia (zawsze zaczyna od
+    strony 1) i _bulk_update_inventory per strona jest niezależny od innych
+    stron, więc bufor porządkujący jest tu tylko dla przewidywalnej
+    kolejności logów/liczenia.
+
+    Zwraca:
+      {'status': 'success', 'updated_count': N}          - czysty przebieg
+      {'status': 'partial', 'updated_count': N, 'error'}  - któraś strona padła
+          (5xx / brak JSON / sieć) po wyczerpaniu prób; wołający NIE powinien
+          oznaczać importu jako 'completed', żeby znacznik last_update nie
+          przeskoczył i kolejny tick nadgonił pominięte okno stanów
+      {'status': 'error', 'error'}                        - nie dało się w ogóle wystartować
+    """
     try:
         # Użyj tej samej daty startu co ITEMS z poprawnym formatowaniem
         last_update = _get_last_items_update_time()
@@ -1100,9 +1576,6 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
         logger.info(
             f"📅 INVENTORY używam tej samej daty co ITEMS: {last_update}")
 
-        # Pobierz dane uwierzytelniające
-        from django.conf import settings
-        import requests
         api_key = getattr(settings, 'MATTERHORN_API_KEY', '')
         if not api_key:
             api_key = f"{username}:{password}"
@@ -1113,67 +1586,102 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
         }
 
         updated_count = 0
-        page = 1
         limit = 1000
+        inventory_error = None  # ustawiane gdy strona INVENTORY padnie (nie: koniec danych)
 
-        while True:
-            try:
-                # Pobierz dane z INVENTORY API z last_update
-                url = f"{api_url}/B2BAPI/ITEMS/INVENTORY/?page={page}&limit={limit}&last_update={last_update}"
-                logger.info(f"🔗 INVENTORY Request URL: {url}")
+        # Wystrzeliwanie na osobnym wątku, niezależnie od zapisu - patrz
+        # obszerny komentarz w _import_products_from_items. Bez tego seria
+        # kilku stron odpowiadających naraz (bo strona z przodu kolejki była
+        # wolna) blokowałaby wystrzeliwanie nowych na czas całego zapisu
+        # backlogu do bazy.
+        pending = {}  # page -> Future - bufor odpowiedzi czekających na zapis
+        pending_lock = threading.Lock()
+        next_to_process = 1
+        stop_launching = threading.Event()
+        task_ctx = _capture_task_context()  # (task, request) do logów z wątków w tle
 
-                response = requests.get(url, headers=headers, timeout=120)
-                time.sleep(0.6)  # Ograniczenie API: max 2 requests/sekundę
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=MATTERHORN_PIPELINE_MAX_WORKERS)
 
-                logger.info(
-                    f"🔍 INVENTORY API Response strona {page}: status={response.status_code}")
-
-                if response.status_code == 200:
-                    if not response.text.strip():
-                        logger.info(
-                            "📊 INVENTORY - pusta odpowiedź - koniec danych")
-                        break
-
-                    try:
-                        inventory_data = response.json()
-                        if not inventory_data:
-                            logger.info(
-                                "📊 INVENTORY - brak danych na stronie - koniec")
+        def _launcher(start_page):
+            p = start_page
+            while not stop_launching.is_set():
+                launched = False
+                with pending_lock:
+                    # Backpressure - patrz _import_products_from_items.
+                    if len(pending) < MATTERHORN_PIPELINE_MAX_INFLIGHT:
+                        pending[p] = executor.submit(
+                            _run_with_task_context, task_ctx, _fetch_inventory_page,
+                            p, api_url, headers, limit, last_update)
+                        p += 1
+                        launched = True
+                    # Wczesny stop - patrz _import_products_from_items.
+                    for fut in list(pending.values()):
+                        if fut.done() and fut.result()['outcome'] != 'ok':
+                            stop_launching.set()
                             break
+                if not stop_launching.is_set():
+                    time.sleep(MATTERHORN_PAGE_LAUNCH_INTERVAL if launched else 0.5)
 
-                        logger.info(
-                            f"📥 INVENTORY - pobrano {len(inventory_data)} rekordów ze strony {page}")
+        launcher_thread = threading.Thread(
+            target=_run_with_task_context, args=(task_ctx, _launcher, 1),
+            daemon=True, name="matterhorn-inventory-launcher")
+        launcher_thread.start()
 
-                        if not dry_run:
-                            # Bulk update stanów magazynowych
-                            page_updated = _bulk_update_inventory(
-                                inventory_data)
-                            updated_count += page_updated
-                            logger.info(
-                                f"✅ INVENTORY - zaktualizowano {page_updated} produktów na stronie {page}")
+        try:
+            while True:
+                with pending_lock:
+                    fut = pending.get(next_to_process)
 
-                        page += 1
-
-                    except Exception as e:
-                        logger.error(f"❌ Błąd parsowania JSON INVENTORY: {e}")
+                if fut is None or not fut.done():
+                    if stop_launching.is_set() and not launcher_thread.is_alive() and fut is None:
                         break
+                    time.sleep(0.2)
+                    continue
 
-                elif response.status_code == 404:
+                with pending_lock:
+                    result = pending.pop(next_to_process).result()
+                current_page = next_to_process
+
+                if result['outcome'] == 'error':
+                    stop_launching.set()
+                    inventory_error = result.get('error') or f'INVENTORY strona {current_page} - błąd'
+                    logger.error(
+                        f"❌ INVENTORY przerwane błędem na stronie {current_page}: {inventory_error}")
+                    break
+
+                if result['outcome'] == 'end_of_data':
+                    stop_launching.set()
+                    break
+
+                inventory_data = result['items']
+                if not dry_run:
+                    page_updated = _bulk_update_inventory(inventory_data)
+                    updated_count += page_updated
                     logger.info(
-                        "📊 INVENTORY - strona nie istnieje - koniec danych")
-                    break
-                else:
-                    logger.warning(
-                        f"⚠️ Błąd INVENTORY API {response.status_code}")
-                    break
+                        f"✅ INVENTORY - zaktualizowano {page_updated} produktów na stronie {current_page}")
 
-            except Exception as e:
-                logger.error(
-                    f"❌ Błąd podczas pobierania INVENTORY strony {page}: {e}")
-                break
+                next_to_process += 1
+        finally:
+            stop_launching.set()
+            launcher_thread.join(timeout=5)
+            with pending_lock:
+                for f in pending.values():
+                    f.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
 
         logger.info(
-            f"📊 INVENTORY zakończony: {updated_count} zaktualizowanych produktów")
+            f"📊 INVENTORY zakończony: {updated_count} zaktualizowanych produktów"
+            + (f" (PRZERWANE BŁĘDEM: {inventory_error})" if inventory_error else ""))
+
+        if inventory_error:
+            # Nie 'success' - wołający NIE oznaczy importu jako 'completed',
+            # więc znacznik last_update nie przeskoczy i kolejny tick nadgoni
+            # okno stanów, którego ten run nie zdążył pobrać.
+            return {
+                'status': 'partial',
+                'updated_count': updated_count,
+                'error': inventory_error,
+            }
 
         return {
             'status': 'success',
@@ -1189,10 +1697,19 @@ def _update_inventory_from_api(api_url, username, password, batch_size, dry_run)
 
 
 def _bulk_update_inventory(inventory_data):
-    """Bulk update stanów magazynowych z INVENTORY API"""
+    """Aktualizacja stanów magazynowych z INVENTORY API.
+
+    Batch pre-fetch produktów/wariantów (zamiast query per element, wzorzec
+    N+1 jak w _bulk_import_products, patrz #223). Sam zapis stanu robimy
+    warunkowym UPDATE-em per zmieniony wariant (`filter(pk=..., stock=old)
+    .update(...)`), a wiersz StockHistory zapisujemy TYLKO gdy ten UPDATE
+    faktycznie zmienił rząd - to jednocześnie idempotencja (re-run widzi już
+    nowy stan) i ochrona przed wyścigiem nakładających się runów importu,
+    które inaczej powielały wpisy historii dla tej samej zmiany. Nazwy do
+    historii mamy z batcha, więc budujemy wiersze wprost zamiast wołać
+    track_stock_change()."""
     try:
-        from matterhorn1.models import Product, ProductVariant
-        from django.db import transaction
+        from matterhorn1.models import Product, ProductVariant, StockHistory
         from django.utils import timezone
 
         # Sprawdź czy dane są dostępne
@@ -1201,7 +1718,30 @@ def _bulk_update_inventory(inventory_data):
             return 0
 
         updated_count = 0
-        variants_to_update = []
+        history_to_create = []
+
+        # Batch pre-fetch: produkty po product_uid, warianty po variant_uid
+        # (globalnie unikalne - unique=True na modelu).
+        product_uids = [
+            int(item['id']) for item in inventory_data
+            if isinstance(item, dict) and item.get('id')
+        ]
+        products_by_uid = {
+            p.product_uid: p for p in
+            Product.objects.using('matterhorn1').filter(product_uid__in=product_uids)
+        } if product_uids else {}
+
+        all_variant_uids = [
+            str(vd.get('variant_uid'))
+            for item in inventory_data if isinstance(item, dict)
+            for vd in (item.get('inventory') or [])
+            if isinstance(vd, dict) and vd.get('variant_uid')
+        ]
+        variants_by_uid = {
+            v.variant_uid: v for v in
+            ProductVariant.objects.using('matterhorn1').select_related('product').filter(
+                variant_uid__in=all_variant_uids)
+        } if all_variant_uids else {}
 
         # Przygotuj dane do bulk update
         for i, item in enumerate(inventory_data):
@@ -1216,77 +1756,85 @@ def _bulk_update_inventory(inventory_data):
                 continue
 
             # Znajdź produkt
-            try:
-                product = Product.objects.using(
-                    'matterhorn1').get(product_uid=int(product_uid))
-
-                # Aktualizuj warianty (w INVENTORY API dane są w 'inventory')
-                variants_data = item.get('inventory', [])
-
-                if not variants_data:
-                    logger.info(f"Brak wariantów dla produktu {product_uid}")
-                    continue
-
-                for j, variant_data in enumerate(variants_data):
-                    if variant_data is None:
-                        logger.warning(
-                            f"Pominięto None variant {j} dla produktu {product_uid}")
-                        continue
-                    if not isinstance(variant_data, dict):
-                        continue
-
-                    variant_uid = variant_data.get('variant_uid')
-                    if not variant_uid:
-                        continue
-
-                    # Znajdź wariant
-                    try:
-                        variant = ProductVariant.objects.using('matterhorn1').get(
-                            variant_uid=variant_uid,
-                            product=product
-                        )
-
-                        # Aktualizuj stan magazynowy
-                        new_stock = int(variant_data.get('stock', 0)) if variant_data.get(
-                            'stock', '0').isdigit() else 0
-                        if variant.stock != new_stock:
-                            # Śledź zmianę stanu przed aktualizacją
-                            track_stock_change(
-                                variant_uid=variant.variant_uid,
-                                product_uid=variant.product.product_uid,
-                                old_stock=variant.stock,
-                                new_stock=new_stock,
-                                product_name=variant.product.name,
-                                variant_name=variant.name
-                            )
-
-                            variant.stock = new_stock
-                            # bulk_update() nie wywołuje save(), więc auto_now na
-                            # updated_at się nie odpali - trzeba ustawić ręcznie,
-                            # bo bridge MPD.tasks.update_stock_from_matterhorn1
-                            # filtruje warianty właśnie po updated_at.
-                            variant.updated_at = timezone.now()
-                            variants_to_update.append(variant)
-
-                    except ProductVariant.DoesNotExist:
-                        # Wariant nie istnieje - pomiń
-                        continue
-
-            except Product.DoesNotExist:
+            product = products_by_uid.get(int(product_uid))
+            if product is None:
                 # Produkt nie istnieje - pomiń
                 continue
 
-        # Bulk update wariantów
-        if variants_to_update:
-            with transaction.atomic(using='matterhorn1'):
-                ProductVariant.objects.using('matterhorn1').bulk_update(
-                    variants_to_update,
-                    ['stock', 'updated_at'],
-                    batch_size=100
+            # Aktualizuj warianty (w INVENTORY API dane są w 'inventory')
+            variants_data = item.get('inventory', [])
+
+            if not variants_data:
+                logger.info(f"Brak wariantów dla produktu {product_uid}")
+                continue
+
+            for j, variant_data in enumerate(variants_data):
+                if variant_data is None:
+                    logger.warning(
+                        f"Pominięto None variant {j} dla produktu {product_uid}")
+                    continue
+                if not isinstance(variant_data, dict):
+                    continue
+
+                variant_uid = variant_data.get('variant_uid')
+                if not variant_uid:
+                    continue
+
+                # Znajdź wariant - musi należeć do TEGO produktu, jak przy
+                # oryginalnym .get(variant_uid=..., product=product)
+                variant = variants_by_uid.get(str(variant_uid))
+                if variant is None or variant.product_id != product.id:
+                    # Wariant nie istnieje (dla tego produktu) - pomiń
+                    continue
+
+                # Aktualizuj stan magazynowy
+                new_stock = int(variant_data.get('stock', 0)) if variant_data.get(
+                    'stock', '0').isdigit() else 0
+                if variant.stock == new_stock:
+                    continue
+
+                old_stock = variant.stock
+                # Warunkowy UPDATE: zmieni rząd tylko jeśli stan w DB NADAL ==
+                # old_stock. Jeśli inny run (albo redeliver ubitego taska) już
+                # złapał ten sam przeskok, zwróci 0 - wtedy NIE zapisujemy
+                # wiersza historii. Idempotencja + brak wyścigu (to WHERE
+                # stock=old_stock serializuje pisarzy) - patrz duplikaty w
+                # StockHistory przy nakładających się runach importu.
+                # updated_at ustawiane wprost, bo bridge
+                # MPD.tasks.update_stock_from_matterhorn1 filtruje po nim.
+                changed = ProductVariant.objects.using('matterhorn1').filter(
+                    pk=variant.pk, stock=old_stock
+                ).update(stock=new_stock, updated_at=timezone.now())
+                if not changed:
+                    continue
+
+                stock_change = new_stock - old_stock
+                change_type = (
+                    'increase' if stock_change > 0
+                    else 'decrease' if stock_change < 0 else 'no_change'
                 )
-                updated_count = len(variants_to_update)
-                logger.info(
-                    f"✅ INVENTORY bulk update: {updated_count} wariantów")
+                history_to_create.append(StockHistory(
+                    variant_uid=variant.variant_uid,
+                    product_uid=product.product_uid,
+                    product_name=product.name,
+                    variant_name=variant.name,
+                    old_stock=old_stock,
+                    new_stock=new_stock,
+                    stock_change=stock_change,
+                    change_type=change_type,
+                ))
+                updated_count += 1
+
+        # Warianty już zaktualizowane warunkowo wyżej; historia to log - zapis
+        # osobno (bez wspólnej transakcji, żeby ew. błąd bulk_create nie cofał
+        # zaktualizowanych stanów i nie prowadził do ponownego zapisu przy
+        # następnym runie).
+        if history_to_create:
+            StockHistory.objects.using('matterhorn1').bulk_create(
+                history_to_create, batch_size=100)
+            logger.info(
+                f"✅ INVENTORY bulk update: {updated_count} wariantów, "
+                f"{len(history_to_create)} wpisów historii")
 
         return updated_count
 
@@ -1358,14 +1906,22 @@ def test_periodic_task():
 # simple_import_task usunięty - był redundantny z full_import_and_update
 
 
-def _cleanup_old_running_imports():
-    """
-    Czyści stare rekordy 'running' starsze niż 2 godziny.
-    To zapobiega kumulowaniu się zawieszonych importów.
+def _fail_stale_running_imports(older_than_minutes=None):
+    """Oznacza rekordy ITEMS w statusie 'running' jako 'error' (zachowując
+    current_page — `_get_last_items_page` wznowi od tej strony).
+
+    Wołane w dwóch miejscach:
+    * `full_import_and_update` PO zdobyciu advisory locka, bez `older_than_minutes`:
+      skoro trzymamy wyłączny lock, żaden inny run nie działa → każdy 'running'
+      to sierota po ubitym/zrestartowanym workerze.
+    * `watchdog_import_healthcheck` z `older_than_minutes=180`: siatka
+      bezpieczeństwa dla runa wiszącego mimo żywego workera (advisory lock się
+      wtedy NIE zwolnił — nie da się go bezpiecznie sprzątnąć spoza tej sesji).
+
     Z retry logic dla połączenia z bazą danych.
     """
     max_retries = 5
-    retry_delay = 10  # 10 sekund między próbami
+    retry_delay = 10
 
     for attempt in range(max_retries):
         try:
@@ -1373,126 +1929,32 @@ def _cleanup_old_running_imports():
             from django.utils import timezone
             from datetime import timedelta
 
-            # Znajdź stare running rekordy (starsze niż 2 godziny)
-            cutoff_time = timezone.now() - timedelta(hours=2)
-            old_running = ApiSyncLog.objects.using('matterhorn1').filter(
-                sync_type='items_import',
-                status='running',
-                started_at__lt=cutoff_time
-            )
+            qs = ApiSyncLog.objects.using('matterhorn1').filter(
+                sync_type='items_import', status='running')
+            if older_than_minutes is not None:
+                qs = qs.filter(
+                    started_at__lt=timezone.now() - timedelta(minutes=older_than_minutes))
 
-            count = old_running.count()
-            if count > 0:
-                logger.warning(
-                    f"🧹 Znaleziono {count} starych 'running' rekordów - oznaczam jako 'error'")
-
-                # Oznacz jako 'error' zamiast usuwać
-                old_running.update(
+            count = qs.count()
+            if count:
+                qs.update(
                     status='error',
                     completed_at=timezone.now(),
-                    error_details='Zawieszone - automatycznie oznaczone jako błąd po 2 godzinach'
+                    error_details=(
+                        'Sierota po ubitym workerze — advisory lock wolny, rekord '
+                        'został "running"' if older_than_minutes is None
+                        else f'Zawieszone > {older_than_minutes} min bez zakończenia'),
                 )
-                logger.info(
-                    f"✅ Oznaczono {count} starych rekordów jako 'error'")
-            else:
-                logger.info("✅ Brak starych 'running' rekordów do czyszczenia")
-
-            # Jeśli dotarliśmy tutaj, operacja się powiodła
+                logger.warning(f"🧹 Oznaczono {count} zawieszonych 'running' rekordów ITEMS jako 'error'")
             return
 
         except Exception as e:
             logger.error(
-                f"❌ Błąd podczas czyszczenia starych running rekordów (próba {attempt + 1}/{max_retries}): {e}")
-
+                f"❌ Błąd czyszczenia zawieszonych 'running' (próba {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
-                logger.warning(
-                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą...")
                 time.sleep(retry_delay)
             else:
-                logger.error(
-                    "❌ Osiągnięto maksymalną liczbę prób czyszczenia starych rekordów")
-
-
-def _cleanup_all_running_imports():
-    """
-    Sprawdza czy są zawieszone taski i czyści blokadę Redis tylko jeśli task został przerwany.
-    NIE czyści aktywnych tasków - tylko sprawdza czy blokada Redis jest spójna z DB.
-    Z retry logic dla połączenia z bazą danych.
-    """
-    max_retries = 5
-    retry_delay = 10  # 10 sekund między próbami
-
-    for attempt in range(max_retries):
-        try:
-            from matterhorn1.models import ApiSyncLog
-            from django.utils import timezone
-            from django.core.cache import cache
-
-            # Znajdź WSZYSTKIE running rekordy (niezależnie od wieku)
-            all_running = ApiSyncLog.objects.using('matterhorn1').filter(
-                sync_type='items_import',
-                status='running'
-            )
-
-            count = all_running.count()
-
-            # Sprawdź blokadę Redis
-            lock_id = 'matterhorn1_full_import_lock'
-            current_lock = cache.get(lock_id)
-
-            if count > 0 and current_lock:
-                # Są running rekordy w DB I blokada Redis - task działa normalnie
-                logger.info(
-                    f"✅ Znaleziono {count} aktywnych 'running' rekordów - task działa normalnie")
-                logger.info(
-                    "✅ Blokada Redis pozostaje aktywna - task nie został przerwany")
-
-            elif count > 0 and not current_lock:
-                # Są running rekordy w DB ale BRAK blokady Redis - task został przerwany
-                logger.warning(
-                    f"🧹 Znaleziono {count} 'running' rekordów bez blokady Redis - task został przerwany")
-
-                # Oznacz jako 'error' - task został przerwany
-                all_running.update(
-                    status='error',
-                    completed_at=timezone.now(),
-                    error_details='Zawieszone - task został przerwany (restart/stop systemu)'
-                )
-
-                logger.info(
-                    f"✅ Oznaczono {count} przerwanych rekordów jako 'error'")
-
-            elif count == 0 and current_lock:
-                # BRAK running rekordów w DB ale jest blokada Redis - ghost lock
-                logger.warning(
-                    f"🔒 Znaleziono blokadę Redis bez aktywnych tasków: {current_lock}")
-                logger.info("🗑️  Usuwam ghost lock Redis")
-
-                cache.delete(lock_id)
-
-                if not cache.get(lock_id):
-                    logger.info("✅ Ghost lock Redis został usunięty")
-                else:
-                    logger.error("❌ Nie udało się usunąć ghost lock Redis")
-
-            else:
-                # Brak running rekordów i brak blokady Redis - wszystko OK
-                logger.info("✅ Brak aktywnych tasków - system gotowy")
-
-            # Jeśli dotarliśmy tutaj, operacja się powiodła
-            return
-
-        except Exception as e:
-            logger.error(
-                f"❌ Błąd podczas sprawdzania running rekordów (próba {attempt + 1}/{max_retries}): {e}")
-
-            if attempt < max_retries - 1:
-                logger.warning(
-                    f"⏳ Czekam {retry_delay} sekund przed ponowną próbą...")
-                time.sleep(retry_delay)
-            else:
-                logger.error(
-                    "❌ Osiągnięto maksymalną liczbę prób sprawdzania running rekordów")
+                logger.error("❌ Osiągnięto maksymalną liczbę prób czyszczenia 'running'")
 
 
 @shared_task(bind=True, name='matterhorn1.tasks.track_stock_changes', queue='default')
@@ -1635,18 +2097,20 @@ def clean_old_stock_history_task(self, days_to_keep=90):
 @shared_task(bind=True, name='matterhorn1.tasks.watchdog_import_healthcheck')
 def watchdog_import_healthcheck(self):
     """
-    Watchdog task - sprząta stare running oraz ghost locki importu ITEMS.
-    Sprawdza czy taski rzeczywiście pracują na podstawie postępu.
+    Watchdog task - siatka bezpieczeństwa dla zawieszonych importów ITEMS.
+    Blokadą importu jest teraz PostgreSQL advisory lock (#238), który zwalnia
+    się sam po padzie workera - nie ma "ghost locków" do sprzątania. Zostaje
+    tylko wykrywanie rekordów 'running' bez postępu (worker żywy, ale wiszący).
     Uruchamiany co 5 minut przez Celery Beat.
     """
-    logger.info("🔍 Watchdog: Sprawdzam i czyszczę stare blokady importu")
+    logger.info("🔍 Watchdog: sprawdzam zawieszone importy ITEMS")
 
     try:
         from matterhorn1.models import ApiSyncLog
         import datetime
 
-        # Wyczyść stare running rekordy (starsze niż 2 godziny)
-        cleaned_running = _cleanup_old_running_imports()
+        # Bardzo stare 'running' (> 3 h) - twardo na 'error' niezależnie od postępu
+        _fail_stale_running_imports(older_than_minutes=180)
 
         # Sprawdź ghost taski - taski w statusie 'running' bez postępu
         ghost_tasks_cleaned = 0
@@ -1748,37 +2212,15 @@ def watchdog_import_healthcheck(self):
                 logger.info(
                     f"✅ Watchdog: Task ID {task.id} młody ({int(task_age_minutes)} min) - prawdopodobnie pracuje")
 
-        # Wyczyść cache blokady jeśli są stare
-        lock_id = 'matterhorn1_full_import_lock'
-        current_lock = cache.get(lock_id)
-        if current_lock:
-            # Sprawdź czy task nadal istnieje w Celery
-            from celery.result import AsyncResult
-            try:
-                result = AsyncResult(current_lock)
-                if result.state in ['PENDING', 'RETRY']:
-                    # Task nadal istnieje - nie ruszaj blokady
-                    logger.info(
-                        f"🔒 Watchdog: Blokada aktywna (task: {current_lock})")
-                else:
-                    # Task nie istnieje - wyczyść blokadę
-                    cache.delete(lock_id)
-                    logger.info(
-                        f"🧹 Watchdog: Usunięto starą blokadę (task: {current_lock})")
-            except Exception:
-                # Nie można sprawdzić task - wyczyść blokadę
-                cache.delete(lock_id)
-                logger.info(
-                    f"🧹 Watchdog: Usunięto nieznaną blokadę (task: {current_lock})")
+        # Blokada importu = PostgreSQL advisory lock (#238) - zwalnia się sama
+        # po padzie workera, nie ma "ghost locków" Redis do sprzątania.
 
         logger.info(
-            f"✅ Watchdog: Zakończono czyszczenie (running: {cleaned_running}, ghost: {ghost_tasks_cleaned})")
+            f"✅ Watchdog: zakończono (ghost: {ghost_tasks_cleaned})")
 
         return {
             'status': 'success',
-            'cleaned_running': cleaned_running,
             'ghost_tasks_cleaned': ghost_tasks_cleaned,
-            'lock_cleaned': current_lock is not None
         }
 
     except Exception as e:

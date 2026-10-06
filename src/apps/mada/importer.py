@@ -8,8 +8,10 @@ from typing import Dict, Optional, Tuple
 
 from django.utils import timezone
 
-from .models import Brand, Category, MadaProduct, MadaProductImage, MadaProductVariant
-from .stock_tracker import track_stock_change
+from .models import (
+    Brand, Category, MadaProduct, MadaProductImage, MadaProductVariant, StockHistory,
+)
+from .stock_tracker import build_stock_history_row
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,13 @@ def sync_brands(db: str, producers: Dict[str, str]) -> int:
     if to_update:
         Brand.objects.using(db).bulk_update(to_update, ['name', 'updated_at'], batch_size=500)
     return len(to_create) + len(to_update)
+
+
+def load_brand_cache(db: str) -> Dict[str, Brand]:
+    """Wczytuje wszystkie marki raz na przebieg importu ({producer_id: Brand}),
+    żeby `upsert_product` nie robił zapytania na każdy produkt (N+1). Wołać po
+    `sync_brands` (który dopisuje nowe marki z feedu)."""
+    return {b.producer_id: b for b in Brand.objects.using(db).all()}
 
 
 def resolve_category(db: str, categories: list, category_cache: dict) -> Optional[Category]:
@@ -88,12 +97,18 @@ def resolve_category(db: str, categories: list, category_cache: dict) -> Optiona
     return category
 
 
-def upsert_product(db: str, product_dict: dict, category_cache: dict) -> Tuple[MadaProduct, bool]:
+def upsert_product(
+    db: str, product_dict: dict, category_cache: dict,
+    brand_cache: Optional[Dict[str, Brand]] = None,
+) -> Tuple[MadaProduct, bool]:
     api_id = product_dict['api_id']
     brand = None
     producer_id = product_dict.get('producer_id')
     if producer_id:
-        brand = Brand.objects.using(db).filter(producer_id=producer_id).first()
+        if brand_cache is not None:
+            brand = brand_cache.get(producer_id)
+        else:
+            brand = Brand.objects.using(db).filter(producer_id=producer_id).first()
     category = resolve_category(db, product_dict.get('categories') or [], category_cache)
 
     defaults = {
@@ -116,11 +131,22 @@ def upsert_product(db: str, product_dict: dict, category_cache: dict) -> Tuple[M
 
 def upsert_variants(db: str, product: MadaProduct, variants: list) -> int:
     """Upsert wariantów produktu, zapisując zmiany stanu do StockHistory. Zwraca
-    liczbę utworzonych/zmienionych wariantów."""
+    liczbę utworzonych/zmienionych wariantów.
+
+    Stan magazynowy aktualizujemy warunkowym UPDATE (`filter(pk=…, stock=old)`),
+    a wpis do StockHistory tworzymy tylko gdy ten UPDATE faktycznie zmienił wiersz.
+    Dzięki temu operacja jest:
+      * odporna na wyścig — dwa równoległe importy (full + partial) nie zdublują
+        historii, bo `WHERE stock=old` serializuje zapisujących;
+      * idempotentna — powtórny import tego samego pliku (redelivery Celery po
+        `visibility_timeout`) widzi stan już docelowy → 0 wierszy → brak duplikatu.
+    Wpisy historii zbieramy i wrzucamy jednym `bulk_create` (zamiast INSERT/wariant).
+    """
     existing = {
         v.variant_key: v
         for v in MadaProductVariant.objects.using(db).filter(product=product)
     }
+    history_rows = []
     changed = 0
     for v in variants:
         key = v['variant_key']
@@ -136,36 +162,46 @@ def upsert_variants(db: str, product: MadaProduct, variants: list) -> int:
                 ean=v['ean'], stock=v['stock'],
             )
             existing[key] = current
-            track_stock_change(
-                product_api_id=product.api_id, variant_key=key,
-                old_stock=0, new_stock=v['stock'],
-                product_name=product.name, variant_label=label,
+            row = build_stock_history_row(
+                product.api_id, key, 0, v['stock'], product.name, label,
             )
+            if row is not None:
+                history_rows.append(row)
             changed += 1
             continue
 
-        fields_changed = []
+        row_changed = False
         if current.stock != v['stock']:
-            track_stock_change(
-                product_api_id=product.api_id, variant_key=key,
-                old_stock=current.stock, new_stock=v['stock'],
-                product_name=product.name, variant_label=label,
+            old_stock, new_stock = current.stock, v['stock']
+            n = (
+                MadaProductVariant.objects.using(db)
+                .filter(pk=current.pk, stock=old_stock)
+                .update(stock=new_stock, updated_at=timezone.now())
             )
-            current.stock = v['stock']
-            fields_changed.append('stock')
-        if current.color != v['color']:
-            current.color = v['color']
-            fields_changed.append('color')
-        if current.size != v['size']:
-            current.size = v['size']
-            fields_changed.append('size')
-        if current.ean != v['ean']:
-            current.ean = v['ean']
-            fields_changed.append('ean')
-        if fields_changed:
-            fields_changed.append('updated_at')
-            current.save(using=db, update_fields=fields_changed)
+            if n:
+                current.stock = new_stock
+                row = build_stock_history_row(
+                    product.api_id, key, old_stock, new_stock, product.name, label,
+                )
+                if row is not None:
+                    history_rows.append(row)
+                row_changed = True
+
+        attr_changed = []
+        for field in ('color', 'size', 'ean'):
+            if getattr(current, field) != v[field]:
+                setattr(current, field, v[field])
+                attr_changed.append(field)
+        if attr_changed:
+            attr_changed.append('updated_at')
+            current.save(using=db, update_fields=attr_changed)
+            row_changed = True
+
+        if row_changed:
             changed += 1
+
+    if history_rows:
+        StockHistory.objects.using(db).bulk_create(history_rows, batch_size=200)
     return changed
 
 
@@ -188,9 +224,12 @@ def upsert_images(db: str, product: MadaProduct, images: list) -> None:
         MadaProductImage.objects.using(db).filter(product=product, api_image_id__in=stale_ids).delete()
 
 
-def import_product_dict(db: str, product_dict: dict, category_cache: dict) -> bool:
+def import_product_dict(
+    db: str, product_dict: dict, category_cache: dict,
+    brand_cache: Optional[Dict[str, Brand]] = None,
+) -> bool:
     """Importuje jeden produkt (+ warianty, + zdjęcia). Zwraca True gdy produkt był nowy."""
-    product, created = upsert_product(db, product_dict, category_cache)
+    product, created = upsert_product(db, product_dict, category_cache, brand_cache)
     upsert_variants(db, product, product_dict.get('variants') or [])
     upsert_images(db, product, product_dict.get('images') or [])
     return created

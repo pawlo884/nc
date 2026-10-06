@@ -38,9 +38,13 @@ def sync_tabu_stock(self):
 
         db = router.db_for_read(ApiSyncLog)
         try:
+            # Tylko ZAKOŃCZONE runy - inaczej zawieszony 'running'/'failed'
+            # przypina update_from do swojego started_at i kolejne runy pomijają
+            # dane z okna, którego ten run nie zdążył zaimportować. Po nieudanym
+            # runie okno ma się cofnąć do ostatniego udanego (catch-up).
             last_sync = (
                 ApiSyncLog.objects.using(db)  # type: ignore[attr-defined]
-                .filter(sync_type__in=('stock_update', 'stock_full'))
+                .filter(sync_type__in=('stock_update', 'stock_full'), status='completed')
                 .order_by('-started_at')
                 .values('started_at')
                 .first()

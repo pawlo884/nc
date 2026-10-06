@@ -1,15 +1,49 @@
 """
-Management command do konfiguracji periodic task dla synchronizacji stanów magazynowych
+Management command do konfiguracji periodic task dla mostu stanów magazynowych
+hurtownia -> MPD.StockAndPrices (#270: rozszerzone o tabu/mada, wcześniej
+tylko matterhorn1).
 """
+import json
+
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django_celery_beat.models import PeriodicTask, IntervalSchedule
 
+# Nazwa/task_path per źródło. Nazwa dla matterhorn1 zostaje jak była (żeby
+# `PeriodicTask.objects.get(name=...)` trafiał w istniejący wpis w prod DB,
+# a nie tworzył duplikatu) - tabu/mada dostają analogiczne nowe wpisy.
+SOURCES = {
+    'matterhorn1': {
+        'task_name': 'Synchronizacja stanów MPD z Matterhorn1',
+        'task_path': 'MPD.tasks.update_stock_from_matterhorn1',
+        'description': 'Synchronizuje stany magazynowe z bazy Matterhorn1 do MPD',
+        'takes_time_window': True,
+    },
+    'tabu': {
+        'task_name': 'Synchronizacja stanów MPD z Tabu',
+        'task_path': 'MPD.tasks.update_stock_from_tabu',
+        'description': 'Synchronizuje stany magazynowe z bazy Tabu do MPD (#270)',
+        'takes_time_window': False,
+    },
+    'mada': {
+        'task_name': 'Synchronizacja stanów MPD z Mada',
+        'task_path': 'MPD.tasks.update_stock_from_mada',
+        'description': 'Synchronizuje stany magazynowe z bazy Mada do MPD (#270)',
+        'takes_time_window': False,
+    },
+}
+
 
 class Command(BaseCommand):
-    help = 'Konfiguruje periodic task dla synchronizacji stanów magazynowych MPD z Matterhorn1'
+    help = 'Konfiguruje periodic task dla mostu stanów magazynowych hurtownia -> MPD'
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            '--source',
+            choices=sorted(SOURCES.keys()),
+            default='matterhorn1',
+            help='Która hurtownia (domyślnie: matterhorn1, zachowanie sprzed #270)',
+        )
         parser.add_argument(
             '--interval',
             type=int,
@@ -20,7 +54,7 @@ class Command(BaseCommand):
             '--time-window',
             type=int,
             default=15,
-            help='Ile minut wstecz sprawdzać zmiany (domyślnie: 15)'
+            help='Ile minut wstecz sprawdzać zmiany - tylko matterhorn1 (domyślnie: 15)'
         )
         parser.add_argument(
             '--disable',
@@ -34,14 +68,15 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        source = SOURCES[options['source']]
         interval_minutes = options['interval']
         time_window_minutes = options['time_window']
-        task_name = 'Synchronizacja stanów MPD z Matterhorn1'
-        task_path = 'MPD.tasks.update_stock_from_matterhorn1'
+        task_name = source['task_name']
+        task_path = source['task_path']
 
-        # Argumenty dla taska (okno czasowe)
-        import json
-        task_kwargs = json.dumps({'time_window_minutes': time_window_minutes})
+        task_kwargs = ''
+        if source['takes_time_window']:
+            task_kwargs = json.dumps({'time_window_minutes': time_window_minutes})
 
         # Sprawdź czy task już istnieje
         try:
@@ -63,15 +98,17 @@ class Command(BaseCommand):
 
             existing_task.interval = schedule
             existing_task.enabled = not options['disable']
-            existing_task.kwargs = task_kwargs
+            if source['takes_time_window']:
+                existing_task.kwargs = task_kwargs
             existing_task.save()
 
             status = 'wyłączony' if options['disable'] else 'włączony'
+            extra = f'\n   - Okno czasowe: {time_window_minutes} minut' if source['takes_time_window'] else ''
             self.stdout.write(
                 self.style.SUCCESS(
                     f'✅ Zaktualizowano periodic task: {task_name}\n'
-                    f'   - Interval: co {interval_minutes} minut\n'
-                    f'   - Okno czasowe: {time_window_minutes} minut\n'
+                    f'   - Interval: co {interval_minutes} minut'
+                    f'{extra}\n'
                     f'   - Status: {status}'
                 )
             )
@@ -102,15 +139,16 @@ class Command(BaseCommand):
                 kwargs=task_kwargs,
                 enabled=not options['disable'],
                 start_time=timezone.now(),
-                description='Synchronizuje stany magazynowe z bazy Matterhorn1 do MPD'
+                description=source['description'],
             )
 
             status = 'wyłączony' if options['disable'] else 'włączony'
+            extra = f'\n   - Okno czasowe: {time_window_minutes} minut' if source['takes_time_window'] else ''
             self.stdout.write(
                 self.style.SUCCESS(
                     f'✅ Utworzono periodic task: {task_name}\n'
-                    f'   - Interval: co {interval_minutes} minut\n'
-                    f'   - Okno czasowe: {time_window_minutes} minut\n'
+                    f'   - Interval: co {interval_minutes} minut'
+                    f'{extra}\n'
                     f'   - Status: {status}\n'
                     f'   - Task ID: {task.id}'
                 )
@@ -146,11 +184,12 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.HTTP_INFO(
                 '\n💡 Wskazówki:\n'
-                '   - Domyślnie: uruchomienie co 5 minut, sprawdza ostatnie 15 minut\n'
-                '   - Aby zmienić interval: python manage.py setup_stock_sync_task --interval 10\n'
-                '   - Aby zmienić okno czasowe: python manage.py setup_stock_sync_task --time-window 30\n'
-                '   - Aby wyłączyć: python manage.py setup_stock_sync_task --disable\n'
-                '   - Aby usunąć: python manage.py setup_stock_sync_task --delete\n'
+                '   - Domyślnie: matterhorn1, co 5 minut, okno 15 minut\n'
+                '   - Inna hurtownia: python manage.py setup_stock_sync_task --source tabu\n'
+                '   - Zmiana intervalu: python manage.py setup_stock_sync_task --interval 10\n'
+                '   - Zmiana okna czasowego (tylko matterhorn1): --time-window 30\n'
+                '   - Aby wyłączyć: python manage.py setup_stock_sync_task --source tabu --disable\n'
+                '   - Aby usunąć: python manage.py setup_stock_sync_task --source tabu --delete\n'
                 '   - Monitoring: http://localhost:5555 (Flower)\n'
                 '   - Admin: /admin/django_celery_beat/periodictask/\n'
             )

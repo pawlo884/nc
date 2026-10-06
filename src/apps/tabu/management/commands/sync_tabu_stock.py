@@ -8,12 +8,12 @@ Użycie:
 """
 import logging
 import time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
-from django.db import router, transaction
+from django.db import router
+from django.db.models import Sum
 
-from tabu.models import ApiSyncLog, TabuProduct, TabuProductVariant
-from tabu.stock_tracker import track_stock_change
+from tabu.models import ApiSyncLog, StockHistory, TabuProduct, TabuProductVariant
 
 from .base_tabu_api_command import BaseTabuAPICommand
 
@@ -92,67 +92,63 @@ class Command(BaseTabuAPICommand):
                     self.stdout.write(f'   Strona {page}...')
                 time.sleep(1)  # Limit API: 100 req/min
 
-            self.stdout.write(f'   Pobrano {len(all_products)} rekordów (wariantów)')
+            fetched_count = len(all_products)
+            self.stdout.write(f'   Pobrano {fetched_count} rekordów (wariantów)')
 
-            if update_from and not dry_run and self._should_skip_processing(len(all_products)):
+            fetch_fingerprint = self._fetch_fingerprint(all_products)
+
+            if update_from and not dry_run and self._should_skip_processing(fetch_fingerprint):
                 self.stdout.write(
                     self.style.WARNING(
-                        '   Pomijam aktualizację: liczba rekordów jest taka sama jak poprzednio.'
+                        '   Pomijam aktualizację: pobrane dane identyczne jak w poprzednim runie.'
                     )
                 )
                 self.update_sync_log(
-                    products_processed=len(all_products),
+                    products_processed=fetched_count,
                     products_success=0,
                     products_failed=0,
                     raw_response={
                         'stock_changes_logged': 0,
                         'update_from': update_from,
-                        'skipped_reason': 'same_count_as_previous_run',
-                        'fetched_variants': len(all_products),
+                        'skipped_reason': 'identical_fetch_as_previous_run',
+                        'fetched_variants': fetched_count,
+                        'fetch_fingerprint': fetch_fingerprint,
                     },
                 )
                 self.complete_sync_log('completed')
                 return
 
-            success_count = 0
-            fail_count = 0
+            # Redukcja pamięci: rekordy z products/basic bywają bogate, a
+            # _apply_stock_updates trzyma dane przez cały (wielominutowy przy
+            # dużym oknie) zapis do bazy. Zostawiamy tylko 4 potrzebne pola
+            # i zwalniamy surową listę — bez tego przy ~10k+ wariantów worker
+            # Celery dostawał OOM (SIGKILL).
+            lean = [
+                (r.get('variant_id'), r.get('store'), r.get('price_net'), r.get('price_gross'))
+                for r in all_products if isinstance(r, dict)
+            ]
+            del all_products
+
             history_count = 0
             variants_compared = 0
             variants_with_change = 0
+            fail_count = 0
 
-            for i, api_variant in enumerate(all_products):
-                if not dry_run:
-                    try:
-                        h, cmp_count, chg_count = self._update_variant(api_variant)
-                        success_count += 1
-                        history_count += h
-                        variants_compared += cmp_count
-                        variants_with_change += chg_count
-                    except Exception as e:
-                        fail_count += 1
-                        logger.error(
-                            f'Błąd aktualizacji wariantu {api_variant.get("variant_id")}: {e}'
-                        )
-                else:
-                    success_count += 1
-
-                if (i + 1) % 500 == 0:
-                    self.stdout.write(f'   Przetworzono {i + 1}/{len(all_products)}...')
-                    if not dry_run and self.sync_log:
-                        self.update_sync_log(
-                            products_processed=i + 1,
-                            products_success=success_count,
-                            products_failed=fail_count,
-                        )
+            if not dry_run:
+                history_count, variants_compared, variants_with_change, fail_count = (
+                    self._apply_stock_updates(lean)
+                )
+            success_count = variants_compared
 
             if not dry_run:
                 self.update_sync_log(
-                    products_processed=len(all_products),
+                    products_processed=fetched_count,
                     products_success=success_count,
                     products_failed=fail_count,
                     raw_response={
                         'stock_changes_logged': history_count,
                         'update_from': update_from,
+                        'fetch_fingerprint': fetch_fingerprint,
                     },
                 )
                 self.complete_sync_log('completed' if fail_count == 0 else 'completed')
@@ -172,7 +168,7 @@ class Command(BaseTabuAPICommand):
                 )
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'\n✅ Zakończono! Przetworzono: {len(all_products)}, '
+                    f'\n✅ Zakończono! Przetworzono: {fetched_count}, '
                     f'sukces: {success_count}, błędy: {fail_count}, '
                     f'zmiany w historii: {history_count}'
                 )
@@ -184,10 +180,31 @@ class Command(BaseTabuAPICommand):
                 self.complete_sync_log('failed', str(e))
             raise
 
-    def _should_skip_processing(self, fetched_count):
+    @staticmethod
+    def _fetch_fingerprint(records):
+        """Stabilny odcisk pobranej listy wariantów - `(variant_id, store,
+        price_net, price_gross)` posortowane. Dwa runy o tym samym odcisku
+        pobrały DOKŁADNIE te same dane (nie tylko tyle samo rekordów - stąd
+        stary bug: 'ta sama liczba' pomijał realne zmiany innych wariantów).
         """
-        Pomija przetwarzanie stock_update, jeśli liczba pobranych rekordów
-        jest taka sama jak w poprzednim zakończonym uruchomieniu.
+        import hashlib
+
+        rows = sorted(
+            (
+                int(r.get('variant_id') or 0),
+                int(r.get('store') or 0),
+                str(r.get('price_net') or ''),
+                str(r.get('price_gross') or ''),
+            )
+            for r in records
+            if isinstance(r, dict) and r.get('variant_id') is not None
+        )
+        return hashlib.sha1(repr(rows).encode()).hexdigest()
+
+    def _should_skip_processing(self, fetch_fingerprint):
+        """
+        Pomija przetwarzanie stock_update tylko jeśli pobrane dane są
+        IDENTYCZNE jak w poprzednim zakończonym uruchomieniu (ten sam odcisk).
         """
         if not self.sync_log:
             return False
@@ -197,78 +214,150 @@ class Command(BaseTabuAPICommand):
             .filter(sync_type='stock_update', status='completed')
             .exclude(pk=self.sync_log.pk)
             .order_by('-started_at')
-            .only('products_processed')
+            .values('raw_response')
             .first()
         )
 
-        if not previous_log:
+        if not previous_log or not previous_log.get('raw_response'):
             return False
 
-        return previous_log.products_processed == fetched_count
+        return previous_log['raw_response'].get('fetch_fingerprint') == fetch_fingerprint
 
-    def _update_variant(self, api_variant):
+    @staticmethod
+    def _parse_price(value):
+        if value is None:
+            return None
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _record_fields(rec):
+        """(variant_id, store, price_net, price_gross) z rekordu API (dict) albo
+        z krotki lean, którą buduje `handle`, żeby nie trzymać bogatych dictów
+        w pamięci przez cały czas zapisu do bazy."""
+        if isinstance(rec, dict):
+            return (rec.get('variant_id'), rec.get('store'),
+                    rec.get('price_net'), rec.get('price_gross'))
+        return tuple(rec)
+
+    _CHUNK = 1000
+
+    def _apply_stock_updates(self, records):
+        """Batch + PORCJAMI po `_CHUNK` (żeby nie ładować ~10k+ wariantów +
+        produktów do pamięci naraz — powodowało OOM/SIGKILL workera).
+
+        Per porcja: 1 SELECT wariantów po `api_id__in`, warunkowy
+        `filter(pk=..., store=old).update(...)` per zmieniony wariant
+        (idempotencja + brak wyścigu jak matterhorn1 #230), `bulk_create`
+        historii. `store_total` liczony z SUMY wariantów dotkniętych produktów
+        na końcu (bez dryfu - #233 pkt 3), również porcjami.
+
+        Zwraca (history_count, compared, with_change, fail_count).
         """
-        products/basic zwraca płaską listę – każdy element to wariant (id=product_id, variant_id=variant).
-        Aktualizuj stan, ceny wariantu i produktu. Zwraca (history_count, 1 lub 0, 1 lub 0).
-        """
-        variant_id = api_variant.get('variant_id')
-        product_api_id = api_variant.get('id')
-        if variant_id is None:
-            logger.debug(f'Brak variant_id w rekordzie, pomijam')
-            return 0, 0, 0
-
-        variant_id = int(variant_id)
-        product_api_id = int(product_api_id or 0)
-        new_store = int(api_variant.get('store') or 0)
-
         db = router.db_for_write(TabuProduct)
-        history_count = 0
-        compared = 0
-        with_change = 0
+        total_history = total_compared = fail_count = 0
+        affected_products = set()
 
-        with transaction.atomic(using=db):
+        buf = []
+        for rec in records:
+            vid, store, pn, pg = self._record_fields(rec)
+            if vid is None:
+                continue
             try:
-                variant = TabuProductVariant.objects.using(db).select_related('product').get(
-                    api_id=variant_id
-                )
-            except TabuProductVariant.DoesNotExist:
-                logger.debug(f'Wariant {variant_id} nie istnieje, pomijam')
-                return 0, 0, 0
+                buf.append({
+                    'variant_id': int(vid),
+                    'new_store': int(store or 0),
+                    'price_net': self._parse_price(pn),
+                    'price_gross': self._parse_price(pg),
+                })
+            except (ValueError, TypeError) as e:
+                fail_count += 1
+                logger.error(f'Zły rekord stanu (variant_id={vid}): {e}')
+            if len(buf) >= self._CHUNK:
+                h, c, aff = self._apply_stock_chunk(db, buf)
+                total_history += h
+                total_compared += c
+                affected_products |= aff
+                buf = []
+        if buf:
+            h, c, aff = self._apply_stock_chunk(db, buf)
+            total_history += h
+            total_compared += c
+            affected_products |= aff
 
-            product = variant.product
-            old_store = variant.store
-            compared = 1
-
-            variant.store = new_store
-            vf = ['store']
-            if api_variant.get('price_net') is not None:
-                variant.price_net = Decimal(str(api_variant.get('price_net') or 0))
-                vf.append('price_net')
-            if api_variant.get('price_gross') is not None:
-                variant.price_gross = Decimal(str(api_variant.get('price_gross') or 0))
-                vf.append('price_gross')
-            variant.save(update_fields=vf)
-
-            product.store_total = max(
-                0,
-                (product.store_total or 0) - (old_store or 0) + new_store
+        affected_sorted = sorted(affected_products)
+        for i in range(0, len(affected_sorted), self._CHUNK):
+            chunk = affected_sorted[i:i + self._CHUNK]
+            totals = dict(
+                TabuProductVariant.objects.using(db)
+                .filter(product_id__in=chunk)
+                .values('product_id').annotate(t=Sum('store'))
+                .values_list('product_id', 't')
             )
-            product.save(update_fields=['store_total'])
+            prods = list(TabuProduct.objects.using(db).filter(pk__in=chunk))
+            for prod in prods:
+                prod.store_total = max(0, totals.get(prod.pk, 0) or 0)
+            TabuProduct.objects.using(db).bulk_update(prods, ['store_total'], batch_size=200)
+
+        return total_history, total_compared, total_history, fail_count
+
+    def _apply_stock_chunk(self, db, parsed):
+        """Jedna porcja: zwraca (history_count, compared, affected_product_ids)."""
+        variants_by_api = {
+            v.api_id: v for v in
+            TabuProductVariant.objects.using(db).select_related('product').filter(
+                api_id__in=[p['variant_id'] for p in parsed])
+        }
+
+        history_to_create = []
+        price_only = []
+        affected_products = set()
+        compared = 0
+
+        for p in parsed:
+            v = variants_by_api.get(p['variant_id'])
+            if v is None:
+                continue
+            compared += 1
+            old_store, new_store = v.store, p['new_store']
 
             if old_store != new_store:
-                with_change = 1
-                sh = track_stock_change(
-                    variant_api_id=variant_id,
-                    product_api_id=product.api_id,
+                fields = {'store': new_store}
+                if p['price_net'] is not None:
+                    fields['price_net'] = p['price_net']
+                if p['price_gross'] is not None:
+                    fields['price_gross'] = p['price_gross']
+                changed = TabuProductVariant.objects.using(db).filter(
+                    pk=v.pk, store=old_store).update(**fields)
+                if not changed:
+                    continue  # inny run już złapał tę zmianę
+                affected_products.add(v.product_id)
+                history_to_create.append(StockHistory(
+                    variant_api_id=v.api_id,
+                    product_api_id=v.product.api_id,
+                    product_name=v.product.name,
+                    variant_symbol=v.symbol,
                     old_stock=old_store,
                     new_stock=new_store,
-                    product_name=product.name,
-                    variant_symbol=variant.symbol,
-                )
-                if sh:
-                    history_count = 1
+                    stock_change=new_store - old_store,
+                    change_type='increase' if new_store > old_store else 'decrease',
+                ))
+            elif p['price_net'] is not None or p['price_gross'] is not None:
+                if p['price_net'] is not None:
+                    v.price_net = p['price_net']
+                if p['price_gross'] is not None:
+                    v.price_gross = p['price_gross']
+                price_only.append(v)
 
-        return history_count, compared, with_change
+        if price_only:
+            TabuProductVariant.objects.using(db).bulk_update(
+                price_only, ['price_net', 'price_gross'], batch_size=200)
+        if history_to_create:
+            StockHistory.objects.using(db).bulk_create(history_to_create, batch_size=200)
+
+        return len(history_to_create), compared, affected_products
 
     def _debug_sample(self, options):
         """Diagnostyka: products/basic zwraca płaską listę wariantów (id=product, variant_id=variant)."""

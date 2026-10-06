@@ -17,7 +17,7 @@ from django.db import router, transaction
 from django.utils import timezone
 
 from mada.api_client import MadaApiClient, MadaApiError
-from mada.importer import import_product_dict, sync_brands
+from mada.importer import import_product_dict, load_brand_cache, sync_brands
 from mada.models import ApiSyncLog, MadaProduct
 from mada.parser import iter_products, parse_producers
 
@@ -70,12 +70,13 @@ class Command(BaseCommand):
             producers = parse_producers(xml_bytes)
             if producers:
                 sync_brands(db, producers)
+            brand_cache = load_brand_cache(db)
 
             processed = created = errors = 0
             for product_dict in iter_products(xml_bytes):
                 try:
                     with transaction.atomic(using=db):
-                        was_created = import_product_dict(db, product_dict, category_cache)
+                        was_created = import_product_dict(db, product_dict, category_cache, brand_cache)
                         if was_created:
                             created += 1
                 except Exception:

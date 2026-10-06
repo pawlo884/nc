@@ -1,0 +1,14 @@
+{% load i18n %}
+<h3>{{ title }}</h3>
+<ul class="admin-filter-{{ title|cut:' '|lower }}">
+    <li>
+        <form method="GET" action="">
+            {% for k, v in choices.0.query_parts %}
+                <input type="hidden" name="{{ k }}" value="{{ v }}">
+            {% endfor %}
+            <input type="text" name="{{ spec.parameter_name }}"
+                   value="{{ spec.value|default_if_none:'' }}"
+                   placeholder="{{ spec.title }}" style="width: 100%; box-sizing: border-box;"/>
+        </form>
+    </li>
+</ul>

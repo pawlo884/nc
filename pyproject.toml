@@ -1,0 +1,40 @@
+[tool.pytest.ini_options]
+# Runner testów projektu. Uruchamianie:
+#   pytest                       # wszystko
+#   pytest src/apps/matterhorn1  # jedna apka
+#   pytest -m "not e2e"          # szybki cykl
+DJANGO_SETTINGS_MODULE = "core.settings.dev"
+# tylko tests*.py — NIE test_*.py, żeby nie zbierać komend
+# management/commands/test_*_connection.py (jak w check-branch.yml)
+python_files = ["tests*.py"]
+python_classes = ["Test*", "*Test", "*Tests"]
+testpaths = ["src/apps"]
+pythonpath = ["src/apps", "src"]
+addopts = "--reuse-db --strict-markers -ra"
+markers = [
+  "unit: szybki test jednostkowy, bez DB/HTTP",
+  "integration: test z DB lub wieloma komponentami",
+  "e2e: pełny przepływ (np. pipeline importu z zamockowanym HTTP)",
+]
+
+[tool.coverage.run]
+branch = false
+omit = [
+  "*/tests/*",
+  "*/tests.py",
+  "*/tests_*.py",
+  "*/migrations/*",
+  "*/management/commands/*",
+  "*_example.py",
+  "*_examples.py",
+  "*/database_utils.py",           # martwy kod (zero zewnętrznych importów)
+  "*/saga_example.py",
+]
+
+[tool.coverage.report]
+exclude_also = [
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+]
+

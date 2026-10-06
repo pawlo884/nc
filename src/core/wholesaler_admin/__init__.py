@@ -1,4 +1,4 @@
-from .filters import make_scoped_filter
+from .filters import InputFilter, make_input_filter, make_scoped_filter
 from .fuzzy import fuzzy_suggest_mpd_products
 from .mpd_context import build_mpd_change_context
 from .permissions import ReadOnlyLogAdminMixin, RouterScopedQuerysetMixin
@@ -6,6 +6,8 @@ from .stock_history import StockHistoryAdminBase
 from .thumbnails import render_product_thumbnail, resolve_thumbnail_url
 
 __all__ = [
+    'InputFilter',
+    'make_input_filter',
     'make_scoped_filter',
     'fuzzy_suggest_mpd_products',
     'build_mpd_change_context',

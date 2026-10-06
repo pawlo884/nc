@@ -13,7 +13,7 @@ def index(request):
 
 
 def health_check(request):
-    """Health check dla Docker/k3s — w odpowiedzi widać hostname poda."""
+    """Health check dla Docker — w odpowiedzi hostname kontenera."""
     return HttpResponse(
         f"OK pod={socket.gethostname()}",
         content_type="text/plain",

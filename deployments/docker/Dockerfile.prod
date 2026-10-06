@@ -41,14 +41,15 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Dodaj src/ do PYTHONPATH, żeby Python mógł znaleźć aplikacje
 ENV PYTHONPATH=/app:/app/apps
 
-# Skopiuj tylko potrzebne pliki (bez dev)
+# Skopiuj kod (bez dev). Całe src/apps/ jednym COPY — /app/apps jest w PYTHONPATH
+# (wyżej), więc nowe aplikacje w INSTALLED_APPS nie wymagają zmiany w Dockerfile.
+# .dockerignore odsiewa __pycache__, test_*.py, *.md itp.
 COPY src/manage.py .
 COPY src/core/ ./core/
-COPY src/apps/matterhorn1/ ./matterhorn1/
-COPY src/apps/MPD/ ./MPD/
-COPY src/apps/web_agent/ ./web_agent/
-COPY src/apps/tabu/ ./tabu/
-COPY src/apps/mada/ ./mada/
+COPY src/apps/ ./apps/
+# Szablony projektowe (TEMPLATES['DIRS'] = BASE_DIR/'templates'): admin/input_filter.html,
+# admin/app_list.html, robots.txt, index.html. Bez tego 500 na changelistach z InputFilter.
+COPY src/templates/ ./templates/
 # COPY static/ ./static/  # Nie kopiujemy - zostanie utworzony przez collectstatic
 COPY deployments/nginx/nginx.conf ./nginx.conf
 COPY deployments/redis.conf ./redis.conf

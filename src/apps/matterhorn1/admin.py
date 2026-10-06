@@ -20,8 +20,8 @@ from .defs_db import resolve_image_url
 from . import bestsellers_data
 from core.db_routers import _get_mpd_db, _get_matterhorn1_db
 from core.wholesaler_admin import (
-    make_scoped_filter, render_product_thumbnail, fuzzy_suggest_mpd_products,
-    build_mpd_change_context, StockHistoryAdminBase,
+    make_scoped_filter, make_input_filter, render_product_thumbnail,
+    fuzzy_suggest_mpd_products, build_mpd_change_context, StockHistoryAdminBase,
     ReadOnlyLogAdminMixin, RouterScopedQuerysetMixin,
 )
 
@@ -1846,20 +1846,39 @@ class StockHistoryAdmin(RouterScopedQuerysetMixin, ReadOnlyLogAdminMixin, StockH
     ]
     list_display_links = ['product_uid_link']
 
+    # Tabela historii ma setki tysięcy wierszy - domyślny COUNT(*) całości przy
+    # aktywnym filtrze to zbędny full scan.
+    show_full_result_count = False
+
+    def get_queryset(self, request):
+        """Adnotacja `_product_pk` (pk produktu po `product_uid`) jednym
+        skorelowanym podzapytaniem, zamiast query per wiersz w
+        `product_uid_link` - `product_uid` to zwykły IntegerField, nie FK, więc
+        `select_related` nie zadziała, a bez tego changelist robił N+1."""
+        qs = super().get_queryset(request)
+        product_pk = Product.objects.filter(
+            product_uid=OuterRef('product_uid')).values('pk')[:1]
+        return qs.annotate(_product_pk=Subquery(product_pk))
+
     def product_uid_link(self, obj):
-        """Renderuje product_uid jako link do produktu"""
-        if obj.product_uid:
-            product_url = obj.get_product_url()
-            if product_url:
-                return format_html(
-                    '<a href="{}" target="_blank">{}</a>',
-                    product_url,
-                    obj.product_uid
-                )
+        """Renderuje product_uid jako link do produktu (pk z adnotacji, bez query)"""
+        product_pk = getattr(obj, '_product_pk', None)
+        if obj.product_uid and product_pk:
+            from django.urls import reverse
+            return format_html(
+                '<a href="{}" target="_blank">{}</a>',
+                reverse('admin:matterhorn1_product_change', args=[product_pk]),
+                obj.product_uid
+            )
         return obj.product_uid
     product_uid_link.short_description = 'Product UID'
     product_uid_link.admin_order_field = 'product_uid'
-    list_filter = ['change_type', 'timestamp', 'product_uid']
+    # `product_uid` przez pole tekstowe zamiast listy ~38 tys. wartości w pasku
+    # bocznym (to zabijało czas ładowania strony).
+    list_filter = [
+        'change_type', 'timestamp',
+        make_input_filter(title='Product UID', parameter_name='product_uid', cast=int),
+    ]
     search_fields = [
         'product_uid', 'product_name', 'variant_uid', 'variant_name'
     ]

@@ -255,14 +255,7 @@ class StockHistory(models.Model):
     def __str__(self):
         return f"{self.product_name} - {self.variant_name}: {self.old_stock} → {self.new_stock} ({self.timestamp})"
 
-    def get_product_url(self):
-        """Zwraca URL do produktu w admin na podstawie product_uid"""
-        from django.urls import reverse
-        try:
-            # Znajdź produkt po product_uid
-            from .models import Product
-            product = Product.objects.using('matterhorn1').get(
-                product_uid=self.product_uid)
-            return reverse('admin:matterhorn1_product_change', args=[product.pk])
-        except Product.DoesNotExist:
-            return None
+    # Uwaga: nie dodawać tu metody robiącej Product.objects.get(product_uid=...) -
+    # `product_uid` nie jest FK, więc w changelist admina to było N+1 (query na
+    # każdy wiersz). Link do produktu buduje StockHistoryAdmin z adnotacji
+    # `_product_pk` (jedno skorelowane podzapytanie).

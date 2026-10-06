@@ -34,13 +34,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Dodaj src/ do PYTHONPATH, żeby Python mógł znaleźć aplikacje
 ENV PYTHONPATH=/app:/app/apps
 
-# Skopiuj tylko potrzebne pliki
+# Skopiuj kod. Całe src/apps/ jednym COPY — /app/apps jest w PYTHONPATH (wyżej),
+# więc nowe aplikacje w INSTALLED_APPS nie wymagają zmiany w Dockerfile.
 COPY src/manage.py .
 COPY src/core/ ./core/
-COPY src/apps/matterhorn1/ ./matterhorn1/
-COPY src/apps/MPD/ ./MPD/
-COPY src/apps/web_agent/ ./web_agent/
-COPY src/apps/tabu/ ./tabu/
+COPY src/apps/ ./apps/
 COPY deployments/nginx/nginx.conf ./nginx.conf
 COPY deployments/redis.conf ./redis.conf
 COPY package.json .
