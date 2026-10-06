@@ -41,15 +41,23 @@ Dotyczy warstwy AI w `apps/web_agent` — wzbogacanie danych produktu
 
 ### Faza 2 — OpenRouter: routing modeli per zadanie
 
-- [ ] mapa `operacja → profil modelu`, np.:
-  - `name` → tani, szybki (np. `openai/gpt-4o-mini` / `google/gemini-flash`)
-  - `description` → mocny reasoning (np. `kimi-k2-thinking` / `anthropic/claude-*`)
-  - `attributes` → tani + structured output
-  - `short_description` → tani
-- [ ] źródło konfiguracji: rozszerzyć `AIPrompt` o `model` / `model_profile` (edycja w adminie) **albo** `settings.AI_MODEL_ROUTING`
-- [ ] per-model: `temperature`, `max_tokens`, `reasoning.effort` (hack dla kimi już jest — uogólnić)
+- [x] mapa `operacja → profil modelu` — `DEFAULT_MODEL_ROUTING` w
+  `langchain_ai_processor.py`: `name`/`attributes`/`short_description` →
+  `openai/gpt-4o-mini` (tani, szybki, structured output), `description` →
+  `moonshotai/kimi-k2-thinking` (mocny reasoning)
+- [x] źródło konfiguracji: **ani** rozszerzenie `AIPrompt`, **ani**
+  `settings.AI_MODEL_ROUTING` — env vary czytane w module
+  (`AI_MODEL_<OPERACJA>_<ROLA>`, `_resolve_model()`), zgodnie z konwencją
+  całej reszty configu AI/LLM w tym repo (zero ustawień AI w
+  `core/settings/*.py` — sprawdzone przy implementacji)
+- [ ] per-model: `temperature`, `max_tokens` per operacja (dziś: stałe
+  dla wszystkich) — `reasoning.effort` (hack dla kimi) już **uogólniony**:
+  `REASONING_EFFORT_BY_MODEL`, właściwość modelu (nie operacji/pozycji),
+  działa niezależnie od tego czy kimi jest primary czy fallback
 - [ ] OpenRouter provider preferences (`extra_body={"provider": {...}}`) — kontrola kosztu / latencji / `data_collection`
-- [ ] fallback per profil (nie jeden globalny) — `.with_fallbacks()` z listą z konfiguracji
+- [x] fallback per profil (nie jeden globalny) — `self._routing[cache_key]`
+  w `_invoke()`, reczna petla primary→fallback (nie `.with_fallbacks()` —
+  patrz #201, `.with_fallbacks()` maskował błędy walidacji Pydantic)
 - [ ] koszt per operacja z `usage` OpenRouter → `ProductProcessingLog`
 
 ### Faza 3 — Observability / śledzenie agentów

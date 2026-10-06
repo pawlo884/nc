@@ -1,17 +1,29 @@
 """
-Procesor AI: OpenRouter (moonshotai/kimi-k2-thinking -> openai/gpt-4o-mini
-fallback) przez LangChain, tracing przez LangSmith. Ten sam publiczny
-interfejs co AIProcessor (ai_processor.py) - wołany z tych samych miejsc
-(product_processor.py, background_automation.py, browser_automation.py,
-run_automation.py) bez zadnych zmian tam. Ustaw USE_LANGCHAIN_AI=1
-(get_ai_processor w ai_processor.py), zeby z niego korzystac.
+Procesor AI: OpenRouter przez LangChain, tracing przez LangSmith. Ten sam
+publiczny interfejs co AIProcessor (ai_processor.py) - wołany z tych samych
+miejsc (product_processor.py, background_automation.py,
+browser_automation.py, run_automation.py) bez zadnych zmian tam. Ustaw
+USE_LANGCHAIN_AI=1 (get_ai_processor w ai_processor.py), zeby z niego
+korzystac.
 
-Routing = miedzy modelami (niezawodnosc), nie miedzy promptami - oba modele
-ida przez ten sam prompt/schemat. Fallback to JAWNA petla primary->fallback
-w _invoke() (nie LangChainowe .with_fallbacks()) - kazda proba to osobny
-.invoke(), wiec kazda i tak jest osobnym spanem w LangSmith (dodatkowo
-otagowanym nazwa modelu), ale sukces/blad kazdej proby liczymy z PRAWDZIWEGO
-wyniku TEGO wywolania (try/except), a nie z LLM-owych callbackow. To celowe:
+Routing = dwie rzeczy naraz:
+1. Miedzy modelami (niezawodnosc) - primary->fallback per proba, patrz
+   _invoke() nizej.
+2. Miedzy OPERACJAMI (koszt/jakosc) - DEFAULT_MODEL_ROUTING przypisuje inna
+   pare modeli kazdej operacji (name/description/attributes/
+   short_description), nie jeden globalny primary/fallback dla wszystkiego.
+   `description` dostaje mocny model rozumujacy jako primary (uzasadnione -
+   copywriting), pozostale trzy dostaja tani/szybki model jako primary z
+   tym samym mocnym modelem w odwodzie jako fallback (niezawodnosc nie
+   spada - trudniejszy model zawsze jest dostepny, tylko rzadziej
+   potrzebny). Nadpisywalne per operacja przez AI_MODEL_<OP>_<ROLE> env
+   vary bez redeployu kodu - patrz _resolve_model().
+
+Fallback (miedzy modelami) to JAWNA petla primary->fallback w _invoke() (nie
+LangChainowe .with_fallbacks()) - kazda proba to osobny .invoke(), wiec
+kazda i tak jest osobnym spanem w LangSmith (dodatkowo otagowanym nazwa
+modelu), ale sukces/blad kazdej proby liczymy z PRAWDZIWEGO wyniku TEGO
+wywolania (try/except), a nie z LLM-owych callbackow. To celowe:
 .with_structured_output() to w rzeczywistosci DWA kroki (LLM, potem parser
 Pydantic) - .with_fallbacks() + callback na poziomie LLM widzi tylko
 pierwszy krok i potrafi zaraportowac model jako "sukces", mimo ze jego JSON
@@ -33,7 +45,7 @@ Kontrola = dwa niezalezne mechanizmy, nie jeden zamiast drugiego:
 import logging
 import os
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -46,8 +58,56 @@ from .ai_processor import (
 logger = logging.getLogger(__name__)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_PRIMARY_MODEL = "moonshotai/kimi-k2-thinking"
-DEFAULT_FALLBACK_MODEL = "openai/gpt-4o-mini"
+
+# operacja (ten sam cache_key co w _invoke()) -> (primary, fallback). Oba
+# modele juz zweryfikowane na zywym OpenRouter w tej sesji (structured i
+# nie-structured output) - swiadomie zero nowych, niesprawdzonych
+# model-slugow tutaj; dywersyfikacja o trzeci model to osobny krok, do
+# zweryfikowania na zywo przed uzyciem jako domyslny.
+DEFAULT_MODEL_ROUTING: Dict[str, Tuple[str, str]] = {
+    "name": ("openai/gpt-4o-mini", "moonshotai/kimi-k2-thinking"),
+    "description": ("moonshotai/kimi-k2-thinking", "openai/gpt-4o-mini"),
+    "attributes": ("openai/gpt-4o-mini", "moonshotai/kimi-k2-thinking"),
+    "short_description": ("openai/gpt-4o-mini", "moonshotai/kimi-k2-thinking"),
+}
+
+# reasoning.effort to wlasciwosc MODELU (kimi jest modelem rozumujacym), nie
+# operacji/pozycji - kimi moze byc primary (description) albo fallback
+# (pozostale trzy operacje), w obu przypadkach potrzebuje tego samego
+# obejscia (patrz komentarz w _get_llm o reasoning_tokens zjadajacych
+# max_tokens).
+REASONING_EFFORT_BY_MODEL: Dict[str, str] = {
+    "moonshotai/kimi-k2-thinking": "low",
+}
+
+# Wsteczna zgodnosc: te zmienne istnialy PRZED routingiem per operacja i
+# ustawialy globalny primary/fallback dla wszystkiego. Dzis maja sens tylko
+# dla description (jedynej operacji, dla ktorej kimi-k2-thinking byl i jest
+# domyslnym primary) - .env.dev juz ma OPENAI_MODEL_PRODUCT_ENRICHMENT
+# ustawione, nie chcemy zeby przestalo dzialac.
+_LEGACY_ENV_OVERRIDE: Dict[Tuple[str, str], str] = {
+    ("description", "primary"): "OPENAI_MODEL_PRODUCT_ENRICHMENT",
+    ("description", "fallback"): "LANGCHAIN_FALLBACK_MODEL",
+}
+
+
+def _resolve_model(operation: str, role: str) -> str:
+    """Wybiera model dla (operacja, rola). Kolejnosc: AI_MODEL_<OP>_<ROLE>
+    (nowy, per-operacyjny override) > legacy env (tylko description,
+    wstecznie kompatybilne z OPENAI_MODEL_PRODUCT_ENRICHMENT/
+    LANGCHAIN_FALLBACK_MODEL) > DEFAULT_MODEL_ROUTING. Pozwala zmienic model
+    per operacja bez redeployu kodu."""
+    env_key = f"AI_MODEL_{operation.upper()}_{role.upper()}"
+    value = os.getenv(env_key)
+    if value:
+        return value
+    legacy_key = _LEGACY_ENV_OVERRIDE.get((operation, role))
+    if legacy_key:
+        value = os.getenv(legacy_key)
+        if value:
+            return value
+    idx = 0 if role == "primary" else 1
+    return DEFAULT_MODEL_ROUTING[operation][idx]
 
 
 class AttributesOutput(BaseModel):
@@ -78,8 +138,8 @@ def _get_prompt(name: str, **kwargs) -> Optional[str]:
 
 
 class LangChainAIProcessor:
-    """Procesor AI: OpenRouter, dwa modele (moonshotai/kimi-k2-thinking ->
-    openai/gpt-4o-mini), reczny fallback (petla try/except w _invoke() -
+    """Procesor AI: OpenRouter, model routowany PER OPERACJA (patrz
+    DEFAULT_MODEL_ROUTING), reczny fallback (petla try/except w _invoke() -
     patrz docstring modulu), tracing przez LangSmith."""
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
@@ -88,15 +148,18 @@ class LangChainAIProcessor:
             raise ValueError(
                 "API key is required. Ustaw OPENROUTER_API_KEY w .env.dev."
             )
-        self.primary_model = model or os.getenv(
-            "OPENAI_MODEL_PRODUCT_ENRICHMENT", DEFAULT_PRIMARY_MODEL)
-        self.fallback_model = os.getenv(
-            "LANGCHAIN_FALLBACK_MODEL", DEFAULT_FALLBACK_MODEL)
+        # `model` (jesli podany) nadpisuje primary WSZYSTKICH operacji - uzyte
+        # dzis tylko w testach/debugowaniu, produkcyjnie routing jest per
+        # operacja (self._routing) i konfigurowany env-varami, nie tym argumentem.
+        self._routing: Dict[str, Tuple[str, str]] = {
+            op: (model or _resolve_model(op, "primary"), _resolve_model(op, "fallback"))
+            for op in DEFAULT_MODEL_ROUTING
+        }
         self._chains: Dict[tuple, object] = {}
         self._call_log: List[Dict] = []
         logger.info(
-            "LangChainAIProcessor zainicjalizowany (OpenRouter, primary=%s, fallback=%s)",
-            self.primary_model, self.fallback_model,
+            "LangChainAIProcessor zainicjalizowany (OpenRouter, routing=%s)",
+            self._routing,
         )
 
     def pop_call_log(self) -> List[Dict]:
@@ -109,23 +172,28 @@ class LangChainAIProcessor:
 
     def _get_llm(self, model: str):
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(
+        kwargs = dict(
             base_url=OPENROUTER_BASE_URL,
             api_key=self.api_key,
             model=model,
             temperature=0.7,
             max_tokens=1500,
-            # primary (kimi-k2-thinking) jest modelem rozumujacym - bez tego co
-            # najmniej polowa max_tokens znika w niewidocznych reasoning_tokens,
-            # zanim model zdazy dokonczyc strukturyzowany JSON (zweryfikowane na
-            # prawdziwym wywolaniu OpenRouter: max_tokens=1500 -> 989 reasoning,
-            # max_tokens=4000 -> 2467 reasoning, oba razy "length limit was
-            # reached", opis nigdy nie kończył się na primary). OpenRouter-owy
-            # `reasoning.effort` przycina budzet rozumowania niezaleznie od
-            # max_tokens odpowiedzi - z "low" primary faktycznie konczy opis.
-            # Fallback (nie-rozumujacy model) po prostu ignoruje ten parametr.
-            extra_body={"reasoning": {"effort": "low"}},
         )
+        reasoning_effort = REASONING_EFFORT_BY_MODEL.get(model)
+        if reasoning_effort:
+            # modele rozumujace (dzis: kimi-k2-thinking) bez tego zjadaja co
+            # najmniej polowe max_tokens na niewidoczne reasoning_tokens,
+            # zanim zdaza dokonczyc strukturyzowany JSON (zweryfikowane na
+            # prawdziwym wywolaniu OpenRouter: max_tokens=1500 -> 989
+            # reasoning, max_tokens=4000 -> 2467 reasoning, oba razy "length
+            # limit was reached", opis nigdy sie nie konczyl). OpenRouter-owy
+            # `reasoning.effort` przycina budzet rozumowania niezaleznie od
+            # max_tokens odpowiedzi. Modele nie-rozumujace (gpt-4o-mini) nie
+            # dostaja tego kwarga wcale - nie tylko jest im zbedny, ale nie
+            # ma pewnosci ze kazdy model na OpenRouter go ignoruje bez zmian
+            # zachowania.
+            kwargs["extra_body"] = {"reasoning": {"effort": reasoning_effort}}
+        return ChatOpenAI(**kwargs)
 
     def _get_model_chain(self, model: str, cache_key: str, pydantic_class=None):
         """Chain dla POJEDYNCZEGO modelu (opcjonalnie ze strukturyzowanym
@@ -154,7 +222,7 @@ class LangChainAIProcessor:
         messages = [SystemMessage(content=system), HumanMessage(content=user)]
         attempts: List[Dict] = []
         result = None
-        for model in (self.primary_model, self.fallback_model):
+        for model in self._routing[cache_key]:
             started = time.monotonic()
             try:
                 chain = self._get_model_chain(model, cache_key, pydantic_class)
@@ -215,9 +283,10 @@ class LangChainAIProcessor:
             "name", system, user, tags=["name"], pydantic_class=ProductNameStructure)
         if isinstance(result, ProductNameStructure):
             return result.to_final_name()
+        primary, fallback = self._routing["name"]
         raise RuntimeError(
-            f"Nie udało się ulepszyć nazwy produktu ani przez {self.primary_model}, "
-            f"ani przez {self.fallback_model}"
+            f"Nie udało się ulepszyć nazwy produktu ani przez {primary}, "
+            f"ani przez {fallback}"
         )
 
     def enhance_product_description(
@@ -285,9 +354,10 @@ class LangChainAIProcessor:
         )
         if isinstance(result, ProductDescriptionStructure):
             return result.to_formatted_text()
+        primary, fallback = self._routing["description"]
         logger.error(
             "Nie udało się ulepszyć opisu ani przez %s, ani przez %s - zwracam oryginał",
-            self.primary_model, self.fallback_model,
+            primary, fallback,
         )
         return original_description
 
