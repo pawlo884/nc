@@ -88,7 +88,7 @@ pyzmq==26.4.0
 RapidFuzz==3.13.0
 redis==5.2.1
 referencing==0.36.2
-requests==2.33.0
+requests==2.34.2
 responses==0.26.3
 rpds-py==0.26.0
 s3transfer==0.12.0
