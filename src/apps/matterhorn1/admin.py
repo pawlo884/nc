@@ -11,6 +11,7 @@ import json
 import logging
 import requests
 from rapidfuzz import fuzz
+from MPD.colors import ColorResolutionError
 from .models import (
     Brand, Category, Product, ProductDetails, ProductImage,
     ProductVariant, ApiSyncLog, Saga, SagaStep, StockHistory
@@ -485,7 +486,7 @@ class ProductAdmin(admin.ModelAdmin):
                         return JsonResponse({'success': False, 'error': 'Brak głównego koloru'})
 
                     # Wspólna reguła kolorów MPD (MPD/colors.py) – jak przy imporcie.
-                    from MPD.colors import ColorResolutionError, resolve_variant_colors
+                    from MPD.colors import resolve_variant_colors
                     with connections['matterhorn1'].cursor() as matterhorn_cursor:
                         matterhorn_cursor.execute(
                             "SELECT color FROM product WHERE id = %s", [product_id])
@@ -560,7 +561,6 @@ class ProductAdmin(admin.ModelAdmin):
                 mapping_info = {}
                 if size_category:
                     # Dodaj warianty do MPD
-                    from MPD.colors import ColorResolutionError
                     from .saga_variants import create_mpd_variants
                     try:
                         mapping_info = create_mpd_variants(
@@ -752,17 +752,22 @@ class ProductAdmin(admin.ModelAdmin):
                             if not product_id or not mpd_product_id:
                                 continue
 
-                            # Zaktualizuj mapowanie
                             product = Product.objects.get(id=product_id)
+
+                            # Najpierw warianty: gdy kolor nie ma odpowiednika w MPD
+                            # (ColorResolutionError), produkt nie zostaje oznaczony
+                            # jako zmapowany bez wariantów.
+                            self._auto_map_variants(product, mpd_product_id)
+
                             product.mapped_product_uid = mpd_product_id
                             product.is_mapped = True
                             product.save()
 
-                            # Automatycznie zmapuj warianty (sygnał MPD uruchomi task linkowania)
-                            self._auto_map_variants(product, mpd_product_id)
-
                             success_count += 1
 
+                        except ColorResolutionError as e:
+                            errors.append(
+                                f"Błąd mapowania produktu {product_id}: {e}")
                         except Exception as e:
                             errors.append(
                                 f"Błąd mapowania produktu {product_id}"
@@ -1206,7 +1211,7 @@ class ProductAdmin(admin.ModelAdmin):
                     return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': False, 'total': 0, 'error': 'Cena produktu wynosi 0'}
 
                 # Kolor główny wg wspólnej reguły MPD (MPD/colors.py)
-                from MPD.colors import ColorResolutionError, get_main_color
+                from MPD.colors import get_main_color
                 try:
                     color_id = get_main_color(None, product_color, using='MPD').id
                 except ColorResolutionError as e:
