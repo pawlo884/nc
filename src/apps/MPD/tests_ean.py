@@ -125,39 +125,3 @@ class MpdEanCommandTest(TestCase):
         self.assertIn(f'{self.p1.pk};Stanik z Tabu', lines[1])
         self.assertIn(f'{self.p2.pk};Stanik z Mady', lines[1])
 
-
-
-class FindExistingMpdProductTest(TestCase):
-    databases = {'default'}
-
-    def setUp(self):
-        self.source = Sources.objects.create(name='Hurtownia')
-        self.product = Products.objects.create(name='P')
-
-    def test_matches_canonical_ean(self):
-        from MPD.dedup import find_existing_mpd_product
-        ProductVariants.objects.create(product=self.product, ean='5901234123457')
-        self.assertEqual(
-            find_existing_mpd_product([' 5901234123457', None, ''], 'default'), self.product.pk)
-
-    def test_matches_legacy_source_ean_when_canonical_empty(self):
-        from MPD.dedup import find_existing_mpd_product
-        variant = ProductVariants.objects.create(product=self.product)
-        ProductvariantsSources.objects.bulk_create([  # bez sygnału -> variant.ean pusty
-            ProductvariantsSources(variant=variant, source=self.source, ean='00011T180291')])
-        self.assertEqual(
-            find_existing_mpd_product(['00011t180291'], 'default'), self.product.pk)
-
-    def test_no_match(self):
-        from MPD.dedup import find_existing_mpd_product
-        self.assertIsNone(find_existing_mpd_product(['5900000000000'], 'default'))
-        self.assertIsNone(find_existing_mpd_product([None, 'brak'], 'default'))
-
-    def test_ambiguous(self):
-        from MPD.dedup import AmbiguousMatch, find_existing_mpd_product
-        other = Products.objects.create(name='Duplikat')
-        ProductVariants.objects.create(product=self.product, ean='5901234123457')
-        ProductVariants.objects.create(product=other, ean='5901234123457')
-        with self.assertRaises(AmbiguousMatch) as ctx:
-            find_existing_mpd_product(['5901234123457'], 'default')
-        self.assertEqual(ctx.exception.product_ids, sorted([self.product.pk, other.pk]))

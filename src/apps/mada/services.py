@@ -321,82 +321,6 @@ def _saga_clear_mada_mapping(mada_product_id: int, **kwargs: Any) -> None:
     logger.info("Saga kompensacja: wyzerowano mapowanie Mada product id=%s", mada_product_id)
 
 
-def _assign_to_existing_mpd_product(
-    mada_product, form_data: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
-    """Gdy EAN-y wariantów Mada są już w MPD, przypisuje Mada do tamtego produktu.
-
-    Zwraca wynik jak ``create_mpd_product_from_mada`` albo ``None``, gdy w MPD
-    nie ma żadnego wariantu z tymi kodami (wtedy tworzymy nowy produkt).
-    """
-    from MPD.dedup import AmbiguousMatch, find_existing_mpd_product, product_size_category
-    from mada.models import MadaProduct
-    from core.db_routers import _get_mpd_db, _get_mada_db
-
-    mpd_db = _get_mpd_db()
-    source_color = (form_data.get('source_color') or '').strip()
-    variants = list(mada_product.variants.all())
-    if source_color:
-        variants = [
-            v for v in variants
-            if (v.color or '').strip().casefold() == source_color.casefold()
-        ]
-    codes = [v.ean for v in variants] + [getattr(mada_product, 'ean', None)]
-    try:
-        mpd_product_id = find_existing_mpd_product(codes, mpd_db)
-    except AmbiguousMatch as exc:
-        logger.warning("Dedup Mada %s: %s", mada_product.pk, exc)
-        return {
-            'success': False,
-            'mpd_product_id': None,
-            'error_message': 'EAN pasuje do kilku produktów MPD',
-            'candidate_mpd_product_ids': exc.product_ids,
-        }
-    if mpd_product_id is None:
-        return None
-
-    MadaProduct.objects.using(_get_mada_db()).filter(pk=mada_product.pk).update(
-        mapped_product_uid=mpd_product_id
-    )
-    main_color_id = form_data.get('main_color_id')
-    main_color_id = int(main_color_id) if main_color_id and str(main_color_id).isdigit() else None
-    producer_color_name = (form_data.get('producer_color_name') or '').strip() or None
-    mapping_info: Dict[str, Any] = {}
-    size_category = product_size_category(mpd_product_id, mpd_db)
-    if size_category:
-        mapping_info = create_mpd_variants_from_mada(
-            mpd_product_id,
-            mada_product.pk,
-            size_category,
-            producer_code=(form_data.get('producer_code') or '').strip() or None,
-            main_color_id=main_color_id,
-            producer_color_name=producer_color_name,
-            source_color=source_color or None,
-        )
-    else:
-        logger.warning(
-            "Dedup Mada %s: produkt MPD %s bez kategorii rozmiarów — przypisano bez wariantów",
-            mada_product.pk, mpd_product_id,
-        )
-    if form_data.get('upload_images'):
-        try:
-            upload_mada_images_to_mpd(mpd_product_id, mada_product.pk, producer_color_name=producer_color_name)
-        except Exception as img_err:
-            logger.warning("Dedup Mada: błąd uploadu zdjęć: %s", img_err)
-
-    logger.info(
-        "Dedup Mada %s: przypisano do istniejącego produktu MPD %s (%s)",
-        mada_product.pk, mpd_product_id, mapping_info,
-    )
-    return {
-        'success': True,
-        'mpd_product_id': mpd_product_id,
-        'error_message': None,
-        'assigned_existing': True,
-        'created_variants': mapping_info.get('created_variants', 0),
-    }
-
-
 def create_mpd_product_from_mada(
     mada_product_id: int,
     form_data: Optional[Dict[str, Any]] = None,
@@ -433,12 +357,6 @@ def create_mpd_product_from_mada(
                 'mpd_product_id': None,
                 'error_message': 'Produkt jest już zmapowany do MPD',
             }
-
-        # Dedup (#182): ten sam towar z innej hurtowni już jest w MPD → dopinamy
-        # się do istniejącego produktu zamiast tworzyć duplikat.
-        dedup = _assign_to_existing_mpd_product(mada_product, form_data)
-        if dedup is not None:
-            return dedup
 
         saga = MadaSagaOrchestrator()
         saga.add_step(

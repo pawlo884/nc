@@ -47,24 +47,6 @@ class TestCreateMpdProduct:
         res = SagaService._create_mpd_product({"name": "Bez marki"})
         assert Products.objects.using(MPD_DB).get(id=res["mpd_product_id"]).brand is None
 
-    def test_dedup_po_ean_przypina_do_istniejacego_produktu(self):
-        """#182: EAN wariantu Matterhorn już jest w MPD (np. z Tabu) -> bez duplikatu."""
-        from matterhorn1.models import ProductVariant
-        from MPD.models import ProductVariants
-
-        existing = Products.objects.using(MPD_DB).create(name="Ten sam z Tabu")
-        ProductVariants.objects.using(MPD_DB).create(product=existing, ean="5901234123457")
-        brand = Brand.objects.create(brand_id="BD", name="BD")
-        mh = Product.objects.create(product_uid=700101, name="Inna nazwa w MH", brand=brand)
-        ProductVariant.objects.create(variant_uid="700101-1", product=mh, name="M", ean="5901234123457")
-
-        res = SagaService._create_mpd_product(
-            {"name": "Inna nazwa w MH", "brand_name": "BD", "matterhorn_product_id": mh.id})
-
-        assert res["mpd_product_id"] == existing.id
-        assert res["assigned_existing"] is True
-        assert not Products.objects.using(MPD_DB).filter(name="Inna nazwa w MH").exists()
-
 
 class TestMatterhornMapping:
     @pytest.fixture

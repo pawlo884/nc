@@ -57,11 +57,7 @@ class SagaService:
             name="create_mpd_product",
             execute_func=SagaService._create_mpd_product,
             compensate_func=SagaService._delete_mpd_product,
-            data={"mpd_data": {
-                **mpd_product_data,
-                # do dedupu po EAN (#182) w _create_mpd_product
-                "matterhorn_product_id": matterhorn_product_data.get("product_id"),
-            }}
+            data={"mpd_data": mpd_product_data}
         )
 
         # Krok 2: Utwórz produkt w matterhorn1 z mapping
@@ -198,23 +194,6 @@ class SagaService:
                     'MPD').get_or_create(name=brand_name)
                 brand_id = brand.id
 
-            # Dedup (#182): ten sam towar z innej hurtowni już jest w MPD
-            # (te same EAN-y wariantów) → używamy istniejącego produktu;
-            # krok wariantów dopnie Matterhorn po EAN.
-            existing_by_ean = SagaService._find_mpd_product_by_matterhorn_eans(
-                mpd_data.get('matterhorn_product_id'))
-            if existing_by_ean:
-                logger.info(
-                    f"ℹ️ EAN-y produktu Matterhorn {mpd_data.get('matterhorn_product_id')} "
-                    f"są już w MPD (ID: {existing_by_ean}) – przypisuję zamiast tworzyć duplikat"
-                )
-                existing = Products.objects.using('MPD').get(id=existing_by_ean)
-                return {
-                    'mpd_product_id': existing.id,
-                    'assigned_existing': True,
-                    'created_products': [{'id': existing.id, 'name': existing.name}]
-                }
-
             # Sprawdź, czy produkt o tej samej nazwie i marce już istnieje
             # (chroni przed podwójnym utworzeniem tego samego produktu w MPD,
             # np. przy ponownym uruchomieniu Sagi dla tego samego produktu).
@@ -268,26 +247,6 @@ class SagaService:
         except Exception as e:
             logger.error(f"❌ Błąd podczas tworzenia produktu w MPD: {e}")
             raise Exception(f"Failed to create MPD product: {e}")
-
-    @staticmethod
-    def _find_mpd_product_by_matterhorn_eans(matterhorn_product_id) -> Optional[int]:
-        """Produkt MPD z EAN-ami wariantów tego produktu Matterhorn (albo None).
-
-        Gdy EAN-y pasują do kilku produktów MPD, rzuca wyjątek — saga się
-        wycofa, a produkt trzeba przypisać ręcznie (assign-mapping).
-        """
-        if not matterhorn_product_id:
-            return None
-        from matterhorn1.models import ProductVariant
-        from MPD.dedup import AmbiguousMatch, find_existing_mpd_product
-
-        codes = ProductVariant.objects.filter(
-            product_id=matterhorn_product_id).values_list('ean', flat=True)
-        try:
-            return find_existing_mpd_product(codes, 'MPD')
-        except AmbiguousMatch as exc:
-            raise Exception(
-                f"EAN pasuje do kilku produktów MPD {exc.product_ids} – przypisz ręcznie") from exc
 
     @staticmethod
     def _delete_mpd_product(mpd_data: Dict, mpd_product_id: int = None) -> Dict:

@@ -208,35 +208,3 @@ class MadaImageUploadProducerColorTest(TestCase):
             )
         img = ProductImage.objects.using(_mpd_db()).get(product_id=self.mpd_product.id)
         self.assertIsNone(img.producer_color_id)
-
-
-class MadaDedupByEanTest(TestCase):
-    """#182: produkt Mady z EAN-em, który już jest w MPD, przypina się do niego."""
-
-    databases = '__all__'
-
-    def test_assigns_to_existing_product_instead_of_creating(self):
-        from MPD.models import ProductVariants, Sizes
-
-        mpd_db = _mpd_db()
-        mada_db = _mada_db()
-        size = Sizes.objects.using(mpd_db).create(name='M', category='biustonosze')
-        existing = Products.objects.using(mpd_db).create(name='Ten sam stanik z Tabu')
-        ProductVariants.objects.using(mpd_db).create(
-            product=existing, size=size, ean='5901234567890')
-        brand = Brand.objects.using(mada_db).create(producer_id='MADA_DEDUP', name='Dedup')
-        mada_product = MadaProduct.objects.using(mada_db).create(
-            api_id=800201, name='Stanik z Mady', desc='', brand=brand, price=Decimal('50'))
-        mada_variant = MadaProductVariant.objects.using(mada_db).create(
-            product=mada_product, variant_key='5901234567890', size='M',
-            color='Czarny', ean='5901234567890', stock=2)
-        count_before = Products.objects.using(mpd_db).count()
-
-        result = create_mpd_product_from_mada(mada_product.pk, form_data={})
-
-        self.assertTrue(result['success'], result)
-        self.assertTrue(result.get('assigned_existing'))
-        self.assertEqual(result['mpd_product_id'], existing.pk)
-        self.assertEqual(Products.objects.using(mpd_db).count(), count_before)
-        mada_variant.refresh_from_db(using=mada_db)
-        self.assertTrue(mada_variant.is_mapped)
