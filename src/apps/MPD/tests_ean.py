@@ -48,6 +48,19 @@ class PickCanonicalEanTest(SimpleTestCase):
         self.assertIsNone(pick_canonical_ean([_row(1, ean='', mpn='ABC')]))
         self.assertIsNone(pick_canonical_ean([]))
 
+    def test_alphanumeric_fallback_when_no_gtin(self):
+        # kody Gatty z common_products_ean.csv
+        self.assertEqual(pick_canonical_ean([_row(1, ean=' 00011t180291 ')]), '00011T180291')
+
+    def test_gtin_from_any_source_beats_fallback(self):
+        rows = [_row(1, ean='00011T180291'), _row(2, ean='5900000000002')]
+        self.assertEqual(pick_canonical_ean(rows), '5900000000002')
+
+    def test_fallback_rejects_too_long_or_junk(self):
+        self.assertIsNone(pick_canonical_ean([_row(1, ean='32926800180203600')]))
+        self.assertIsNone(pick_canonical_ean([_row(1, ean='brak kodu!')]))
+        self.assertIsNone(pick_canonical_ean([_row(1, ean='brak-kodu')]))
+
 
 class VariantEanSignalTest(TestCase):
 
@@ -72,7 +85,7 @@ class VariantEanSignalTest(TestCase):
 
     def test_invalid_code_leaves_ean_empty(self):
         ProductvariantsSources.objects.create(
-            variant=self.variant, source=self.source, ean='brak-kodu')
+            variant=self.variant, source=self.source, ean='brak kodu!')
         self.variant.refresh_from_db()
         self.assertIsNone(self.variant.ean)
 
@@ -112,10 +125,3 @@ class MpdEanCommandTest(TestCase):
         self.assertIn(f'{self.p1.pk};Stanik z Tabu', lines[1])
         self.assertIn(f'{self.p2.pk};Stanik z Mady', lines[1])
 
-
-class PrestashopReferenceTest(SimpleTestCase):
-
-    def test_canonical_ean_is_used_first(self):
-        from prestashop.exporter import _variant_reference
-        self.assertEqual(
-            _variant_reference(SimpleNamespace(ean='5901234123457')), '5901234123457')

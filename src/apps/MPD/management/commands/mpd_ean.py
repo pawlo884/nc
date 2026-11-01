@@ -60,7 +60,9 @@ class Command(BaseCommand):
                 ean = pick_canonical_ean(source_rows)
                 if ean:
                     filled += ProductVariants.objects.using(db).filter(
-                        variant_id=variant_id).update(ean=ean)
+                        Q(ean__isnull=True) | Q(ean=''),
+                        variant_id=variant_id,
+                    ).update(ean=ean)
         return filled
 
     def _report(self, db):

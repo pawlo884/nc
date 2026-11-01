@@ -27,7 +27,8 @@ def backfill_variant_ean(apps, schema_editor):
         for variant_id, source_rows in rows.items():
             ean = pick_canonical_ean(source_rows)
             if ean:
-                Variant.objects.using(db).filter(variant_id=variant_id).update(ean=ean)
+                Variant.objects.using(db).filter(
+                    variant_id=variant_id, ean__isnull=True).update(ean=ean)
 
 
 class Migration(migrations.Migration):
