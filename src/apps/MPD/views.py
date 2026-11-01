@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from .models import Products, ProductSet, ProductSetItem, ProductPaths, ProductAttribute
 from .models import Brands, Colors, Sizes, ProductVariants, ProductVariantsRetailPrice, ProductvariantsSources
-from .models import FabricComponent, ProductFabric, Attributes, ProductImage, StockAndPrices, Paths, Vat, Sources
+from .models import FabricComponent, ProductFabric, Attributes, ProductImage, StockAndPrices, Paths, Sources
 from django.http import JsonResponse
 from django.db import connections, transaction
 from django.utils import timezone
@@ -21,6 +21,7 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from core.legacy_auth import admin_required
 import decimal
+from .vat import resolve_vat, resolve_vat_id, resolve_vat_id_or_default
 import json
 
 logger = logging.getLogger(__name__)
@@ -915,7 +916,7 @@ def create_product(request):
                 ProductVariantsRetailPrice.objects.using('MPD').create(
                     variant=variant,
                     retail_price=variant_data['price'],
-                    vat=variant_data.get('vat', 23.0),
+                    vat=resolve_vat_id_or_default(variant_data.get('vat')),
                     currency=variant_data.get('currency', 'PLN'),
                     net_price=variant_data.get('net_price')
                 )
@@ -1056,7 +1057,7 @@ def update_product(request, product_id):
                     ProductVariantsRetailPrice.objects.using('MPD').create(
                         variant=variant,
                         retail_price=variant_data['price'],
-                        vat=variant_data.get('vat', 23.0),
+                        vat=resolve_vat_id_or_default(variant_data.get('vat')),
                         currency=variant_data.get('currency', 'PLN'),
                         net_price=variant_data.get('net_price')
                     )
@@ -1164,20 +1165,8 @@ def get_product(request, product_id):
 
             try:
                 price = variant.productvariantsretailprice
-                vat_id = None
-                vat_rate = None
-                if price.vat is not None:
-                    try:
-                        vat_id = int(price.vat)
-                        vat_row = Vat.objects.using('MPD').filter(id=vat_id).first()
-                        if vat_row:
-                            vat_rate = float(vat_row.vat_rate) if vat_row.vat_rate is not None else None
-                        else:
-                            # legacy: w kolumnie bywa stawka zamiast id
-                            vat_rate = float(price.vat)
-                            vat_id = None
-                    except (TypeError, ValueError):
-                        vat_rate = float(price.vat) if price.vat is not None else None
+                vat_id, rate = resolve_vat(price.vat)
+                vat_rate = float(rate) if rate is not None else None
                 variant_data['price'] = {
                     'retail_price': float(price.retail_price) if price.retail_price else None,
                     'vat': vat_id,
@@ -1327,32 +1316,6 @@ def update_product_retail_prices(request, product_id):
             {'status': 'error', 'message': 'Tylko metoda POST jest obsługiwana'},
             status=405,
         )
-
-    def resolve_vat_id(vat_raw):
-        """Kolumna vat to FK do tabeli vat(id), nie stawka procentowa."""
-        if vat_raw in (None, ''):
-            return 1  # jak w adminie MPD
-        try:
-            val = decimal.Decimal(str(vat_raw))
-        except (decimal.InvalidOperation, TypeError, ValueError):
-            return 1
-
-        # Najpierw traktuj jako ID
-        if val == val.to_integral_value():
-            vat_id = int(val)
-            if Vat.objects.using('MPD').filter(id=vat_id).exists():
-                return vat_id
-
-        # Potem jako stawkę (np. 23 → rekord z vat_rate=23)
-        vat_row = Vat.objects.using('MPD').filter(vat_rate=val).first()
-        if vat_row:
-            return vat_row.id
-
-        # Fallback jak w adminie
-        if Vat.objects.using('MPD').filter(id=1).exists():
-            return 1
-        first = Vat.objects.using('MPD').order_by('id').first()
-        return first.id if first else 1
 
     try:
         data = json.loads(request.body)
@@ -1660,7 +1623,7 @@ def bulk_map_from_matterhorn1(request):
                             ProductVariantsRetailPrice.objects.using('MPD').create(
                                 variant=variant,
                                 retail_price=variant_data['price'],
-                                vat=variant_data.get('vat', 23.0),
+                                vat=resolve_vat_id_or_default(variant_data.get('vat')),
                                 currency=variant_data.get('currency', 'PLN'),
                                 net_price=variant_data.get('net_price')
                             )

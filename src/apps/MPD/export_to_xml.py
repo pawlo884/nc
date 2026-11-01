@@ -7,6 +7,7 @@ from xml.dom import minidom
 from datetime import datetime
 from django.utils import timezone
 from .models import Sources
+from .vat import vat_rate as vat_rate_from_db
 
 """
 Eksporter XML dla systemu MPD
@@ -189,7 +190,7 @@ class FullXMLExporter(BaseXMLExporter):
         NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
         """
         from django.utils.html import escape
-        from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths, Vat
+        from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths
         from datetime import timedelta
 
         now = timezone.now()
@@ -259,13 +260,9 @@ class FullXMLExporter(BaseXMLExporter):
                     'MPD').filter(variant=variant).first()
                 if pvrp:
                     currency = pvrp.currency or 'PLN'
-                    if pvrp.vat:
-                        vat_obj = Vat.objects.using(
-                            'MPD').filter(id=pvrp.vat).first()
-                        if vat_obj:
-                            vat_rate = str(vat_obj.vat_rate)
-                        else:
-                            vat_rate = str(pvrp.vat)
+                    rate = vat_rate_from_db(pvrp.vat)
+                    if rate is not None:
+                        vat_rate = str(rate)
                     has_price = True
                     break
 
@@ -638,7 +635,7 @@ class LightXMLExporter(BaseXMLExporter):
         NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
         """
         from django.utils.html import escape
-        from .models import Products, ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, Vat, FullChangeFile
+        from .models import Products, ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, FullChangeFile
         from datetime import timedelta
 
         now = timezone.now()
@@ -702,14 +699,7 @@ class LightXMLExporter(BaseXMLExporter):
                         variant=variant
                     ).first()
                     if retail_price and retail_price.vat:
-                        # Pobierz VAT z tabeli vat
-                        vat_obj = Vat.objects.using('MPD').filter(
-                            id=retail_price.vat
-                        ).first()
-                        if vat_obj:
-                            vat_rate = vat_obj.vat_rate
-                        else:
-                            vat_rate = retail_price.vat
+                        vat_rate = vat_rate_from_db(retail_price.vat)
                         break
 
                 # Pobierz group_name z category rozmiaru (jak w FullXMLExporter)
@@ -953,7 +943,7 @@ class LightXMLExporter(BaseXMLExporter):
         NIE ZMIENIAJ tej logiki bez wyraźnego polecenia!
         """
         from django.utils.html import escape
-        from .models import ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources, Vat
+        from .models import ProductVariants, StockAndPrices, ProductVariantsRetailPrice, ProductvariantsSources
         from datetime import timedelta
 
         now = timezone.now()
@@ -985,14 +975,7 @@ class LightXMLExporter(BaseXMLExporter):
                         variant=variant
                     ).first()
                     if retail_price and retail_price.vat:
-                        # Pobierz VAT z tabeli vat
-                        vat_obj = Vat.objects.using('MPD').filter(
-                            id=retail_price.vat
-                        ).first()
-                        if vat_obj:
-                            vat_rate = vat_obj.vat_rate
-                        else:
-                            vat_rate = retail_price.vat
+                        vat_rate = vat_rate_from_db(retail_price.vat)
                         break
 
                 # Pobierz group_name z category rozmiaru
@@ -2117,7 +2100,6 @@ class FullChangeXMLExporter(BaseXMLExporter):
         from .models import ProductVariants, ProductImage, StockAndPrices, ProductVariantsRetailPrice, ProductPaths, Paths
         from datetime import timedelta
         from django.db.models import Q
-        from .models import Vat
 
         now = timezone.now()
         # Konwertuj na czas lokalny (Europe/Warsaw)
@@ -2199,13 +2181,9 @@ class FullChangeXMLExporter(BaseXMLExporter):
                     'MPD').filter(variant=variant).first()
                 if pvrp:
                     currency = pvrp.currency or 'PLN'
-                    if pvrp.vat:
-                        vat_obj = Vat.objects.using(
-                            'MPD').filter(id=pvrp.vat).first()
-                        if vat_obj:
-                            vat_rate = str(vat_obj.vat_rate)
-                        else:
-                            vat_rate = str(pvrp.vat)
+                    rate = vat_rate_from_db(pvrp.vat)
+                    if rate is not None:
+                        vat_rate = str(rate)
                     has_price = True
                     break
 
