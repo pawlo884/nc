@@ -16,6 +16,7 @@ from .models import (
 )
 from . import bestsellers_data
 from core.db_routers import _get_mpd_db, _get_tabu_db
+from MPD.colors import ColorResolutionError
 from core.wholesaler_admin import (
     make_scoped_filter, render_product_thumbnail, fuzzy_suggest_mpd_products,
     build_mpd_change_context, StockHistoryAdminBase, ReadOnlyLogAdminMixin,
@@ -292,6 +293,8 @@ class TabuProductAdmin(admin.ModelAdmin):
                         source_color=source_color,
                     )
                     logger.info("Wynik dodawania wariantów Tabu→MPD: %s", mapping_info)
+                except ColorResolutionError as e:
+                    mapping_info = {'error': str(e)}
                 except Exception as e:
                     logger.exception("Błąd podczas dodawania wariantów Tabu→MPD: %s", e)
                     mapping_info = {'error': 'Wystąpił błąd'}

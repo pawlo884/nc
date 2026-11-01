@@ -30,8 +30,8 @@ def create_mpd_variants(
 ) -> Dict:
     """Utwórz warianty w MPD - na koniec wysyłany jest 1 task linkowania po EAN (product_id + source_id)."""
     from matterhorn1.models import Product as MhProduct, ProductVariant as MhProductVariant
+    from MPD.colors import ColorResolutionError, resolve_variant_colors
     from MPD.models import (
-        Colors,
         ProductVariants,
         ProductvariantsSources,
         Sizes,
@@ -58,7 +58,6 @@ def create_mpd_variants(
     try:
         # Pobierz produkt z matterhorn1
         mh_product = MhProduct.objects.using(mh_db).get(id=matterhorn_product_id)
-        product_color = mh_product.color or 'Brak koloru'
         product_prices = mh_product.prices or {}
         if isinstance(product_prices, str):
             product_prices = json.loads(product_prices) if product_prices else {}
@@ -66,31 +65,17 @@ def create_mpd_variants(
         if isinstance(product_price, str):
             product_price = float(product_price)
 
-        logger.info("Produkt: kolor=%s, cena=%s", product_color, product_price)
+        logger.info("Produkt: kolor=%s, cena=%s", mh_product.color, product_price)
 
-        # Kolor w MPD
-        color = Colors.objects.using(mpd_db).filter(name=product_color).first()
-        if not color:
-            raise ValueError("Color %s not found in MPD" % product_color)
-        color_id = color.id
-
-        # Producer color. UWAGA: colors.name jest UNIQUE — szukamy po samej nazwie,
-        # parent_id trafia tylko do defaults. Lookup po (name, parent_id) wywalał się
-        # na colors_name_key, gdy kolor o tej nazwie już istniał z innym parentem
-        # (np. „Beige" przypięty do innego koloru głównego).
-        producer_color_id = None
-        if producer_color_name and main_color_id:
-            producer_color, created = Colors.objects.using(mpd_db).get_or_create(
-                name=producer_color_name,
-                defaults={'hex_code': '', 'parent_id': main_color_id},
-            )
-            producer_color_id = producer_color.id
-            if created:
-                logger.info("Utworzono kolor producenta: %s", producer_color_name)
-        else:
-            logger.warning(
-                "Brak producer_color_name lub main_color_id - producer_color_id będzie None"
-            )
+        # Kolory: wspólna reguła MPD dla wszystkich hurtowni (MPD/colors.py)
+        colors = resolve_variant_colors(
+            main_color_id=main_color_id,
+            producer_color_name=producer_color_name,
+            source_color_name=mh_product.color,
+            using=mpd_db,
+        )
+        color_id = colors.color.id
+        producer_color_id = colors.producer_color.id if colors.producer_color else None
 
         # Licznik IAI usunięty – zwracamy placeholder dla kompatybilności API
         iai_product_id = None
@@ -248,6 +233,8 @@ def create_mpd_variants(
 
     except MhProduct.DoesNotExist:
         raise ValueError("Product %s not found in matterhorn1" % matterhorn_product_id)
+    except ColorResolutionError:
+        raise
     except Exception as e:
         raise Exception("Failed to create MPD variants: %s" % e) from e
 

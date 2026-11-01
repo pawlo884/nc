@@ -105,6 +105,22 @@ class TestBulkMapToMpd:
         other.refresh_from_db()
         assert other.mapped_product_uid == 2
 
+    def test_brak_koloru_w_mpd_nie_oznacza_produktu_jako_zmapowany(self, product_admin, mh_product):
+        from MPD.colors import ColorResolutionError
+        body = json.dumps({"mappings": [{"product_id": mh_product.id, "mpd_product_id": 42}]})
+        request = RequestFactory().post("/", data=body, content_type="application/json")
+
+        with patch.object(ProductAdmin, "_auto_map_variants",
+                          side_effect=ColorResolutionError("Kolor hurtowni „Fuksja” nie ma odpowiednika")):
+            response = product_admin.bulk_map_to_mpd(request)
+
+        payload = json.loads(response.content)
+        assert len(payload["errors"]) == 1
+        assert "Fuksja" in payload["errors"][0]
+        mh_product.refresh_from_db()
+        assert mh_product.mapped_product_uid is None
+        assert mh_product.is_mapped is False
+
     def test_get_zwraca_blad_metody(self, product_admin):
         response = product_admin.bulk_map_to_mpd(RequestFactory().get("/"))
         assert json.loads(response.content)["success"] is False
