@@ -7,19 +7,20 @@ odwołasz): kategoria + kolory/rozmiary (mapping.py) -> produkt -> combinations
 
 Ceny/kod producenta: te same reguły co apps/MPD/export_to_xml.py
 (FullXMLExporter.generate_xml) - pierwsza cena z pierwszego wariantu,
-code_producer w kolejności ean -> gtin14 -> gtin13 -> producer_code -> other.
+code_producer z MPD.ean.variant_code_producer (kanoniczny ProductVariants.ean,
+fallback ean -> gtin14 -> gtin13 -> producer_code -> other z hurtowni).
 """
 import logging
 from xml.etree import ElementTree as ET
 
 from django.utils.text import slugify
 
+from MPD.ean import variant_code_producer
 from MPD.models import (
     ProductPaths,
     ProductVariants,
     ProductVariantsRetailPrice,
     Products,
-    ProductvariantsSources,
     StockAndPrices,
 )
 
@@ -40,19 +41,9 @@ SHOP_ID = 1
 
 
 def _variant_reference(variant: ProductVariants) -> str:
-    """Kod producenta/EAN wariantu - fallback ean->gtin14->gtin13->producer_code->other,
-    identycznie jak w export_to_xml.py (żeby oba kanały zgadzały się w SKU)."""
-    source = ProductvariantsSources.objects.using(
-        'MPD').filter(variant=variant).first()
-    if not source:
-        return ''
-    for field in ('ean', 'gtin14', 'gtin13'):
-        value = getattr(source, field, None)
-        if value:
-            return value
-    if getattr(source, 'producer_code', None):
-        return source.producer_code
-    return source.other or ''
+    """Kod producenta/EAN wariantu - ta sama reguła co export_to_xml.py
+    (MPD.ean.variant_code_producer), żeby oba kanały zgadzały się w SKU."""
+    return variant_code_producer(variant)
 
 
 def _extract_id(xml_bytes: bytes, root_tag: str) -> int:

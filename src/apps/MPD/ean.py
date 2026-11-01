@@ -105,3 +105,32 @@ def ensure_variant_ean(variant_id: int, using: str) -> Optional[str]:
             Q(ean__isnull=True) | Q(ean=''), variant_id=variant_id,
         ).update(ean=ean)
     return ean
+
+
+LEGACY_CODE_FIELDS = ('ean', 'gtin14', 'gtin13', 'producer_code', 'other')
+
+
+def variant_code_producer(variant, using: str = 'MPD') -> str:
+    """Kod producenta wariantu dla eksportów (IOF XML ``code_producer``,
+    PrestaShop ``reference``) — jedna reguła dla obu kanałów.
+
+    Najpierw kanoniczny ``ProductVariants.ean``. Gdy go brak (np. hurtownia
+    nie podała GTIN-u), stara kolejność z pierwszego źródła wariantu:
+    ean -> gtin14 -> gtin13 -> producer_code -> other.
+    """
+    if getattr(variant, 'ean', None):
+        return variant.ean
+
+    from .models import ProductvariantsSources
+
+    source = (
+        ProductvariantsSources.objects.using(using)
+        .filter(variant=variant).order_by('source_id', 'pk').first()
+    )
+    if not source:
+        return ''
+    for field in LEGACY_CODE_FIELDS:
+        value = getattr(source, field, None)
+        if value:
+            return value
+    return ''

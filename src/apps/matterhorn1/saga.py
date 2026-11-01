@@ -663,9 +663,11 @@ class SagaService:
             with connections['MPD'].cursor() as mpd_cursor:
                 for idx, (image_url, image_order) in enumerate(images, 1):
                     if image_url:
-                        # Upload do bucketa
+                        # productimage.image_url to zwykle klucz w buckecie
+                        # (np. db_images/xxx.jpg), nie URL - bez rozwiązania
+                        # upload szuka pliku lokalnie i zdjęcie przepada.
                         bucket_key = upload_image_to_bucket_and_get_url(
-                            image_path=image_url,
+                            image_path=resolve_image_url(image_url) or image_url,
                             product_id=mpd_product_id,
                             producer_color_name=producer_color_name,
                             image_number=idx
