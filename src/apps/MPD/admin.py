@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 import json
 import logging
 from .models import Brands, Collection, Products, Sizes, Sources, ProductVariants, ProductSet, ProductSetItem, StockAndPrices, StockHistory, Colors, ProductVariantsRetailPrice, ProductvariantsSources, Paths, ProductPaths, FullChangeFile, Attributes, ProductAttribute, ProductImage, ProductSeries, Seasons, Categories, Vat, Units, FabricComponent, ProductFabric
+from .vat import resolve_vat_id
 from matterhorn1.defs_db import resolve_image_url
 import decimal
 # Register your models here.
@@ -394,8 +395,7 @@ class ProductsAdmin(admin.ModelAdmin):
                     try:
                         retail_price = decimal.Decimal(
                             value) if value.strip() else None
-                        vat = decimal.Decimal(
-                            vat_value) if vat_value else decimal.Decimal('1')
+                        vat = resolve_vat_id(vat_value)
                         currency = currency_value if currency_value else 'PLN'
                         for variant_id in variant_ids:
                             # Sprawdź czy wariant istnieje w tabeli product_variants

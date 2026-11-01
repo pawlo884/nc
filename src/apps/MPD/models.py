@@ -122,7 +122,7 @@ class Products(models.Model):
     description = models.TextField(blank=True, null=True)
     short_description = models.CharField(max_length=500, blank=True, null=True)
     brand = models.ForeignKey(
-        Brands, on_delete=models.CASCADE, db_column='brand_id', to_field='id', null=True, blank=True)
+        Brands, on_delete=models.PROTECT, db_column='brand_id', to_field='id', null=True, blank=True)
     collection = models.ForeignKey(
         'Collection', on_delete=models.SET_NULL, db_column='collection_id', null=True, blank=True,
         related_name='products', verbose_name='Kolekcja')
@@ -131,7 +131,7 @@ class Products(models.Model):
     series = models.ForeignKey('ProductSeries', db_column='series_id',
                                on_delete=models.SET_NULL, blank=True, null=True)
     unit = models.ForeignKey(
-        'Units', on_delete=models.CASCADE, db_column='unit', to_field='unit_id', null=True, blank=True)
+        'Units', on_delete=models.PROTECT, db_column='unit', to_field='unit_id', null=True, blank=True)
     season = models.ForeignKey(
         'Seasons', on_delete=models.SET_NULL, db_column='season_id', null=True, blank=True,
         related_name='products', verbose_name='Sezon')
@@ -244,7 +244,7 @@ class ProductVariants(models.Model):
     producer_color = models.ForeignKey(
         Colors, on_delete=models.SET_NULL, db_column='producer_color_id', null=True, blank=True, related_name='producer_variants')
     size = models.ForeignKey(
-        Sizes, on_delete=models.CASCADE, db_column='size_id', null=True, blank=True)
+        Sizes, on_delete=models.PROTECT, db_column='size_id', null=True, blank=True)
     exported_to_iai = models.BooleanField(
         default=False, verbose_name='Wyeksportowany do IAI')
     presta_combination_id = models.IntegerField(
@@ -339,7 +339,9 @@ class ProductImage(models.Model):
     # Oryginalny URL w hurtowni – do dedupu przy ponownym imporcie
     # (re-upload do bucketa generuje nowe klucze, więc file_path nie wystarcza).
     origin_url = models.CharField(max_length=1000, blank=True, null=True)
-    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    # auto_now: eksport przyrostowy (export_to_xml) filtruje po tej dacie, więc
+    # musi się zmieniać przy każdym zapisie (np. przepięcie zdjęcia do koloru).
+    updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     objects = models.Manager()
 
     class Meta:
