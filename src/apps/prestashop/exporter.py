@@ -40,8 +40,11 @@ SHOP_ID = 1
 
 
 def _variant_reference(variant: ProductVariants) -> str:
-    """Kod producenta/EAN wariantu - fallback ean->gtin14->gtin13->producer_code->other,
+    """Kod wariantu: najpierw kanoniczny ProductVariants.ean (MPD/ean.py),
+    potem fallback z hurtowni ean->gtin14->gtin13->producer_code->other,
     identycznie jak w export_to_xml.py (żeby oba kanały zgadzały się w SKU)."""
+    if getattr(variant, 'ean', None):
+        return variant.ean
     source = ProductvariantsSources.objects.using(
         'MPD').filter(variant=variant).first()
     if not source:

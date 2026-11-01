@@ -295,6 +295,21 @@ def update_retail_price_timestamp(sender, instance, using, **kwargs):
         instance.updated_at = timezone.now()
 
 
+@receiver(post_save, sender=ProductvariantsSources)
+def set_canonical_variant_ean(sender, instance, using, **kwargs):
+    """Po zapisaniu kodów z hurtowni uzupełnia ProductVariants.ean, jeśli pusty."""
+    if instance.variant_id is None:
+        return
+    from .ean import clean_gtin, ensure_variant_ean
+    from .ean import SOURCE_CODE_FIELDS
+    if not any(clean_gtin(getattr(instance, f, None)) for f in SOURCE_CODE_FIELDS):
+        return
+    try:
+        ensure_variant_ean(instance.variant_id, using)
+    except Exception:  # nie blokuj importu z powodu EAN-u
+        logger.exception('Nie udało się ustawić EAN wariantu %s', instance.variant_id)
+
+
 # Task linkowania wariantów po EAN: sygnał na Products (created=True) + on_commit; Matterhorn jawnie na koniec create_mpd_variants.
 
 

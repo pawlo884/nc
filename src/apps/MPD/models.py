@@ -249,6 +249,13 @@ class ProductVariants(models.Model):
         default=False, verbose_name='Wyeksportowany do IAI')
     presta_combination_id = models.IntegerField(
         blank=True, null=True, verbose_name='ID combination w PrestaShop')
+    # Kanoniczny EAN/GTIN wariantu (jeden na wariant, niezależnie od hurtowni).
+    # Wypełniany z ProductvariantsSources regułą z MPD/ean.py; bez unique, bo
+    # w bazie są jeszcze duplikaty produktów między hurtowniami (#182) —
+    # raport: manage.py mpd_ean --report.
+    ean = models.CharField(
+        max_length=14, blank=True, null=True, db_index=True,
+        verbose_name='EAN (kanoniczny)')
     updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     objects = models.Manager()
 
