@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.47.0](https://github.com/pawlo884/nc/compare/v1.46.1...v1.47.0) (2026-11-01)
+
+### Features
+
+* **MPD:** kanoniczny EAN na wariancie (ProductVariants.ean) ([#302](https://github.com/pawlo884/nc/issues/302)) ([44f6ff0](https://github.com/pawlo884/nc/commit/44f6ff0f090a9e5ceda123133a22244a122b1f40)), closes [#188](https://github.com/pawlo884/nc/issues/188), references [#182](https://github.com/pawlo884/nc/issues/182)
+
 ## [1.46.1](https://github.com/pawlo884/nc/compare/v1.46.0...v1.46.1) (2026-11-01)
 
 ### Bug Fixes
