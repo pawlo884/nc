@@ -1302,12 +1302,12 @@ class AttributesAdmin(admin.ModelAdmin):
 @admin.register(ProductVariants)
 class ProductVariantsAdmin(admin.ModelAdmin):
     list_display = ['variant_id', 'product', 'color', 'producer_color',
-                    'size', 'updated_at']
+                    'size', 'ean', 'updated_at']
     list_filter = ['color', 'producer_color', 'size', 'updated_at']
-    search_fields = ['variant_id', 'product__name']
+    search_fields = ['variant_id', 'product__name', '=ean']
     raw_id_fields = ['product', 'color', 'producer_color', 'size']
     readonly_fields = ['variant_id', 'updated_at']
-    fields = ['product', 'color', 'producer_color', 'size',
+    fields = ['product', 'color', 'producer_color', 'size', 'ean',
               'exported_to_iai']
     show_full_result_count = False
     list_per_page = 50
