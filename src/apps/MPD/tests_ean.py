@@ -5,7 +5,9 @@ from types import SimpleNamespace
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 
-from MPD.ean import clean_gtin, ensure_variant_ean, pick_canonical_ean
+from MPD.ean import (
+    clean_gtin, ensure_variant_ean, pick_canonical_ean, variant_code_producer,
+)
 from MPD.models import Products, ProductVariants, ProductvariantsSources, Sources
 
 
@@ -125,3 +127,36 @@ class MpdEanCommandTest(TestCase):
         self.assertIn(f'{self.p1.pk};Stanik z Tabu', lines[1])
         self.assertIn(f'{self.p2.pk};Stanik z Mady', lines[1])
 
+
+class VariantCodeProducerTest(TestCase):
+    """Wspólny code_producer dla IOF XML i PrestaShop."""
+    databases = {'default', 'MPD'}
+
+    def setUp(self):
+        objs = lambda m: m.objects.using('MPD')  # noqa: E731
+        self.s1 = objs(Sources).create(name='Hurtownia A')
+        self.s2 = objs(Sources).create(name='Hurtownia B')
+        self.variant = objs(ProductVariants).create(
+            product=objs(Products).create(name='P'))
+
+    def _sources(self, *rows):
+        # bulk_create: bez sygnału, kanoniczny EAN zostaje pusty
+        ProductvariantsSources.objects.using('MPD').bulk_create(
+            [ProductvariantsSources(variant=self.variant, **r) for r in rows])
+
+    def test_canonical_ean_wins(self):
+        self._sources({'source': self.s1, 'ean': '5900000000001'})
+        ProductVariants.objects.using('MPD').filter(pk=self.variant.pk).update(
+            ean='5000000000000')
+        self.variant.refresh_from_db(using='MPD')
+        self.assertEqual(variant_code_producer(self.variant), '5000000000000')
+
+    def test_fallback_to_first_source_fields(self):
+        self._sources(
+            {'source': self.s2, 'ean': '5900000000002'},
+            {'source': self.s1, 'producer_code': 'ABC-1'},
+        )
+        self.assertEqual(variant_code_producer(self.variant), 'ABC-1')
+
+    def test_empty_without_sources(self):
+        self.assertEqual(variant_code_producer(self.variant), '')

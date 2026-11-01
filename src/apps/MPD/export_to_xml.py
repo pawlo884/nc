@@ -8,6 +8,7 @@ from datetime import datetime
 from django.utils import timezone
 from .models import Sources
 from .vat import vat_rate as vat_rate_from_db
+from .ean import variant_code_producer
 
 """
 Eksporter XML dla systemu MPD
@@ -383,23 +384,8 @@ class FullXMLExporter(BaseXMLExporter):
                     panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
                     # code_external: product_id-variant_id (variant_id jest unikalny dla każdego wariantu)
                     code_external = f'{product.id}-{variant.variant_id}'
-                    # code_producer: z tabeli product_variants_sources (ean, gtin14, gtin13, producer_code, other)
-                    from .models import ProductvariantsSources
-                    variant_source = ProductvariantsSources.objects.using(
-                        'MPD').filter(variant=variant).first()
-                    code_producer = ''
-                    if variant_source:
-                        # Sprawdź kolejno: ean, gtin14, gtin13, other
-                        if variant_source.ean:
-                            code_producer = variant_source.ean
-                        elif variant_source.gtin14:
-                            code_producer = variant_source.gtin14
-                        elif variant_source.gtin13:
-                            code_producer = variant_source.gtin13
-                        elif getattr(variant_source, 'producer_code', None):
-                            code_producer = variant_source.producer_code
-                        elif variant_source.other:
-                            code_producer = variant_source.other
+                    # code_producer: kanoniczny EAN wariantu, fallback na źródła (MPD/ean.py)
+                    code_producer = variant_code_producer(variant)
 
                     # Buduj atrybuty do węzła <size>
                     size_id = variant.size.iai_size_id if variant.size and variant.size.iai_size_id else ''
@@ -762,25 +748,8 @@ class LightXMLExporter(BaseXMLExporter):
                     # code_external: product_id-variant_id (identycznie jak w FullXMLExporter)
                     code_external = f'{product.id}-{variant.variant_id}'
 
-                    # Pobierz kod producenta - identycznie jak w FullXMLExporter
-                    code_producer = ""
-                    try:
-                        variant_source = ProductvariantsSources.objects.using('MPD').filter(
-                            variant=variant
-                        ).first()
-                        if variant_source:
-                            if variant_source.ean:
-                                code_producer = variant_source.ean
-                            elif variant_source.gtin14:
-                                code_producer = variant_source.gtin14
-                            elif variant_source.gtin13:
-                                code_producer = variant_source.gtin13
-                            elif getattr(variant_source, 'producer_code', None):
-                                code_producer = variant_source.producer_code
-                            elif variant_source.other:
-                                code_producer = variant_source.other
-                    except Exception:
-                        pass
+                    # Kod producenta - ta sama reguła co FullXMLExporter i PrestaShop
+                    code_producer = variant_code_producer(variant)
 
                     # Buduj atrybuty rozmiaru - tylko wymagane
                     size_attrs = []
@@ -1027,24 +996,7 @@ class LightXMLExporter(BaseXMLExporter):
                     code_external = f'{product.id}-{variant.variant_id}'
 
                     # Pobierz kod producenta
-                    code_producer = ""
-                    try:
-                        variant_source = ProductvariantsSources.objects.using('MPD').filter(
-                            variant=variant
-                        ).first()
-                        if variant_source:
-                            if variant_source.ean:
-                                code_producer = variant_source.ean
-                            elif variant_source.gtin14:
-                                code_producer = variant_source.gtin14
-                            elif variant_source.gtin13:
-                                code_producer = variant_source.gtin13
-                            elif getattr(variant_source, 'producer_code', None):
-                                code_producer = variant_source.producer_code
-                            elif variant_source.other:
-                                code_producer = variant_source.other
-                    except Exception:
-                        pass
+                    code_producer = variant_code_producer(variant)
 
                     # Buduj atrybuty rozmiaru
                     size_attrs = []
@@ -2305,22 +2257,8 @@ class FullChangeXMLExporter(BaseXMLExporter):
                     panel_name = f'{size_name}_{group_name}' if size_name and group_name else size_name or group_name
                     # code_external: product_id-variant_id (variant_id jest unikalny dla każdego wariantu)
                     code_external = f'{product.id}-{variant.variant_id}'
-                    # code_producer: z tabeli product_variants_sources (ean, gtin14, gtin13, producer_code, other)
-                    from .models import ProductvariantsSources
-                    variant_source = ProductvariantsSources.objects.using(
-                        'MPD').filter(variant=variant).first()
-                    code_producer = ''
-                    if variant_source:
-                        if variant_source.ean:
-                            code_producer = variant_source.ean
-                        elif variant_source.gtin14:
-                            code_producer = variant_source.gtin14
-                        elif variant_source.gtin13:
-                            code_producer = variant_source.gtin13
-                        elif getattr(variant_source, 'producer_code', None):
-                            code_producer = variant_source.producer_code
-                        elif variant_source.other:
-                            code_producer = variant_source.other
+                    # code_producer: kanoniczny EAN wariantu, fallback na źródła (MPD/ean.py)
+                    code_producer = variant_code_producer(variant)
 
                     # Buduj atrybuty do węzła <size>
                     size_id = variant.size.iai_size_id if variant.size and variant.size.iai_size_id else ''
