@@ -30,6 +30,9 @@ class TabuSagaTest(TestCase):
     databases = '__all__'
 
     def setUp(self):
+        # Słownik kolorów głównych żyje w MPD (MPD/colors.py) – import go nie rozszerza.
+        from MPD.models import Colors
+        self.mpd_czerwony = Colors.objects.using(_mpd_db()).create(name='Czerwony')
         mpd_db = _mpd_db()
         tabu_db = _tabu_db()
 
@@ -98,6 +101,38 @@ class TabuSagaTest(TestCase):
         )
         self.assertEqual([s.step_name for s in steps], ['create_mpd', 'update_tabu_mapping'])
         self.assertTrue(all(s.status == 'completed' for s in steps))
+
+    def test_saga_fails_when_source_color_not_in_mpd(self):
+        """Kolor hurtowni bez odpowiednika w MPD i bez wyboru w formularzu = błąd, nic nie powstaje."""
+        from MPD.models import Colors
+        mpd_db = _mpd_db()
+        self.mpd_czerwony.delete(using=mpd_db)
+        colors_before = Colors.objects.using(mpd_db).count()
+        products_before = Products.objects.using(mpd_db).count()
+
+        result = create_mpd_product_from_tabu(self.tabu_product.pk, form_data={})
+
+        self.assertFalse(result['success'])
+        self.assertIn('Czerwony', result.get('error_message', ''))
+        self.assertEqual(Colors.objects.using(mpd_db).count(), colors_before)
+        self.assertEqual(Products.objects.using(mpd_db).count(), products_before)
+
+    def test_saga_uses_form_main_color_and_producer_color(self):
+        from MPD.models import Colors, ProductVariants
+        mpd_db = _mpd_db()
+        czarny = Colors.objects.using(mpd_db).create(name='Czarny saga')
+
+        result = create_mpd_product_from_tabu(
+            self.tabu_product.pk,
+            form_data={'main_color_id': str(czarny.id), 'producer_color_name': 'Nero saga'},
+        )
+
+        self.assertTrue(result['success'], result.get('error_message'))
+        pv = ProductVariants.objects.using(mpd_db).select_related('producer_color').get(
+            product_id=result['mpd_product_id'])
+        self.assertEqual(pv.color_id, czarny.id)
+        self.assertEqual(pv.producer_color.name, 'Nero saga')
+        self.assertEqual(pv.producer_color.parent_id, czarny.id)
 
     def test_saga_compensation_when_step2_fails(self):
         """Gdy krok 2 (zapis w Tabu) rzuci błąd, kompensacja usuwa produkt z MPD."""

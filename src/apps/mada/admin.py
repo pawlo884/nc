@@ -14,6 +14,7 @@ from .models import (
     StockHistory, Saga, SagaStep,
 )
 from core.db_routers import _get_mada_db, _get_mpd_db
+from MPD.colors import ColorResolutionError
 from core.wholesaler_admin import (
     make_scoped_filter, render_product_thumbnail, fuzzy_suggest_mpd_products,
     build_mpd_change_context, ReadOnlyLogAdminMixin,
@@ -233,6 +234,8 @@ class MadaProductAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
                         source_color=source_color,
                     )
                     logger.info("Wynik dodawania wariantów Mada→MPD: %s", mapping_info)
+                except ColorResolutionError as e:
+                    mapping_info = {'error': str(e)}
                 except Exception as e:
                     logger.exception("Błąd podczas dodawania wariantów Mada→MPD: %s", e)
                     mapping_info = {'error': 'Wystąpił błąd'}

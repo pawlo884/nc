@@ -38,11 +38,11 @@ def _saga_create_mpd_tabu(
         return [val]
 
     from tabu.models import TabuProduct
+    from MPD.colors import resolve_variant_colors
     from MPD.models import (
         Products,
         Brands,
         ProductVariants,
-        Colors,
         Sizes,
         Sources,
         ProductPaths,
@@ -135,22 +135,17 @@ def _saga_create_mpd_tabu(
 
         main_color_id = form_data.get('main_color_id')
         producer_color_name = _post('producer_color_name').strip()
-        main_color = None
-        if main_color_id is not None and str(main_color_id).isdigit():
-            try:
-                main_color = Colors.objects.using(mpd_db).get(id=int(main_color_id))
-            except Colors.DoesNotExist:
-                pass
+
+        def _variant_colors(source_color_name):
+            # Wspólna reguła kolorów MPD dla wszystkich hurtowni (MPD/colors.py)
+            return resolve_variant_colors(
+                main_color_id=main_color_id,
+                producer_color_name=producer_color_name,
+                source_color_name=source_color_name,
+                using=mpd_db,
+            )
 
         producer_color = None
-        if producer_color_name:
-            # Lookup po samej nazwie (colors.name jest UNIQUE) – parent_id tylko w
-            # defaults, analogicznie do Matterhorn, żeby nie wywalić się na
-            # colors_name_key gdy kolor już istnieje z innym parentem.
-            producer_color, _ = Colors.objects.using(mpd_db).get_or_create(
-                name=producer_color_name[:50],
-                defaults={'parent_id': main_color.id if main_color else None},
-            )
 
         tabu_source, _ = Sources.objects.using(mpd_db).get_or_create(
             name='Tabu API',
@@ -168,20 +163,16 @@ def _saga_create_mpd_tabu(
                 if (v.color or '').strip().casefold() == source_color.casefold()
             ]
         for v in variants:
-            color_obj = main_color if main_color else None
-            if not color_obj and v.color:
-                color_obj, _ = Colors.objects.using(mpd_db).get_or_create(
-                    name=v.color[:50],
-                    defaults={'name': v.color[:50]},
-                )
+            colors = _variant_colors(v.color)
+            producer_color = colors.producer_color
             size_obj = None
             if v.size:
                 size_obj = Sizes.objects.using(mpd_db).filter(name=v.size[:255]).first()
 
             pv = ProductVariants.objects.using(mpd_db).create(
                 product=mpd_product,
-                color=color_obj,
-                producer_color=producer_color,
+                color=colors.color,
+                producer_color=colors.producer_color,
                 size=size_obj,
             )
 
@@ -209,10 +200,12 @@ def _saga_create_mpd_tabu(
             variant_mapping.append((v.pk, pv.variant_id))
 
         if not variants:
+            colors = _variant_colors(source_color or None)
+            producer_color = colors.producer_color
             pv = ProductVariants.objects.using(mpd_db).create(
                 product=mpd_product,
-                color=main_color,
-                producer_color=producer_color,
+                color=colors.color,
+                producer_color=colors.producer_color,
             )
             ProductvariantsSources.objects.using(mpd_db).get_or_create(
                 variant=pv,
@@ -422,8 +415,8 @@ def create_mpd_variants_from_tabu(
     from django.db import connections
     from django.utils import timezone
     from tabu.models import TabuProduct, TabuProductVariant
+    from MPD.colors import resolve_variant_colors
     from MPD.models import (
-        Colors,
         ProductVariants,
         ProductvariantsSources,
         Sizes,
@@ -447,54 +440,15 @@ def create_mpd_variants_from_tabu(
         logger.warning("Brak wariantów Tabu dla produktu %s (source_color=%r)", tabu_product_id, source_color)
         return {"created_variants": 0, "variant_ids": []}
 
-    # Główny kolor: z formularza (main_color_id) albo z produktu MPD / Tabu
-    color_id = None
-    producer_color_id = None
-    if main_color_id:
-        main_color_obj = Colors.objects.using(mpd_db).filter(pk=main_color_id).first()
-        if main_color_obj:
-            color_id = main_color_obj.id
-            logger.info("Użyto głównego koloru z formularza: %s (id=%s)", main_color_obj.name, color_id)
-
-    if color_id is None:
-        first_mpd = (
-            ProductVariants.objects.using(mpd_db)
-            .filter(product_id=mpd_product_id)
-            .select_related("color", "producer_color")
-            .first()
-        )
-        tabu_color_name = (tabu_variants[0].color or (tabu_product.brand.name if tabu_product.brand else "Brak koloru")).strip() or "Brak koloru"
-        tabu_producer_name = (producer_color_name or "").strip()[:50] if producer_color_name else ""
-        if first_mpd and first_mpd.color and (first_mpd.color.name or "").strip() == tabu_color_name:
-            if tabu_producer_name:
-                if first_mpd.producer_color and (first_mpd.producer_color.name or "").strip() == tabu_producer_name:
-                    color_id = first_mpd.color_id
-                    producer_color_id = first_mpd.producer_color_id
-                    logger.info("Ten sam kolor i kolor producenta – dopisuję tylko warianty (color_id=%s, producer_color_id=%s)", color_id, producer_color_id)
-            else:
-                color_id = first_mpd.color_id
-                producer_color_id = first_mpd.producer_color_id
-                logger.info("Ten sam kolor – dopisuję tylko warianty (color_id=%s)", color_id)
-
-    if color_id is None:
-        tabu_color_name = (tabu_variants[0].color or (tabu_product.brand.name if tabu_product.brand else "Brak koloru")).strip() or "Brak koloru"
-        color = Colors.objects.using(mpd_db).filter(name=tabu_color_name).first()
-        if not color:
-            color = Colors.objects.using(mpd_db).create(name=tabu_color_name)
-        color_id = color.id
-
-    if producer_color_id is None and producer_color_name:
-        name_key = producer_color_name.strip()[:50]
-        defaults = {"hex_code": ""}
-        if main_color_id:
-            parent_color = Colors.objects.using(mpd_db).filter(pk=main_color_id).first()
-            if parent_color:
-                defaults["parent_id"] = parent_color
-        producer_color, _ = Colors.objects.using(mpd_db).get_or_create(
-            name=name_key,
-            defaults=defaults,
-        )
-        producer_color_id = producer_color.id
+    # Kolory: wspólna reguła MPD dla wszystkich hurtowni (MPD/colors.py)
+    colors = resolve_variant_colors(
+        main_color_id=main_color_id,
+        producer_color_name=producer_color_name,
+        source_color_name=(source_color or tabu_variants[0].color),
+        using=mpd_db,
+    )
+    color_id = colors.color.id
+    producer_color_id = colors.producer_color.id if colors.producer_color else None
 
     tabu_source = Sources.objects.using(mpd_db).filter(name__icontains="Tabu").first()
     if not tabu_source:
@@ -639,7 +593,7 @@ def upload_tabu_images_to_mpd(
         # Jawne przypisanie do koloru (grupowanie po producer_color_id, nie heurystyka
         # po nazwie pliku). colors.name UNIQUE → lookup deterministyczny.
         producer_color_obj = (
-            Colors.objects.using(mpd_db).filter(name=producer_color).first()
+            Colors.objects.using(mpd_db).filter(name__iexact=producer_color).first()
             if producer_color else None
         )
         uploaded_count = 0

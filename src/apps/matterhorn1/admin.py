@@ -484,46 +484,31 @@ class ProductAdmin(admin.ModelAdmin):
                     if not main_color_id:
                         return JsonResponse({'success': False, 'error': 'Brak głównego koloru'})
 
+                    # Wspólna reguła kolorów MPD (MPD/colors.py) – jak przy imporcie.
+                    from MPD.colors import ColorResolutionError, resolve_variant_colors
+                    with connections['matterhorn1'].cursor() as matterhorn_cursor:
+                        matterhorn_cursor.execute(
+                            "SELECT color FROM product WHERE id = %s", [product_id])
+                        color_result = matterhorn_cursor.fetchone()
+                    try:
+                        colors = resolve_variant_colors(
+                            main_color_id=main_color_id,
+                            producer_color_name=producer_color_name,
+                            source_color_name=color_result[0] if color_result else None,
+                            using='MPD',
+                        )
+                    except ColorResolutionError as e:
+                        return JsonResponse({'success': False, 'error': str(e)})
+                    if colors.producer_color is None:
+                        return JsonResponse({'success': False, 'error': 'Brak nazwy koloru producenta'})
+
                     with connections['MPD'].cursor() as cursor:
-                        # Pobierz kolor aktualnego produktu z matterhorn1
-                        with connections['matterhorn1'].cursor() as matterhorn_cursor:
-                            matterhorn_cursor.execute(
-                                "SELECT color FROM product WHERE id = %s", [product_id])
-                            color_result = matterhorn_cursor.fetchone()
-                            if not color_result:
-                                return JsonResponse({'success': False, 'error': 'Brak koloru dla produktu'})
-                            product_color = color_result[0]
-
-                        # Pobierz ID koloru w MPD
-                        cursor.execute(
-                            "SELECT id FROM colors WHERE name = %s", [product_color])
-                        color_row = cursor.fetchone()
-                        if not color_row:
-                            return JsonResponse({'success': False, 'error': f'Brak koloru {product_color} w bazie MPD'})
-                        color_id = color_row[0]
-
-                        # Sprawdź czy kolor producenta już istnieje
-                        cursor.execute("SELECT id FROM colors WHERE name = %s AND parent_id = %s",
-                                       [producer_color_name, color_id])
-                        pc_row = cursor.fetchone()
-                        if pc_row:
-                            producer_color_id = pc_row[0]
-                        else:
-                            # Utwórz nowy kolor producenta
-                            cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id",
-                                           [producer_color_name, color_id])
-                            row = cursor.fetchone()
-                            if row:
-                                producer_color_id = row[0]
-                            else:
-                                return JsonResponse({'success': False, 'error': 'Nie udało się utworzyć koloru producenta'})
-
-                        # Aktualizuj tylko warianty z tym samym color_id (tym samym kolorem produktu)
+                        # Aktualizuj tylko warianty z tym samym kolorem głównym
                         cursor.execute("""
                             UPDATE product_variants 
                             SET producer_color_id = %s, updated_at = NOW() 
                             WHERE product_id = %s AND color_id = %s
-                        """, [producer_color_id, product.mapped_product_uid, color_id])
+                        """, [colors.producer_color.id, product.mapped_product_uid, colors.color.id])
 
                         updated_count = cursor.rowcount
 
@@ -545,26 +530,7 @@ class ProductAdmin(admin.ModelAdmin):
                 producer_code = request.POST.get('producer_code')
                 producer_color_name = request.POST.get('producer_color_name')
                 main_color_id = request.POST.get('main_color_id')
-                producer_color_id = None
-
-                # Obsługa koloru producenta
-                if producer_color_name and main_color_id:
-                    with connections['MPD'].cursor() as cursor:
-                        # Sprawdź czy kolor o takiej nazwie już istnieje
-                        cursor.execute("SELECT id FROM colors WHERE name = %s", [
-                                       producer_color_name])
-                        pc_result = cursor.fetchone()
-                        if pc_result:
-                            producer_color_id = pc_result[0]
-                            logger.info(
-                                f"Użyto istniejącego koloru producenta: {producer_color_name} (id={producer_color_id})")
-                        else:
-                            # Jeśli nie istnieje, dodaj nowy kolor
-                            cursor.execute("INSERT INTO colors (name, parent_id) VALUES (%s, %s) RETURNING id",
-                                           [producer_color_name, main_color_id])
-                            producer_color_id = cursor.fetchone()[0]
-                            logger.info(
-                                f"Dodano nowy kolor producenta: {producer_color_name} (id={producer_color_id})")
+                # Kolor producenta tworzy create_mpd_variants (MPD/colors.py).
 
                 # Zaktualizuj mapped_product_uid i is_mapped
                 with connections['matterhorn1'].cursor() as cursor:
@@ -594,6 +560,7 @@ class ProductAdmin(admin.ModelAdmin):
                 mapping_info = {}
                 if size_category:
                     # Dodaj warianty do MPD
+                    from MPD.colors import ColorResolutionError
                     from .saga_variants import create_mpd_variants
                     try:
                         mapping_info = create_mpd_variants(
@@ -602,6 +569,8 @@ class ProductAdmin(admin.ModelAdmin):
                         )
                         logger.info(
                             f"Wynik dodawania wariantów: {mapping_info}")
+                    except ColorResolutionError as e:
+                        mapping_info = {'error': str(e)}
                     except Exception as e:
                         logger.error(f"Błąd podczas dodawania wariantów: {e}")
                         mapping_info = {'error': 'Błąd mapowania wariantów'}
@@ -1041,14 +1010,15 @@ class ProductAdmin(admin.ModelAdmin):
             name__icontains='matterhorn'
         ).first()
 
+        # Kolor główny wg wspólnej reguły MPD (MPD/colors.py) – nie tworzymy
+        # kolorów ze słownika hurtowni.
+        from MPD.colors import get_main_color
+        color_id = get_main_color(None, product.color, using=mpd_db).id
+
         with connections[mpd_db].cursor() as cursor:
             for variant in product.variants.all():
                 # Znajdź lub utwórz rozmiar
                 size_id = self._get_or_create_size(variant.name, mpd_db)
-
-                # Znajdź lub utwórz kolor
-                color_id = self._get_or_create_color(
-                    product.color or 'Brak koloru', mpd_db)
 
                 # Utwórz wariant w MPD (producer_code tylko w product_variants_sources)
                 cursor.execute("""
@@ -1101,23 +1071,6 @@ class ProductAdmin(admin.ModelAdmin):
                     VALUES (%s, %s, %s)
                     RETURNING id
                 """, [size_name, 'default', size_name.lower()])
-                return cursor.fetchone()[0]
-
-    def _get_or_create_color(self, color_name, mpd_db='MPD'):
-        """Pobierz lub utwórz kolor w MPD"""
-        with connections[mpd_db].cursor() as cursor:
-            cursor.execute(
-                "SELECT id FROM colors WHERE name = %s", [color_name])
-            result = cursor.fetchone()
-
-            if result:
-                return result[0]
-            else:
-                cursor.execute("""
-                    INSERT INTO colors (name)
-                    VALUES (%s)
-                    RETURNING id
-                """, [color_name])
                 return cursor.fetchone()[0]
 
     def _upload_image_to_bucket(self, image_url, product_id, color_name=None, image_number=1):
@@ -1252,17 +1205,15 @@ class ProductAdmin(admin.ModelAdmin):
                         f"[add_new_variants_to_mpd] Produkt {product_id} ma cenę {product_price} - pomijam dodawanie wariantów")
                     return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': False, 'total': 0, 'error': 'Cena produktu wynosi 0'}
 
-                # Pobierz ID koloru w MPD
-                mpd_cursor.execute(
-                    "SELECT id FROM colors WHERE name = %s", [product_color])
-                color_result = mpd_cursor.fetchone()
-                if not color_result:
+                # Kolor główny wg wspólnej reguły MPD (MPD/colors.py)
+                from MPD.colors import ColorResolutionError, get_main_color
+                try:
+                    color_id = get_main_color(None, product_color, using='MPD').id
+                except ColorResolutionError as e:
                     variant_logger.error(
-                        f"[add_new_variants_to_mpd] Brak koloru {product_color} w bazie MPD")
+                        f"[add_new_variants_to_mpd] {e}")
                     missing_colors = True
                     return {'added': 0, 'skipped_existing': 0, 'missing_sizes': [], 'missing_color': True, 'total': 0}
-
-                color_id = color_result[0]
                 variant_logger.info(
                     f"[add_new_variants_to_mpd] ID koloru w MPD: {color_id}")
 

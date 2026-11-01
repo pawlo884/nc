@@ -205,6 +205,50 @@ class CreateMpdVariantsTest(TestCase):
         ).first()
         self.assertEqual(pv.producer_color_id, beige.id)
 
+    def test_create_mpd_variants_form_main_color_wins_over_matterhorn_color(self):
+        """Wspólna reguła MPD: kolor główny z formularza ma pierwszeństwo przed kolorem hurtowni."""
+        mpd_db = _mpd_db()
+        czarny = Colors.objects.using(mpd_db).create(name='Czarny MH')
+
+        create_mpd_variants(
+            mpd_product_id=self.mpd_product.id,
+            matterhorn_product_id=self.mh_product.id,
+            size_category='test_category',
+            main_color_id=czarny.id,
+        )
+
+        colors = set(ProductVariants.objects.using(mpd_db).filter(
+            product_id=self.mpd_product.id).values_list('color_id', flat=True))
+        self.assertEqual(colors, {czarny.id})
+
+    def test_create_mpd_variants_matches_matterhorn_color_case_insensitive(self):
+        mpd_db = _mpd_db()
+        MhProduct.objects.using(_mh_db()).filter(pk=self.mh_product.pk).update(color='CZERWONY')
+
+        create_mpd_variants(
+            mpd_product_id=self.mpd_product.id,
+            matterhorn_product_id=self.mh_product.id,
+            size_category='test_category',
+        )
+
+        colors = set(ProductVariants.objects.using(mpd_db).filter(
+            product_id=self.mpd_product.id).values_list('color_id', flat=True))
+        self.assertEqual(colors, {self.mpd_color.id})
+
+    def test_create_mpd_variants_unknown_color_raises_without_creating(self):
+        from MPD.colors import ColorResolutionError
+        mpd_db = _mpd_db()
+        MhProduct.objects.using(_mh_db()).filter(pk=self.mh_product.pk).update(color='Fuksja')
+        before = Colors.objects.using(mpd_db).count()
+
+        with self.assertRaises(ColorResolutionError):
+            create_mpd_variants(
+                mpd_product_id=self.mpd_product.id,
+                matterhorn_product_id=self.mh_product.id,
+                size_category='test_category',
+            )
+        self.assertEqual(Colors.objects.using(mpd_db).count(), before)
+
     def test_create_mpd_variants_empty_variants_returns_zero(self):
         """Gdy produkt nie ma wariantów, zwraca created_variants=0"""
         mh_db, mpd_db = _mh_db(), _mpd_db()
