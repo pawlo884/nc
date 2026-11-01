@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.46.1](https://github.com/pawlo884/nc/compare/v1.46.0...v1.46.1) (2026-11-01)
+
+### Bug Fixes
+
+* **MPD:** PROTECT na słownikach, auto_now dla zdjęć, jedna reguła VAT ([#300](https://github.com/pawlo884/nc/issues/300)) ([cbf5dbf](https://github.com/pawlo884/nc/commit/cbf5dbf3820472088d5e9b967e4a2547dfc3d77e))
+
 ## [1.46.0](https://github.com/pawlo884/nc/compare/v1.45.0...v1.46.0) (2026-11-01)
 
 ### Features
