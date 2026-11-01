@@ -167,11 +167,28 @@ class MadaProductAdmin(RouterScopedQuerysetMixin, admin.ModelAdmin):
         from .services import create_mpd_product_from_mada
         result = create_mpd_product_from_mada(int(product_id), form_data)
         if result['success']:
+            if result.get('assigned_existing'):
+                message = (
+                    f'Ten produkt już jest w MPD (ID: {result["mpd_product_id"]}) – '
+                    f'przypisano go zamiast tworzyć duplikat. '
+                    f'Dopiętych wariantów: {result.get("created_variants", 0)}.'
+                )
+            else:
+                message = f'Utworzono produkt w MPD (ID: {result["mpd_product_id"]})'
             return JsonResponse({
                 'success': True,
-                'message': f'Utworzono produkt w MPD (ID: {result["mpd_product_id"]})',
+                'message': message,
                 'mpd_product_id': result['mpd_product_id'],
+                'assigned_existing': bool(result.get('assigned_existing')),
             })
+        if result.get('candidate_mpd_product_ids'):
+            ids = ', '.join(str(i) for i in result['candidate_mpd_product_ids'])
+            return JsonResponse({
+                'success': False,
+                'error': f'EAN pasuje do kilku produktów MPD ({ids}) – wybierz kolor '
+                         f'hurtowni albo przypisz produkt ręcznie.',
+                'candidate_mpd_product_ids': result['candidate_mpd_product_ids'],
+            }, status=409)
         status_code = 404 if (result.get('error_message') or '').find('nie istnieje') >= 0 else 400
         err = result.get('error_message') or ''
         safe = {
