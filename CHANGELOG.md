@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.46.0](https://github.com/pawlo884/nc/compare/v1.45.0...v1.46.0) (2026-11-01)
+
+### Features
+
+* **web_agent:** routuj modele OpenRouter per operacja (Faza 2, [#195](https://github.com/pawlo884/nc/issues/195)) ([#202](https://github.com/pawlo884/nc/issues/202)) ([5abef71](https://github.com/pawlo884/nc/commit/5abef713503f9414c70e4ae728baacc98470717c)), references [#201](https://github.com/pawlo884/nc/issues/201)
+
 ## [1.45.0](https://github.com/pawlo884/nc/compare/v1.44.23...v1.45.0) (2026-09-10)
 
 ### Features
