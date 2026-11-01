@@ -10,12 +10,8 @@ RUNNING_TESTS = 'test' in sys.argv or 'pytest' in sys.modules
 
 # Development rozszerza DATABASES z base.py o wersje z zzz_
 # Dodajemy bazy z przedrostkiem zzz_ (routery wybiorą je automatycznie)
-DATABASES['zzz_default'] = DATABASES['default'].copy()
-DATABASES['zzz_MPD'] = DATABASES['MPD'].copy()
-DATABASES['zzz_matterhorn1'] = DATABASES['matterhorn1'].copy()
-DATABASES['zzz_web_agent'] = DATABASES['web_agent'].copy()
-DATABASES['zzz_tabu'] = DATABASES['tabu'].copy()
-DATABASES['zzz_mada'] = DATABASES['mada'].copy()
+for _alias in list(DATABASES):
+    DATABASES[f'zzz_{_alias}'] = DATABASES[_alias].copy()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv(
