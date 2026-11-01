@@ -21,7 +21,7 @@ colorama==0.4.6
 comm==0.2.3
 coverage==7.16.2
 cron-descriptor==1.4.5
-decorator==5.2.1
+decorator==5.3.1
 distro==1.9.0
 Django==6.0.9
 django-storages==1.14.6
