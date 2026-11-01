@@ -192,16 +192,28 @@ TEMPLATES = [
 
 
 # Database
-# Base zawiera konfigurację produkcyjną (bez przedrostka zzz_)
-# Development (dev.py) nadpisuje na wersje z przedrostkiem zzz_
-DATABASES = {
-    'default': {
+# Base zawiera konfigurację produkcyjną (bez przedrostka zzz_).
+# Development (dev.py) dokłada kopie z przedrostkiem zzz_, prod.py je usuwa.
+# Każda baza ma te same ustawienia; różnią się tylko prefiksem zmiennych env
+# (<PREFIX>_DB_NAME/_USER/_PASSWORD/_HOST/_PORT).
+_DB_ALIASES = (
+    ('default', 'DEFAULT'),
+    ('MPD', 'MPD'),
+    ('matterhorn1', 'MATTERHORN1'),
+    ('web_agent', 'WEB_AGENT'),
+    ('tabu', 'TABU'),
+    ('mada', 'MADA'),
+)
+
+
+def _db_config(env_prefix):
+    return {
         'ENGINE': 'core.db_backend',
-        'NAME': os.getenv('DEFAULT_DB_NAME'),
-        'USER': os.getenv('DEFAULT_DB_USER'),
-        'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
-        'HOST': os.getenv('DEFAULT_DB_HOST'),
-        'PORT': os.getenv('DEFAULT_DB_PORT'),
+        'NAME': os.getenv(f'{env_prefix}_DB_NAME'),
+        'USER': os.getenv(f'{env_prefix}_DB_USER'),
+        'PASSWORD': os.getenv(f'{env_prefix}_DB_PASSWORD'),
+        'HOST': os.getenv(f'{env_prefix}_DB_HOST'),
+        'PORT': os.getenv(f'{env_prefix}_DB_PORT'),
         # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
         'CONN_MAX_AGE': 0,
         'OPTIONS': {
@@ -211,135 +223,11 @@ DATABASES = {
             'keepalives_interval': 10,  # Interval 10s
             'keepalives_count': 5,  # 5 prób
             'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-    'zzz_default': {
-        'ENGINE': 'core.db_backend',
-        'NAME': os.getenv('DEFAULT_DB_NAME'),
-        'USER': os.getenv('DEFAULT_DB_USER'),
-        'PASSWORD': os.getenv('DEFAULT_DB_PASSWORD'),
-        'HOST': os.getenv('DEFAULT_DB_HOST'),
-        'PORT': os.getenv('DEFAULT_DB_PORT'),
-        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
-            'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60,  # Keepalive co 60s
-            'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5,  # 5 prób
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-    'MPD': {
-        'ENGINE': 'core.db_backend',
-        'NAME': os.getenv('MPD_DB_NAME'),
-        'USER': os.getenv('MPD_DB_USER'),
-        'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
-        'HOST': os.getenv('MPD_DB_HOST'),
-        'PORT': os.getenv('MPD_DB_PORT'),
-        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
-            'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60,  # Keepalive co 60s
-            'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5,  # 5 prób
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-    'zzz_MPD': {
-        'ENGINE': 'core.db_backend',
-        'NAME': os.getenv('MPD_DB_NAME'),
-        'USER': os.getenv('MPD_DB_USER'),
-        'PASSWORD': os.getenv('MPD_DB_PASSWORD'),
-        'HOST': os.getenv('MPD_DB_HOST'),
-        'PORT': os.getenv('MPD_DB_PORT'),
-        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
-            'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60,  # Keepalive co 60s
-            'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5,  # 5 prób
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-    'matterhorn1': {
-        'ENGINE': 'core.db_backend',
-        'NAME': os.getenv('MATTERHORN1_DB_NAME'),
-        'USER': os.getenv('MATTERHORN1_DB_USER'),
-        'PASSWORD': os.getenv('MATTERHORN1_DB_PASSWORD'),
-        'HOST': os.getenv('MATTERHORN1_DB_HOST'),
-        'PORT': os.getenv('MATTERHORN1_DB_PORT'),
-        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
-            'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60,  # Keepalive co 60s
-            'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5,  # 5 prób
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-    'web_agent': {
-        'ENGINE': 'core.db_backend',
-        'NAME': os.getenv('WEB_AGENT_DB_NAME'),
-        'USER': os.getenv('WEB_AGENT_DB_USER'),
-        'PASSWORD': os.getenv('WEB_AGENT_DB_PASSWORD'),
-        'HOST': os.getenv('WEB_AGENT_DB_HOST'),
-        'PORT': os.getenv('WEB_AGENT_DB_PORT'),
-        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
-            'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60,  # Keepalive co 60s
-            'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5,  # 5 prób
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-    'tabu': {
-        'ENGINE': 'core.db_backend',
-        'NAME': os.getenv('TABU_DB_NAME'),
-        'USER': os.getenv('TABU_DB_USER'),
-        'PASSWORD': os.getenv('TABU_DB_PASSWORD'),
-        'HOST': os.getenv('TABU_DB_HOST'),
-        'PORT': os.getenv('TABU_DB_PORT'),
-        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
-            'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60,  # Keepalive co 60s
-            'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5,  # 5 prób
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-    'mada': {
-        'ENGINE': 'core.db_backend',
-        'NAME': os.getenv('MADA_DB_NAME'),
-        'USER': os.getenv('MADA_DB_USER'),
-        'PASSWORD': os.getenv('MADA_DB_PASSWORD'),
-        'HOST': os.getenv('MADA_DB_HOST'),
-        'PORT': os.getenv('MADA_DB_PORT'),
-        # Musi być 0 z powodu database routing - routery wymagają zamykania połączeń po każdym użyciu
-        'CONN_MAX_AGE': 0,
-        'OPTIONS': {
-            'connect_timeout': 30,  # Zwiększone do 30s dla zewnętrznych serwerów
-            'keepalives': 1,       # Włącz TCP keepalive
-            'keepalives_idle': 60,  # Keepalive co 60s
-            'keepalives_interval': 10,  # Interval 10s
-            'keepalives_count': 5,  # 5 prób
-            'options': '-c statement_timeout=300000 -c lock_timeout=300000'  # 5 minutes
-        }
-    },
-}
+        },
+    }
+
+
+DATABASES = {alias: _db_config(prefix) for alias, prefix in _DB_ALIASES}
 
 # Database routers
 DATABASE_ROUTERS = [
