@@ -132,6 +132,99 @@ class TestApplyStockUpdates:
         assert p.store_total == 50   # store_total z sumy po wszystkich porcjach
 
 
+class TestUjemnyStan:
+    """Ujemny `store` (np. -1 z API Tabu) nie może łamać `StockHistory`
+    (PositiveIntegerField) ani wywalać całej porcji."""
+
+    @pytest.fixture
+    def cmd(self):
+        return Command()
+
+    def test_ujemny_stan_w_bazie_do_zera_bez_historii(self, cmd):
+        # przypadek z produkcji: DB store=-1, API store=0 -> CheckViolation
+        p = factories.tabu_product(api_id=1100, store_total=0)
+        v = factories.tabu_variant(p, api_id=2100, store=-1)
+
+        hist, compared, changed, failed = cmd._apply_stock_updates([
+            factories.basic_record(product_api_id=1100, variant_api_id=2100, store=0)])
+
+        assert (hist, compared, failed) == (0, 1, 0)
+        v.refresh_from_db()
+        assert v.store == 0
+        assert StockHistory.objects.count() == 0
+
+    def test_ujemny_stan_w_bazie_wzrost_liczony_od_zera(self, cmd):
+        p = factories.tabu_product(api_id=1101)
+        factories.tabu_variant(p, api_id=2101, store=-1)
+
+        assert cmd._apply_stock_updates([
+            factories.basic_record(product_api_id=1101, variant_api_id=2101, store=3)
+        ])[0] == 1
+        h = StockHistory.objects.get(variant_api_id=2101)
+        assert (h.old_stock, h.new_stock, h.stock_change, h.change_type) == (0, 3, 3, "increase")
+
+    def test_ujemny_stan_z_api_zapisywany_jako_zero(self, cmd):
+        p = factories.tabu_product(api_id=1102, store_total=2)
+        v = factories.tabu_variant(p, api_id=2102, store=2)
+
+        cmd._apply_stock_updates([
+            factories.basic_record(product_api_id=1102, variant_api_id=2102, store=-1)])
+
+        v.refresh_from_db()
+        p.refresh_from_db()
+        assert v.store == 0
+        assert p.store_total == 0
+        h = StockHistory.objects.get(variant_api_id=2102)
+        assert (h.old_stock, h.new_stock, h.change_type) == (2, 0, "decrease")
+
+    def test_ujemny_wiersz_nie_blokuje_reszty_porcji(self, cmd):
+        p = factories.tabu_product(api_id=1103)
+        factories.tabu_variant(p, api_id=2103, store=-1)
+        ok = factories.tabu_variant(p, api_id=2104, store=5)
+
+        hist, compared, _, failed = cmd._apply_stock_updates([
+            factories.basic_record(product_api_id=1103, variant_api_id=2103, store=0),
+            factories.basic_record(product_api_id=1103, variant_api_id=2104, store=1),
+        ])
+
+        assert (hist, compared, failed) == (1, 2, 0)
+        ok.refresh_from_db()
+        assert ok.store == 1
+
+    def test_blad_historii_cofa_update_porcji(self, cmd, monkeypatch):
+        """UPDATE stanów i historia w jednej transakcji: gdy zapis historii
+        padnie, stany nie mogą zostać zmienione (inaczej kolejny run nie
+        widzi zmiany i historia przepada)."""
+        from django.db import IntegrityError
+        from django.db.models.query import QuerySet
+
+        p = factories.tabu_product(api_id=1104)
+        v = factories.tabu_variant(p, api_id=2105, store=5)
+
+        def boom(*a, **kw):
+            raise IntegrityError("symulowany błąd historii")
+
+        monkeypatch.setattr(QuerySet, "bulk_create", boom)
+        with pytest.raises(IntegrityError):
+            cmd._apply_stock_updates([
+                factories.basic_record(product_api_id=1104, variant_api_id=2105, store=1)])
+
+        v.refresh_from_db()
+        assert v.store == 5
+
+
+@pytest.mark.unit
+class TestParseStore:
+    def test_clamp(self):
+        from tabu.management.commands.base_tabu_api_command import parse_store
+        assert parse_store(-1) == 0
+        assert parse_store("-3") == 0
+        assert parse_store(None) == 0
+        assert parse_store("7") == 7
+        with pytest.raises(ValueError):
+            parse_store("abc")
+
+
 class TestSyncTabuStockCommand:
     """Pełny przebieg `call_command('sync_tabu_stock', ...)`."""
 

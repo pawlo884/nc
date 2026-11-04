@@ -22,6 +22,19 @@ from tabu.models import ApiSyncLog
 logger = logging.getLogger(__name__)
 
 
+def parse_store(value):
+    """Stan magazynowy z API Tabu -> int >= 0.
+
+    API Tabu potrafi zwrócić ujemny `store` (np. -1 przy wyprzedanym /
+    rezerwacji ponad stan). Dla nas ujemny stan = 0 sztuk do sprzedaży;
+    zapisanie -1 w `TabuProductVariant.store` psuło potem `StockHistory`
+    (`old_stock`/`new_stock` to PositiveIntegerField -> CheckViolation
+    wywalający cały batch) i trafiało jako ujemny stock do MPD.
+    Rzuca ValueError/TypeError dla wartości nieliczbowych.
+    """
+    return max(0, int(value or 0))
+
+
 class BaseTabuAPICommand(BaseCommand):
     """
     Bazowa klasa dla komend synchronizacji z API Tabu.
