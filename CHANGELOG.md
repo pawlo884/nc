@@ -1,5 +1,11 @@
 # Zmiany
 
+## [1.47.1](https://github.com/pawlo884/nc/compare/v1.47.0...v1.47.1) (2026-11-04)
+
+### Bug Fixes
+
+* **tabu:** ujemny stan z API nie wywala sync_tabu_stock ([#312](https://github.com/pawlo884/nc/issues/312)) ([737dd8c](https://github.com/pawlo884/nc/commit/737dd8c5214fc87b939d267242b0fbd0317f83bb))
+
 ## [1.47.0](https://github.com/pawlo884/nc/compare/v1.46.1...v1.47.0) (2026-11-01)
 
 ### Features
