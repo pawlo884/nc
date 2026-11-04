@@ -16,7 +16,7 @@ from django.utils import timezone
 
 from tabu.models import Brand, Category, TabuProduct, TabuProductImage, TabuProductVariant
 
-from .base_tabu_api_command import BaseTabuAPICommand
+from .base_tabu_api_command import BaseTabuAPICommand, parse_store
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def map_api_product_to_model(api_product):
     Zawiera: desc_long, desc_safety, groups, dictionaries, stores, gallery.
     """
     variants = api_product.get('variants') or []
-    store_total = sum(int(v.get('store') or 0) for v in variants)
+    store_total = sum(parse_store(v.get('store')) for v in variants)
     last_update = parse_datetime(api_product.get('last_update'))
 
     return {
@@ -117,7 +117,7 @@ def map_api_variant_to_model(api_variant, product):
         'vat_label': str(api_variant.get('vat') or '23%')[:20],
         'vat_id': int(api_variant.get('vat_id') or 1),
         'vat_value': Decimal(str(api_variant.get('vat_value') or 23)),
-        'store': int(api_variant.get('store') or 0),
+        'store': parse_store(api_variant.get('store')),
         'weight': Decimal(str(api_variant.get('weight') or 0)),
         'color': color[:100],
         'size': size[:50],

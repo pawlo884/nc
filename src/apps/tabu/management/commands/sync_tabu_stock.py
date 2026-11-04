@@ -10,12 +10,12 @@ import logging
 import time
 from decimal import Decimal, InvalidOperation
 
-from django.db import router
+from django.db import router, transaction
 from django.db.models import Sum
 
 from tabu.models import ApiSyncLog, StockHistory, TabuProduct, TabuProductVariant
 
-from .base_tabu_api_command import BaseTabuAPICommand
+from .base_tabu_api_command import BaseTabuAPICommand, parse_store
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +268,7 @@ class Command(BaseTabuAPICommand):
             try:
                 buf.append({
                     'variant_id': int(vid),
-                    'new_store': int(store or 0),
+                    'new_store': parse_store(store),
                     'price_net': self._parse_price(pn),
                     'price_gross': self._parse_price(pg),
                 })
@@ -304,7 +304,17 @@ class Command(BaseTabuAPICommand):
         return total_history, total_compared, total_history, fail_count
 
     def _apply_stock_chunk(self, db, parsed):
-        """Jedna porcja: zwraca (history_count, compared, affected_product_ids)."""
+        """Jedna porcja: zwraca (history_count, compared, affected_product_ids).
+
+        Całość w jednej transakcji: UPDATE wariantów i `bulk_create` historii
+        albo wchodzą razem, albo wcale. Wcześniej błąd przy zapisie historii
+        zostawiał już zaktualizowane `store`, więc kolejny run nie widział
+        zmiany i historia dla całej porcji przepadała.
+        """
+        with transaction.atomic(using=db):
+            return self._apply_stock_chunk_atomic(db, parsed)
+
+    def _apply_stock_chunk_atomic(self, db, parsed):
         variants_by_api = {
             v.api_id: v for v in
             TabuProductVariant.objects.using(db).select_related('product').filter(
@@ -322,6 +332,10 @@ class Command(BaseTabuAPICommand):
                 continue
             compared += 1
             old_store, new_store = v.store, p['new_store']
+            # Starsze runy mogły zapisać ujemny stan z API (np. -1) - w historii
+            # traktujemy go jak 0 (PositiveIntegerField), a -1 -> 0 to nie
+            # realna zmiana stanu, tylko korekta danych (bez wpisu w historii).
+            old_effective = max(0, old_store or 0)
 
             if old_store != new_store:
                 fields = {'store': new_store}
@@ -334,15 +348,17 @@ class Command(BaseTabuAPICommand):
                 if not changed:
                     continue  # inny run już złapał tę zmianę
                 affected_products.add(v.product_id)
+                if old_effective == new_store:
+                    continue
                 history_to_create.append(StockHistory(
                     variant_api_id=v.api_id,
                     product_api_id=v.product.api_id,
                     product_name=v.product.name,
                     variant_symbol=v.symbol,
-                    old_stock=old_store,
+                    old_stock=old_effective,
                     new_stock=new_store,
-                    stock_change=new_store - old_store,
-                    change_type='increase' if new_store > old_store else 'decrease',
+                    stock_change=new_store - old_effective,
+                    change_type='increase' if new_store > old_effective else 'decrease',
                 ))
             elif p['price_net'] is not None or p['price_gross'] is not None:
                 if p['price_net'] is not None:
@@ -397,7 +413,7 @@ class Command(BaseTabuAPICommand):
                 continue
             try:
                 vdb = TabuProductVariant.objects.using(db).select_related('product').get(api_id=int(vid))
-                new_s = int(r.get('store') or 0)
+                new_s = parse_store(r.get('store'))
                 self.stdout.write(
                     f'  variant_id={vid}: DB store={vdb.store}, API={new_s}, zmiana={vdb.store != new_s}'
                 )
